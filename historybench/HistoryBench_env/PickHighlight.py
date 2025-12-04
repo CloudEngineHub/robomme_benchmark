@@ -406,8 +406,8 @@ class PickHighlight(BaseEnv):
             highlight_obj(
                 self,
                 target_cubes[i],
-                start_step=20,
-                end_step=120,
+                start_step=10,
+                end_step=100,
                 cur_step=timestep,
             )
         obs, reward, terminated, truncated, info = super().step(action)

@@ -1368,7 +1368,7 @@ def solve_button(env, planner,obj,steps_press=None,interval=20,without_hold=Fals
         planner.move_to_pose_with_screw(sapien.Pose(p=ready_position,q=rotate))
     planner.close_gripper()
     steps=env.elapsed_steps.item()
-    print("press buuton at step",steps)
+    print("press button at step",steps)
     planner.move_to_pose_with_screw(sapien.Pose(p=position,q=rotate))
 
     planner.move_to_pose_with_screw(sapien.Pose(p=ready_position, q=rotate))

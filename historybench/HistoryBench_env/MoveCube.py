@@ -450,8 +450,8 @@ class MoveCube(BaseEnv):
         if self.way=="gripper_push":
             tasks = [{
                                 "func": lambda: is_obj_pushed_onto(self,self.cube,self.goal_site,distance_threshold=self.cube_half_size*2*1.2,must_gripper_open=True),
-                                "name": "Close gripper and push the cube to the target",
-                                "subgoal_segment":f"Close gripper and push the cube at <> to the target at <>",
+                                "name": "Close the gripper and push the cube to the target",
+                                "subgoal_segment":f"Close the gripper and push the cube at <> to the target at <>",
                                 "demonstration": True,
                                 "failure_func":  lambda: [is_obj_pickup(self, obj=self.cube),
                                                           is_obj_pickup(self, obj=self.grasp_target),
@@ -478,8 +478,8 @@ class MoveCube(BaseEnv):
                                 },
                                 {
                                 "func": lambda: is_obj_pushed_onto(self,self.cube,self.goal_site,distance_threshold=self.cube_half_size*2*1.2,must_gripper_open=True),
-                                "name": "Close gripper and push the cube to the target",
-                                "subgoal_segment":f"Close gripper and push the cube at <> to the target at <>",
+                                "name": "Close the gripper and push the cube to the target",
+                                "subgoal_segment":f"Close the gripper and push the cube at <> to the target at <>",
                                 "demonstration": False,
                                 "failure_func":  lambda: [is_obj_pickup(self, obj=self.cube),
                                                           is_obj_pickup(self, obj=self.grasp_target),

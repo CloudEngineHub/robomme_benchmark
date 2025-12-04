@@ -365,14 +365,14 @@ class SwingXtimes(BaseEnv):
                 "solve": lambda env, planner: solve_pickup(env, planner, obj=self.target_cube),
                 'segment':self.target_cube,
             })
-        
+
         ordinals = ["first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth", "ninth", "tenth"]
         for i in range(self.num_repeats):
             ordinal = ordinals[i] if i < len(ordinals) else f"{i+1}th"
             tasks.append({
                 "func": (lambda: is_obj_swing_onto(self,obj=self.target_cube,target=self.target_right,distance_threshold=0.03,z_threshold=0.12)),
                 "name": f"move to the top of the right-side target for the {ordinal} time",
-                "subgoal_segment":f"move to the top of the right-side target for the {ordinal} time at <>",
+                "subgoal_segment":f"move to the top of the right-side target at <> for the {ordinal} time",
                 "demonstration": False,
                 "failure_func": lambda:  [is_any_obj_pickup(self, self.non_target_cubes),is_button_pressed(self, obj=self.button),too_many_swings(self)],
                 "solve": lambda env, planner: [solve_swingonto_whenhold(env, planner,target=self.target_right,height=0.1),
@@ -382,7 +382,7 @@ class SwingXtimes(BaseEnv):
             tasks.append({
                 "func": (lambda: is_obj_swing_onto(self,obj=self.target_cube,target=self.target_left,distance_threshold=0.03,z_threshold=0.12)),
                 "name": f"move to the top of the left-side target for the {ordinal} time",
-                "subgoal_segment":f"move to the top of the left-side target for the {ordinal} time at <>",
+                "subgoal_segment":f"move to the top of the left-side target at <> for the {ordinal} time",
                 "demonstration": False,
                 "failure_func": lambda:  [is_any_obj_pickup(self, self.non_target_cubes),is_button_pressed(self, obj=self.button),too_many_swings(self)],
                 "solve": lambda env, planner: [solve_swingonto_whenhold(env, planner, target=self.target_left,height=0.1),

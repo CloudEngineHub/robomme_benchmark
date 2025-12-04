@@ -269,14 +269,14 @@ class StopCube(BaseEnv):
                                 },)
             tasks.append({
                         "func": lambda: is_obj_stopped_onto(self, obj=self.cube, target=self.target, stop=self.stop),
-                        "name": "press button to stop the cube",
-                        "subgoal_segment": "press button to stop the cube at <>",
+                        "name": "press the button to stop the cube on the target",
+                        "subgoal_segment": "press the button to stop the cube on the target at <>",
                         "demonstration": False,
                         "failure_func": lambda: None,
                         "solve": lambda env, planner: [solve_button(env, planner, obj=self.button,without_hold=True)
                                                        ],
 
-                        "segment":self.cap_link 
+                        "segment":self.target 
                         },
             )
 

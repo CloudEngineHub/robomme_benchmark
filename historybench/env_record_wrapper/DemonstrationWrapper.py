@@ -562,6 +562,7 @@ class DemonstrationWrapper(gym.Wrapper):
             self._doing_extra_step = True
             try:
                 # 复用完整 DemonstrationWrapper.step 流程（包含记录/可视化等）
+
                 self.step(action)
             finally:
                 self._doing_extra_step = False

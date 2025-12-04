@@ -57,7 +57,7 @@ def _parse_args():
         "--dataset-dir",
         type=str,
         #default=_PARENT,
-        default="/data/hongzefu/dataset_generate",
+        default="/data/hongzefu/dataset_demonstration",
         help="Directory that contains record_dataset_*.h5 files. Defaults to repository parent.",
     )
     parser.add_argument(
@@ -69,7 +69,7 @@ def _parse_args():
     parser.add_argument(  
         "--num-episodes",
         type=int,
-        default=-1,
+        default=10,
         help="Maximum number of episodes to replay for each environment. Use a negative value to replay all.",
     )
     parser.add_argument(
@@ -267,7 +267,7 @@ def _replay_episode(
                     _save_episode_video(episode_video_frames, env_id, episode, step, prefix="fail")
                     break
                 if terminated:
-                    obs, reward, terminated, truncated, info = env.step(action)#highlight显示
+                    #obs, reward, terminated, truncated, info = env.step(action)#highlight显示
                     if success_flag:
                         print(f"[{env_id}] Episode {episode} succeeded at step {step}")
                         _save_episode_video(episode_video_frames, env_id, episode, step, prefix="success")

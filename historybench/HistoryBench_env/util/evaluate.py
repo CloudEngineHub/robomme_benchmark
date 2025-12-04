@@ -720,7 +720,7 @@ def reset_check(self,gripper=None,target_qpos=None):
         return True
     return False
 
-def button_hover(self,button,distance_threshold=0.01,z_threshold=0.2):
+def button_hover(self,button,distance_threshold=0.03,z_threshold=0.2):
      # 获取物体和目标的位置
     obj_pos =self.agent.tcp.pose.p[0]
     target_pos = button.pose.p[0]
@@ -796,6 +796,29 @@ def is_button_pressed(self, obj):
         flag=True
 
     return flag
+
+
+def is_any_button_pressed_removelist(self, button_list):
+    """
+    Return True if any button in the provided list is pressed and remove those buttons from the list.
+
+    Args:
+        button_list (MutableSequence): sequence of button objects to check.
+
+    Returns:
+        bool: True if at least one button was pressed during this call.
+    """
+    if not button_list:
+        return False
+
+    pressed_found = False
+    # Iterate over a copy so we can safely mutate the original list.
+    for button in list(button_list):
+        if is_button_pressed(self, button):
+            pressed_found = True
+            button_list.remove(button)
+
+    return pressed_found
 
 def check_in_bin_number(self, in_bin_list, total_number_list):
     """

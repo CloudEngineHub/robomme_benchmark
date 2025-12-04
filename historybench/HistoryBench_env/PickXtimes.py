@@ -333,7 +333,7 @@ class PickXtimes(BaseEnv):
         tasks.append( {
                 "func": lambda:is_button_pressed(self, obj=self.button),
                 "name": "press the button to stop",
-                "subgoal_segment": "press the button to stop at <>",
+                "subgoal_segment": "press the button at <> to stop",
                 "demonstration": False,
                 "failure_func":lambda:is_any_obj_pickup(self, self.non_target_cubes),
                 "solve": lambda env, planner: solve_button(env, planner, obj=self.button),

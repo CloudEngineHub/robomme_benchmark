@@ -112,7 +112,7 @@ def main():
                     print("time limit!")
                     break
                 if terminated:
-                    obs, reward, terminated, truncated, info = env.step(action)#highlight显示
+                    #obs, reward, terminated, truncated, info = env.step(action)#highlight显示
                     if info.get("success", False):
                         print("success")
                     if info.get("fail", False):

@@ -123,7 +123,7 @@ def _options_button_unmask_swap(env, planner, require_target, base) -> List[dict
     if button_obj_left is not None:
         options.append(
             {
-                "label": "press the right button",
+                "label": "press the first button",
                 "solve": lambda button_obj=button_obj_left: solve_button(
                     env, planner, obj=button_obj
                 ),
@@ -133,7 +133,7 @@ def _options_button_unmask_swap(env, planner, require_target, base) -> List[dict
     if button_obj_right is not None:
         options.append(
             {
-                "label": "press the left button",
+                "label": "press the second button",
                 "solve": lambda button_obj=button_obj_right: solve_button(
                     env, planner, obj=button_obj
                 ),

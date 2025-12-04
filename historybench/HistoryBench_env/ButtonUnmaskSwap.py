@@ -408,7 +408,7 @@ class ButtonUnmaskSwap(BaseEnv):
 
         self._refresh_swap_schedule()
 
-
+        self.button_list= [self.button_left, self.button_right]
 
     def _initialize_episode(self, env_idx: torch.Tensor, options: dict):
         with torch.device(self.device):
@@ -436,21 +436,21 @@ class ButtonUnmaskSwap(BaseEnv):
         self.target_label = target_color
         tasks = [
             {
-                "func": lambda: is_button_pressed(self, obj=self.button_left),
+                "func": lambda: is_any_button_pressed_removelist(self, button_list=self.button_list),
                 "name": "press the first button",
                 "subgoal_segment":"press the first button at <>",
                 "demonstration": False,
                 "failure_func":None,
-                "solve": lambda env, planner: solve_button(env, planner, obj=self.button_left),
+                "solve": lambda env, planner: solve_button(env, planner, obj=self.button_right),
                 "segment":self.cap_links["button_left"]
             },
                   {
-                "func": lambda: is_button_pressed(self, obj=self.button_right),
+                "func": lambda: is_any_button_pressed_removelist(self, button_list=self.button_list),
                 "name": "press the second button",
                 "subgoal_segment":"press the second button at <>",
                 "demonstration": False,
                 "failure_func":None,
-                "solve": lambda env, planner: solve_button(env, planner, obj=self.button_right),
+                "solve": lambda env, planner: solve_button(env, planner, obj=self.button_left),
                 "segment":self.cap_links["button_right"]
             },
 

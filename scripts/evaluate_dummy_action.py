@@ -80,7 +80,6 @@ def main():
 
         for episode in range(num_episodes):
             env, episode_dataset, seed, difficulty = resolver.make_env_for_episode(episode)
-            import pdb ;pdb.set_trace()
            
             env.reset()
 
