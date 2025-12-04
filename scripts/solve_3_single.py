@@ -35,7 +35,7 @@ def main():
     """
 
     num_episodes = 1
-    env_id_list=["ButtonUnmaskSwap"]
+    env_id_list=["VideoUnmask"]
     for env_id in env_id_list:
         dataset_path = Path(f"/data/hongzefu/dataset_generate/record_dataset_{env_id}.h5")
         for episode in range(num_episodes):
@@ -49,7 +49,7 @@ def main():
                 control_mode="pd_joint_pos",
                 render_mode="human",
                 reward_mode="dense",
-                HistoryBench_seed =4431,
+                HistoryBench_seed =1270,
                 max_episode_steps=1000,
                 HistoryBench_difficulty="hard",
             )

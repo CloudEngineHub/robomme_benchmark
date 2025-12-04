@@ -295,7 +295,7 @@ def run_env_dataset(
         if difficulty:
             print(f"Episode {episode} assigned difficulty: {difficulty}")
 
-        base_seed = env_code * 1000 + (episode % 100) * 10 -1 + 20000  # env (2 digits) | episode (2 digits) | attempt (1 digit) #add 20000 for test
+        base_seed = env_code * 1000 + (episode % 100) * 10 -1  # env (2 digits) | episode (2 digits) | attempt (1 digit) #add 20000 for test
         attempt = 1
         while True:
             seed = base_seed + (attempt % 10)  # rightmost digit cycles with attempts
@@ -428,7 +428,7 @@ def parse_args() -> argparse.Namespace:
         "--episodes",
         "-n",
         type=int,
-        default=32,
+        default=4,
         help="Number of episodes to generate per environment (default: 50)",
     )
 
@@ -462,7 +462,7 @@ def parse_args() -> argparse.Namespace:
         "--max-workers",
         "-w",
         type=int,
-        default=32,
+        default=10,
         help="Number of parallel workers when running multiple environments.",
     )
     return parser.parse_args()
