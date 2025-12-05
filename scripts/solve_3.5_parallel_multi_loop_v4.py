@@ -19,12 +19,9 @@ from gymnasium.utils.save_video import save_video
 
 from historybench.env_record_wrapper import HistoryBenchRecordWrapper, FailsafeTimeout
 from historybench.HistoryBench_env import *
+from historybench.HistoryBench_env.errors import SceneGenerationError
 
 
-from mani_skill.examples.motionplanning.panda.motionplanner import \
-    PandaArmMotionPlanningSolver
-
-from mani_skill.examples.motionplanning.panda.motionplanner_stick import PandaStickMotionPlanningSolver
 from mani_skill.examples.motionplanning.base_motionplanner.utils import (
     compute_grasp_info_by_obb,
     get_actor_obb,
@@ -32,6 +29,12 @@ from mani_skill.examples.motionplanning.base_motionplanner.utils import (
 
 # from util import *
 import torch
+
+from planner_fail_safe import (
+    FailAwarePandaArmMotionPlanningSolver,
+    FailAwarePandaStickMotionPlanningSolver,
+    ScrewPlanFailure,
+)
 
 
 
@@ -58,25 +61,25 @@ import torch
 
 
 DEFAULT_ENVS =[
-"PickXtimes",
-"StopCube",
-"SwingXtimes",
-"BinFill",
+# "PickXtimes",
+# "StopCube",
+# "SwingXtimes",
+# "BinFill",
 
-"VideoUnmaskSwap",
-"VideoUnmask",
+# "VideoUnmaskSwap",
+# "VideoUnmask",
 "ButtonUnmaskSwap",
-"ButtonUnmask",
+# "ButtonUnmask",
 
- "VideoRepick",
-"VideoPlaceButton",
-"VideoPlaceOrder",
-"PickHighlight",
+# "VideoRepick",
+# "VideoPlaceButton",
+# "VideoPlaceOrder",
+# "PickHighlight",
 
-"InsertPeg",
-'MoveCube',
-"PatternLock",
-"RouteStick"
+# "InsertPeg",
+# 'MoveCube',
+# "PatternLock",
+# "RouteStick"
 
 ]
 ENV_ID_TO_CODE = {name: idx + 1 for idx, name in enumerate(DEFAULT_ENVS)}
@@ -152,33 +155,35 @@ def _run_episode_attempt(
     """Run a single episode attempt and report success/failure."""
     print(f"--- Running simulation for episode:{episode}, seed:{seed}, env: {env_id} ---")
 
-    env = gym.make(
-        env_id,
-        obs_mode="rgb+depth+segmentation",
-        control_mode="pd_joint_pos",
-        render_mode="rgb_array",
-        reward_mode="dense",
-        HistoryBench_seed=seed,
-        max_episode_steps=200,
-        HistoryBench_difficulty=difficulty,
-    )
-    env = HistoryBenchRecordWrapper(
-        env,
-        HistoryBench_dataset=str(temp_dataset_path),
-        HistoryBench_env=env_id,
-        HistoryBench_episode=episode,
-        HistoryBench_seed=seed,
-        save_video=save_video,
-
-    )
-
-    episode_successful = False
-
+    env: Optional[gym.Env] = None
     try:
+        env = gym.make(
+            env_id,
+            obs_mode="rgb+depth+segmentation",
+            control_mode="pd_joint_pos",
+            render_mode="rgb_array",
+            reward_mode="dense",
+            HistoryBench_seed=seed,
+            max_episode_steps=200,
+            HistoryBench_difficulty=difficulty,
+        )
+        env = HistoryBenchRecordWrapper(
+            env,
+            HistoryBench_dataset=str(temp_dataset_path),
+            HistoryBench_env=env_id,
+            HistoryBench_episode=episode,
+            HistoryBench_seed=seed,
+            save_video=save_video,
+
+        )
+
+        episode_successful = False
+
+
         env.reset()
 
         if env_id == "PatternLock" or env_id == "RouteStick":
-            planner = PandaStickMotionPlanningSolver(
+            planner = FailAwarePandaStickMotionPlanningSolver(
                 env,
                 debug=False,
                 vis=False,
@@ -188,7 +193,7 @@ def _run_episode_attempt(
                 joint_vel_limits=0.3,
             )
         else:
-            planner = PandaArmMotionPlanningSolver(
+            planner = FailAwarePandaArmMotionPlanningSolver(
                 env,
                 debug=False,
                 vis=False,
@@ -200,53 +205,63 @@ def _run_episode_attempt(
         env.unwrapped.evaluate()
         tasks = list(getattr(env.unwrapped, "task_list", []) or [])
 
-        if not tasks:
-            print("No tasks defined for this environment; skipping execution")
-            episode_successful = True
+        print(f"{env_id}: Task list has {len(tasks)} tasks")
+
+        for idx, task_entry in enumerate(tasks):
+            task_name = task_entry.get("name", f"Task {idx}")
+            print(f"Executing task {idx + 1}/{len(tasks)}: {task_name}")
+
+            solve_callable = task_entry.get("solve")
+            if not callable(solve_callable):
+                raise ValueError(
+                    f"Task '{task_name}' must supply a callable 'solve'."
+                )
+
+            env.unwrapped.evaluate(solve_complete_eval=True)
+            screw_failed = False
+            try:
+                solve_callable(env, planner)
+            except ScrewPlanFailure as exc:
+                screw_failed = True
+                print(f"Screw plan failure during '{task_name}': {exc}")
+                env.unwrapped.failureflag = torch.tensor([True])
+                env.unwrapped.successflag = torch.tensor([False])
+                env.unwrapped.current_task_failure = True
+            except FailsafeTimeout as exc:
+                print(f"Failsafe: {exc}")
+                break
+
+            evaluation = env.unwrapped.evaluate(solve_complete_eval=True)
+
+            fail_flag = evaluation.get("fail", False)
+            success_flag = evaluation.get("success", False)
+
+            if _tensor_to_bool(success_flag):
+                print("All tasks completed successfully.")
+                episode_successful = True
+                break
+
+            if screw_failed or _tensor_to_bool(fail_flag):
+                print("Encountered failure condition; stopping task sequence.")
+                break
+
         else:
-            print(f"{env_id}: Task list has {len(tasks)} tasks")
-
-            for idx, task_entry in enumerate(tasks):
-                task_name = task_entry.get("name", f"Task {idx}")
-                print(f"Executing task {idx + 1}/{len(tasks)}: {task_name}")
-
-                solve_callable = task_entry.get("solve")
-                if not callable(solve_callable):
-                    raise ValueError(
-                        f"Task '{task_name}' must supply a callable 'solve'."
-                    )
-
-                try:
-                    env.unwrapped.evaluate(solve_complete_eval=True)
-                    solve_callable(env, planner)
-                    evaluation = env.unwrapped.evaluate(solve_complete_eval=True)
-                except FailsafeTimeout as exc:
-                    print(f"Failsafe: {exc}")
-                    break
-
-                fail_flag = evaluation.get("fail", False)
-                success_flag = evaluation.get("success", False)
-
-                if _tensor_to_bool(success_flag):
-                    print("All tasks completed successfully.")
-                    episode_successful = True
-                    break
-
-                if _tensor_to_bool(fail_flag):
-                    print("Encountered failure condition; stopping task sequence.")
-                    break
-
-            else:
-                evaluation = env.unwrapped.evaluate(solve_complete_eval=True)
-                episode_successful = _tensor_to_bool(evaluation.get("success", False))
+            evaluation = env.unwrapped.evaluate(solve_complete_eval=True)
+            episode_successful = _tensor_to_bool(evaluation.get("success", False))
 
         # Prefer the wrapper's own success signal in case evaluation misses it
         episode_successful = episode_successful or _tensor_to_bool(
             getattr(env, "episode_success", False)
         )
+    except SceneGenerationError as exc:#swingxtimes特殊处理
 
+        print(
+            f"Scene generation failed for env {env_id}, episode {episode}, seed {seed}: {exc}"
+        )
+        episode_successful = False
     finally:
-        env.close()
+        if env is not None:
+            env.close()
 
     status_text = "SUCCESS" if episode_successful else "FAILED"
     print(
@@ -295,10 +310,10 @@ def run_env_dataset(
         if difficulty:
             print(f"Episode {episode} assigned difficulty: {difficulty}")
 
-        base_seed = env_code * 1000 + (episode % 100) * 10 -1  # env (2 digits) | episode (2 digits) | attempt (1 digit) #add 20000 for test
-        attempt = 1
+        base_seed = env_code * 1000 + (episode % 100) * 100 # env (2 digits) | episode (2 digits) |
+        attempt = 0
         while True:
-            seed = base_seed + (attempt % 10)  # rightmost digit cycles with attempts
+            seed = base_seed + attempt  # unique seed for each attempt
             success = _run_episode_attempt(
                 env_id=env_id,
                 episode=episode,
@@ -319,8 +334,9 @@ def run_env_dataset(
                 break
 
             attempt += 1
+            next_seed = base_seed + attempt
             print(
-                f"Episode {episode} failed; retrying with new seed {seed} (attempt {attempt})"
+                f"Episode {episode} failed; retrying with new seed {next_seed} (attempt {attempt + 1})"
             )
 
     return episode_records
@@ -428,7 +444,7 @@ def parse_args() -> argparse.Namespace:
         "--episodes",
         "-n",
         type=int,
-        default=4,
+        default=100,
         help="Number of episodes to generate per environment (default: 50)",
     )
 
@@ -462,7 +478,7 @@ def parse_args() -> argparse.Namespace:
         "--max-workers",
         "-w",
         type=int,
-        default=10,
+        default=32,
         help="Number of parallel workers when running multiple environments.",
     )
     return parser.parse_args()

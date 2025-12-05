@@ -442,17 +442,17 @@ class BinFill(BaseEnv):
         self.vis_obj_id_list=[]
         
         timestep = self.elapsed_steps
-        # if self.dynamic:
-        #     # 对每个颜色的cube进行动态lift操作（从第2个cube开始）
-        #     for cube_list in [self.red_cubes, self.blue_cubes, self.green_cubes]:
-        #         for idx in range(1, len(cube_list)):
-        #             lift_and_drop_objects_back_to_original(
-        #                 self,
-        #                 obj=cube_list[idx],
-        #                 start_step=0,
-        #                 end_step=idx * 100,
-        #                 cur_step=timestep,
-        #             )
+        if self.dynamic:
+            # 对每个颜色的cube进行动态lift操作（从第2个cube开始）
+            for cube_list in [self.red_cubes, self.blue_cubes, self.green_cubes]:
+                for idx in range(1, len(cube_list)):
+                    lift_and_drop_objects_back_to_original(
+                        self,
+                        obj=cube_list[idx],
+                        start_step=0,
+                        end_step=idx * 100,
+                        cur_step=timestep,
+                    )
                 
         obs, reward, terminated, truncated, info = super().step(action)
 

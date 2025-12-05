@@ -74,7 +74,7 @@ def swap_flat_two_lane(
     # 懒初始化缓存容器
     if not hasattr(self, "_two_lane_swaps"):
         self._two_lane_swaps = {}
-    print("swap!")
+    #print("swap!")
     key = (id(cube_a), id(cube_b), int(start_step), int(end_step))
 
     # --- 端点捕获（进入窗口首帧或缓存缺失） ---

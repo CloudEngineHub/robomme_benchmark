@@ -481,23 +481,15 @@ class VideoPlaceOrder(BaseEnv):
              
             })
             tasks.append(       {
-                                "func": lambda: static_check(self, timestep=int(self.elapsed_steps), static_steps=20),
-                                "name": "static",
-                                "subgoal_segment":f"static",
-                                "demonstration": True,
-                                "failure_func": None,
-
-                                "solve": lambda env, planner: [solve_reset(env,planner), solve_hold_obj(env, planner, static_steps=20)],
-                                },)
-            tasks.append(             {
                                 "func": lambda: static_check(self, timestep=int(self.elapsed_steps), static_steps=60),
                                 "name": "static",
                                 "subgoal_segment":f"static",
                                 "demonstration": True,
                                 "failure_func": None,
-                                "specialflag":"swap",
-                                "solve": lambda env, planner: [solve_hold_obj(env, planner, static_steps=60)],
+
+                                "solve": lambda env, planner: [solve_reset(env,planner), solve_hold_obj(env, planner, static_steps=60)],
                                 },)
+
 
             tasks.append({
                                 "func": lambda:reset_check(self),

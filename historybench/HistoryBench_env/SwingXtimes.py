@@ -24,6 +24,7 @@ from mani_skill.utils.geometry.rotation_conversions import (
     matrix_to_quaternion,
 )
 
+from .errors import SceneGenerationError
 from .util import *
 from .util.evaluate import static_check, too_many_swings
 from .util.object_generation import spawn_fixed_cube, build_board_with_hole
@@ -158,163 +159,165 @@ class SwingXtimes(BaseEnv):
         generator = torch.Generator()
         generator.manual_seed(self.HistoryBench_seed)
 
-        self.table_scene = TableSceneBuilder(
-            self, robot_init_qpos_noise=self.robot_init_qpos_noise
-        )
-        self.table_scene.build()
-
-
-
-        button_obb = build_button(
-            self,
-            center_xy=(-0.2, 0),
-            scale=1.5,
-            generator=generator,
-        )
-        avoid = [button_obb]
-
-
-
-        self.all_cubes = []  # 保存所有 cube 对象
-
-        # Initialize storage for each color group
-        self.red_cubes = []
-        self.red_cube_names = []
-        self.blue_cubes = []
-        self.blue_cube_names = []
-        self.green_cubes = []
-        self.green_cube_names = []
-
-        cubes_per_color = 1
-        color_groups = [
-            {"color": (1, 0, 0, 1), "name": "red", "list": self.red_cubes, "name_list": self.red_cube_names},
-            {"color": (0, 0, 1, 1), "name": "blue", "list": self.blue_cubes, "name_list": self.blue_cube_names},
-            {"color": (0, 1, 0, 1), "name": "green", "list": self.green_cubes, "name_list": self.green_cube_names}
-        ]
-        shuffle_indices = torch.randperm(len(color_groups), generator=generator).tolist()
-        color_groups = [color_groups[i] for i in shuffle_indices]
-
-        # Randomly select target color using generator
-        target_color_idx = torch.randint(0, len(color_groups), (1,), generator=generator).item()
-        self.target_color_name = color_groups[target_color_idx]["name"]
-        print(f"Target color selected: {self.target_color_name}")
-
-         # Generate 5 cubes for each color group
-        for idx, group in enumerate(color_groups):
-            if idx < self.configs[self.difficulty]['color']:
-                for idx in range(cubes_per_color):
-                    try:
-                        cube = spawn_random_cube(
-                            self,
-                            color=group["color"],
-                            avoid=avoid,
-                            include_existing=False,
-                            include_goal=False,
-                            region_center=[-0.1, 0],
-                            region_half_size=0.25,
-                            half_size=self.cube_half_size,
-                            min_gap=self.cube_half_size,
-                            random_yaw=True,
-                            name_prefix=f"cube_{group['name']}_{idx}",
-                            generator=generator,
-                        )
-                    except RuntimeError as e:
-                        print(f"生成{group['name']} cube {idx} 失败：{e}")
-                        break
-
-                    self.all_cubes.append(cube)
-                    group["list"].append(cube)
-                    cube_name = f"cube_{group['name']}_{idx}"
-                    group["name_list"].append(cube_name)
-                    setattr(self, cube_name, cube)
-                    avoid.append(cube)
-
-            print(f"Generated {len(group['list'])} {group['name']} cubes")
-
-        print(f"Generated {len(self.all_cubes)} cubes total (red: {len(self.red_cubes)}, blue: {len(self.blue_cubes)}, green: {len(self.green_cubes)})")
-
-        # Generate first target
         try:
-            temp_target_0 = spawn_random_target(
-                self,
-                avoid=avoid,  # 使用当前避让清单，包含所有已生成的cubes
-                include_existing=False,  # 手动维护清单
-                include_goal=False,  # 手动维护清单
-                region_center=[-0.1, -0.2],
-                region_half_size=0.1,
-                radius=self.cube_half_size*2,  # 使用radius而不是half_size
-                thickness=0.005,  # target的厚度
-                min_gap=self.cube_half_size*1,  # 与cube相同的间隙要求
-                name_prefix=f"temp_target_0",
-                generator=generator,
-                target_style="gray"
+            self.table_scene = TableSceneBuilder(
+                self, robot_init_qpos_noise=self.robot_init_qpos_noise
             )
-            avoid.append(temp_target_0)
-            print(f"Generated first target")
-        except RuntimeError as e:
-            print(f"First target采样失败：{e}")
+            self.table_scene.build()
 
-        # Generate second target
-        try:
-            temp_target_1 = spawn_random_target(
+            button_obb = build_button(
                 self,
-                avoid=avoid,  # 使用当前避让清单，包含所有已生成的cubes和第一个target
-                include_existing=False,  # 手动维护清单
-                include_goal=False,  # 手动维护清单
-                region_center=[-0.1, 0.2],
-                region_half_size=0.1,
-                radius=self.cube_half_size*2,  # 使用radius而不是half_size
-                thickness=0.005,  # target的厚度
-                min_gap=self.cube_half_size*1,  # 与cube相同的间隙要求
-                name_prefix=f"temp_target_1",
+                center_xy=(-0.2, 0),
+                scale=1.5,
                 generator=generator,
-                target_style="gray"
             )
-            avoid.append(temp_target_1)
-            print(f"Generated second target")
-        except RuntimeError as e:
-            print(f"Second target采样失败：{e}")
+            avoid = [button_obb]
 
-        # Swap names if necessary to ensure target_0.y < target_1.y
-        temp_0_y = temp_target_0.pose.p[0, 1].item()  # Get y coordinate
-        temp_1_y = temp_target_1.pose.p[0, 1].item()  # Get y coordinate
+            self.all_cubes = []  # 保存所有 cube 对象
 
-        if temp_0_y < temp_1_y:
-            # No swap needed
-            self.target_right = temp_target_0
-            self.target_left = temp_target_1
-            print(f"target_0 y={temp_0_y:.3f}, target_1 y={temp_1_y:.3f} (no swap needed)")
-        else:
-            # Swap the assignments
-            self.target_right = temp_target_1
-            self.target_left = temp_target_0
-            print(f"Swapped: target_0 y={temp_1_y:.3f}, target_1 y={temp_0_y:.3f} (swapped to ensure target_0.y < target_1.y)")
+            # Initialize storage for each color group
+            self.red_cubes = []
+            self.red_cube_names = []
+            self.blue_cubes = []
+            self.blue_cube_names = []
+            self.green_cubes = []
+            self.green_cube_names = []
 
- # Randomly select one cube from all available cubes as the target
-        if len(self.all_cubes) > 0:
-            target_cube_idx = torch.randint(0, len(self.all_cubes), (1,), generator=generator).item()
-            self.target_cube = self.all_cubes[target_cube_idx]
+            cubes_per_color = 1
+            color_groups = [
+                {"color": (1, 0, 0, 1), "name": "red", "list": self.red_cubes, "name_list": self.red_cube_names},
+                {"color": (0, 0, 1, 1), "name": "blue", "list": self.blue_cubes, "name_list": self.blue_cube_names},
+                {"color": (0, 1, 0, 1), "name": "green", "list": self.green_cubes, "name_list": self.green_cube_names}
+            ]
+            shuffle_indices = torch.randperm(len(color_groups), generator=generator).tolist()
+            color_groups = [color_groups[i] for i in shuffle_indices]
 
-            # Determine the color of the selected target cube
-            if self.target_cube in self.red_cubes:
-                self.target_color_name = "red"
-            elif self.target_cube in self.blue_cubes:
-                self.target_color_name = "blue"
-            elif self.target_cube in self.green_cubes:
-                self.target_color_name = "green"
+            # Randomly select target color using generator
+            target_color_idx = torch.randint(0, len(color_groups), (1,), generator=generator).item()
+            self.target_color_name = color_groups[target_color_idx]["name"]
+            print(f"Target color selected: {self.target_color_name}")
 
+            # Generate cubes for each color group
+            for idx, group in enumerate(color_groups):
+                if idx < self.configs[self.difficulty]['color']:
+                    for cube_idx in range(cubes_per_color):
+                        try:
+                            cube = spawn_random_cube(
+                                self,
+                                color=group["color"],
+                                avoid=avoid,
+                                include_existing=False,
+                                include_goal=False,
+                                region_center=[-0.1, 0],
+                                region_half_size=0.25,
+                                half_size=self.cube_half_size,
+                                min_gap=self.cube_half_size,
+                                random_yaw=True,
+                                name_prefix=f"cube_{group['name']}_{cube_idx}",
+                                generator=generator,
+                            )
+                        except RuntimeError as e:
+                            raise SceneGenerationError(
+                                f"生成{group['name']} cube {cube_idx} 失败：{e}"
+                            ) from e
 
-            print(f"Target cube selected: {self.target_color_name} cube (index {target_cube_idx} in all_cubes)")
-        else:
-            self.target_cube = None
-            self.target_color_name = None
-            print("No cubes generated, no target cube selected")
+                        self.all_cubes.append(cube)
+                        group["list"].append(cube)
+                        cube_name = f"cube_{group['name']}_{cube_idx}"
+                        group["name_list"].append(cube_name)
+                        setattr(self, cube_name, cube)
+                        avoid.append(cube)
 
-        # Create list of non-target cubes for failure checking
-        self.non_target_cubes = [cube for cube in self.all_cubes if cube != self.target_cube]
-        print(f"Non-target cubes: {len(self.non_target_cubes)}")
+                print(f"Generated {len(group['list'])} {group['name']} cubes")
 
+            print(f"Generated {len(self.all_cubes)} cubes total (red: {len(self.red_cubes)}, blue: {len(self.blue_cubes)}, green: {len(self.green_cubes)})")
 
+            # Generate first target
+            try:
+                temp_target_0 = spawn_random_target(
+                    self,
+                    avoid=avoid,  # 使用当前避让清单，包含所有已生成的cubes
+                    include_existing=False,  # 手动维护清单
+                    include_goal=False,  # 手动维护清单
+                    region_center=[-0.1, -0.2],
+                    region_half_size=0.1,
+                    radius=self.cube_half_size*2,  # 使用radius而不是half_size
+                    thickness=0.005,  # target的厚度
+                    min_gap=self.cube_half_size*1,  # 与cube相同的间隙要求
+                    name_prefix=f"temp_target_0",
+                    generator=generator,
+                    target_style="gray"
+                )
+                avoid.append(temp_target_0)
+                print(f"Generated first target")
+            except RuntimeError as e:
+                raise SceneGenerationError("First target采样失败") from e
+
+            # Generate second target
+            try:
+                temp_target_1 = spawn_random_target(
+                    self,
+                    avoid=avoid,  # 使用当前避让清单，包含所有已生成的cubes和第一个target
+                    include_existing=False,  # 手动维护清单
+                    include_goal=False,  # 手动维护清单
+                    region_center=[-0.1, 0.2],
+                    region_half_size=0.1,
+                    radius=self.cube_half_size*2,  # 使用radius而不是half_size
+                    thickness=0.005,  # target的厚度
+                    min_gap=self.cube_half_size*1,  # 与cube相同的间隙要求
+                    name_prefix=f"temp_target_1",
+                    generator=generator,
+                    target_style="gray"
+                )
+                avoid.append(temp_target_1)
+                print(f"Generated second target")
+            except RuntimeError as e:
+                raise SceneGenerationError("Second target采样失败") from e
+
+            # Swap names if necessary to ensure target_0.y < target_1.y
+            temp_0_y = temp_target_0.pose.p[0, 1].item()  # Get y coordinate
+            temp_1_y = temp_target_1.pose.p[0, 1].item()  # Get y coordinate
+
+            if temp_0_y < temp_1_y:
+                # No swap needed
+                self.target_right = temp_target_0
+                self.target_left = temp_target_1
+                print(f"target_0 y={temp_0_y:.3f}, target_1 y={temp_1_y:.3f} (no swap needed)")
+            else:
+                # Swap the assignments
+                self.target_right = temp_target_1
+                self.target_left = temp_target_0
+                print(f"Swapped: target_0 y={temp_1_y:.3f}, target_1 y={temp_0_y:.3f} (swapped to ensure target_0.y < target_1.y)")
+
+            # Randomly select one cube from all available cubes as the target
+            if len(self.all_cubes) > 0:
+                target_cube_idx = torch.randint(0, len(self.all_cubes), (1,), generator=generator).item()
+                self.target_cube = self.all_cubes[target_cube_idx]
+
+                # Determine the color of the selected target cube
+                if self.target_cube in self.red_cubes:
+                    self.target_color_name = "red"
+                elif self.target_cube in self.blue_cubes:
+                    self.target_color_name = "blue"
+                elif self.target_cube in self.green_cubes:
+                    self.target_color_name = "green"
+
+                print(f"Target cube selected: {self.target_color_name} cube (index {target_cube_idx} in all_cubes)")
+            else:
+                self.target_cube = None
+                self.target_color_name = None
+                print("No cubes generated, no target cube selected")
+
+            # Create list of non-target cubes for failure checking
+            self.non_target_cubes = [cube for cube in self.all_cubes if cube != self.target_cube]
+            print(f"Non-target cubes: {len(self.non_target_cubes)}")
+
+        except SceneGenerationError:
+            raise
+        except Exception as exc:
+            raise SceneGenerationError(
+                f"Failed to load SwingXtimes scene for seed {self.HistoryBench_seed}"
+            ) from exc
 
     def _initialize_episode(self, env_idx: torch.Tensor, options: dict):
         with torch.device(self.device):

@@ -442,7 +442,7 @@ class ButtonUnmaskSwap(BaseEnv):
                 "demonstration": False,
                 "failure_func":None,
                 "solve": lambda env, planner: solve_button(env, planner, obj=self.button_right),
-                "segment":self.cap_links["button_left"]
+                "segment":self.cap_links["button_right"]
             },
                   {
                 "func": lambda: is_any_button_pressed_removelist(self, button_list=self.button_list),
@@ -451,7 +451,7 @@ class ButtonUnmaskSwap(BaseEnv):
                 "demonstration": False,
                 "failure_func":None,
                 "solve": lambda env, planner: solve_button(env, planner, obj=self.button_left),
-                "segment":self.cap_links["button_right"]
+                "segment":self.cap_links["button_left"]
             },
 
             {

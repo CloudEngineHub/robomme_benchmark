@@ -24,6 +24,7 @@ from mani_skill.utils.geometry.rotation_conversions import (
     matrix_to_quaternion,
 )
 
+from .errors import SceneGenerationError
 from .util import *
 from .util.evaluate import static_check
 from .util.object_generation import spawn_fixed_cube, build_board_with_hole
@@ -162,150 +163,143 @@ class VideoRepick(BaseEnv):
     def _load_scene(self, options: dict):
         generator = torch.Generator()
         generator.manual_seed(self.HistoryBench_seed)
-    
-        self.table_scene = TableSceneBuilder(
-            self, robot_init_qpos_noise=self.robot_init_qpos_noise
-        )
-        self.table_scene.build()
+        try:
+            self.table_scene = TableSceneBuilder(
+                self, robot_init_qpos_noise=self.robot_init_qpos_noise
+            )
+            self.table_scene.build()
 
-        
-        
-        button_obb_1 = build_button(
-            self,
-            center_xy=(-0.2, 0),
-            scale=1.5,
-            generator=generator,
-            name="button",
-            randomize=True,
-            randomize_range=(0.1, 0.1)
-        )
-        # Store first button before building second one
-        self.button_left = self.button
-        self.button_joint_1 = self.button_joint
+            button_obb_1 = build_button(
+                self,
+                center_xy=(-0.2, 0),
+                scale=1.5,
+                generator=generator,
+                name="button",
+                randomize=True,
+                randomize_range=(0.1, 0.1)
+            )
+            # Store first button before building second one
+            self.button_left = self.button
+            self.button_joint_1 = self.button_joint
 
-        avoid = [button_obb_1]
+            avoid = [button_obb_1]
 
+            options = [
+                {"color": (1, 0, 0, 1), "name": "red"},
+                {"color": (0, 0, 1, 1), "name": "blue"},
+                {"color": (0, 1, 0, 1), "name": "green"},
+            ]
+            if self.difficulty == "hard":
+                self.spawned_cubes = []
 
+                for idx in range(5):
+                    shuffle_indices = torch.randperm(len(options), generator=generator).tolist()
+                    new_options = [options[i] for i in shuffle_indices]
+                    for group in new_options:
+                        try:
+                            cube = spawn_random_cube(
+                                self,
+                                color=group["color"],
+                                avoid=avoid,
+                                include_existing=False,
+                                include_goal=False,
+                                region_center=[-0.1, 0],
+                                region_half_size=[0.2, 0.25],
+                                half_size=self.cube_half_size,
+                                min_gap=self.cube_half_size,
+                                random_yaw=True,
+                                name_prefix=f"cube_{group['name']}_{idx}",
+                                generator=generator,
+                            )
+                        except RuntimeError as e:
+                            raise SceneGenerationError(
+                                f"生成{group['name']} cube {idx} 失败"
+                            ) from e
 
+                        self.spawned_cubes.append(cube)
+                        avoid.append(cube)
 
-        # 在每个bin下方生成3个动态cube（使用固定位置，颜色为红、绿、蓝、黄）
+                if not self.spawned_cubes:
+                    raise SceneGenerationError("未能生成任何cube")
 
-        options = [
-            {"color": (1, 0, 0, 1), "name": "red"},
-            {"color": (0, 0, 1, 1), "name": "blue"},
-            {"color": (0, 1, 0, 1), "name": "green"},
-        ]
-        if  self.difficulty == "hard":
-            self.spawned_cubes=[]
-            
-            #cluster_num = torch.randint(4, 6, generator=generator).item()
-            for idx in range(5):
-                shuffle_indices = torch.randperm(len(options), generator=generator).tolist()
-                new_options = [options[i] for i in shuffle_indices]
-                for group in new_options:
+                target_idx = torch.randint(0, len(self.spawned_cubes), (1,), generator=generator).item()
+                print("target index", target_idx)
+                self.target_cube_1 = self.spawned_cubes[target_idx]
+
+            else:
+                idx = torch.randint(0, len(options), (1,), generator=generator).item()
+                chosen_color = options[idx]["color"]
+
+                cube_colors = [chosen_color] * 4
+                shuffle_indices = torch.randperm(len(cube_colors), generator=generator).tolist()
+                cube_colors = [cube_colors[i] for i in shuffle_indices]
+
+                self.spawned_cubes = []
+
+                region4 = [[-0.05, -0.1], [-0.05, 0.1], [0.1, 0.1], [0.1, -0.1]]
+                region3_tri = [[-0.05, -0.1], [-0.05, 0.1], [0.1, 0]]
+                region3_line = [[0, -0.15], [0, 0.15], [0, 0]]
+
+                region3_choice = torch.randint(0, 2, (1,), generator=generator).item()
+                region3 = region3_tri if region3_choice == 0 else region3_line
+
+                if self.configs[self.difficulty]['cube'] == 4:
+                    region = region4
+                else:
+                    region = region3
+                angle, region = rotate_points_random(region, (0, 180), generator)
+
+                for i in range(self.configs[self.difficulty]['cube']):
                     try:
-                        cube = spawn_random_cube(
+                        cube_actor = spawn_random_cube(
                             self,
-                            color=group["color"],
                             avoid=avoid,
-                            include_existing=False,
-                            include_goal=False,
-                            region_center=[-0.1, 0],
-                            region_half_size=[0.2,0.25],
+                            region_center=region[i],
+                            region_half_size=0.07,
+                            min_gap=self.cube_half_size * 1,
                             half_size=self.cube_half_size,
-                            min_gap=self.cube_half_size,
-                            random_yaw=True,
-                            name_prefix=f"cube_{group['name']}_{idx}",
-                            generator=generator,
+                            name_prefix=f"bin_{i}",
+                            max_trials=256,
+                            color=cube_colors[i],
+                            generator=generator
+
                         )
                     except RuntimeError as e:
-                        print(f"生成{group['name']} cube {idx} 失败：{e}")
-                        break
+                        raise SceneGenerationError(f"生成bin_{i}失败") from e
 
-                    self.spawned_cubes.append(cube)
-                    avoid.append(cube)
+                    self.spawned_cubes.append(cube_actor)
+                    setattr(self, f"bin_{i}", cube_actor)
+                    avoid.append(cube_actor)
 
-                        # 随机选择1个cube
-            target_indices = torch.randint(0, len(self.spawned_cubes), size=(1,), generator=generator)
-            # target_indices = np.random.randint(0, len(self.spawned_cubes), size=(1,))[0]
-            print("target indices", target_indices)
-            self.target_cube_1=self.spawned_cubes[target_indices]
+                if not self.spawned_cubes:
+                    raise SceneGenerationError("未能生成任何bin")
 
-        else:
-            idx = torch.randint(0, len(options), (1,), generator=generator).item()  # 没有 generator 可去掉该参数
-            chosen_color = options[idx]["color"]
-    
-            cube_colors = [chosen_color] * 4 
+                target_indices = torch.randperm(len(self.spawned_cubes), generator=generator)[:1].tolist()
+                self.target_cube_1 = self.spawned_cubes[target_indices[0]]
 
+                if self.difficulty != "hard":
+                    remaining_indices = [i for i in range(len(self.spawned_cubes)) if i not in target_indices]
+                    if len(remaining_indices) < 2:
+                        raise SceneGenerationError("可用于交换的cube数量不足")
 
-            # 使用 seed 随机打乱颜色顺序
+                    selected_remaining = torch.randperm(len(remaining_indices), generator=generator)[:2].tolist()
+                    selected_indices = [remaining_indices[i] for i in selected_remaining]
+                    swap_indices = target_indices + selected_indices
 
-            shuffle_indices = torch.randperm(len(cube_colors), generator=generator).tolist()
-            cube_colors = [cube_colors[i] for i in shuffle_indices]
+                    self.swap_pair1_idx1 = self.spawned_cubes[swap_indices[0]]
+                    self.swap_pair2_idx1 = self.spawned_cubes[swap_indices[1]]
+                    self.swap_pair3_idx1 = self.spawned_cubes[swap_indices[2]]
+                    self.swap_pair1_idx2 = None
+                    self.swap_pair2_idx2 = None
+                    self.swap_pair3_idx2 = None
+                    self._refresh_swap_schedule()
 
-            self.spawned_cubes=[]
-
-            region4=[[-0.05,-0.1],[-0.05,0.1],[0.1,0.1],[0.1,-0.1]]
-            region3_tri=[[-0.05,-0.1],[-0.05,0.1],[0.1,0]]
-            region3_line=[[0,-0.15],[0,0.15],[0,0]]
-
-            # 使用 generator 随机选择 region3_tri 或 region3_line
-            region3_choice = torch.randint(0, 2, (1,), generator=generator).item()
-            region3 = region3_tri if region3_choice == 0 else region3_line
-
-            if self.configs[self.difficulty]['cube']==4:
-                region=region4
-            else:
-                region=region3
-            angle, region = rotate_points_random(region,(0,180),generator)
-        
-            for i in range(self.configs[self.difficulty]['cube']):
-                try:
-                    cube_actor = spawn_random_cube(
-                        self,
-                        avoid=avoid,  # 使用当前避让清单，包含所有已生成的对象
-                        region_center=region[i],
-                        region_half_size=0.07,
-                        min_gap=self.cube_half_size*1,
-                            # bins需要更大的间隙，增加到6倍避免碰撞
-                        half_size=self.cube_half_size,
-                        name_prefix=f"bin_{i}",
-                        max_trials=256,
-                        color=cube_colors[i],
-                        generator=generator
-                        
-                    )
-                except RuntimeError as e:
-                   break
-
-                self.spawned_cubes.append(cube_actor)
-                # 将bin赋值给self.bin_0, self.bin_1等属性
-                setattr(self, f"bin_{i}", cube_actor)
-                # 将新生成的bin加入避让清单
-                avoid.append(cube_actor)
-
-
-            # 随机选择1个cube
-            target_indices = torch.randperm(len(self.spawned_cubes), generator=generator)[:1].tolist()
-            self.target_cube_1=self.spawned_cubes[target_indices[0]]
-
-            if self.difficulty != "hard":#需要swap的时候再随机选择 以免hard无法生成
-                    # 随机选择2个cube
-                # swap_indices 必须包含 target_indices，再从剩余索引中选择2个
-                remaining_indices = [i for i in range(len(self.spawned_cubes)) if i not in target_indices]
-
-                # 从剩余索引中随机选择2个
-                selected_remaining = torch.randperm(len(remaining_indices), generator=generator)[:2].tolist()
-                selected_indices = [remaining_indices[i] for i in selected_remaining]
-                swap_indices = target_indices + selected_indices
-
-                self.swap_pair1_idx1=self.spawned_cubes[swap_indices[0]]
-                self.swap_pair2_idx1=self.spawned_cubes[swap_indices[1]]
-                self.swap_pair3_idx1=self.spawned_cubes[swap_indices[2]]
-                self.swap_pair1_idx2=None
-                self.swap_pair2_idx2=None
-                self.swap_pair3_idx2=None
-                self._refresh_swap_schedule()
+        except SceneGenerationError:
+            raise
+        except Exception as exc:
+            raise SceneGenerationError(
+                f"Failed to load VideoRepick scene for seed {self.HistoryBench_seed}"
+            ) from exc
 
 
 

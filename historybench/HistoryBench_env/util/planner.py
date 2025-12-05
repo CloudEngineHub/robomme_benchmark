@@ -23,7 +23,7 @@ from historybench.HistoryBench_env.util import *
 import random
 
 # Probability for deliberately triggering a failed hover before pickup.
-FAILED_HOVER_PROB = 0.01
+FAILED_HOVER_PROB = 0.03
 
 
 def grasp_and_lift_peg_side(env, planner,obj):
