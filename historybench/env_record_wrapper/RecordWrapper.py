@@ -26,6 +26,10 @@ from mani_skill.utils.visualization.misc import (
 from mani_skill.utils.wrappers import CPUGymWrapper
 import imageio
 from ..HistoryBench_env.util import task_goal
+from ..HistoryBench_env.util.segmentation_utils import (
+    process_segmentation,
+    create_segmentation_visuals,
+)
 class FailsafeTimeout(RuntimeError):
     """Raised when the HistoryBench failsafe stops an episode early."""
     pass
@@ -61,6 +65,9 @@ class HistoryBenchRecordWrapper(gym.Wrapper):
         self.previous_subgoal_segment = None
         self.current_subgoal_segment_filled = None
         self.segmentation_points = []  # Cache for segmentation center point(s)
+        self.previous_subgoal_segment_online = None
+        self.current_subgoal_segment_online_filled = None
+        self.segmentation_points_online = []  # Cache for online segmentation targets
 
         # 视频缓冲区
         self.video_frames = []  # 存储组合后的视频帧
@@ -205,130 +212,52 @@ class HistoryBenchRecordWrapper(gym.Wrapper):
         wrist_camera_frame = obs['sensor_data']['hand_camera']['rgb'][0].cpu().numpy()
         segmentation=obs['sensor_data']['base_camera']['segmentation'].cpu().numpy()[0]
 
-        #generate segmentation
-        # current_segment 可能是单个 Actor 或 Actor 列表，这里统一展开，方便对齐后续 placeholder
-        current_segment = getattr(self, "current_segment", None)
-        if isinstance(current_segment, (list, tuple)):
-            active_segments = list(current_segment)
-        elif current_segment is None:
-            active_segments = []
-        else:
-            active_segments = [current_segment]
-
-        # segment_ids_by_index 会记录 “第几个 segment -> 对应的 seg id 列表”，用于计算独立中心点
-        segment_ids_by_index = {idx: [] for idx in range(len(active_segments))}
-        self.vis_obj_id_list=[]
-        table_id = None
-        for obj_id, obj in sorted(self.segmentation_id_map.items()):
-            if active_segments:
-                for idx, target in enumerate(active_segments):
-                    if obj is target:
-                        self.vis_obj_id_list.append(obj_id)
-                        segment_ids_by_index[idx].append(obj_id)
-                        break
-                            
-            if obj.name=='table-workspace':
-                table_id = obj_id
-                self.color_map[table_id] = [0, 0, 0]  # Set table color to black
-        # segmentation_result 只保留当前任务关心的对象，其他像素置零，方便后续定位中心点
-        segmentation_result =np.where(np.isin(segmentation,self.vis_obj_id_list), segmentation, 0)
-        segmentation_2d = segmentation.squeeze() if segmentation.ndim > 2 else segmentation
-        segmentation_result_2d = segmentation_result.squeeze() if segmentation_result.ndim > 2 else segmentation_result
-
-
-        # Add center coordinates to current_subgoal_segment within <>
-        # Only update if current_subgoal_segment has changed from previous
         current_subgoal_segment = getattr(self.unwrapped, 'current_subgoal_segment', None)
+        current_subgoal_segment_online = getattr(self.unwrapped, 'current_subgoal_segment_online', None)
+        current_task_name_online = getattr(self.unwrapped, 'current_task_name_online', getattr(self, 'current_task_name_online', 'Unknown'))
+        segmentation_output = process_segmentation(
+            segmentation=segmentation,
+            segmentation_id_map=getattr(self, "segmentation_id_map", None),
+            color_map=self.color_map,
+            current_segment=getattr(self, "current_segment", None),
+            current_subgoal_segment=current_subgoal_segment,
+            previous_subgoal_segment=self.previous_subgoal_segment,
+            current_task_name=getattr(self, 'current_task_name', 'Unknown'),
+            existing_points=self.segmentation_points,
+            existing_subgoal_filled=self.current_subgoal_segment_filled,
+        )
+        segmentation_result = segmentation_output["segmentation_result"]
+        self.segmentation_points = segmentation_output["segmentation_points"]
+        self.current_subgoal_segment_filled = segmentation_output[
+            "current_subgoal_segment_filled"
+        ]
+        self.no_object_flag = segmentation_output["no_object_flag"]
+        self.previous_subgoal_segment = segmentation_output[
+            "updated_previous_subgoal_segment"
+        ]
+        self.vis_obj_id_list = segmentation_output["vis_obj_id_list"]
 
-        if current_subgoal_segment != self.previous_subgoal_segment:
-            # 仅在切换子目标时重新计算中心点，避免每帧都完整扫描
-            # Subgoal has changed, recalculate segmentation points and update filled version
-            def compute_center_from_ids(self,segmentation_mask, ids):
-                """在二维 segmentation mask 中求指定 ID 集合的像素中心，返回[y,x]"""
-                if not ids:
-                    return None
-                mask = np.isin(segmentation_mask, ids)
-                if not np.any(mask):
-                    self.no_object_flag=True
-                    return None
-                coords = np.argwhere(mask)
-                if coords.size == 0:
-                    return None
-                center_y = int(coords[:, 0].mean())
-                center_x = int(coords[:, 1].mean())
-                return [center_y, center_x]
-
-            segment_centers = []
-            if active_segments:
-                for idx in range(len(active_segments)):
-                    segment_centers.append(
-                        compute_center_from_ids(
-                            self,segmentation_2d, segment_ids_by_index.get(idx, [])
-                        )
-                    )
-            else:
-                segment_centers.append(
-                    compute_center_from_ids(self,segmentation_2d, self.vis_obj_id_list)
-                )
-
-            # 记录所有 segment 各自的中心坐标，便于给多目标任务标记不同点
-            self.segmentation_points = [
-                center for center in segment_centers if center is not None
-            ]
-
-            if current_subgoal_segment:
-                import re
-
-                subgoal_text = getattr(self, 'current_task_name', 'Unknown')
-                seg_shape = (
-                    segmentation_result_2d.shape
-                    if segmentation_result_2d.ndim >= 2
-                    else (256, 256)
-                )
-                normalized_centers = []
-                for center in segment_centers:
-                    if center is None:
-                        normalized_centers.append(None)
-                        continue
-                    center_y, center_x = center
-                    # 不再归一化到 [0, 1]，直接使用像素坐标
-                    normalized_centers.append(f'<{center_y}, {center_x}>')
-
-                # 子目标字符串里可能出现多个 <>，依次替换为对应 segment 的中心坐标（不足则保留原文本）
-                placeholder_pattern = re.compile(r'<[^>]*>')
-                placeholders = list(placeholder_pattern.finditer(current_subgoal_segment))
-                placeholder_count = len(placeholders)
-                if placeholder_count > 0 and normalized_centers:
-                    replacements = normalized_centers.copy()
-                    if len(replacements) == 1 and placeholder_count > 1:
-                        replacements = replacements * placeholder_count
-                    elif len(replacements) < placeholder_count:
-                        replacements.extend([None] * (placeholder_count - len(replacements)))
-
-                    missing_placeholder = False
-                    new_text_parts = []
-                    last_idx = 0
-                    for idx, match in enumerate(placeholders):
-                        new_text_parts.append(current_subgoal_segment[last_idx:match.start()])
-                        replacement_text = replacements[idx]
-                        if replacement_text is None:
-                            # new_text_parts.append(match.group(0))  # 原逻辑：保留占位符本身
-                            missing_placeholder = True
-                        else:
-                            new_text_parts.append(replacement_text)
-                        last_idx = match.end()
-                    new_text_parts.append(current_subgoal_segment[last_idx:])
-                    # 缺失时用子目标文本替换整个文本
-                    self.current_subgoal_segment_filled = subgoal_text if missing_placeholder else ''.join(new_text_parts)
-                else:
-                    self.current_subgoal_segment_filled = current_subgoal_segment
-            else:
-                self.current_subgoal_segment_filled = current_subgoal_segment
-
-            # Update the previous subgoal
-            self.previous_subgoal_segment = current_subgoal_segment
-        # else: keep both segmentation_points and current_subgoal_segment_filled unchanged
-           
+        segmentation_output_online = process_segmentation(
+            segmentation=segmentation,
+            segmentation_id_map=getattr(self, "segmentation_id_map", None),
+            color_map=self.color_map,
+            current_segment=getattr(self, "current_segment_online", None),
+            current_subgoal_segment=current_subgoal_segment_online,
+            previous_subgoal_segment=self.previous_subgoal_segment_online,
+            current_task_name=current_task_name_online,
+            existing_points=self.segmentation_points_online,
+            existing_subgoal_filled=self.current_subgoal_segment_online_filled,
+        )
+        segmentation_result_online = segmentation_output_online["segmentation_result"]
+        self.segmentation_points_online = segmentation_output_online["segmentation_points"]
+        self.current_subgoal_segment_online_filled = segmentation_output_online[
+            "current_subgoal_segment_filled"
+        ]
+        self.no_object_flag_online = segmentation_output_online["no_object_flag"]
+        self.previous_subgoal_segment_online = segmentation_output_online[
+            "updated_previous_subgoal_segment"
+        ]
+        self.vis_obj_id_list_online = segmentation_output_online["vis_obj_id_list"]
 
         current_task=self.current_task_name if hasattr(self, 'current_task_name') else "Unknown"
         if self.save_video and current_task!='NO RECORD':
@@ -336,6 +265,7 @@ class HistoryBenchRecordWrapper(gym.Wrapper):
             # 如果是 demonstration 任务，添加红色边框（仅用于视频，不影响HDF5）
             is_demonstration = getattr(self, 'current_task_demonstration', False)
             subgoal_text = getattr(self, 'current_task_name', 'Unknown')
+            subgoal_online_text = getattr(self, 'current_task_name_online', 'Unknown')
 
 
 
@@ -344,6 +274,7 @@ class HistoryBenchRecordWrapper(gym.Wrapper):
             wrist_camera_frame_for_video = copy.deepcopy(wrist_camera_frame)
             segmentation_for_video=copy.deepcopy(segmentation)
             segmentation_result_for_video=copy.deepcopy(segmentation_result)
+            segmentation_result_online_for_video=copy.deepcopy(segmentation_result_online)
 
 
             if base_camera_frame_for_video.shape[:2] != wrist_camera_frame_for_video.shape[:2]:
@@ -353,58 +284,45 @@ class HistoryBenchRecordWrapper(gym.Wrapper):
                     interpolation=cv2.INTER_LINEAR,
                 )
 
-            # Convert segmentation masks to RGB for visualization
-            # Create colormap for segmentation visualization
-            segmentation_vis = np.zeros((*segmentation_for_video.shape[:2], 3), dtype=np.uint8)
-            segmentation_result_vis = np.zeros((*segmentation_result_for_video.shape[:2], 3), dtype=np.uint8)
+            (
+                segmentation_vis,
+                segmentation_result_vis,
+                target_for_video,
+            ) = create_segmentation_visuals(
+                segmentation_for_video,
+                segmentation_result_for_video,
+                base_camera_frame_for_video,
+                self.color_map,
+                self.segmentation_points,
+            )
 
-
-
-            # Ensure segmentation masks are 2D
-            seg_2d = segmentation_for_video.squeeze() if segmentation_for_video.ndim > 2 else segmentation_for_video
-            seg_result_2d = segmentation_result_for_video.squeeze() if segmentation_result_for_video.ndim > 2 else segmentation_result_for_video
-
-            # Apply colors to segmentation_vis
-            for seg_id in np.unique(seg_2d):
-                if seg_id > 0:
-                    color = self.color_map.get(seg_id, [255, 255, 255])  # Default white for unmapped IDs
-                    mask = seg_2d == seg_id
-                    segmentation_vis[mask] = color
-
-            # Apply colors to segmentation_result_vis (same color map)
-            # segmentation_result_vis 仅渲染与当前任务相关的对象，便于展示 grounding 结果
-            for seg_id in np.unique(seg_result_2d):
-                if seg_id > 0:
-                    color = self.color_map.get(seg_id, [255, 255, 255])  # Default white for unmapped IDs
-                    mask = seg_result_2d == seg_id
-                    segmentation_result_vis[mask] = color
-
-            # Resize segmentation visualizations to match camera frame size
-            if segmentation_vis.shape[:2] != base_camera_frame_for_video.shape[:2]:
-                segmentation_vis = cv2.resize(
-                    segmentation_vis,
-                    (base_camera_frame_for_video.shape[1], base_camera_frame_for_video.shape[0]),
-                    interpolation=cv2.INTER_NEAREST,
-                )
-
-            if segmentation_result_vis.shape[:2] != base_camera_frame_for_video.shape[:2]:
-                segmentation_result_vis = cv2.resize(
-                    segmentation_result_vis,
-                    (base_camera_frame_for_video.shape[1], base_camera_frame_for_video.shape[0]),
-                    interpolation=cv2.INTER_NEAREST,
-                )
-
-            # Plot segmentation points onto target frame with a red dot (diameter 5px)
-            diameter = 5
-            target_for_video = copy.deepcopy(base_camera_frame_for_video)
-            if self.segmentation_points:
-                for center_y, center_x in self.segmentation_points:
-                    cv2.circle(target_for_video, (center_x, center_y), diameter, (255, 0, 0), -1)
+            (
+                segmentation_vis_online,
+                segmentation_result_vis_online,
+                target_for_video_online,
+            ) = create_segmentation_visuals(
+                segmentation_for_video,
+                segmentation_result_online_for_video,
+                base_camera_frame_for_video,
+                self.color_map,
+                self.segmentation_points_online,
+            )
 
             # 最终视频帧拼接结构：base | wrist | 原 segmentation | filtered segmentation | base+红点
             combined=np.hstack([base_camera_frame_for_video, wrist_camera_frame_for_video,
                               segmentation_vis, segmentation_result_vis,target_for_video])
-            
+            combined_online=np.hstack([base_camera_frame_for_video, wrist_camera_frame_for_video,
+                              segmentation_vis_online, segmentation_result_vis_online,target_for_video_online])
+
+            # 为第一行添加 subgoal_text 和 grounded_subgoal 文本
+            combined = self._add_text_to_frame(combined, ["PLANNER:",subgoal_text, self.current_subgoal_segment_filled], position='top_right')
+
+            # 为第二行添加 ONLINE: 标记和 subgoal_online_text 和 grounded_subgoal_online 文本
+            combined_online = self._add_text_to_frame(combined_online, ["ONLINE:", subgoal_online_text, self.current_subgoal_segment_online_filled], position='top_right')
+
+            # 将两行视频流垂直堆叠
+            combined=np.vstack([combined,combined_online])
+
             # combined=np.hstack([base_camera_frame_for_video, wrist_camera_frame_for_video,
             #                   ])
 
@@ -415,7 +333,7 @@ class HistoryBenchRecordWrapper(gym.Wrapper):
 
 
             language_goal = task_goal.get_language_goal(self.env, self.HistoryBench_env)
-            combined = self._add_text_to_frame(combined, [language_goal,subgoal_text,self.current_subgoal_segment_filled], position='top_right')
+            combined = self._add_text_to_frame(combined, [language_goal], position='top_right')
             #wrist_camera_frame_for_video = self._add_text_to_frame(wrist_camera_frame_for_video, language_goal, position='top_right')
 
             self.video_frames.append(combined)
@@ -440,11 +358,13 @@ class HistoryBenchRecordWrapper(gym.Wrapper):
                 'action': action,
                 'state': self.agent.robot.qpos.cpu().numpy() if hasattr(self.agent.robot.qpos, 'cpu') else self.agent.robot.qpos,
                 'velocity': end_effector_velocity,
-                'subgoal': self.current_task_name if hasattr(self, 'current_task_name') else "Unknown",
+                'simple_subgoal': subgoal_text,
+                'simple_subgoal_online': subgoal_online_text,
                 'demonstration': self.current_task_demonstration if hasattr(self, 'current_task_demonstration') else False,
                 'segmentation':segmentation,
                 'segmentation_result':segmentation_result,
-                'subgoal_grounded': self.current_subgoal_segment_filled
+                'grounded_subgoal': self.current_subgoal_segment_filled,
+                'grounded_subgoal_online': self.current_subgoal_segment_online_filled
             }
 
             self.buffer.append(record_data)
@@ -573,21 +493,34 @@ class HistoryBenchRecordWrapper(gym.Wrapper):
                 ts_group.create_dataset("velocity", data=record_data['velocity'])
 
                 # 处理字符串任务名
-                task_name = record_data['subgoal']
+                task_name = record_data['simple_subgoal']
                 if isinstance(task_name, str):
                     task_name_encoded = task_name.encode('utf-8')
                 else:
                     task_name_encoded = task_name
-                ts_group.create_dataset("subgoal", data=task_name_encoded)
-                
+                ts_group.create_dataset("simple_subgoal", data=task_name_encoded)
 
-                task_name = record_data['subgoal_grounded']
+                online_task_name = record_data.get('simple_subgoal_online', 'Unknown')
+                if isinstance(online_task_name, str):
+                    task_name_encoded = online_task_name.encode('utf-8')
+                else:
+                    task_name_encoded = online_task_name
+                ts_group.create_dataset("simple_subgoal_online", data=task_name_encoded)
+
+                task_name = record_data['grounded_subgoal']
                 if isinstance(task_name, str):
                     task_name_encoded = task_name.encode('utf-8')
                 else:
                     task_name_encoded = task_name
-                ts_group.create_dataset("subgoal_grounded", data=task_name_encoded)
-                
+                ts_group.create_dataset("grounded_subgoal", data=task_name_encoded)
+
+                task_name_online = record_data.get('grounded_subgoal_online', 'Unknown')
+                if isinstance(task_name_online, str):
+                    task_name_encoded = task_name_online.encode('utf-8')
+                else:
+                    task_name_encoded = task_name_online
+                ts_group.create_dataset("grounded_subgoal_online", data=task_name_encoded)
+
                 ts_group.create_dataset("demonstration", data=record_data['demonstration'])
 
             # 写入 setup 信息
@@ -599,7 +532,7 @@ class HistoryBenchRecordWrapper(gym.Wrapper):
                     dtype=h5py.string_dtype(encoding="utf-8"),
                 )
 
-            # 记录任务列表（如果存在），便于离线复现每个 subgoal 的语义
+            # 记录任务列表（如果存在），便于离线复现每个 simple_subgoal 的语义
             if hasattr(self, 'task_list'):
                 tasks_group = setup_group.create_group("task_list")
                 for i, task_entry in enumerate(self.task_list):

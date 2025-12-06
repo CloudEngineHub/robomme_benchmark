@@ -54,7 +54,7 @@ def main():
                 reward_mode="dense",
                 HistoryBench_seed=seed,
                 max_episode_steps=200,
-                HistoryBench_difficulty=difficulty,
+                HistoryBench_difficulty="hard",
             )
 
             env_kwargs["historybench_failure_recovery"] = True

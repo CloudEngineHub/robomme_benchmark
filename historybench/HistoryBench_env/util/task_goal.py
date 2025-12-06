@@ -136,7 +136,7 @@ def get_language_goal(self,historybench_env):
             else:
                 language_goal=f'watch the video carefully, then pick up the same block that was previously picked up again, finally press the button to stop'
         elif historybench_env=="PickPeg":
-            language_goal="Watch the video carefully, then pick up and insert the peg the same way as you did before"
+            language_goal="watch the video carefully, then grasp the same end of the same peg you've picked before and insert it into the same side of the box"
 
         elif historybench_env=="StopCube":
             repeats=getattr(self.env.unwrapped, "stop_time", 1)

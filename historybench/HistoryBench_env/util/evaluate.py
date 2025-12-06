@@ -168,6 +168,9 @@ def sequential_task_check(self, tasks,allow_subgoal_change_this_timestep):
         self.current_task_solve = task_entry.get("solve")
         self.current_segment=current_segment
         self.current_subgoal_segment=current_subgoal_segment
+    self.current_task_name_online = current_task_name#实时subgoal
+    self.current_subgoal_segment_online=current_subgoal_segment#实时subgoalsegment
+    self.current_segment_online=current_segment#实时segmentonline
 
     self.current_task_specialflag=current_task_specialflag
 

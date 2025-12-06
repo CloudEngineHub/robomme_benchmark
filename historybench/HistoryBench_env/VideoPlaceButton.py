@@ -25,6 +25,7 @@ from mani_skill.utils.geometry.rotation_conversions import (
 )
 
 from .util import *
+from .errors import SceneGenerationError
 from .util.evaluate import static_check
 from .util.object_generation import spawn_fixed_cube, build_board_with_hole
 from .util import reset_panda
@@ -171,368 +172,453 @@ class VideoPlaceButton(BaseEnv):
     def _load_agent(self, options: dict):
         super()._load_agent(options, sapien.Pose(p=[-0.615, 0, 0]))
 
+
     def _load_scene(self, options: dict):
         generator = torch.Generator()
         generator.manual_seed(self.HistoryBench_seed)
 
-        self.table_scene = TableSceneBuilder(
-            self, robot_init_qpos_noise=self.robot_init_qpos_noise
-        )
-        self.table_scene.build()
-        self.goal_site = spawn_random_target(
-                        self,
-                        avoid=None,  # 使用当前避让清单，包含所有已生成的cubes
-                        include_existing=False,  # 手动维护清单
-                        include_goal=False,  # 手动维护清单
-                        region_center=[-0.2, 0],
-                        region_half_size=0.05,
-                        radius=self.cube_half_size*2,  # 使用radius而不是half_size
-                        thickness=0.005,  # target的厚度
-                        min_gap=self.cube_half_size*1,  # 与cube相同的间隙要求
-                        name_prefix=f"goal_site",
-                        generator=generator
-                        )
-        avoid=[]
-        avoid.append(self.goal_site)    
+        try:
+            self.table_scene = TableSceneBuilder(
+                self, robot_init_qpos_noise=self.robot_init_qpos_noise
+            )
+            self.table_scene.build()
+            try:
+                self.goal_site = spawn_random_target(
+                    self,
+                    avoid=None,  # 使用当前避让清单，包含所有已生成的cubes
+                    include_existing=False,  # 手动维护清单
+                    include_goal=False,  # 手动维护清单
+                    region_center=[-0.1, 0],
+                    region_half_size=0.05,
+                    radius=self.cube_half_size * 2,  # 使用radius而不是half_size
+                    thickness=0.005,  # target的厚度
+                    min_gap=self.cube_half_size * 1,  # 与cube相同的间隙要求
+                    name_prefix=f"goal_site",
+                    generator=generator,
+                )
+            except RuntimeError as exc:
+                raise SceneGenerationError("goal_site采样失败") from exc
+            avoid = [self.goal_site]
 
+            button_obb = build_button(
+                self,
+                center_xy=(-0.1, 0),
+                scale=1.5,
+                generator=generator,
+            )
+            avoid.append(button_obb)
 
+            self.all_cubes = []  # 保存所有 cube 对象
 
-        button_obb = build_button(
-            self,
-            center_xy=(-0.1, 0),
-            scale=1.5,
-            generator=generator,
-        )
-        avoid.append(button_obb)
+            # Initialize storage for each color group
+            self.red_cubes = []
+            self.red_cube_names = []
+            self.blue_cubes = []
+            self.blue_cube_names = []
+            self.green_cubes = []
+            self.green_cube_names = []
 
-                # 生成targets
-       
+            cubes_per_color = 1
+            color_groups = [
+                {"color": (1, 0, 0, 1), "name": "red", "list": self.red_cubes, "name_list": self.red_cube_names},
+                {"color": (0, 0, 1, 1), "name": "blue", "list": self.blue_cubes, "name_list": self.blue_cube_names},
+                {"color": (0, 1, 0, 1), "name": "green", "list": self.green_cubes, "name_list": self.green_cube_names},
+            ]
+            shuffle_indices = torch.randperm(len(color_groups), generator=generator).tolist()
+            color_groups = [color_groups[i] for i in shuffle_indices]
 
+            self.target_color_name = color_groups[0]["name"]
+            print(f"Target color selected: {self.target_color_name}")
 
+            # Generate cubes for each color group
+            for idx, group in enumerate(color_groups):
+                if idx < self.configs[self.difficulty]["color"]:
+                    for cube_idx in range(cubes_per_color):
+                        try:
+                            cube = spawn_random_cube(
+                                self,
+                                color=group["color"],
+                                avoid=avoid,
+                                include_existing=False,
+                                include_goal=False,
+                                region_center=[-0.1, 0],
+                                region_half_size=0.3,
+                                half_size=self.cube_half_size,
+                                min_gap=self.cube_half_size,
+                                random_yaw=True,
+                                name_prefix=f"cube_{group['name']}_{cube_idx}",
+                                generator=generator,
+                            )
+                        except RuntimeError as exc:
+                            raise SceneGenerationError(
+                                f"生成{group['name']} cube {cube_idx} 失败：{exc}"
+                            ) from exc
 
-        self.all_cubes = []  # 保存所有 cube 对象
+                        self.all_cubes.append(cube)
+                        group["list"].append(cube)
+                        cube_name = f"cube_{group['name']}_{cube_idx}"
+                        group["name_list"].append(cube_name)
+                        setattr(self, cube_name, cube)
+                        avoid.append(cube)
 
-        # Initialize storage for each color group
-        self.red_cubes = []
-        self.red_cube_names = []
-        self.blue_cubes = []
-        self.blue_cube_names = []
-        self.green_cubes = []
-        self.green_cube_names = []
+                print(f"Generated {len(group['list'])} {group['name']} cubes")
 
-        cubes_per_color = 1
-        color_groups = [
-            {"color": (1, 0, 0, 1), "name": "red", "list": self.red_cubes, "name_list": self.red_cube_names},
-            {"color": (0, 0, 1, 1), "name": "blue", "list": self.blue_cubes, "name_list": self.blue_cube_names},
-            {"color": (0, 1, 0, 1), "name": "green", "list": self.green_cubes, "name_list": self.green_cube_names}
-        ]
-        shuffle_indices = torch.randperm(len(color_groups), generator=generator).tolist()
-        color_groups = [color_groups[i] for i in shuffle_indices]
+            print(
+                f"Generated {len(self.all_cubes)} cubes total (red: {len(self.red_cubes)}, blue: {len(self.blue_cubes)}, green: {len(self.green_cubes)})"
+            )
 
-
-
-        self.target_color_name = color_groups[0]["name"]
-        print(f"Target color selected: {self.target_color_name}")
-
-            # Generate 5 cubes for each color group
-        for idx, group in enumerate(color_groups):
-            if idx < self.configs[self.difficulty]['color']:
-                for idx in range(cubes_per_color):
+            self.targets = []
+            for i in range(4):
+                if i < self.configs[self.difficulty]["targets"]:
                     try:
-                        cube = spawn_random_cube(
+                        target = spawn_random_target(
                             self,
-                            color=group["color"],
-                            avoid=avoid,
-                            include_existing=False,
-                            include_goal=False,
-                            region_center=[-0.1, 0],
-                            region_half_size=0.3,
-                            half_size=self.cube_half_size,
-                            min_gap=self.cube_half_size,
-                            random_yaw=True,
-                            name_prefix=f"cube_{group['name']}_{idx}",
+                            avoid=avoid,  # 使用当前避让清单，包含所有已生成的cubes
+                            include_existing=False,  # 手动维护清单
+                            include_goal=False,  # 手动维护清单
+                            region_center=[0, 0],
+                            region_half_size=0.2,
+                            radius=self.cube_half_size * 2,  # 使用radius而不是half_size
+                            thickness=0.005,  # target的厚度
+                            min_gap=self.cube_half_size * 1,  # 与cube相同的间隙要求
+                            name_prefix=f"target_{i}",
                             generator=generator,
                         )
-                    except RuntimeError as e:
-                        print(f"生成{group['name']} cube {idx} 失败：{e}")
-                        break
+                    except RuntimeError as exc:
+                        raise SceneGenerationError(f"第 {i + 1} 个target采样失败：{exc}") from exc
 
-                    self.all_cubes.append(cube)
-                    group["list"].append(cube)
-                    cube_name = f"cube_{group['name']}_{idx}"
-                    group["name_list"].append(cube_name)
-                    setattr(self, cube_name, cube)
-                    avoid.append(cube)
+                    self.targets.append(target)
+                    setattr(self, f"target_{i}", target)
+                    avoid.append(target)
 
-            print(f"Generated {len(group['list'])} {group['name']} cubes")
+            if len(self.all_cubes) > 0:
+                target_cube_idx = torch.randint(0, len(self.all_cubes), (1,), generator=generator).item()
+                self.target_cube = self.all_cubes[target_cube_idx]
 
-        print(f"Generated {len(self.all_cubes)} cubes total (red: {len(self.red_cubes)}, blue: {len(self.blue_cubes)}, green: {len(self.green_cubes)})")
+                if self.target_cube in self.red_cubes:
+                    self.target_color_name = "red"
+                elif self.target_cube in self.blue_cubes:
+                    self.target_color_name = "blue"
+                elif self.target_cube in self.green_cubes:
+                    self.target_color_name = "green"
 
-        self.targets = []
-        for i in range(4):
-            if i < self.configs[self.difficulty]['targets']:
-                try:
-                    target = spawn_random_target(
-                        self,
-                        avoid=avoid,  # 使用当前避让清单，包含所有已生成的cubes
-                        include_existing=False,  # 手动维护清单
-                        include_goal=False,  # 手动维护清单
-                        region_center=[0, 0],
-                        region_half_size=0.2,
-                        radius=self.cube_half_size*2,  # 使用radius而不是half_size
-                        thickness=0.005,  # target的厚度
-                        min_gap=self.cube_half_size*1,  # 与cube相同的间隙要求
-                        name_prefix=f"target_{i}",
-                        generator=generator
-                    )
-                except RuntimeError as e:
-                    print(f"第 {i + 1} 个target采样失败：{e}")
-                    break
-
-                self.targets.append(target)
-                # 将target赋值给self.target_0, self.target_1等属性
-                setattr(self, f"target_{i}", target)
-                # 将新生成的target加入避让清单
-                
-                avoid.append(target)
-                    # 将除 target_1 外的所有 targets 放入列表
-        
-
-
-
-
-
- # Randomly select one cube from all available cubes as the target
-        if len(self.all_cubes) > 0:
-            target_cube_idx = torch.randint(0, len(self.all_cubes), (1,), generator=generator).item()
-            self.target_cube = self.all_cubes[target_cube_idx]
-
-            # Determine the color of the selected target cube
-            if self.target_cube in self.red_cubes:
-                self.target_color_name = "red"
-            elif self.target_cube in self.blue_cubes:
-                self.target_color_name = "blue"
-            elif self.target_cube in self.green_cubes:
-                self.target_color_name = "green"
-
-
-            print(f"Target cube selected: {self.target_color_name} cube (index {target_cube_idx} in all_cubes)")
-        else:
-            self.target_cube = None
-            self.target_color_name = None
-            print("No cubes generated, no target cube selected")
-
-        # Create list of non-target cubes for failure checking
-        self.non_target_cubes = [cube for cube in self.all_cubes if cube != self.target_cube]
-        print(f"Non-target cubes: {len(self.non_target_cubes)}")
-
-
-
-
-        # 预设交换目标
-        self.swap_target_a = None
-        self.swap_target_b = None
-        self.swap_target_other = []
-
-        if self.configs[self.difficulty]['swap']==True:
-            if len(self.targets) >= 2:
-                perm = torch.randperm(len(self.targets), generator=generator)
-                swap_idx_a = perm[0].item()
-                swap_idx_b = perm[1].item()
-                self.swap_target_a = self.targets[swap_idx_a]
-                self.swap_target_b = self.targets[swap_idx_b]
-                self.swap_target_other = [
-                    target
-                    for idx, target in enumerate(self.targets)
-                    if idx not in (swap_idx_a, swap_idx_b)
-                ]
                 print(
-                    f"Swap targets selected: target_{swap_idx_a} <-> target_{swap_idx_b}"
+                    f"Target cube selected: {self.target_color_name} cube (index {target_cube_idx} in all_cubes)"
                 )
+            else:
+                self.target_cube = None
+                self.target_color_name = None
+                print("No cubes generated, no target cube selected")
 
-        if  self.configs[self.difficulty]['additional_place']==True:
-            self.pre_flag = torch.rand(1, generator=generator).item() < 0.5
-            self.post_flag = torch.rand(1, generator=generator).item() < 0.5
-        else:
-            self.pre_flag=0
-            self.post_flag=0
-        self.task_flag=torch.rand(1, generator=generator).item() < 0.5
+            self.non_target_cubes = [cube for cube in self.all_cubes if cube != self.target_cube]
+            print(f"Non-target cubes: {len(self.non_target_cubes)}")
 
-    
-        if self.task_flag ==1:
-            self.target_target=self.target_0
-            self.target_target_language="before"
-        else:
-            self.target_target=self.target_1
-            self.target_target_language="after"
+            self.swap_target_a = None
+            self.swap_target_b = None
+            self.swap_target_other = []
 
-        self.targets_not_true = [t for i, t in enumerate(self.targets) if self.targets[i]!=self.target_target]
-        
-        tasks = []
-        if self.pre_flag==True:
-            tasks.append({
-                    "func": (lambda: is_obj_pickup(self, obj=self.target_cube)),
-                    "name": f"pick up the cube",
-                    "subgoal_segment":f"pick up the cube at <>",
-                    "demonstration": True,
-                    "failure_func": None,
-                    "solve": lambda env, planner: solve_pickup(env, planner, obj=self.target_cube),
-                    'segment':self.target_cube,
-                })
-            tasks.append({
-                    "func": (lambda: is_obj_dropped_onto(self,obj=self.target_cube,target=self.target_2)),
-                    "name": "drop the cube onto target",
-                    "subgoal_segment":f"drop the cube onto target at <>",
-                    "demonstration": True,
-                    "failure_func": None,
-                    "solve": lambda env, planner: solve_putonto_whenhold(env, planner,target=self.target_2),
-                    'segment':self.target_2,
-            })
-############
-        tasks.append({
-                "func": (lambda: is_obj_pickup(self, obj=self.target_cube)),
-                "name": f"pick up the cube",
-                "subgoal_segment":f"pick up the cube at <>",
-                "demonstration": True,
-                "failure_func": None,
-                "solve": lambda env, planner: solve_pickup(env, planner, obj=self.target_cube),
-                'segment':self.target_cube,
-            })
-        tasks.append({
-                "func": (lambda: is_obj_dropped_onto(self,obj=self.target_cube,target=self.target_0)),
-                "name": "drop the cube onto target",
-                "subgoal_segment":f"drop the cube onto target at <>",
-                "demonstration": True,
-                "failure_func": None,
-                "solve": lambda env, planner: solve_putonto_whenhold(env, planner,target=self.target_0),
-                'segment':self.target_0,
-         })
-############
-        tasks.append({
-                "func": (lambda: is_button_pressed(self,obj=self.button)),
-                "name": "press the button",
-                "subgoal_segment":f"press the button at <>",
-                "demonstration": True,
-                "failure_func": None,
-                "solve": lambda env, planner: solve_button(env, planner, self.button),
-                "segment":self.cap_link 
-         })
-        ############
-        if self.post_flag==True:
-                    tasks.append({
+            if self.configs[self.difficulty]["swap"] == True:
+                if len(self.targets) >= 2:
+                    perm = torch.randperm(len(self.targets), generator=generator)
+                    swap_idx_a = perm[0].item()
+                    swap_idx_b = perm[1].item()
+                    self.swap_target_a = self.targets[swap_idx_a]
+                    self.swap_target_b = self.targets[swap_idx_b]
+                    self.swap_target_other = [
+                        target
+                        for idx, target in enumerate(self.targets)
+                        if idx not in (swap_idx_a, swap_idx_b)
+                    ]
+                    print(
+                        f"Swap targets selected: target_{swap_idx_a} <-> target_{swap_idx_b}"
+                    )
+
+            if self.configs[self.difficulty]["additional_place"] == True:
+                self.pre_flag = torch.rand(1, generator=generator).item() < 0.5
+                self.post_flag = torch.rand(1, generator=generator).item() < 0.5
+            else:
+                self.pre_flag = 0
+                self.post_flag = 0
+            self.task_flag = torch.rand(1, generator=generator).item() < 0.5
+
+            if self.task_flag == 1:
+                self.target_target = self.target_0
+                self.target_target_language = "before"
+            else:
+                self.target_target = self.target_1
+                self.target_target_language = "after"
+
+            self.targets_not_true = [
+                t for i, t in enumerate(self.targets) if self.targets[i] != self.target_target
+            ]
+
+            tasks = []
+            if self.pre_flag == True:
+                tasks.append(
+                    {
                         "func": (lambda: is_obj_pickup(self, obj=self.target_cube)),
                         "name": f"pick up the cube",
-                        "subgoal_segment":f"pick up the cube at <>",
+                        "subgoal_segment": f"pick up the cube at <>",
                         "demonstration": True,
                         "failure_func": None,
-                        "solve": lambda env, planner: solve_pickup(env, planner, obj=self.target_cube),
-                        'segment':self.target_cube,
-                    })
-                    tasks.append({
-                            "func": (lambda: is_obj_dropped_onto(self,obj=self.target_cube,target=self.target_3)),
-                            "name": "drop the cube onto target",
-                            "subgoal_segment":f"drop the cube onto target at <>",
-                            "demonstration": True,
-                            "failure_func": None,
-                            "solve": lambda env, planner: solve_putonto_whenhold(env, planner,target=self.target_3),
-                            'segment':self.target_3,
-            })
-############
-        tasks.append({
-                "func": (lambda: is_obj_pickup(self, obj=self.target_cube)),
-                "name": f"pick up the cube",
-                "subgoal_segment":f"pick up the cube at <>",
-                "demonstration": True,
-                "failure_func": None,
-                "solve": lambda env, planner: solve_pickup(env, planner, obj=self.target_cube),
-                'segment':self.target_cube,
-            })
-        tasks.append({
-                "func": (lambda: is_obj_dropped_onto(self,obj=self.target_cube,target=self.target_1)),
-                "name": "drop the cube onto target",
-                "subgoal_segment":f"drop the cube onto target at <>",
-                "demonstration": True,
-                "failure_func": None,
-                "solve": lambda env, planner: solve_putonto_whenhold(env, planner, target=self.target_1),
-                'segment':self.target_1,
-            
-         })
+                        "solve": lambda env, planner: solve_pickup(
+                            env, planner, obj=self.target_cube
+                        ),
+                        "segment": self.target_cube,
+                    }
+                )
+                tasks.append(
+                    {
+                        "func": (
+                            lambda: is_obj_dropped_onto(
+                                self, obj=self.target_cube, target=self.target_2
+                            )
+                        ),
+                        "name": "drop the cube onto target",
+                        "subgoal_segment": f"drop the cube onto target at <>",
+                        "demonstration": True,
+                        "failure_func": None,
+                        "solve": lambda env, planner: solve_putonto_whenhold(
+                            env, planner, target=self.target_2
+                        ),
+                        "segment": self.target_2,
+                    }
+                )
 
-############
-        tasks.append({
-                "func": (lambda: is_obj_pickup(self, obj=self.target_cube)),
-                "name": f"pick up the cube",
-                "subgoal_segment":f"pick up the cube at <>",
-                "demonstration": True,
-                "failure_func": None,
-                "solve": lambda env, planner: solve_pickup(env, planner, obj=self.target_cube),
-                'segment':self.target_cube,
-            })
-        tasks.append({
-                "func": (lambda: is_obj_dropped_onto(self,obj=self.target_cube,target=self.goal_site)),
-                "name": "drop the cube onto table",
-                "subgoal_segment":f"drop the cube onto table",
-                "demonstration": True,
-                "failure_func": None,
-                "solve": lambda env, planner: [solve_putonto_whenhold(env, planner,target=self.goal_site), 
-                                              ],
-
-         })
-        
-        tasks.append(       {
-                            "func": lambda: static_check(self, timestep=int(self.elapsed_steps), static_steps=60),
-                            "name": "static",
-                            "subgoal_segment":f"static",
-                            "demonstration": True,
-                            "failure_func": None,
-                            "solve": lambda env, planner: [solve_reset(env,planner), solve_hold_obj(env, planner, static_steps=60)],
-
-                            },)
-   
-        tasks.append(             {
-                            "func": lambda:reset_check(self),
-                            "name": "NO RECORD",
-                            "subgoal_segment":f"NO RECORD",
-                            "demonstration": True,
-                            "failure_func": None,
-                            "solve": lambda env, planner: [ solve_strong_reset(env,planner)],
-                            },)
-
-        tasks.append({
-                "func": (lambda: is_obj_pickup(self, obj=self.target_cube)),
-                "name": f"pick up the cube",
-                "subgoal_segment":f"pick up the cube at <>",
-                "demonstration": False,
-                "failure_func":lambda: is_any_obj_pickup(self, self.non_target_cubes),
-                "solve": lambda env, planner: [solve_pickup(env, planner, obj=self.target_cube)],
-                'segment':self.target_cube,
-            })
-        tasks.append({
-                "func": (lambda: is_obj_dropped_onto(self,obj=self.target_cube,target=self.target_target)),
-                "name": "place the cube onto the correct target",
-                "subgoal_segment":f"place the cube onto the correct target at <>",
-                "demonstration": False,
-                "failure_func": (lambda: is_obj_dropped_onto_any(self,obj=self.target_cube,target=self.targets_not_true)),
-                "solve": lambda env, planner: [solve_putonto_whenhold(env, planner,target=self.target_target),],
-                'segment':self.target_target,
-        
-         })
-
-
-
-        # 存储任务列表供RecordWrapper使用
-        self.task_list = tasks
-        # 记录用于恢复的 pickup 相关任务索引和条目
-        self.recovery_pickup_indices, self.recovery_pickup_tasks = task4recovery(self.task_list)
-        if self.historybench_failure_recovery:
-            # Only inject an intentional failed grasp when recovery mode is enabled
-            self.fail_grasp_task_index = inject_fail_grasp(
-                self.task_list,
-                generator=generator,
-                mode=self.historybench_failure_recovery_mode,
+            tasks.append(
+                {
+                    "func": (lambda: is_obj_pickup(self, obj=self.target_cube)),
+                    "name": f"pick up the cube",
+                    "subgoal_segment": f"pick up the cube at <>",
+                    "demonstration": True,
+                    "failure_func": None,
+                    "solve": lambda env, planner: solve_pickup(
+                        env, planner, obj=self.target_cube
+                    ),
+                    "segment": self.target_cube,
+                }
             )
-        else:
-            self.fail_grasp_task_index = None
+            tasks.append(
+                {
+                    "func": (
+                        lambda: is_obj_dropped_onto(
+                            self, obj=self.target_cube, target=self.target_0
+                        )
+                    ),
+                    "name": "drop the cube onto target",
+                    "subgoal_segment": f"drop the cube onto target at <>",
+                    "demonstration": True,
+                    "failure_func": None,
+                    "solve": lambda env, planner: solve_putonto_whenhold(
+                        env, planner, target=self.target_0
+                    ),
+                    "segment": self.target_0,
+                }
+            )
+
+            tasks.append(
+                {
+                    "func": (lambda: is_button_pressed(self, obj=self.button)),
+                    "name": "press the button",
+                    "subgoal_segment": f"press the button at <>",
+                    "demonstration": True,
+                    "failure_func": None,
+                    "solve": lambda env, planner: solve_button(env, planner, self.button),
+                    "segment": self.cap_link,
+                }
+            )
+
+            if self.post_flag == True:
+                tasks.append(
+                    {
+                        "func": (lambda: is_obj_pickup(self, obj=self.target_cube)),
+                        "name": f"pick up the cube",
+                        "subgoal_segment": f"pick up the cube at <>",
+                        "demonstration": True,
+                        "failure_func": None,
+                        "solve": lambda env, planner: solve_pickup(
+                            env, planner, obj=self.target_cube
+                        ),
+                        "segment": self.target_cube,
+                    }
+                )
+                tasks.append(
+                    {
+                        "func": (
+                            lambda: is_obj_dropped_onto(
+                                self, obj=self.target_cube, target=self.target_3
+                            )
+                        ),
+                        "name": "drop the cube onto target",
+                        "subgoal_segment": f"drop the cube onto target at <>",
+                        "demonstration": True,
+                        "failure_func": None,
+                        "solve": lambda env, planner: solve_putonto_whenhold(
+                            env, planner, target=self.target_3
+                        ),
+                        "segment": self.target_3,
+                    }
+                )
+
+            tasks.append(
+                {
+                    "func": (lambda: is_obj_pickup(self, obj=self.target_cube)),
+                    "name": f"pick up the cube",
+                    "subgoal_segment": f"pick up the cube at <>",
+                    "demonstration": True,
+                    "failure_func": None,
+                    "solve": lambda env, planner: solve_pickup(
+                        env, planner, obj=self.target_cube
+                    ),
+                    "segment": self.target_cube,
+                }
+            )
+            tasks.append(
+                {
+                    "func": (
+                        lambda: is_obj_dropped_onto(
+                            self, obj=self.target_cube, target=self.target_1
+                        )
+                    ),
+                    "name": "drop the cube onto target",
+                    "subgoal_segment": f"drop the cube onto target at <>",
+                    "demonstration": True,
+                    "failure_func": None,
+                    "solve": lambda env, planner: solve_putonto_whenhold(
+                        env, planner, target=self.target_1
+                    ),
+                    "segment": self.target_1,
+                }
+            )
+
+            tasks.append(
+                {
+                    "func": (lambda: is_obj_pickup(self, obj=self.target_cube)),
+                    "name": f"pick up the cube",
+                    "subgoal_segment": f"pick up the cube at <>",
+                    "demonstration": True,
+                    "failure_func": None,
+                    "solve": lambda env, planner: solve_pickup(
+                        env, planner, obj=self.target_cube
+                    ),
+                    "segment": self.target_cube,
+                }
+            )
+            tasks.append(
+                {
+                    "func": (
+                        lambda: is_obj_dropped_onto(
+                            self, obj=self.target_cube, target=self.goal_site
+                        )
+                    ),
+                    "name": "drop the cube onto table",
+                    "subgoal_segment": f"drop the cube onto table",
+                    "demonstration": True,
+                    "failure_func": None,
+                    "solve": lambda env, planner: [
+                        solve_putonto_whenhold(env, planner, target=self.goal_site),
+                    ],
+                }
+            )
+
+            tasks.append(
+                {
+                    "func": lambda: static_check(
+                        self, timestep=int(self.elapsed_steps), static_steps=20
+                    ),
+                    "name": "static",
+                    "subgoal_segment": f"static",
+                    "demonstration": True,
+                    "failure_func": None,
+                    "solve": lambda env, planner: [
+                        solve_reset(env, planner),
+                        solve_hold_obj(env, planner, static_steps=20),
+                    ],
+                },
+            )
+
+            tasks.append(
+                {
+                    "func": lambda: static_check(
+                        self, timestep=int(self.elapsed_steps), static_steps=60
+                    ),
+                    "name": "static",
+                    "subgoal_segment": f"static",
+                    "specialflag": "swap",
+                    "demonstration": True,
+                    "failure_func": None,
+                    "solve": lambda env, planner: [
+                        solve_hold_obj(env, planner, static_steps=60)
+                    ],
+                },
+            )
+
+            tasks.append(
+                {
+                    "func": lambda: reset_check(self),
+                    "name": "NO RECORD",
+                    "subgoal_segment": f"NO RECORD",
+                    "demonstration": True,
+                    "failure_func": None,
+                    "solve": lambda env, planner: [solve_strong_reset(env, planner)],
+                },
+            )
+
+            tasks.append(
+                {
+                    "func": (lambda: is_obj_pickup(self, obj=self.target_cube)),
+                    "name": f"pick up the cube",
+                    "subgoal_segment": f"pick up the cube at <>",
+                    "demonstration": False,
+                    "failure_func": lambda: is_any_obj_pickup(self, self.non_target_cubes),
+                    "solve": lambda env, planner: [
+                        solve_pickup(env, planner, obj=self.target_cube)
+                    ],
+                    "segment": self.target_cube,
+                }
+            )
+            tasks.append(
+                {
+                    "func": (
+                        lambda: is_obj_dropped_onto(
+                            self, obj=self.target_cube, target=self.target_target
+                        )
+                    ),
+                    "name": "place the cube onto the correct target",
+                    "subgoal_segment": f"place the cube onto the correct target at <>",
+                    "demonstration": False,
+                    "failure_func": (
+                        lambda: is_obj_dropped_onto_any(
+                            self, obj=self.target_cube, target=self.targets_not_true
+                        )
+                    ),
+                    "solve": lambda env, planner: [
+                        solve_putonto_whenhold(env, planner, target=self.target_target),
+                    ],
+                    "segment": self.target_target,
+                }
+            )
+
+            self.task_list = tasks
+            self.recovery_pickup_indices, self.recovery_pickup_tasks = task4recovery(
+                self.task_list
+            )
+            if self.historybench_failure_recovery:
+                self.fail_grasp_task_index = inject_fail_grasp(
+                    self.task_list,
+                    generator=generator,
+                    mode=self.historybench_failure_recovery_mode,
+                )
+            else:
+                self.fail_grasp_task_index = None
+
+        except SceneGenerationError:
+            raise
+        except Exception as exc:
+            raise SceneGenerationError(
+                f"Failed to load VideoPlaceButton scene for seed {self.HistoryBench_seed}"
+            ) from exc
+
 
     def _initialize_episode(self, env_idx: torch.Tensor, options: dict):
         with torch.device(self.device):

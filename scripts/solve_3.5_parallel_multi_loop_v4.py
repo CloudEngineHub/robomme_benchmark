@@ -61,22 +61,22 @@ from planner_fail_safe import (
 
 
 DEFAULT_ENVS =[
-# "PickXtimes",
-# "StopCube",
-# "SwingXtimes",
-# "BinFill",
+"PickXtimes",
+"StopCube",
+"SwingXtimes",
+"BinFill",
 
-# "VideoUnmaskSwap",
-# "VideoUnmask",
-# "ButtonUnmaskSwap",
-# "ButtonUnmask",
+"VideoUnmaskSwap",
+"VideoUnmask",
+"ButtonUnmaskSwap",
+"ButtonUnmask",
 
-# "VideoRepick",
-# "VideoPlaceButton",
-# "VideoPlaceOrder",
-# "PickHighlight",
+"VideoRepick",
+"VideoPlaceButton",
+"VideoPlaceOrder",
+"PickHighlight",
 
-#"InsertPeg",
+"InsertPeg",
 'MoveCube',
 "PatternLock",
 "RouteStick"
@@ -452,7 +452,7 @@ def parse_args() -> argparse.Namespace:
         "--episodes",
         "-n",
         type=int,
-        default=10,
+        default=32,
         help="Number of episodes to generate per environment (default: 50)",
     )
 

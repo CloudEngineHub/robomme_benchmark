@@ -28,6 +28,7 @@ from mani_skill.utils.geometry.rotation_conversions import (
     matrix_to_quaternion,
 )
 
+from .errors import SceneGenerationError
 from .util import *
 from .util.evaluate import static_check
 from .util.object_generation import spawn_fixed_cube, build_board_with_hole
@@ -174,248 +175,226 @@ class VideoPlaceOrder(BaseEnv):
     def _load_agent(self, options: dict):
         super()._load_agent(options, sapien.Pose(p=[-0.615, 0, 0]))
 
+
     def _load_scene(self, options: dict):
 
-
-        self.table_scene = TableSceneBuilder(
-            self, robot_init_qpos_noise=self.robot_init_qpos_noise
-        )
-        self.table_scene.build()
-
-        yaw=0
-        rotate = np.array([np.cos(yaw/2), 0, 0, np.sin(yaw/2)])  # z轴旋转的四元数
-        angles = torch.deg2rad(torch.tensor([0.0, 90.0, 0.0], dtype=torch.float32))  # (3,)
-        rotate = matrix_to_quaternion(
-            euler_angles_to_matrix(angles, convention="XYZ")
-        )
-        self.goal_site = spawn_random_target(
-                        self,
-                        avoid=None,  # 使用当前避让清单，包含所有已生成的cubes
-                        include_existing=False,  # 手动维护清单
-                        include_goal=False,  # 手动维护清单
-                        region_center=[-0.2, 0],
-                        region_half_size=0.05,
-                        radius=self.cube_half_size*2,  # 使用radius而不是half_size
-                        thickness=0.005,  # target的厚度
-                        min_gap=self.cube_half_size*1,  # 与cube相同的间隙要求
-                        name_prefix=f"goal_site",
-                        generator=self.generator
-                        )
-        avoid=[]
-        avoid.append(self.goal_site)    
-        button_obb = build_button(
-            self,
-            center_xy=(-0.1, 0),
-            scale=1.5,
-            generator=self.generator,
-        )
-        avoid.append(button_obb)
-
-                # 生成targets
-       
-
-
-
-        self.all_cubes = []  # 保存所有 cube 对象
-
-        # Initialize storage for each color group
-        self.red_cubes = []
-        self.red_cube_names = []
-        self.blue_cubes = []
-        self.blue_cube_names = []
-        self.green_cubes = []
-        self.green_cube_names = []
-
-        cubes_per_color = 1
-        color_groups = [
-            {"color": (1, 0, 0, 1), "name": "red", "list": self.red_cubes, "name_list": self.red_cube_names},
-            {"color": (0, 0, 1, 1), "name": "blue", "list": self.blue_cubes, "name_list": self.blue_cube_names},
-            {"color": (0, 1, 0, 1), "name": "green", "list": self.green_cubes, "name_list": self.green_cube_names}
-        ]
-        shuffle_indices = torch.randperm(len(color_groups), generator=self.generator).tolist()
-        color_groups = [color_groups[i] for i in shuffle_indices]
-
-
-        self.target_color_name = color_groups[0]["name"]
-        print(f"Target color selected: {self.target_color_name}")
-
-            # Generate 5 cubes for each color group
-        for idx, group in enumerate(color_groups):
-            if idx < self.configs[self.difficulty]['color']:
-                for idx in range(cubes_per_color):
-                    try:
-                        cube = spawn_random_cube(
-                            self,
-                            color=group["color"],
-                            avoid=avoid,
-                            include_existing=False,
-                            include_goal=False,
-                            region_center=[-0.1, 0],
-                            region_half_size=0.2,
-                            half_size=self.cube_half_size,
-                            min_gap=self.cube_half_size,
-                            random_yaw=True,
-                            name_prefix=f"cube_{group['name']}_{idx}",
-                            generator=self.generator,
-                        )
-                    except RuntimeError as e:
-                        print(f"生成{group['name']} cube {idx} 失败：{e}")
-                        break
-
-                    self.all_cubes.append(cube)
-                    group["list"].append(cube)
-                    cube_name = f"cube_{group['name']}_{idx}"
-                    group["name_list"].append(cube_name)
-                    setattr(self, cube_name, cube)
-                    avoid.append(cube)
-
-            print(f"Generated {len(group['list'])} {group['name']} cubes")
-
-        print(f"Generated {len(self.all_cubes)} cubes total (red: {len(self.red_cubes)}, blue: {len(self.blue_cubes)}, green: {len(self.green_cubes)})")
-
-        self.targets = []
-        for i in range(4):
-            if i < self.configs[self.difficulty]['targets']:
-                try:
-                    target = spawn_random_target(
-                        self,
-                        avoid=avoid,  # 使用当前避让清单，包含所有已生成的cubes
-                        include_existing=False,  # 手动维护清单
-                        include_goal=False,  # 手动维护清单
-                        region_center=[0, 0],
-                        region_half_size=0.2,
-                        radius=self.cube_half_size*2,  # 使用radius而不是half_size
-                        thickness=0.005,  # target的厚度
-                        min_gap=self.cube_half_size*1,  # 与cube相同的间隙要求
-                        name_prefix=f"target_{i}",
-                        generator=self.generator
-                    )
-                except RuntimeError as e:
-                    print(f"第 {i + 1} 个target采样失败：{e}")
-                    break
-
-                self.targets.append(target)
-                # 将target赋值给self.target_0, self.target_1等属性
-                setattr(self, f"target_{i}", target)
-                # 将新生成的target加入避让清单
-                
-                avoid.append(target)
-                    # 将除 target_1 外的所有 targets 放入列表
-        
-
-
-
-
-
- # Randomly select one cube from all available cubes as the target
-        if len(self.all_cubes) > 0:
-            target_cube_idx = torch.randint(0, len(self.all_cubes), (1,), generator=self.generator).item()
-            self.target_cube = self.all_cubes[target_cube_idx]
-
-            # Determine the color of the selected target cube
-            if self.target_cube in self.red_cubes:
-                self.target_color_name = "red"
-            elif self.target_cube in self.blue_cubes:
-                self.target_color_name = "blue"
-            elif self.target_cube in self.green_cubes:
-                self.target_color_name = "green"
-
-
-            print(f"Target cube selected: {self.target_color_name} cube (index {target_cube_idx} in all_cubes)")
-        else:
-            self.target_cube = None
-            self.target_color_name = None
-            print("No cubes generated, no target cube selected")
-
-        # Create list of non-target cubes for failure checking
-        self.non_target_cubes = [cube for cube in self.all_cubes if cube != self.target_cube]
-        print(f"Non-target cubes: {len(self.non_target_cubes)}")
-
-
-
-
-        # 预设交换目标
-        self.swap_target_a = None
-        self.swap_target_b = None
-        self.swap_target_other = []
-
-        if self.configs[self.difficulty]['swap']==True:
-            if len(self.targets) >= 2:
-                perm = torch.randperm(len(self.targets), generator=self.generator)
-                swap_idx_a = perm[0].item()
-                swap_idx_b = perm[1].item()
-                self.swap_target_a = self.targets[swap_idx_a]
-                self.swap_target_b = self.targets[swap_idx_b]
-                self.swap_target_other = [
-                    target
-                    for idx, target in enumerate(self.targets)
-                    if idx not in (swap_idx_a, swap_idx_b)
-                ]
-                print(
-                    f"Swap targets selected: target_{swap_idx_a} <-> target_{swap_idx_b}"
-                )
-        # 随机选择1-4个targets
-        num_targets_to_pick = torch.randint(2, len(self.targets) + 1, (1,), generator=self.generator).item()
-
-        #num_targets_to_pick = torch.randint(4, len(self.targets) + 1, (1,), generator=self.generator).item()
-        indices = torch.randperm(len(self.targets), generator=self.generator)[:num_targets_to_pick]
-
-        self.which_targets_to_pick = [self.targets[i] for i in indices]
-
-
-        self.which_in_subset=torch.randint(1,len(self.which_targets_to_pick)+1,(1,),generator=self.generator).item()
-        #self.which_targets_to_pick = torch.ran
-
-
-        print("self.which_in_subset:",self.which_in_subset)
-        self.target_target=self.which_targets_to_pick[self.which_in_subset-1]
-
-        self.targets_not_true = [t for i, t in enumerate(self.targets) if self.targets[i]!=self.target_target]
-
-        if len(self.which_targets_to_pick) > 0:
-            k = torch.randint(0, len(self.which_targets_to_pick), (1,), generator=self.generator).item()
-            self.button_task_index = k * 2 + 2  # each pair contributes pickup + drop
-        else:
-            self.button_task_index = 0
-
-        def _actor_to_name(actor):
-            if actor is None:
-                return None
-            if hasattr(actor, "name"):
-                return actor.name
-            return str(actor)
-
-        target_debug_payload = {
-            "historybench_seed": self.HistoryBench_seed,
-            "which_in_subset": self.which_in_subset,
-            "num_targets_to_pick": num_targets_to_pick,
-            "which_targets_to_pick": [_actor_to_name(target) for target in self.which_targets_to_pick],
-            "target_target": _actor_to_name(self.target_target),
-            "button_task_index": self.button_task_index,
-        }
-
         try:
-            log_path = Path(__file__).resolve().parent / "target_selection.json"
-            payload_list = []
-            if log_path.exists():
-                try:
-                    with open(log_path, "r") as fp:
-                        existing_payload = json.load(fp)
-                    if isinstance(existing_payload, list):
-                        payload_list = existing_payload
-                    elif existing_payload is not None:
-                        payload_list = [existing_payload]
-                except json.JSONDecodeError:
-                    # 如果文件被破坏，保留备份并重新开始
-                    log_path.with_suffix(".json.bak").write_text(log_path.read_text())
-                    payload_list = []
-            payload_list.append(target_debug_payload)
-            with open(log_path, "w") as fp:
-                json.dump(payload_list, fp, indent=2)
+            self.table_scene = TableSceneBuilder(
+                self, robot_init_qpos_noise=self.robot_init_qpos_noise
+            )
+            self.table_scene.build()
+
+            yaw = 0
+            rotate = np.array([np.cos(yaw / 2), 0, 0, np.sin(yaw / 2)])  # z轴旋转的四元数
+            angles = torch.deg2rad(torch.tensor([0.0, 90.0, 0.0], dtype=torch.float32))  # (3,)
+            rotate = matrix_to_quaternion(
+                euler_angles_to_matrix(angles, convention="XYZ")
+            )
+            try:
+                self.goal_site = spawn_random_target(
+                    self,
+                    avoid=None,  # 使用当前避让清单，包含所有已生成的cubes
+                    include_existing=False,  # 手动维护清单
+                    include_goal=False,  # 手动维护清单
+                    region_center=[-0.1, 0],
+                    region_half_size=0.05,
+                    radius=self.cube_half_size * 2,  # 使用radius而不是half_size
+                    thickness=0.005,  # target的厚度
+                    min_gap=self.cube_half_size * 1,  # 与cube相同的间隙要求
+                    name_prefix=f"goal_site",
+                    generator=self.generator,
+                )
+            except RuntimeError as exc:
+                raise SceneGenerationError("goal_site采样失败") from exc
+            avoid = []
+            avoid.append(self.goal_site)
+            button_obb = build_button(
+                self,
+                center_xy=(-0.1, 0),
+                scale=1.5,
+                generator=self.generator,
+            )
+            avoid.append(button_obb)
+
+            self.all_cubes = []  # 保存所有 cube 对象
+
+            self.red_cubes = []
+            self.red_cube_names = []
+            self.blue_cubes = []
+            self.blue_cube_names = []
+            self.green_cubes = []
+            self.green_cube_names = []
+
+            cubes_per_color = 1
+            color_groups = [
+                {"color": (1, 0, 0, 1), "name": "red", "list": self.red_cubes, "name_list": self.red_cube_names},
+                {"color": (0, 0, 1, 1), "name": "blue", "list": self.blue_cubes, "name_list": self.blue_cube_names},
+                {"color": (0, 1, 0, 1), "name": "green", "list": self.green_cubes, "name_list": self.green_cube_names},
+            ]
+            shuffle_indices = torch.randperm(len(color_groups), generator=self.generator).tolist()
+            color_groups = [color_groups[i] for i in shuffle_indices]
+
+            self.target_color_name = color_groups[0]["name"]
+            print(f"Target color selected: {self.target_color_name}")
+
+            for idx, group in enumerate(color_groups):
+                if idx < self.configs[self.difficulty]['color']:
+                    for cube_idx in range(cubes_per_color):
+                        try:
+                            cube = spawn_random_cube(
+                                self,
+                                color=group["color"],
+                                avoid=avoid,
+                                include_existing=False,
+                                include_goal=False,
+                                region_center=[-0.1, 0],
+                                region_half_size=0.2,
+                                half_size=self.cube_half_size,
+                                min_gap=self.cube_half_size,
+                                random_yaw=True,
+                                name_prefix=f"cube_{group['name']}_{cube_idx}",
+                                generator=self.generator,
+                            )
+                        except RuntimeError as exc:
+                            raise SceneGenerationError(
+                                f"生成{group['name']} cube {cube_idx} 失败：{exc}"
+                            ) from exc
+
+                        self.all_cubes.append(cube)
+                        group["list"].append(cube)
+                        cube_name = f"cube_{group['name']}_{cube_idx}"
+                        group["name_list"].append(cube_name)
+                        setattr(self, cube_name, cube)
+                        avoid.append(cube)
+
+                print(f"Generated {len(group['list'])} {group['name']} cubes")
+
+            print(f"Generated {len(self.all_cubes)} cubes total (red: {len(self.red_cubes)}, blue: {len(self.blue_cubes)}, green: {len(self.green_cubes)})")
+
+            self.targets = []
+            for i in range(4):
+                if i < self.configs[self.difficulty]['targets']:
+                    try:
+                        target = spawn_random_target(
+                            self,
+                            avoid=avoid,  # 使用当前避让清单，包含所有已生成的cubes
+                            include_existing=False,  # 手动维护清单
+                            include_goal=False,  # 手动维护清单
+                            region_center=[0, 0],
+                            region_half_size=0.2,
+                            radius=self.cube_half_size*2,  # 使用radius而不是half_size
+                            thickness=0.005,  # target的厚度
+                            min_gap=self.cube_half_size*1,  # 与cube相同的间隙要求
+                            name_prefix=f"target_{i}",
+                            generator=self.generator
+                        )
+                    except RuntimeError as exc:
+                        raise SceneGenerationError(f"第 {i + 1} 个target采样失败：{exc}") from exc
+
+                    self.targets.append(target)
+                    setattr(self, f"target_{i}", target)
+                    avoid.append(target)
+
+            if len(self.all_cubes) > 0:
+                target_cube_idx = torch.randint(0, len(self.all_cubes), (1,), generator=self.generator).item()
+                self.target_cube = self.all_cubes[target_cube_idx]
+
+                if self.target_cube in self.red_cubes:
+                    self.target_color_name = "red"
+                elif self.target_cube in self.blue_cubes:
+                    self.target_color_name = "blue"
+                elif self.target_cube in self.green_cubes:
+                    self.target_color_name = "green"
+
+                print(f"Target cube selected: {self.target_color_name} cube (index {target_cube_idx} in all_cubes)")
+            else:
+                self.target_cube = None
+                self.target_color_name = None
+                print("No cubes generated, no target cube selected")
+
+            self.non_target_cubes = [cube for cube in self.all_cubes if cube != self.target_cube]
+            print(f"Non-target cubes: {len(self.non_target_cubes)}")
+
+            self.swap_target_a = None
+            self.swap_target_b = None
+            self.swap_target_other = []
+
+            if self.configs[self.difficulty]['swap']==True:
+                if len(self.targets) >= 2:
+                    perm = torch.randperm(len(self.targets), generator=self.generator)
+                    swap_idx_a = perm[0].item()
+                    swap_idx_b = perm[1].item()
+                    self.swap_target_a = self.targets[swap_idx_a]
+                    self.swap_target_b = self.targets[swap_idx_b]
+                    self.swap_target_other = [
+                        target
+                        for idx, target in enumerate(self.targets)
+                        if idx not in (swap_idx_a, swap_idx_b)
+                    ]
+                    print(
+                        f"Swap targets selected: target_{swap_idx_a} <-> target_{swap_idx_b}"
+                    )
+            num_targets_to_pick = torch.randint(2, len(self.targets) + 1, (1,), generator=self.generator).item()
+
+            indices = torch.randperm(len(self.targets), generator=self.generator)[:num_targets_to_pick]
+
+            self.which_targets_to_pick = [self.targets[i] for i in indices]
+
+            self.which_in_subset=torch.randint(1,len(self.which_targets_to_pick)+1,(1,),generator=self.generator).item()
+
+            print("self.which_in_subset:",self.which_in_subset)
+            self.target_target=self.which_targets_to_pick[self.which_in_subset-1]
+
+            self.targets_not_true = [t for i, t in enumerate(self.targets) if self.targets[i]!=self.target_target]
+
+            if len(self.which_targets_to_pick) > 0:
+                k = torch.randint(0, len(self.which_targets_to_pick), (1,), generator=self.generator).item()
+                self.button_task_index = k * 2 + 2  # each pair contributes pickup + drop
+            else:
+                self.button_task_index = 0
+
+            def _actor_to_name(actor):
+                if actor is None:
+                    return None
+                if hasattr(actor, "name"):
+                    return actor.name
+                return str(actor)
+
+            target_debug_payload = {
+                "historybench_seed": self.HistoryBench_seed,
+                "which_in_subset": self.which_in_subset,
+                "num_targets_to_pick": num_targets_to_pick,
+                "which_targets_to_pick": [_actor_to_name(target) for target in self.which_targets_to_pick],
+                "target_target": _actor_to_name(self.target_target),
+                "button_task_index": self.button_task_index,
+            }
+
+            try:
+                log_path = Path(__file__).resolve().parent / "target_selection.json"
+                payload_list = []
+                if log_path.exists():
+                    try:
+                        with open(log_path, "r") as fp:
+                            existing_payload = json.load(fp)
+                        if isinstance(existing_payload, list):
+                            payload_list = existing_payload
+                        elif existing_payload is not None:
+                            payload_list = [existing_payload]
+                    except json.JSONDecodeError:
+                        log_path.with_suffix(".json.bak").write_text(log_path.read_text())
+                        payload_list = []
+                payload_list.append(target_debug_payload)
+                with open(log_path, "w") as fp:
+                    json.dump(payload_list, fp, indent=2)
+            except Exception as exc:
+                print(f"Failed to write target selection log: {exc}")
+
+        except SceneGenerationError:
+            raise
         except Exception as exc:
-            print(f"Failed to write target selection log: {exc}")
-        
-        
+            raise SceneGenerationError(
+                f"Failed to load VideoPlaceOrder scene for seed {self.HistoryBench_seed}"
+            ) from exc
 
 
     def _initialize_episode(self, env_idx: torch.Tensor, options: dict):
@@ -492,15 +471,26 @@ class VideoPlaceOrder(BaseEnv):
              
             })
             tasks.append(       {
-                                "func": lambda: static_check(self, timestep=int(self.elapsed_steps), static_steps=60),
+                                "func": lambda: static_check(self, timestep=int(self.elapsed_steps), static_steps=20),
                                 "name": "static",
                                 "subgoal_segment":f"static",
+
                                 "demonstration": True,
                                 "failure_func": None,
 
-                                "solve": lambda env, planner: [solve_reset(env,planner), solve_hold_obj(env, planner, static_steps=60)],
+                                "solve": lambda env, planner: [solve_reset(env,planner), solve_hold_obj(env, planner, static_steps=20)],
                                 },)
 
+            tasks.append(       {
+                                "func": lambda: static_check(self, timestep=int(self.elapsed_steps), static_steps=60),
+                                "name": "static",
+                                "subgoal_segment":f"static",
+                                "specialflag":"swap",
+                                "demonstration": True,
+                                "failure_func": None,
+
+                                "solve": lambda env, planner: [solve_hold_obj(env, planner, static_steps=60)],
+                                },)
 
             tasks.append({
                                 "func": lambda:reset_check(self),
