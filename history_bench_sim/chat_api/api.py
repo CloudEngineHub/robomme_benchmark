@@ -6,7 +6,7 @@ from typing import Optional, Union, List, Dict
 import google.generativeai as genai
 from openai import OpenAI, AzureOpenAI
 
-from history_bench_sim.chat_api.prompts import *
+from .prompts import *
 
 import numpy as np
 import imageio

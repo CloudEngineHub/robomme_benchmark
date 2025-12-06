@@ -7,11 +7,11 @@ import numpy as np
 from moviepy import VideoFileClip
 from copy import deepcopy
 import re
-from history_bench_sim.chat_api.prompts import *
+from .prompts import *
 import cv2
 
-from history_bench_sim.chat_api.api import GeminiModel, OpenAIModel
-from history_bench_sim.chat_api.utils import *
+from .api import GeminiModel, OpenAIModel
+from .utils import *
 
 
 

@@ -667,7 +667,7 @@ class EpisodeConfigResolverForOraclePlanner:
 def main():
     # Initialization Wrapper
     oracle_resolver = EpisodeConfigResolverForOraclePlanner(
-        gui_render=False,#环境本身是否开启gui渲染
+        gui_render=True,#环境本身是否开启gui渲染
         max_steps_without_demonstration=3000
     )
 
@@ -679,7 +679,7 @@ def main():
         #"PickXtimes",
         #"StopCube",
         #"SwingXtimes",
-        "BinFill",
+        #"BinFill",
        # "VideoUnmaskSwap",
         # "VideoUnmask",
         #"ButtonUnmaskSwap",
@@ -687,7 +687,7 @@ def main():
         # "VideoRepick",
          #"VideoPlaceButton",
         # "VideoPlaceOrder",
-        #"PickHighlight",
+        "PickHighlight",
          #"InsertPeg",
         #'MoveCube',
         #"PatternLock",
@@ -716,25 +716,25 @@ def main():
                         planner,
                         env_id,
                         color_map,
-                        # use_segmentation=use_segmentation,#需要可视化这三个设置为true
-                        # use_visualize=use_visualization,
-                        # figures_to_close=figures_to_close
+                        use_segmentation=use_segmentation,#需要可视化这三个设置为true
+                        use_visualize=use_visualization,
+                        figures_to_close=figures_to_close
                     )
 
                     print(f"Available Actions: {available_options}")
 
                     # # [Step B] Input Collection
                     print(f"Language Goal: {language_goal}")
-                    # command_dict = get_input_from_gui(#从gui里获取用户输入的命令
-                    #         env,
-                    #         planner,
-                    #         env_id,
-                    #         seg_vis,
-                    #         # mouse_select=mouse_select,
-                    #         # use_visualize=use_visualization,
-                    #         # figures_to_close=figures_to_close
-                    # )
-                    command_dict={'action': 'Pick red cube', 'point': (20, 20)}
+                    command_dict = get_input_from_gui(#从gui里获取用户输入的命令
+                            env,
+                            planner,
+                            env_id,
+                            seg_vis,
+                            mouse_select=mouse_select,
+                            use_visualize=use_visualization,
+                            figures_to_close=figures_to_close
+                    )
+                    #command_dict={'action': 'Pick red cube', 'point': (20, 20)}
                  
 
                     # [Step C] 执行逻辑处理并调用求解器
@@ -747,8 +747,8 @@ def main():
                         base_frames,
                         wrist_frames,
                         command_dict,
-                        # use_visualize=use_visualization,#需要可视化这两个设置为true
-                        # figures_to_close=figures_to_close
+                        use_visualize=use_visualization,#需要可视化这两个设置为true
+                        figures_to_close=figures_to_close
                     )
 
                     _cleanup_figures(figures_to_close, close_all=True)#每个step需要清理可视化的图像窗口，以防混淆

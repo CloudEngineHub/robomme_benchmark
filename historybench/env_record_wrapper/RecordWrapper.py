@@ -512,7 +512,15 @@ class HistoryBenchRecordWrapper(gym.Wrapper):
                 if filename_suffix
                 else difficulty_tag
             )
-        fail_recover_suffix = "_FailRecover" if getattr(self.env, "use_fail_planner", False) else ""
+        fail_recover_suffix = ""
+        if getattr(self.env, "use_fail_planner", False):
+            fail_mode = getattr(self.env, "fail", None)
+            if fail_mode == "xy":
+                fail_recover_suffix = "_FailRecoverXY"
+            elif fail_mode == "z":
+                fail_recover_suffix = "_FailRecoverZ"
+            else:
+                fail_recover_suffix = "_FailRecover"
         video_prefix = f"{self.HistoryBench_env}_ep{self.HistoryBench_episode}_seed{self.HistoryBench_seed}{fail_recover_suffix}"
 
         # 只有在 episode 成功时才写入数据到 HDF5

@@ -1,3 +1,6 @@
+import sys
+from pathlib import Path
+
 import numpy as np
 import cv2
 import imageio
@@ -5,10 +8,18 @@ import os
 import json
 import shutil
 
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = Path(__file__).resolve().parents[2]
+
+for path in (PROJECT_ROOT, REPO_ROOT):
+    if str(path) not in sys.path:
+        sys.path.insert(0, str(path))
+
 from chat_api.api import GeminiModel, OpenAIModel
 from chat_api.prompts import *
-from third_party.HistoryBench.scripts.evaluate_oracle_planner_gui import EpisodeConfigResolverForOraclePlanner
-from third_party.HistoryBench.scripts.evaluate_oracle_planner_gui import step_before, step_after, _tensor_to_bool
+from scripts.evaluate_oracle_planner_gui import EpisodeConfigResolverForOraclePlanner
+from scripts.evaluate_oracle_planner_gui import step_before, step_after, _tensor_to_bool
 
 
 

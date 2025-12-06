@@ -39,7 +39,7 @@ def main():
     """
 
     num_episodes = 1
-    env_id_list=["SwingXtimes"]
+    env_id_list=["BinFill"]
     for env_id in env_id_list:
         dataset_path = Path(f"/data/hongzefu/dataset_generate/record_dataset_{env_id}.h5")
         for episode in range(num_episodes):
@@ -47,16 +47,23 @@ def main():
             print(f"--- Running simulation for episode:{episode},env: {env_id} ---")
 
             # Initialize the environment with the specified seed for recording
-            env = gym.make(
-                env_id,
+            env_kwargs = dict(
                 obs_mode="rgb+depth+segmentation",
                 control_mode="pd_joint_pos",
                 render_mode="rgb_array",
                 reward_mode="dense",
-                HistoryBench_seed =3300,
-                max_episode_steps=1000,
-                HistoryBench_difficulty="hard",
+                HistoryBench_seed=seed,
+                max_episode_steps=200,
+                HistoryBench_difficulty=difficulty,
             )
+
+            env_kwargs["historybench_failure_recovery"] = True
+            env_kwargs["historybench_failure_recovery_mode"] = "xy"
+
+
+            env = gym.make(env_id, **env_kwargs)
+
+            
             env = HistoryBenchRecordWrapper(env,HistoryBench_dataset=str(dataset_path),HistoryBench_env=env_id,HistoryBench_episode=episode,HistoryBench_seed=seed,
                                             save_video=True)
             env.reset()

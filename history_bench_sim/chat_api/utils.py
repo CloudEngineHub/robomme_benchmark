@@ -8,7 +8,7 @@ import shutil
 import numpy as np
 from moviepy import VideoFileClip
 import re
-from history_bench_sim.chat_api.prompts import *
+from .prompts import *
 
 
 

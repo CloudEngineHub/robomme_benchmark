@@ -113,6 +113,16 @@ class ButtonUnmaskSwap(BaseEnv):
         self.human_cam_target_pos = cfg["human_cam_target_pos"]
 
         self.HistoryBench_seed = HistoryBench_seed
+        self.historybench_failure_recovery = bool(
+            kwargs.pop("historybench_failure_recovery", False)
+        )
+        self.historybench_failure_recovery_mode = kwargs.pop(
+            "historybench_failure_recovery_mode", None
+        )
+        if isinstance(self.historybench_failure_recovery_mode, str):
+            self.historybench_failure_recovery_mode = (
+                self.historybench_failure_recovery_mode.lower()
+            )
         normalized_historybench_difficulty = normalize_historybench_difficulty(
             kwargs.pop("HistoryBench_difficulty", None)
         )
@@ -409,6 +419,7 @@ class ButtonUnmaskSwap(BaseEnv):
         self._refresh_swap_schedule()
 
         self.button_list= [self.button_left, self.button_right]
+        self.generator=generator
 
     def _initialize_episode(self, env_idx: torch.Tensor, options: dict):
         with torch.device(self.device):
@@ -416,24 +427,6 @@ class ButtonUnmaskSwap(BaseEnv):
             self.table_scene.initialize(env_idx)
             qpos=reset_panda.get_reset_panda_param("qpos")
             self.agent.reset(qpos)
-
-
-    def _get_obs_extra(self, info: Dict):
-        return dict()
-
-
-
-    def evaluate(self,solve_complete_eval=False):
-        self.successflag=torch.tensor([False])
-        self.failureflag = torch.tensor([False])
-        target_color = getattr(self, "target_cube_color", None)
-        if target_color is None and getattr(self, "color_names", None):
-            target_color = self.color_names[0]
-        if target_color is None:
-            target_color = getattr(self, "target_label", None)
-        if target_color is None:
-            target_color = "target"
-        self.target_label = target_color
         tasks = [
             {
                 "func": lambda: is_any_button_pressed_removelist(self, button_list=self.button_list),
@@ -492,6 +485,36 @@ class ButtonUnmaskSwap(BaseEnv):
         # 存储任务列表供RecordWrapper使用
         self.task_list = tasks
 
+        # 记录用于恢复的 pickup 相关任务索引和条目
+        self.recovery_pickup_indices, self.recovery_pickup_tasks = task4recovery(self.task_list)
+        if self.historybench_failure_recovery:
+            # Only inject an intentional failed grasp when recovery mode is enabled
+            self.fail_grasp_task_index = inject_fail_grasp(
+                self.task_list,
+                generator=self.generator,
+                mode=self.historybench_failure_recovery_mode,
+            )
+        else:
+            self.fail_grasp_task_index = None
+            
+    def _get_obs_extra(self, info: Dict):
+        return dict()
+
+
+
+    def evaluate(self,solve_complete_eval=False):
+        self.successflag=torch.tensor([False])
+        self.failureflag = torch.tensor([False])
+        target_color = getattr(self, "target_cube_color", None)
+        if target_color is None and getattr(self, "color_names", None):
+            target_color = self.color_names[0]
+        if target_color is None:
+            target_color = getattr(self, "target_label", None)
+        if target_color is None:
+            target_color = "target"
+        self.target_label = target_color
+
+
         # 使用封装的序列任务检查函数
         if(self.use_demonstrationwrapper==False):#record时候planner结束再改变subgoal
             if solve_complete_eval==True:
@@ -503,7 +526,7 @@ class ButtonUnmaskSwap(BaseEnv):
                 allow_subgoal_change_this_timestep=True
             else:
                 allow_subgoal_change_this_timestep=False
-        all_tasks_completed, current_task_name, task_failed ,self.current_task_specialflag= sequential_task_check(self, tasks,allow_subgoal_change_this_timestep=allow_subgoal_change_this_timestep)
+        all_tasks_completed, current_task_name, task_failed ,self.current_task_specialflag= sequential_task_check(self, self.task_list,allow_subgoal_change_this_timestep=allow_subgoal_change_this_timestep)
 
         # 如果任务失败，立即标记失败
         if task_failed:

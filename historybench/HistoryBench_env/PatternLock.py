@@ -109,6 +109,17 @@ class PatternLock(BaseEnv):
         self.human_cam_eye_pos = cfg["human_cam_eye_pos"]
         self.human_cam_target_pos = cfg["human_cam_target_pos"]
 
+
+        self.historybench_failure_recovery = bool(
+            kwargs.pop("historybench_failure_recovery", False)
+        )
+        self.historybench_failure_recovery_mode = kwargs.pop(
+            "historybench_failure_recovery_mode", None
+        )
+        if isinstance(self.historybench_failure_recovery_mode, str):
+            self.historybench_failure_recovery_mode = (
+                self.historybench_failure_recovery_mode.lower()
+            )
         self.HistoryBench_seed = HistoryBench_seed
         normalized_historybench_difficulty = normalize_historybench_difficulty(
             kwargs.pop("HistoryBench_difficulty", None)

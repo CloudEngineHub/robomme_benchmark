@@ -108,6 +108,16 @@ class VideoRepick(BaseEnv):
         self.human_cam_target_pos = cfg["human_cam_target_pos"]
 
         self.HistoryBench_seed = HistoryBench_seed
+        self.historybench_failure_recovery = bool(
+            kwargs.pop("historybench_failure_recovery", False)
+        )
+        self.historybench_failure_recovery_mode = kwargs.pop(
+            "historybench_failure_recovery_mode", None
+        )
+        if isinstance(self.historybench_failure_recovery_mode, str):
+            self.historybench_failure_recovery_mode = (
+                self.historybench_failure_recovery_mode.lower()
+            )
 
         np.random.seed(HistoryBench_seed)
         normalized_historybench_difficulty = normalize_historybench_difficulty(
@@ -125,12 +135,12 @@ class VideoRepick(BaseEnv):
                 self.difficulty = "hard"
         #self.difficulty = "hard"
         # 使用 seed 随机确定需要重复的次数 (1-5)
-        generator = torch.Generator()
-        generator.manual_seed(HistoryBench_seed)
-        self.num_repeats = torch.randint(1, 4, (1,), generator=generator).item()
+        self.generator = torch.Generator()
+        self.generator.manual_seed(HistoryBench_seed)
+        self.num_repeats = torch.randint(1, 4, (1,), generator=self.generator).item()
         print(f"Task will repeat {self.num_repeats} times (pickup-drop cycles)")
 
-        self.swap_times = torch.randint(self.configs[self.difficulty]['swap_min'], self.configs[self.difficulty]['swap_max']+1, (1,), generator=generator).item()
+        self.swap_times = torch.randint(self.configs[self.difficulty]['swap_min'], self.configs[self.difficulty]['swap_max']+1, (1,), generator=self.generator).item()
         print(f"Task will swap {self.swap_times} times")
 
 
@@ -161,8 +171,6 @@ class VideoRepick(BaseEnv):
         super()._load_agent(options, sapien.Pose(p=[-0.615, 0, 0]))
 
     def _load_scene(self, options: dict):
-        generator = torch.Generator()
-        generator.manual_seed(self.HistoryBench_seed)
         try:
             self.table_scene = TableSceneBuilder(
                 self, robot_init_qpos_noise=self.robot_init_qpos_noise
@@ -173,7 +181,7 @@ class VideoRepick(BaseEnv):
                 self,
                 center_xy=(-0.2, 0),
                 scale=1.5,
-                generator=generator,
+                generator=self.generator,
                 name="button",
                 randomize=True,
                 randomize_range=(0.1, 0.1)
@@ -193,7 +201,7 @@ class VideoRepick(BaseEnv):
                 self.spawned_cubes = []
 
                 for idx in range(5):
-                    shuffle_indices = torch.randperm(len(options), generator=generator).tolist()
+                    shuffle_indices = torch.randperm(len(options), generator=self.generator).tolist()
                     new_options = [options[i] for i in shuffle_indices]
                     for group in new_options:
                         try:
@@ -209,7 +217,7 @@ class VideoRepick(BaseEnv):
                                 min_gap=self.cube_half_size,
                                 random_yaw=True,
                                 name_prefix=f"cube_{group['name']}_{idx}",
-                                generator=generator,
+                                generator=self.generator,
                             )
                         except RuntimeError as e:
                             raise SceneGenerationError(
@@ -222,16 +230,16 @@ class VideoRepick(BaseEnv):
                 if not self.spawned_cubes:
                     raise SceneGenerationError("未能生成任何cube")
 
-                target_idx = torch.randint(0, len(self.spawned_cubes), (1,), generator=generator).item()
+                target_idx = torch.randint(0, len(self.spawned_cubes), (1,), generator=self.generator).item()
                 print("target index", target_idx)
                 self.target_cube_1 = self.spawned_cubes[target_idx]
 
             else:
-                idx = torch.randint(0, len(options), (1,), generator=generator).item()
+                idx = torch.randint(0, len(options), (1,), generator=self.generator).item()
                 chosen_color = options[idx]["color"]
 
                 cube_colors = [chosen_color] * 4
-                shuffle_indices = torch.randperm(len(cube_colors), generator=generator).tolist()
+                shuffle_indices = torch.randperm(len(cube_colors), generator=self.generator).tolist()
                 cube_colors = [cube_colors[i] for i in shuffle_indices]
 
                 self.spawned_cubes = []
@@ -240,14 +248,14 @@ class VideoRepick(BaseEnv):
                 region3_tri = [[-0.05, -0.1], [-0.05, 0.1], [0.1, 0]]
                 region3_line = [[0, -0.15], [0, 0.15], [0, 0]]
 
-                region3_choice = torch.randint(0, 2, (1,), generator=generator).item()
+                region3_choice = torch.randint(0, 2, (1,), generator=self.generator).item()
                 region3 = region3_tri if region3_choice == 0 else region3_line
 
                 if self.configs[self.difficulty]['cube'] == 4:
                     region = region4
                 else:
                     region = region3
-                angle, region = rotate_points_random(region, (0, 180), generator)
+                angle, region = rotate_points_random(region, (0, 180), self.generator)
 
                 for i in range(self.configs[self.difficulty]['cube']):
                     try:
@@ -261,7 +269,7 @@ class VideoRepick(BaseEnv):
                             name_prefix=f"bin_{i}",
                             max_trials=256,
                             color=cube_colors[i],
-                            generator=generator
+                            generator=self.generator
 
                         )
                     except RuntimeError as e:
@@ -274,7 +282,7 @@ class VideoRepick(BaseEnv):
                 if not self.spawned_cubes:
                     raise SceneGenerationError("未能生成任何bin")
 
-                target_indices = torch.randperm(len(self.spawned_cubes), generator=generator)[:1].tolist()
+                target_indices = torch.randperm(len(self.spawned_cubes), generator=self.generator)[:1].tolist()
                 self.target_cube_1 = self.spawned_cubes[target_indices[0]]
 
                 if self.difficulty != "hard":
@@ -282,7 +290,7 @@ class VideoRepick(BaseEnv):
                     if len(remaining_indices) < 2:
                         raise SceneGenerationError("可用于交换的cube数量不足")
 
-                    selected_remaining = torch.randperm(len(remaining_indices), generator=generator)[:2].tolist()
+                    selected_remaining = torch.randperm(len(remaining_indices), generator=self.generator)[:2].tolist()
                     selected_indices = [remaining_indices[i] for i in selected_remaining]
                     swap_indices = target_indices + selected_indices
 
@@ -293,7 +301,6 @@ class VideoRepick(BaseEnv):
                     self.swap_pair2_idx2 = None
                     self.swap_pair3_idx2 = None
                     self._refresh_swap_schedule()
-
         except SceneGenerationError:
             raise
         except Exception as exc:
@@ -310,18 +317,8 @@ class VideoRepick(BaseEnv):
             self.table_scene.initialize(env_idx)
             qpos=reset_panda.get_reset_panda_param("qpos")
             self.agent.reset(qpos)
-
-
-    def _get_obs_extra(self, info: Dict):
-        return dict()
-
-
-
-    def evaluate(self,solve_complete_eval=False):
-        self.successflag=torch.tensor([False])
-        self.failureflag = torch.tensor([False])
-        tasks = [
-{
+            tasks = [
+            {
                 "func": (lambda: is_obj_pickup(self, obj=self.target_cube_1)),
                 "name": f"pick up the cube",
                 "subgoal_segment":f"pick up the cube at <>",
@@ -337,87 +334,109 @@ class VideoRepick(BaseEnv):
                 "failure_func": lambda: None,
                 "solve": lambda env, planner: [solve_putdown_whenhold(env, planner,release_z=0.03)]
                 }, 
-        ]
-        if self.swap_times>=1:
-         tasks.append(   {
-                        "func": lambda: static_check(self, timestep=int(self.elapsed_steps), static_steps=20),
-                        "name": "static",
-                        "subgoal_segment":"static",
-                        "demonstration": True,
-                        "failure_func": None,
-                        "solve": lambda env, planner: [solve_reset(env,planner),solve_hold_obj(env, planner, static_steps=20)],
-                        },)
-        if self.swap_times>=1:
-            for count in range(self.swap_times):
+            ]
+            if self.swap_times>=1:
                 tasks.append(   {
-                            "func": lambda: static_check(self, timestep=int(self.elapsed_steps), static_steps=self.swap_schedule[-1][3]-self.swap_schedule[-1][2]),
-                            "name": "static",
-                            "subgoal_segment":"static",
-                            "demonstration": True,
-                            "failure_func": None,
-                            "specialflag":"swap",
-                            "solve": lambda env, planner: [solve_hold_obj(env, planner, static_steps=self.swap_schedule[-1][3]-self.swap_schedule[-1][2])],
-                            },)
-            
-        tasks.append(             {
-                            "func": lambda:reset_check(self),
-                            "name": "NO RECORD",
-                            "subgoal_segment":"NO RECORD",
-                            "demonstration": True,
-                            "failure_func": None,
-                            "solve": lambda env, planner: [ solve_strong_reset(env,planner)],
-                            },)
-        ordinal_words = [
-            "first",
-            "second",
-            "third",
-            "fourth",
-            "fifth",
-            "sixth",
-            "seventh",
-            "eighth",
-            "ninth",
-            "tenth",
-        ]
-        for i in range(self.num_repeats):
-            ordinal = ordinal_words[i] if i < len(ordinal_words) else f"{i+1}th"
-            tasks.append(  {
-                    "func": (lambda: is_obj_pickup(self, obj=self.target_cube_1)),
-                    "name": f"pick up the correct cube for the {ordinal} time" ,
-                    "subgoal_segment":f"pick up the correct cube at <> for the {ordinal} time" ,
-                    "demonstration": False,
-                    "failure_func": lambda: [
-                        is_any_obj_pickup(self,[cube for cube in self.spawned_cubes if cube != self.target_cube_1]),
-                        timewindow(self, lambda: is_button_pressed(self, obj=self.button_left),min_steps=50,max_steps=500,timewindow_timer=2,),],
-                    "solve": lambda env, planner: solve_pickup(env, planner, obj=self.target_cube_1),
-                    'segment':self.target_cube_1,
-                },)
-            
-            tasks.append({
-                    "func": lambda: is_obj_dropped(self,obj=self.target_cube_1),
-                "name": "put it down",
-                "subgoal_segment":f"put it down",
-                    "demonstration": False,
-                    "failure_func": lambda:[
-                        is_any_obj_pickup(self,[cube for cube in self.spawned_cubes if cube != self.target_cube_1]),
-                        timewindow(self, lambda: is_button_pressed(self, obj=self.button_left),min_steps=50,max_steps=500,timewindow_timer=3,),], 
-                    "solve": lambda env, planner: solve_putdown_whenhold(env, planner,release_z=0.01)
-                })
+                                "func": lambda: static_check(self, timestep=int(self.elapsed_steps), static_steps=20),
+                                "name": "static",
+                                "subgoal_segment":"static",
+                                "demonstration": True,
+                                "failure_func": None,
+                                "solve": lambda env, planner: [solve_reset(env,planner),solve_hold_obj(env, planner, static_steps=20)],
+                                },)
+            if self.swap_times>=1:
+                for count in range(self.swap_times):
+                    tasks.append(   {
+                                "func": lambda: static_check(self, timestep=int(self.elapsed_steps), static_steps=self.swap_schedule[-1][3]-self.swap_schedule[-1][2]),
+                                "name": "static",
+                                "subgoal_segment":"static",
+                                "demonstration": True,
+                                "failure_func": None,
+                                "specialflag":"swap",
+                                "solve": lambda env, planner: [solve_hold_obj(env, planner, static_steps=self.swap_schedule[-1][3]-self.swap_schedule[-1][2])],
+                                },)
+                
+            tasks.append(             {
+                                "func": lambda:reset_check(self),
+                                "name": "NO RECORD",
+                                "subgoal_segment":"NO RECORD",
+                                "demonstration": True,
+                                "failure_func": None,
+                                "solve": lambda env, planner: [ solve_strong_reset(env,planner)],
+                                },)
+            ordinal_words = [
+                "first",
+                "second",
+                "third",
+                "fourth",
+                "fifth",
+                "sixth",
+                "seventh",
+                "eighth",
+                "ninth",
+                "tenth",
+            ]
+            for i in range(self.num_repeats):
+                ordinal = ordinal_words[i] if i < len(ordinal_words) else f"{i+1}th"
+                tasks.append(  {
+                        "func": (lambda: is_obj_pickup(self, obj=self.target_cube_1)),
+                        "name": f"pick up the correct cube for the {ordinal} time" ,
+                        "subgoal_segment":f"pick up the correct cube at <> for the {ordinal} time" ,
+                        "demonstration": False,
+                        "failure_func": lambda: [
+                            is_any_obj_pickup(self,[cube for cube in self.spawned_cubes if cube != self.target_cube_1]),
+                            timewindow(self, lambda: is_button_pressed(self, obj=self.button_left),min_steps=50,max_steps=500,timewindow_timer=2,),],
+                        "solve": lambda env, planner: solve_pickup(env, planner, obj=self.target_cube_1),
+                        'segment':self.target_cube_1,
+                    },)
+                
+                tasks.append({
+                        "func": lambda: is_obj_dropped(self,obj=self.target_cube_1),
+                    "name": "put it down",
+                    "subgoal_segment":f"put it down",
+                        "demonstration": False,
+                        "failure_func": lambda:[
+                            is_any_obj_pickup(self,[cube for cube in self.spawned_cubes if cube != self.target_cube_1]),
+                            timewindow(self, lambda: is_button_pressed(self, obj=self.button_left),min_steps=50,max_steps=500,timewindow_timer=3,),], 
+                        "solve": lambda env, planner: solve_putdown_whenhold(env, planner,release_z=0.01)
+                    })
 
-        tasks.append({
-                "func": lambda: is_button_pressed(self, obj=self.button_left),
-                "name": "press the button to finish",
-                "subgoal_segment":f"press the button at <> to finish",
-                "demonstration": False,
-                "failure_func":lambda: is_any_obj_pickup(self,[cube for cube in self.spawned_cubes]),
-                "solve": lambda env, planner: solve_button(env, planner, obj=self.button_left),
-                "segment":self.cap_link 
-            })
+            tasks.append({
+                    "func": lambda: is_button_pressed(self, obj=self.button_left),
+                    "name": "press the button to finish",
+                    "subgoal_segment":f"press the button at <> to finish",
+                    "demonstration": False,
+                    "failure_func":lambda: is_any_obj_pickup(self,[cube for cube in self.spawned_cubes]),
+                    "solve": lambda env, planner: solve_button(env, planner, obj=self.button_left),
+                    "segment":self.cap_link 
+                })
 
 
 
         # 存储任务列表供RecordWrapper使用
         self.task_list = tasks
+
+        # 记录用于恢复的 pickup 相关任务索引和条目
+        self.recovery_pickup_indices, self.recovery_pickup_tasks = task4recovery(self.task_list)
+        if self.historybench_failure_recovery:
+            # Only inject an intentional failed grasp when recovery mode is enabled
+            self.fail_grasp_task_index = inject_fail_grasp(
+                self.task_list,
+                generator=self.generator,
+                mode=self.historybench_failure_recovery_mode,
+            )
+        else:
+            self.fail_grasp_task_index = None
+
+    def _get_obs_extra(self, info: Dict):
+        return dict()
+
+
+
+    def evaluate(self,solve_complete_eval=False):
+        self.successflag=torch.tensor([False])
+        self.failureflag = torch.tensor([False])
+
 
         # 使用封装的序列任务检查函数
         if(self.use_demonstrationwrapper==False):#record时候planner结束再改变subgoal
@@ -430,7 +449,7 @@ class VideoRepick(BaseEnv):
                 allow_subgoal_change_this_timestep=True
             else:
                 allow_subgoal_change_this_timestep=False
-        all_tasks_completed, current_task_name, task_failed,self.current_task_specialflag = sequential_task_check(self, tasks,allow_subgoal_change_this_timestep=allow_subgoal_change_this_timestep)
+        all_tasks_completed, current_task_name, task_failed,self.current_task_specialflag = sequential_task_check(self, self.task_list,allow_subgoal_change_this_timestep=allow_subgoal_change_this_timestep)
 
         # 如果任务失败，立即标记失败
         if task_failed:
@@ -519,7 +538,7 @@ class VideoRepick(BaseEnv):
 
         return candidate_map
 
-    def _select_swap_pair_from_positions(self, positions, generator):
+    def _select_swap_pair_from_positions(self, positions, generator=None):
         """Select one swap pair given current planned positions."""
         num_bins = len(positions)
         if num_bins < 2:
@@ -531,9 +550,7 @@ class VideoRepick(BaseEnv):
             return None
 
         if generator is None:
-            generator = torch.Generator()
-            generator.manual_seed(int(self.HistoryBench_seed))
-            self._swap_rng = generator
+            generator = self.generator
 
         first_idx = valid_indices[
             int(torch.randint(0, len(valid_indices), (1,), generator=generator).item())

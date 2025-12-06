@@ -118,6 +118,17 @@ class VideoPlaceOrder(BaseEnv):
         self.HistoryBench_seed = HistoryBench_seed
         self.generator = torch.Generator()
         self.generator.manual_seed(HistoryBench_seed)
+
+        self.historybench_failure_recovery = bool(
+            kwargs.pop("historybench_failure_recovery", False)
+        )
+        self.historybench_failure_recovery_mode = kwargs.pop(
+            "historybench_failure_recovery_mode", None
+        )
+        if isinstance(self.historybench_failure_recovery_mode, str):
+            self.historybench_failure_recovery_mode = (
+                self.historybench_failure_recovery_mode.lower()
+            )
         normalized_historybench_difficulty = normalize_historybench_difficulty(
             kwargs.pop("HistoryBench_difficulty", None)
         )
@@ -526,6 +537,20 @@ class VideoPlaceOrder(BaseEnv):
 
             # 存储任务列表供RecordWrapper使用
             self.task_list = tasks
+                    # 记录用于恢复的 pickup 相关任务索引和条目
+            self.recovery_pickup_indices, self.recovery_pickup_tasks = task4recovery(self.task_list)
+            if self.historybench_failure_recovery:
+                # Only inject an intentional failed grasp when recovery mode is enabled
+                self.fail_grasp_task_index = inject_fail_grasp(
+                    self.task_list,
+                    generator=self.generator,
+                    mode=self.historybench_failure_recovery_mode,
+                )
+            else:
+                self.fail_grasp_task_index = None
+
+
+                
             try:
                 task_entries = []
                 for task in tasks:

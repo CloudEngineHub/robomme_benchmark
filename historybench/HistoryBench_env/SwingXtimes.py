@@ -109,6 +109,16 @@ class SwingXtimes(BaseEnv):
         self.human_cam_target_pos = cfg["human_cam_target_pos"]
 
         self.HistoryBench_seed = HistoryBench_seed
+        self.historybench_failure_recovery = bool(
+            kwargs.pop("historybench_failure_recovery", False)
+        )
+        self.historybench_failure_recovery_mode = kwargs.pop(
+            "historybench_failure_recovery_mode", None
+        )
+        if isinstance(self.historybench_failure_recovery_mode, str):
+            self.historybench_failure_recovery_mode = (
+                self.historybench_failure_recovery_mode.lower()
+            )
         normalized_historybench_difficulty = normalize_historybench_difficulty(
             kwargs.pop("HistoryBench_difficulty", None)
         )
@@ -312,12 +322,85 @@ class SwingXtimes(BaseEnv):
             self.non_target_cubes = [cube for cube in self.all_cubes if cube != self.target_cube]
             print(f"Non-target cubes: {len(self.non_target_cubes)}")
 
+
+
         except SceneGenerationError:
             raise
         except Exception as exc:
             raise SceneGenerationError(
                 f"Failed to load SwingXtimes scene for seed {self.HistoryBench_seed}"
             ) from exc
+        
+
+        tasks = []
+        tasks.append({
+                "func": (lambda: is_obj_pickup(self, obj=self.target_cube)),
+                "name": f"pick up the {self.target_color_name} cube",
+                "subgoal_segment":f"pick up the {self.target_color_name} cube at <>",
+                "demonstration": False,
+                "failure_func": lambda: [is_any_obj_pickup(self, self.non_target_cubes),is_button_pressed(self, obj=self.button),too_many_swings(self)],
+                "solve": lambda env, planner: solve_pickup(env, planner, obj=self.target_cube),
+                'segment':self.target_cube,
+            })
+
+        ordinals = ["first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth", "ninth", "tenth"]
+        for i in range(self.num_repeats):
+            ordinal = ordinals[i] if i < len(ordinals) else f"{i+1}th"
+            tasks.append({
+                "func": (lambda: is_obj_swing_onto(self,obj=self.target_cube,target=self.target_right,distance_threshold=0.03,z_threshold=0.12)),
+                "name": f"move to the top of the right-side target for the {ordinal} time",
+                "subgoal_segment":f"move to the top of the right-side target at <> for the {ordinal} time",
+                "demonstration": False,
+                "failure_func": lambda:  [is_any_obj_pickup(self, self.non_target_cubes),is_button_pressed(self, obj=self.button),too_many_swings(self)],
+                "solve": lambda env, planner: [solve_swingonto_whenhold(env, planner,target=self.target_right,height=0.1),
+                                            ],
+                'segment':self.target_right,
+            })
+            tasks.append({
+                "func": (lambda: is_obj_swing_onto(self,obj=self.target_cube,target=self.target_left,distance_threshold=0.03,z_threshold=0.12)),
+                "name": f"move to the top of the left-side target for the {ordinal} time",
+                "subgoal_segment":f"move to the top of the left-side target at <> for the {ordinal} time",
+                "demonstration": False,
+                "failure_func": lambda:  [is_any_obj_pickup(self, self.non_target_cubes),is_button_pressed(self, obj=self.button),too_many_swings(self)],
+                "solve": lambda env, planner: [solve_swingonto_whenhold(env, planner, target=self.target_left,height=0.1),
+                                            ],
+                'segment':self.target_left,
+            })
+
+
+        tasks.append({
+                "func": (lambda: is_obj_dropped(self, obj=self.target_cube)),
+                "name": f"put the {self.target_color_name} cube on the table",
+                "subgoal_segment":f"put the {self.target_color_name} cube on the table",
+                "demonstration": False,
+                "failure_func":  lambda: [is_any_obj_pickup(self, self.non_target_cubes),is_button_pressed(self, obj=self.button),too_many_swings(self)],
+                "solve": lambda env, planner: solve_putdown_whenhold(env, planner,),
+            })
+        tasks.append({
+                "func": lambda: is_button_pressed(self, obj=self.button),
+                "name": "press the button",
+                "subgoal_segment":"press the button at <>",
+                "demonstration": False,
+                "failure_func":lambda:[is_any_obj_pickup(self, self.non_target_cubes),too_many_swings(self)],
+                "solve": lambda env, planner: solve_button(env, planner, obj=self.button),
+                "segment":self.cap_link 
+            })
+
+
+        # 存储任务列表供RecordWrapper使用
+        self.task_list = tasks
+
+        # 记录用于恢复的 pickup 相关任务索引和条目
+        self.recovery_pickup_indices, self.recovery_pickup_tasks = task4recovery(self.task_list)
+        if self.historybench_failure_recovery:
+            # Only inject an intentional failed grasp when recovery mode is enabled
+            self.fail_grasp_task_index = inject_fail_grasp(
+                self.task_list,
+                generator=generator,
+                mode=self.historybench_failure_recovery_mode,
+            )
+        else:
+            self.fail_grasp_task_index = None
 
     def _initialize_episode(self, env_idx: torch.Tensor, options: dict):
         with torch.device(self.device):
@@ -358,64 +441,7 @@ class SwingXtimes(BaseEnv):
 
 
 
-        tasks = []
-        tasks.append({
-                "func": (lambda: is_obj_pickup(self, obj=self.target_cube)),
-                "name": f"pick up the {self.target_color_name} cube",
-                "subgoal_segment":f"pick up the {self.target_color_name} cube at <>",
-                "demonstration": False,
-                "failure_func": lambda: [is_any_obj_pickup(self, self.non_target_cubes),is_button_pressed(self, obj=self.button),too_many_swings(self)],
-                "solve": lambda env, planner: solve_pickup(env, planner, obj=self.target_cube),
-                'segment':self.target_cube,
-            })
-
-        ordinals = ["first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth", "ninth", "tenth"]
-        for i in range(self.num_repeats):
-            ordinal = ordinals[i] if i < len(ordinals) else f"{i+1}th"
-            tasks.append({
-                "func": (lambda: is_obj_swing_onto(self,obj=self.target_cube,target=self.target_right,distance_threshold=0.03,z_threshold=0.12)),
-                "name": f"move to the top of the right-side target for the {ordinal} time",
-                "subgoal_segment":f"move to the top of the right-side target at <> for the {ordinal} time",
-                "demonstration": False,
-                "failure_func": lambda:  [is_any_obj_pickup(self, self.non_target_cubes),is_button_pressed(self, obj=self.button),too_many_swings(self)],
-                "solve": lambda env, planner: [solve_swingonto_whenhold(env, planner,target=self.target_right,height=0.1),
-                                               ],
-                'segment':self.target_right,
-            })
-            tasks.append({
-                "func": (lambda: is_obj_swing_onto(self,obj=self.target_cube,target=self.target_left,distance_threshold=0.03,z_threshold=0.12)),
-                "name": f"move to the top of the left-side target for the {ordinal} time",
-                "subgoal_segment":f"move to the top of the left-side target at <> for the {ordinal} time",
-                "demonstration": False,
-                "failure_func": lambda:  [is_any_obj_pickup(self, self.non_target_cubes),is_button_pressed(self, obj=self.button),too_many_swings(self)],
-                "solve": lambda env, planner: [solve_swingonto_whenhold(env, planner, target=self.target_left,height=0.1),
-                                            ],
-                'segment':self.target_left,
-            })
-
-
-        tasks.append({
-                "func": (lambda: is_obj_dropped(self, obj=self.target_cube)),
-                "name": f"put the {self.target_color_name} cube on the table",
-                "subgoal_segment":f"put the {self.target_color_name} cube on the table",
-                "demonstration": False,
-                "failure_func":  lambda: [is_any_obj_pickup(self, self.non_target_cubes),is_button_pressed(self, obj=self.button),too_many_swings(self)],
-                "solve": lambda env, planner: solve_putdown_whenhold(env, planner,),
-            })
-        tasks.append({
-                "func": lambda: is_button_pressed(self, obj=self.button),
-                "name": "press the button",
-                "subgoal_segment":"press the button at <>",
-                "demonstration": False,
-                "failure_func":lambda:[is_any_obj_pickup(self, self.non_target_cubes),too_many_swings(self)],
-                "solve": lambda env, planner: solve_button(env, planner, obj=self.button),
-                "segment":self.cap_link 
-            })
-
-
-        # 存储任务列表供RecordWrapper使用
-        self.task_list = tasks
-
+       
         # 使用封装的序列任务检查函数
         if(self.use_demonstrationwrapper==False):#record时候planner结束再改变subgoal
             if solve_complete_eval==True:
@@ -427,7 +453,7 @@ class SwingXtimes(BaseEnv):
                 allow_subgoal_change_this_timestep=True
             else:
                 allow_subgoal_change_this_timestep=False
-        all_tasks_completed, current_task_name, task_failed,self.current_task_specialflag = sequential_task_check(self, tasks,allow_subgoal_change_this_timestep=allow_subgoal_change_this_timestep)
+        all_tasks_completed, current_task_name, task_failed,self.current_task_specialflag = sequential_task_check(self, self.task_list,allow_subgoal_change_this_timestep=allow_subgoal_change_this_timestep)
 
         # 如果任务失败，立即标记失败
         if task_failed:

@@ -87,6 +87,16 @@ class StopCube(BaseEnv):
 
 
         self.HistoryBench_seed = HistoryBench_seed
+        self.historybench_failure_recovery = bool(
+            kwargs.pop("historybench_failure_recovery", False)
+        )
+        self.historybench_failure_recovery_mode = kwargs.pop(
+            "historybench_failure_recovery_mode", None
+        )
+        if isinstance(self.historybench_failure_recovery_mode, str):
+            self.historybench_failure_recovery_mode = (
+                self.historybench_failure_recovery_mode.lower()
+            )
         normalized_historybench_difficulty = normalize_historybench_difficulty(
             kwargs.pop("HistoryBench_difficulty", None)
         )

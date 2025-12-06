@@ -106,6 +106,19 @@ class PickHighlight(BaseEnv):
         self.human_cam_target_pos = cfg["human_cam_target_pos"]
 
         self.HistoryBench_seed = HistoryBench_seed
+        self.generator = torch.Generator()
+        self.generator.manual_seed(self.HistoryBench_seed)
+
+        self.historybench_failure_recovery = bool(
+            kwargs.pop("historybench_failure_recovery", False)
+        )
+        self.historybench_failure_recovery_mode = kwargs.pop(
+            "historybench_failure_recovery_mode", None
+        )
+        if isinstance(self.historybench_failure_recovery_mode, str):
+            self.historybench_failure_recovery_mode = (
+                self.historybench_failure_recovery_mode.lower()
+            )
         normalized_historybench_difficulty = normalize_historybench_difficulty(
             kwargs.pop("HistoryBench_difficulty", None)
         )
@@ -120,11 +133,6 @@ class PickHighlight(BaseEnv):
                 self.difficulty = "medium"
             else:  # seed_mod == 2
                 self.difficulty = "hard"
-
-        # 使用 seed 随机确定需要重复的次数 (1-5)
-        generator = torch.Generator()
-        generator.manual_seed(HistoryBench_seed)
-
 
         super().__init__(*args, robot_uids=robot_uids, **kwargs)
 
@@ -151,8 +159,7 @@ class PickHighlight(BaseEnv):
         super()._load_agent(options, sapien.Pose(p=[-0.615, 0, 0]))
 
     def _load_scene(self, options: dict):
-        generator = torch.Generator()
-        generator.manual_seed(self.HistoryBench_seed)
+        self.generator.manual_seed(self.HistoryBench_seed)
         self.table_scene = TableSceneBuilder(
             self, robot_init_qpos_noise=self.robot_init_qpos_noise
         )
@@ -163,7 +170,7 @@ class PickHighlight(BaseEnv):
             self,
             center_xy=(-0.2, 0),
             scale=1.5,
-            generator=generator,
+            generator=self.generator,
         )
         avoid = [button_obb]
 
@@ -184,7 +191,7 @@ class PickHighlight(BaseEnv):
         # 生成指定数量的cube，每个cube颜色随机选择
         for cube_idx in range(num_cubes_to_spawn):
             # 随机选择一个颜色
-            color_choice_idx = torch.randint(0, len(available_colors), (1,), generator=generator).item()
+            color_choice_idx = torch.randint(0, len(available_colors), (1,), generator=self.generator).item()
             chosen_color = available_colors[color_choice_idx]
 
             try:
@@ -200,7 +207,7 @@ class PickHighlight(BaseEnv):
                     min_gap=self.cube_half_size*2,
                     random_yaw=True,
                     name_prefix=f"cube_{chosen_color['name']}_{cube_idx}",
-                    generator=generator,
+                    generator=self.generator,
                 )
 
                 cube_name = f"cube_{chosen_color['name']}_{cube_idx}"
@@ -221,7 +228,7 @@ class PickHighlight(BaseEnv):
 
 
          # Randomly select one cube from all available cubes as the target
-        target_cube_indices = torch.randperm(len(self.all_cubes), generator=generator)[:self.configs[self.difficulty]['pickup']]
+        target_cube_indices = torch.randperm(len(self.all_cubes), generator=self.generator)[:self.configs[self.difficulty]['pickup']]
 
         self.target_cubes = [self.all_cubes[idx] for idx in target_cube_indices]
         self.target_cube_names = [self.all_cube_names[idx] for idx in target_cube_indices]
@@ -232,25 +239,6 @@ class PickHighlight(BaseEnv):
         ]
         # 记录每个目标方块被抓起的次数；所有目标方块计数均大于1才算成功
         self.target_cube_pickup_counts = {name: 0 for name in self.target_cube_names}
-
-            
-
-
-    def _initialize_episode(self, env_idx: torch.Tensor, options: dict):
-        with torch.device(self.device):
-            b = len(env_idx)
-            self.table_scene.initialize(env_idx)
-            qpos=reset_panda.get_reset_panda_param("qpos")
-            self.agent.reset(qpos)            
-
-
-    def _get_obs_extra(self, info: Dict):
-        return dict()
-
-
-    def evaluate(self,solve_complete_eval=False):
-        self.successflag=torch.tensor([False])
-        self.failureflag = torch.tensor([False])
 
         # 定义任务列表，每个任务包含一个带函数、名称、demonstration 标志和可选 failure_func 的字典
         tasks = []
@@ -307,20 +295,41 @@ class PickHighlight(BaseEnv):
                     })
             
         
-        # tasks.append({
-        #         "func": lambda: is_button_pressed(self, obj=self.button),
-        #         "name": "press the button to stop",
-        #         "subgoal_segment":"press the button at <> to stop",
-        #         "demonstration": False,
-        #         "failure_func":lambda:  [ is_any_obj_pickup(self,[cube for cube in self.all_cubes if cube not in self.target_cubes])],
-        #         "solve": lambda env, planner: solve_button(env, planner, obj=self.button),
-        #         "segment":self.cap_link,
-        #     })
-
 
 
         # 存储任务列表供RecordWrapper使用
-        self.task_list = tasks
+        self.task_list = tasks            
+
+
+        # 记录用于恢复的 pickup 相关任务索引和条目
+        self.recovery_pickup_indices, self.recovery_pickup_tasks = task4recovery(self.task_list)
+        if self.historybench_failure_recovery:
+            # Only inject an intentional failed grasp when recovery mode is enabled
+            self.fail_grasp_task_index = inject_fail_grasp(
+                self.task_list,
+                generator=self.generator,
+                mode=self.historybench_failure_recovery_mode,
+            )
+        else:
+            self.fail_grasp_task_index = None
+
+    def _initialize_episode(self, env_idx: torch.Tensor, options: dict):
+        with torch.device(self.device):
+            b = len(env_idx)
+            self.table_scene.initialize(env_idx)
+            qpos=reset_panda.get_reset_panda_param("qpos")
+            self.agent.reset(qpos)            
+
+
+    def _get_obs_extra(self, info: Dict):
+        return dict()
+
+
+    def evaluate(self,solve_complete_eval=False):
+        self.successflag=torch.tensor([False])
+        self.failureflag = torch.tensor([False])
+
+
 
         if(self.use_demonstrationwrapper==False):#record时候planner结束再改变subgoal
             if solve_complete_eval==True:

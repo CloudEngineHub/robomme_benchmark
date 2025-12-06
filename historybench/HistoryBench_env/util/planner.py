@@ -740,12 +740,12 @@ def move_to_avoid(env, planner):
     return None
 
 
-def solve_pickup_fail(env, planner, obj=None,z_offset=None,xy_offset=None,obj_type="cube"):
+def solve_pickup_fail(env, planner, obj=None,z_offset=None,xy_offset=None,obj_type="cube",mode=None):
     """Hover directly above grasp pose with slight random +z, close then reopen gripper."""
     if obj is None:
         return None
 
-    env = env.unwrapped
+    env = getattr(env, "unwrapped", env)
     planner.open_gripper()
 
     # Build the same grasp pose as the normal pickup, but stop above it with random z lift <= 0.1.
@@ -766,10 +766,13 @@ def solve_pickup_fail(env, planner, obj=None,z_offset=None,xy_offset=None,obj_ty
     fail_pose_p = np.asarray(grasp_pose.p, dtype=np.float32).reshape(-1).tolist()
     fail_pose_q = np.asarray(grasp_pose.q, dtype=np.float32).reshape(-1).tolist()
 
+    normalized_mode = mode.lower() if isinstance(mode, str) else mode
+
     # Randomly pick whether to perturb the failed hover in XY or Z.
-    mode = random.choice(["xy", "z"])
+    #mode = random.choice(["xy", "z"])
     #mode="xy"
-    if mode == "xy":
+    if normalized_mode == "xy":
+        env.fail="xy"
         xy_offset = np.asarray(xy_offset, dtype=np.float32).reshape(-1)
         if xy_offset.size == 1:
             xy_offset = np.repeat(xy_offset, 2)
@@ -780,10 +783,13 @@ def solve_pickup_fail(env, planner, obj=None,z_offset=None,xy_offset=None,obj_ty
         signed_offset = xy_offset * np.array(signs, dtype=np.float32)
         fail_pose_p[0] += float(signed_offset[0])
         fail_pose_p[1] += float(signed_offset[1])
-    else:
+    elif normalized_mode == "z":
+        env.fail="z"
         z_shift = z_offset 
         fail_pose_p[2] += z_shift
-
+    else:
+        raise ValueError(f"Invalid fail mode: {mode}")
+    
     ready_pose_p = fail_pose_p.copy()
     ready_pose_p[2] = 0.15
     if obj_type=="bin":
@@ -801,12 +807,12 @@ def solve_pickup_fail(env, planner, obj=None,z_offset=None,xy_offset=None,obj_ty
     return None
 
 
-def solve_pickup(env, planner, obj=None):
+def solve_pickup(env, planner, obj=None,fail_grasp=False,mode=None):
     # 10% chance to perform a deliberate failed hover before the normal pickup.
     planner.open_gripper()
     if(env.use_demonstrationwrapper==False):
-        if random.random() < FAILED_HOVER_PROB:#不调用opengripper保持原有状态
-            solve_pickup_fail(env, planner, obj,z_offset=env.cube_half_size*2,xy_offset=env.cube_half_size*2,obj_type="cube")
+        if fail_grasp==True:
+            solve_pickup_fail(env, planner, obj,z_offset=env.cube_half_size*2,xy_offset=env.cube_half_size*2,obj_type="cube",mode=mode)
 
     FINGER_LENGTH = 0.025
     env = env.unwrapped
@@ -852,12 +858,12 @@ def solve_pickup(env, planner, obj=None):
     planner.close()
     return res
 
-def solve_pickup_bin(env, planner, obj=None):
+def solve_pickup_bin(env, planner, obj=None, fail_grasp=False, mode=None):
     planner.open_gripper()
     # 10% chance to perform a deliberate failed hover before the normal pickup.
     if(env.use_demonstrationwrapper==False):
-        if random.random() < FAILED_HOVER_PROB:
-            solve_pickup_fail(env, planner, obj,z_offset=0.035,xy_offset=0.035,obj_type="bin")
+        if fail_grasp==True:
+            solve_pickup_fail(env, planner, obj,z_offset=0.035,xy_offset=0.035,obj_type="bin", mode=mode)
 
     FINGER_LENGTH = 0.025
     env = env.unwrapped

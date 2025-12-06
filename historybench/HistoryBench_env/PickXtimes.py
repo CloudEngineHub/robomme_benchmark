@@ -106,6 +106,16 @@ class PickXtimes(BaseEnv):
         self.human_cam_eye_pos = cfg["human_cam_eye_pos"]
         self.human_cam_target_pos = cfg["human_cam_target_pos"]
 
+        self.historybench_failure_recovery = bool(
+            kwargs.pop("historybench_failure_recovery", False)
+        )
+        self.historybench_failure_recovery_mode = kwargs.pop(
+            "historybench_failure_recovery_mode", None
+        )
+        if isinstance(self.historybench_failure_recovery_mode, str):
+            self.historybench_failure_recovery_mode = (
+                self.historybench_failure_recovery_mode.lower()
+            )
         self.HistoryBench_seed = HistoryBench_seed
         normalized_historybench_difficulty = normalize_historybench_difficulty(
             kwargs.pop("HistoryBench_difficulty", None)
@@ -282,32 +292,7 @@ class PickXtimes(BaseEnv):
         self.non_target_cubes = [cube for cube in self.all_cubes if cube != self.target_cube]
         print(f"Non-target cubes: {len(self.non_target_cubes)}")
 
-
-
-    def _initialize_episode(self, env_idx: torch.Tensor, options: dict):
-        with torch.device(self.device):
-            b = len(env_idx)
-            self.table_scene.initialize(env_idx)
-            qpos=reset_panda.get_reset_panda_param("qpos")
-            self.agent.reset(qpos)
-            print(self.agent.robot.qpos)
-
-    def _get_obs_extra(self, info: Dict):
-        return dict()
-
-
-
-    def evaluate(self,solve_complete_eval=False):
-
-
-        previous_failure = getattr(self, "failureflag", None)
-        self.successflag = torch.tensor([False])
-        if previous_failure is not None and bool(previous_failure.item()):
-            self.failureflag = previous_failure
-        else:
-            self.failureflag = torch.tensor([False])
-
-        # 动态生成 N 次 pickup-drop 循环的任务列表
+                # 动态生成 N 次 pickup-drop 循环的任务列表
         tasks = []
         for i in range(self.num_repeats):
 
@@ -344,6 +329,44 @@ class PickXtimes(BaseEnv):
         # 存储任务列表供RecordWrapper使用
         self.task_list = tasks
 
+                # 记录用于恢复的 pickup 相关任务索引和条目
+        self.recovery_pickup_indices, self.recovery_pickup_tasks = task4recovery(self.task_list)
+        if self.historybench_failure_recovery:
+            # Only inject an intentional failed grasp when recovery mode is enabled
+            self.fail_grasp_task_index = inject_fail_grasp(
+                self.task_list,
+                generator=generator,
+                mode=self.historybench_failure_recovery_mode,
+            )
+        else:
+            self.fail_grasp_task_index = None
+
+
+    def _initialize_episode(self, env_idx: torch.Tensor, options: dict):
+        with torch.device(self.device):
+            b = len(env_idx)
+            self.table_scene.initialize(env_idx)
+            qpos=reset_panda.get_reset_panda_param("qpos")
+            self.agent.reset(qpos)
+            print(self.agent.robot.qpos)
+
+    def _get_obs_extra(self, info: Dict):
+        return dict()
+
+
+
+    def evaluate(self,solve_complete_eval=False):
+
+
+        previous_failure = getattr(self, "failureflag", None)
+        self.successflag = torch.tensor([False])
+        if previous_failure is not None and bool(previous_failure.item()):
+            self.failureflag = previous_failure
+        else:
+            self.failureflag = torch.tensor([False])
+
+
+
         # 使用封装的序列任务检查函数
         if(self.use_demonstrationwrapper==False):#record时候planner结束再改变subgoal
             if solve_complete_eval==True:
@@ -355,7 +378,7 @@ class PickXtimes(BaseEnv):
                 allow_subgoal_change_this_timestep=True
             else:
                 allow_subgoal_change_this_timestep=False
-        all_tasks_completed, current_task_name, task_failed,self.current_task_specialflag= sequential_task_check(self, tasks,allow_subgoal_change_this_timestep=allow_subgoal_change_this_timestep)
+        all_tasks_completed, current_task_name, task_failed,self.current_task_specialflag= sequential_task_check(self, self.task_list,allow_subgoal_change_this_timestep=allow_subgoal_change_this_timestep)
 
         # 如果任务失败，立即标记失败
         if task_failed:

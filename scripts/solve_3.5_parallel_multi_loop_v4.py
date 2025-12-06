@@ -68,7 +68,7 @@ DEFAULT_ENVS =[
 
 # "VideoUnmaskSwap",
 # "VideoUnmask",
-"ButtonUnmaskSwap",
+# "ButtonUnmaskSwap",
 # "ButtonUnmask",
 
 # "VideoRepick",
@@ -76,10 +76,10 @@ DEFAULT_ENVS =[
 # "VideoPlaceOrder",
 # "PickHighlight",
 
-# "InsertPeg",
-# 'MoveCube',
-# "PatternLock",
-# "RouteStick"
+#"InsertPeg",
+'MoveCube',
+"PatternLock",
+"RouteStick"
 
 ]
 ENV_ID_TO_CODE = {name: idx + 1 for idx, name in enumerate(DEFAULT_ENVS)}
@@ -157,8 +157,7 @@ def _run_episode_attempt(
 
     env: Optional[gym.Env] = None
     try:
-        env = gym.make(
-            env_id,
+        env_kwargs = dict(
             obs_mode="rgb+depth+segmentation",
             control_mode="pd_joint_pos",
             render_mode="rgb_array",
@@ -167,6 +166,15 @@ def _run_episode_attempt(
             max_episode_steps=200,
             HistoryBench_difficulty=difficulty,
         )
+        if episode <= 5:
+            env_kwargs["historybench_failure_recovery"] = True
+            if episode <=2:
+                env_kwargs["historybench_failure_recovery_mode"] = "z"
+            else:
+                env_kwargs["historybench_failure_recovery_mode"] = "xy"
+
+
+        env = gym.make(env_id, **env_kwargs)
         env = HistoryBenchRecordWrapper(
             env,
             HistoryBench_dataset=str(temp_dataset_path),
@@ -444,7 +452,7 @@ def parse_args() -> argparse.Namespace:
         "--episodes",
         "-n",
         type=int,
-        default=100,
+        default=10,
         help="Number of episodes to generate per environment (default: 50)",
     )
 
