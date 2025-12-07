@@ -30,15 +30,15 @@ def main():
     Main function to run the simulation and record data for multiple seeds.
     """
 
-    num_episodes = 1
+    num_episodes = 10
     gui_render=True
     max_steps=3000
     
 
     # env_id_list=['VideoUnmaskSwap']
     # dataset_path= f"/data/hongzefu/dataset_generate/record_dataset_VideoUnmaskSwap.h5"
-    env_id_list=['BinFill']
-    dataset_path= f"/data/hongzefu/data_1129_3/record_dataset_BinFill.h5"
+    env_id_list=['PickHighlight']
+    dataset_path= f"/data/hongzefu/data_1206/record_dataset_PickHighlight.h5"
     h5_path = dataset_path
     dataset = h5py.File(h5_path, "r")
     metadata_path = Path(h5_path).with_name(f"{Path(h5_path).stem}_metadata.json")

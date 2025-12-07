@@ -215,7 +215,7 @@ class StopCube(BaseEnv):
 
             stop_time=torch.randint(2, 6, (1,), generator=generator).item()
 
-            self.steps_press=self.move_interval*stop_time-self.move_interval/2
+            self.steps_press=self.move_interval*(stop_time)-self.move_interval/2
             self.stop_time_range = (
                 self.move_interval * (stop_time - 1),
                 self.move_interval * (stop_time ),
@@ -323,7 +323,7 @@ class StopCube(BaseEnv):
         all_tasks_completed, current_task_name, task_failed,self.current_task_specialflag = sequential_task_check(self, self.task_list,allow_subgoal_change_this_timestep=allow_subgoal_change_this_timestep)
         task_failed = task_failed or self._task_failed_persistent#保证过冲会被覆盖
 
-
+###################################################
         if all_tasks_completed:
             correct=correct_timestep(self,time_range=self.stop_time_range,stop_timestep=self.stop_timestep)#识别第几次经过 按下了，停上去，次数错误
             if correct!= True:
@@ -336,9 +336,14 @@ class StopCube(BaseEnv):
         if press_before== True:
             #import pdb; pdb.set_trace()
             task_failed=True
+##################################################
+        #超过没按直接错误
+        current_step = int(getattr(self, "elapsed_steps", 0))
+        if current_step > self.move_interval * self.stop_time:
+            task_failed = True
 
 
-
+#################################################
         # 如果任务失败，立即标记失败
         if task_failed:
             self._task_failed_persistent = True

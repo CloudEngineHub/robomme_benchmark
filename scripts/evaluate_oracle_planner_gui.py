@@ -32,7 +32,7 @@ except ImportError:
 # Ensure script can find root modules
 _ROOT = os.path.abspath(os.path.dirname(__file__))
 _PARENT = os.path.dirname(_ROOT)
-_HARDCODED_DATASET_ROOT = Path("/data/hongzefu/historybench-v4.4/dataset_json")
+_HARDCODED_DATASET_ROOT = Path("/data/hongzefu/historybench-v4.8.3/dataset_json")
 DEFAULT_DATASET_ROOT = (
     _HARDCODED_DATASET_ROOT
     if _HARDCODED_DATASET_ROOT.exists()
@@ -681,17 +681,17 @@ def main():
         #"SwingXtimes",
         #"BinFill",
        # "VideoUnmaskSwap",
-        # "VideoUnmask",
+        #"VideoUnmask",
         #"ButtonUnmaskSwap",
         # "ButtonUnmask",
         # "VideoRepick",
          #"VideoPlaceButton",
         # "VideoPlaceOrder",
-        #"PickHighlight",
+        "PickHighlight",
          #"InsertPeg",
         #'MoveCube',
         #"PatternLock",
-        "RouteStick"
+       #"RouteStick"
     ]
 
     try:
@@ -701,7 +701,7 @@ def main():
                 print(f"[{env_id}] No episodes detected; skipping.")
                 continue
             for episode in range(num_episodes):
-                if episode != 0:
+                if episode != 42:
                     continue
 
                 # --- WRAPPED INITIALIZATION  ---

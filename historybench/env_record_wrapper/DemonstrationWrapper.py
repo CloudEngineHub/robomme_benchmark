@@ -232,32 +232,13 @@ class DemonstrationWrapper(gym.Wrapper):
             action=reset_panda.get_reset_panda_param("action",gripper=gripper)
         
 
+        # Only add the extra step when a video demonstration task exists (no length check)
+        has_video_demo = any(
+            task.get("demonstration", False)
+            for task in getattr(self, "task_list", [])
+        )
+
         obs, _, _, _, _ = self.step(action)
-
-        state=self.agent.robot.qpos.cpu().numpy() if hasattr(self.agent.robot.qpos, 'cpu') else self.agent.robot.qpos
-        # 追加新的观察数据到现有列表
-        self.demonstration_data['frames'].append(obs['sensor_data']['base_camera']['rgb'][0].cpu().numpy())
-        self.demonstration_data['wrist_frames'].append(obs['sensor_data']['hand_camera']['rgb'][0].cpu().numpy())
-        # actions 和 states 根据需要追加
-        self.demonstration_data['actions'].append(action)
-        self.demonstration_data['states'].append(state)
-        self.demonstration_data['velocity'].append(self.agent.robot.links[9].get_linear_velocity().tolist()[0] + self.agent.robot.links[9].get_angular_velocity().tolist()[0])
-        self.demonstration_data['subgoal'].append(getattr(self, 'current_task_name', 'Unknown'))
-        self.demonstration_data['subgoal_grounded'].append(self.current_subgoal_segment_filled)
-        
-
-
-        #         return {
-        #     'frames': self.frames,
-        #     'wrist_frames': self.wrist_frames,
-        #     'actions': self.actions,
-        #     'states': self.states,
-        #     'velocity':self.velocity,
-        #     'subgoal':self.subgoal,
-        #     'subgoal_grounded': self.subgoal_grounded,  # 所有步骤《》占位符填充为坐标后的文本序列
-        #     'language goal':language_goal,
-        #     'video_frames':self.video_frames,
-        # }
 
         return None
 

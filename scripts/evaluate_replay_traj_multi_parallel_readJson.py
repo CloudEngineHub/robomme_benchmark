@@ -26,25 +26,25 @@ import torch
 import h5py
 
 DEFAULT_ENVS = [
-    "PickXtimes",
-    "StopCube",
-    "SwingXtimes",
-    "BinFill",
+    # "PickXtimes",
+    # "StopCube",
+    # "SwingXtimes",
+    # "BinFill",
 
-    "VideoUnmaskSwap",
-    "VideoUnmask",
-    "ButtonUnmaskSwap",
-    "ButtonUnmask",
+    # "VideoUnmaskSwap",
+    # "VideoUnmask",
+    # "ButtonUnmaskSwap",
+    # "ButtonUnmask",
 
-    "VideoRepick",
-    "VideoPlaceButton",
-    "VideoPlaceOrder",
+    #"VideoRepick",
+    # "VideoPlaceButton",
+    # "VideoPlaceOrder",
     "PickHighlight",
 
-    "InsertPeg",
-    "MoveCube",
-    "PatternLock",
-    "RouteStick",
+    # "InsertPeg",
+    # "MoveCube",
+    # "PatternLock",
+    # "RouteStick",
 
 ]
 
@@ -57,7 +57,7 @@ def _parse_args():
         "--dataset-dir",
         type=str,
         #default=_PARENT,
-        default="/data/hongzefu/dataset_demonstration",
+        default="/data/hongzefu/data_1206",
         help="Directory that contains record_dataset_*.h5 files. Defaults to repository parent.",
     )
     parser.add_argument(

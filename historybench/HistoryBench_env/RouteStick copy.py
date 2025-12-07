@@ -99,8 +99,7 @@ class RouteStick(BaseEnv):
         self.demonstration_record_traj=False
         self.match=False
         self.after_demo=False
-        self.current_task_demonstration = False
-        self._gripper_xy_trace=[]
+        self.direction_mistake_flag=False
         self.robot_init_qpos_noise = robot_init_qpos_noise
         if robot_uids in PICK_CUBE_CONFIGS:
             cfg = PICK_CUBE_CONFIGS[robot_uids]
@@ -412,11 +411,11 @@ class RouteStick(BaseEnv):
             #task_name=f"rotate around the {stick_side} stick {direction}"
             task_name=f"move to the nearest {stick_side} target by circling around the stick {direction}"
             tasks.append({
-            "func":   lambda t=current_target,list=[current_target, prev_target,direction]: is_obj_swing_onto(self, obj=self.agent.tcp, target=t, distance_threshold=0.03, z_threshold=self.z_threshold,judge_direction_list=list),
+            "func":   lambda t=current_target: is_obj_swing_onto(self, obj=self.agent.tcp, target=t, distance_threshold=0.03, z_threshold=self.z_threshold),
             "name": task_name,
             "subgoal_segment":task_name,
             "demonstration": False,
-            "failure_func":  (lambda expected=current_target, last=prev_target: [self._wrong_button_touch(expected_button=expected, last_button=last)]),
+            "failure_func":  (lambda expected=current_target, last=prev_target: [self._wrong_button_touch(expected_button=expected, last_button=last), self.direction_fail()]),
             "expected_dir": direction,
             "solve": lambda env, planner, t=current_target, d=direction: solve_swingonto_withDirection(env, planner, target=t,radius=0.2,direction=d),
         })  
@@ -432,7 +431,6 @@ class RouteStick(BaseEnv):
             self.table_scene.initialize(env_idx)
             qpos=reset_panda.get_reset_panda_param("qpos",gripper="stick")
             self.agent.reset(qpos)
-            self.failureflag = torch.tensor([False])
 
      
 
@@ -444,21 +442,27 @@ class RouteStick(BaseEnv):
 
 
     def evaluate(self,solve_complete_eval=False):
-        previous_failure = getattr(self, "failureflag", torch.tensor([False]))
-        if isinstance(previous_failure, torch.Tensor):
-            failure_latched = bool(previous_failure.detach().cpu().item())
-        else:
-            failure_latched = bool(previous_failure)
-        self.successflag = torch.tensor([False])
-        self.failureflag = torch.tensor([True]) if failure_latched else torch.tensor([False])
-        had_latched_fail = failure_latched
+        self.successflag=torch.tensor([False])
+        self.failureflag = torch.tensor([False])
 
+        after_demo_active = bool(getattr(self, "after_demo", False))
+        # 仅在示范结束后开始记录轨迹与检测，且在首次开启后清空历史
+        if after_demo_active and not getattr(self, "_after_demo_initialized", False):
+            self._swing_success_history = []
+            self._gripper_xy_trace = []
+            self._last_swing_pair_reported_step = None
+            self._after_demo_initialized = True
 
+        cur_step = int(self.elapsed_steps[0].item())
+        prev_timestep = getattr(self, "timestep", 0)
+        prev_task = None
+        if hasattr(self, "task_list") and 0 <= prev_timestep < len(self.task_list):
+            prev_task = self.task_list[prev_timestep]
 
-        # 记录当前步的夹爪xy位置（仅在 demonstration后开启后才记录）
-        if  self.current_task_demonstration == False:
+        # 记录当前步的夹爪xy位置（仅在 after_demo 开启后才记录）
+        if after_demo_active:
             gripper_xy = torch.as_tensor(self.agent.tcp.pose.p[0][:2]).detach().cpu()
-            self._gripper_xy_trace.append((self.elapsed_steps, gripper_xy))
+            self._gripper_xy_trace.append((cur_step, gripper_xy))
 
         # 使用封装的序列任务检查函数
         if(self.use_demonstrationwrapper==False):#record时候planner结束再改变subgoal
@@ -472,131 +476,78 @@ class RouteStick(BaseEnv):
             else:
                 allow_subgoal_change_this_timestep=False
         all_tasks_completed, current_task_name, task_failed,self.current_task_specialflag = sequential_task_check(self, self.task_list,allow_subgoal_change_this_timestep=allow_subgoal_change_this_timestep)
-     
-        
 
-        # 如果任务失败，立即标记失败，并保持之后为 fail
-        if task_failed:
+
+
+        # 如果任务失败，立即标记失败
+        if task_failed or self.direction_fail():
             self.failureflag = torch.tensor([True])
-            if not had_latched_fail:
-                print(f"Task failed: {current_task_name}")
+            print(f"Task failed: {current_task_name}")
 
         # 如果static_check成功或者所有任务完成，则设置成功标志
         if all_tasks_completed and not task_failed:
             self.successflag = torch.tensor([True])
 
 
-        # # 检测是否刚完成一个摆动任务
-        # if after_demo_active:
-        #     # 如果 current_task_name 发生跳变，按顺序记录相邻两目标
-        #     last_logged_name = getattr(self, "_last_logged_task_name", None)
-        #     if current_task_name != last_logged_name:
-        #         change_idx = getattr(self, "_swing_task_change_idx", 0)
-        #         buttons = getattr(self, "selected_buttons", [])
-        #         if change_idx + 1 < len(buttons):
-        #             first_target = buttons[change_idx]
-        #             second_target = buttons[change_idx + 1]
-        #             expected_dir = (
-        #                 self.swing_directions[change_idx]
-        #                 if change_idx < len(getattr(self, "swing_directions", []))
-        #                 else None
-        #             )
-        #             self._swing_success_history = [
-        #                 {"step": cur_step, "target": first_target, "expected_dir": None},
-        #                 {"step": cur_step, "target": second_target, "expected_dir": expected_dir},
-        #             ]
-        #             self._swing_task_change_idx = change_idx + 1
-        #         self._last_logged_task_name = current_task_name
+        # 检测是否刚完成一个摆动任务
+        if after_demo_active:
+            new_timestep = getattr(self, "timestep", prev_timestep)
+            task_completed = prev_task is not None and new_timestep > prev_timestep
+            if task_completed:
+                func = prev_task.get("func") if isinstance(prev_task, dict) else None
+                if callable(func) and hasattr(func, "__code__") and "is_obj_swing_onto" in func.__code__.co_names:
+                    target = func.__defaults__[0] if func.__defaults__ else None
+                    history = self._swing_success_history
+                    if target is not None and (not history or history[-1]["target"] is not target):
+                        # 记录这次摆动完成的时间戳与目标；仅保留最近两条（必须目标不同）
+                        expected_dir = None
+                        if isinstance(prev_task, dict):
+                            expected_dir = prev_task.get("expected_dir")
+                        history.append({"step": cur_step, "target": target, "expected_dir": expected_dir})
+                        self._swing_success_history = history[-2:]
 
-        #     # 当存在最近两次摆动成功（目标不同）时，判断夹爪轨迹在两目标连线的左右侧并打印
-        #     if len(self._swing_success_history) == 2:
-        #         first, second = self._swing_success_history
-        #         pair_key = (first["step"], second["step"])
-        #         if first["target"] is not second["target"] and self._last_swing_pair_reported_step != pair_key:
-        #             start, end = first["step"], second["step"]
-        #             segment = [(s, xy) for s, xy in self._gripper_xy_trace if start <= s <= end]
-        #             # 只保留从第一次时间戳开始的轨迹，避免列表无限增长
-        #             self._gripper_xy_trace = [(s, xy) for s, xy in self._gripper_xy_trace if s >= start]
+            # 当存在最近两次摆动成功（目标不同）时，判断夹爪轨迹在两目标连线的左右侧并打印
+            if len(self._swing_success_history) == 2:
+                first, second = self._swing_success_history
+                pair_key = (first["step"], second["step"])
+                if first["target"] is not second["target"] and self._last_swing_pair_reported_step != pair_key:
+                    start, end = first["step"], second["step"]
+                    segment = [(s, xy) for s, xy in self._gripper_xy_trace if start <= s <= end]
+                    # 只保留从第一次时间戳开始的轨迹，避免列表无限增长
+                    self._gripper_xy_trace = [(s, xy) for s, xy in self._gripper_xy_trace if s >= start]
 
-        #             t1 = torch.as_tensor(first["target"].pose.p[0][:2]).detach().cpu()
-        #             t2 = torch.as_tensor(second["target"].pose.p[0][:2]).detach().cpu()
-        #             line_vec = t2 - t1
-        #             cross_vals = []
-        #             for _, xy in segment:
-        #                 rel = xy - t1
-        #                 cross_vals.append(float(line_vec[0] * rel[1] - line_vec[1] * rel[0]))
+                    t1 = torch.as_tensor(first["target"].pose.p[0][:2]).detach().cpu()
+                    t2 = torch.as_tensor(second["target"].pose.p[0][:2]).detach().cpu()
+                    line_vec = t2 - t1
+                    cross_vals = []
+                    for _, xy in segment:
+                        rel = xy - t1
+                        cross_vals.append(float(line_vec[0] * rel[1] - line_vec[1] * rel[0]))
 
-        #             if cross_vals:
-        #                 avg_cross = sum(cross_vals) / len(cross_vals)
-        #                 # 根据当前坐标系，正叉积方向应视为顺时针
-        #                 side = "clockwise" if avg_cross > 0 else "counterclockwise" if avg_cross <0 else "on the line"
-        #                 expected_dir = second.get("expected_dir")
-        #                 if expected_dir and side != "on the line" and side != expected_dir:
-        #                     print("direction mistake!!!")
-        #                 print(f"Gripper path from step {start} to {end} stayed on the {side} side of the directed line between the last two targets.")
-        #             self._last_swing_pair_reported_step = pair_key
+                    if cross_vals:
+                        avg_cross = sum(cross_vals) / len(cross_vals)
+                        # 根据当前坐标系，正叉积方向应视为顺时针
+                        side = "clockwise" if avg_cross > 0 else "counterclockwise" if avg_cross <0 else "on the line"
+                        expected_dir = second.get("expected_dir")
+                        if expected_dir and side != "on the line" and side != expected_dir:
+                            print("direction mistake!!!")
+                            self.direction_mistake_flag=True
+                        print(f"Gripper path from step {start} to {end} stayed on the {side} side of the directed line between the last two targets.")
+                    self._last_swing_pair_reported_step = pair_key
 
         return {
             "success": self.successflag,
             "fail": self.failureflag,
         }
 
-    def direction_fail(self,judge_direction_list=None):
-        if judge_direction_list is None:
-            return True
-
-        # judge_direction_list 格式为 [current_target, prev_target, expected_dir]
-        try:
-            current_target, prev_target, expected_dir = judge_direction_list
-        except Exception:
-            # 参数异常时无法判断方向，保持未完成状态
-            self.failureflag = torch.tensor([True])
-            return False
-
-        trace = getattr(self, "_gripper_xy_trace", [])
-
-        # 计算上一目标到当前目标的连线向量
-        prev_xy = torch.as_tensor(prev_target.pose.p[0][:2]).detach().cpu()
-        curr_xy = torch.as_tensor(current_target.pose.p[0][:2]).detach().cpu()
-        line_vec = curr_xy - prev_xy
-
-        # 若两目标重合或没有轨迹，无法判定方向
-        if torch.norm(line_vec) < 1e-6 or len(trace) == 0:
-            self.failureflag = torch.tensor([True])
-            return False
-
-        cross_vals = []
-        for _, xy in trace:
-            xy = torch.as_tensor(xy).detach().cpu()
-            rel = xy - prev_xy
-            cross_vals.append(float(line_vec[0] * rel[1] - line_vec[1] * rel[0]))
-
-        # 轨迹被消费后立即清空，便于下一段判断
-        self._gripper_xy_trace = []
-
-        if len(cross_vals) == 0:
-            self.failureflag = torch.tensor([True])
-            return False
-
-        avg_cross = sum(cross_vals) / len(cross_vals)
-        # 当前坐标系下正叉积视为顺时针
-        side = "clockwise" if avg_cross > 0 else "counterclockwise" if avg_cross < 0 else "on the line"
-
-        # 沿线无法判断方向；需重新尝试
-        if side == "on the line":
-            self.failureflag = torch.tensor([True])
-            return False
-
-        expected_dir = str(expected_dir).lower()
-        if side != expected_dir:
-            print(f"direction mistake: expected {expected_dir}, got {side}")
-            self.failureflag = torch.tensor([True])
-            return False
-
-        return True
-
-
-
+    def direction_fail(self):
+        """
+        方向错误失败检查：一旦检测到方向错误，返回 True 供 sequential_task_check 标记失败。
+        """
+        flag=bool(getattr(self,"direction_mistake_flag",False))
+        if flag:
+            print("direction_fail triggered")
+        return flag
 
 
     def compute_dense_reward(self, obs: Any, action: torch.Tensor, info: Dict):

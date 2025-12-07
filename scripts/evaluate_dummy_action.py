@@ -40,13 +40,13 @@ def main():
 
     env_id_list = [
         # "VideoRepick",
-        # "BinFill",
+        #"BinFill",
         # "ButtonUnmask",
-        # "ButtonUnmaskSwap",
+        #"ButtonUnmaskSwap",
         # "InsertPeg",
         # "MoveCube",
-        "PatternLock",
-        # "PickHighlight",
+        #"PatternLock",
+        "PickHighlight",
         # "PickXtimes",
         # "RouteStick",
         # "StopCube",
@@ -65,9 +65,9 @@ def main():
         render_mode="rgb_array"
 
     for env_id in env_id_list:
-        dataset_path= f"/data/hongzefu/dataset_demonstration/record_dataset_{env_id}.h5"
+        dataset_path= f"/data/hongzefu/data_1206/record_dataset_{env_id}.h5"
         dataset = h5py.File(dataset_path, "r")
-        metadata_path =  f"/data/hongzefu/dataset_demonstration/record_dataset_{env_id}_metadata.json"
+        metadata_path =  f"/data/hongzefu/data_1206/record_dataset_{env_id}_metadata.json"
 
         resolver = EpisodeConfigResolver(
             env_id=env_id,

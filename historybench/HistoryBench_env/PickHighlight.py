@@ -394,6 +394,8 @@ class PickHighlight(BaseEnv):
             self.failureflag = torch.tensor([True])
             print(f"Pickup counts not satisfied: {pickup_counts}")
 
+        if self.failureflag == torch.tensor([True]):
+            pass
         return {
             "success": self.successflag,
             "fail": self.failureflag,

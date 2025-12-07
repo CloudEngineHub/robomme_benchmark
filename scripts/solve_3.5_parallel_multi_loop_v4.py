@@ -62,7 +62,7 @@ from planner_fail_safe import (
 
 DEFAULT_ENVS =[
 # "PickXtimes",
-# "StopCube",
+#"StopCube",
 # "SwingXtimes",
 # "BinFill",
 
@@ -79,7 +79,7 @@ DEFAULT_ENVS =[
 "InsertPeg",
 # 'MoveCube',
 # "PatternLock",
-# "RouteStick"
+#"RouteStick"
 
 ]
 ENV_ID_TO_CODE = {name: idx + 1 for idx, name in enumerate(DEFAULT_ENVS)}

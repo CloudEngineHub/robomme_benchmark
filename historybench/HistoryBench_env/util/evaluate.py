@@ -539,7 +539,7 @@ def is_obj_stopped_onto(self, obj, target, stop):
 def is_all_obj_dropped(self, objects):
     return all(is_obj_dropped(self, obj) for obj in objects)
 
-def is_obj_swing_onto(self, obj, target, achieved_list=None,distance_threshold=0.01,z_threshold=0.1):
+def is_obj_swing_onto(self, obj, target, achieved_list=None,distance_threshold=0.01,z_threshold=0.1,judge_direction_list=None):
     
     # 获取物体和目标的位置
     obj_pos = obj.pose.p[0]  # [x, y, z]
@@ -557,8 +557,10 @@ def is_obj_swing_onto(self, obj, target, achieved_list=None,distance_threshold=0
     z_flag=obj_pos[2]<z_threshold
 
     if horizontal_distance <= distance_threshold and z_flag:
-
-        return True
+        if judge_direction_list!=None:
+            return self.direction_fail(judge_direction_list=judge_direction_list)
+        else:
+            return True
 
     return False
 

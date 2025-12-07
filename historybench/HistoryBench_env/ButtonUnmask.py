@@ -270,15 +270,7 @@ class ButtonUnmask(BaseEnv):
                         "subgoal_segment":f"pick up the container at <> that hides the {self.color_names[0]} cube",
                         "demonstration": False,
                         "failure_func": lambda: [
-                                is_any_bin_pickup(self,[bin for bin in self.spawned_bins if bin != self.bin_0]),
-                                timewindow(
-                                    self,
-                                    lambda: is_button_pressed(self, obj=self.button_left),
-                                    min_steps=50,
-                                    max_steps=500,
-                                    timewindow_timer=2,
-                                ),
-                                ],
+                                is_any_bin_pickup(self,[bin for bin in self.spawned_bins if bin != self.bin_0]), ],
                         "solve": lambda env, planner: [solve_pickup_bin(env, planner, obj=self.bin_0)],
                          "segment":self.bin_0,
                     })
