@@ -350,13 +350,42 @@ class PickHighlight(BaseEnv):
             print(f"Task failed: {current_task_name}")
 
 
+        #############上升沿检测 必须放在fail检测之前
+        target_cubes = getattr(self, "target_cubes", [])
+        target_cube_names = getattr(self, "target_cube_names", [])
+
+        if target_cubes and not hasattr(self, "target_cube_pickup_counts"):
+            self.target_cube_pickup_counts = {name: 0 for name in target_cube_names}
+            self.target_cube_pickup_active = {name: False for name in target_cube_names}
+
+
+        if target_cubes and not hasattr(self, "target_cube_pickup_active"):
+            self.target_cube_pickup_active = {name: False for name in target_cube_names}
+
+        # 仅在某个方块从“未抓取”变为“抓取”时计数，避免同一次抓取在多帧内重复累计
+        for cube, name in zip(target_cubes, target_cube_names):
+            pickup_tensor = is_obj_pickup(self, cube)
+            if isinstance(pickup_tensor, torch.Tensor):
+                picked_now = bool(pickup_tensor.detach().cpu().any())
+            else:
+                picked_now = bool(pickup_tensor)
+
+            was_picked = self.target_cube_pickup_active.get(name, False)
+            if picked_now and not was_picked:
+                self.target_cube_pickup_counts[name] = (
+                    self.target_cube_pickup_counts.get(name, 0) + 1
+                )
+            self.target_cube_pickup_active[name] = picked_now
 
         pickup_counts = getattr(self, "target_cube_pickup_counts", {})
         counts_satisfied = (
             len(pickup_counts) > 0
-            and all(count > 1 for count in pickup_counts.values())
+            and all(count >= 1 for count in pickup_counts.values())
         )
-        #任何情况下只要都pick一次即刻成功
+        #############上升沿检测 必须放在fail检测之前
+
+
+        # 任何情况下只要都 pick 至少一次即刻成功（计数记录离散抓取事件）
         if counts_satisfied:
             self.successflag = torch.tensor([True])
        
@@ -391,25 +420,8 @@ class PickHighlight(BaseEnv):
       
         timestep = self.elapsed_steps
         target_cubes = getattr(self, "target_cubes", [])
-        target_cube_names = getattr(self, "target_cube_names", [])
 
-
-        if target_cubes and not hasattr(self, "target_cube_pickup_counts"):
-            self.target_cube_pickup_counts = {name: 0 for name in target_cube_names}
-        if not target_cubes:
-            return super().step(action)
-
-        # 对每个目标方块只要当前抓住就计数+1，不去除持续抓取的重复
-        for cube, name in zip(target_cubes, target_cube_names):
-            pickup_tensor = is_obj_pickup(self, cube)
-            if isinstance(pickup_tensor, torch.Tensor):
-                picked_now = bool(pickup_tensor.detach().cpu().any())
-            else:
-                picked_now = bool(pickup_tensor)
-            if picked_now:
-                self.target_cube_pickup_counts[name] = (
-                    self.target_cube_pickup_counts.get(name, 0) + 1
-                )
+      
 
         highlight_count = min(self.configs[self.difficulty]["pickup"], len(target_cubes))
         for i in range(highlight_count):

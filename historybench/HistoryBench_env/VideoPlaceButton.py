@@ -190,7 +190,7 @@ class VideoPlaceButton(BaseEnv):
                     include_goal=False,  # 手动维护清单
                     region_center=[-0.1, 0],
                     region_half_size=0.05,
-                    radius=self.cube_half_size * 2,  # 使用radius而不是half_size
+                    radius=self.cube_half_size * 4,  # 使用radius而不是half_size
                     thickness=0.005,  # target的厚度
                     min_gap=self.cube_half_size * 1,  # 与cube相同的间隙要求
                     name_prefix=f"goal_site",

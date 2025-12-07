@@ -687,11 +687,11 @@ def main():
         # "VideoRepick",
          #"VideoPlaceButton",
         # "VideoPlaceOrder",
-        "PickHighlight",
+        #"PickHighlight",
          #"InsertPeg",
         #'MoveCube',
         #"PatternLock",
-        #"RouteStick"
+        "RouteStick"
     ]
 
     try:

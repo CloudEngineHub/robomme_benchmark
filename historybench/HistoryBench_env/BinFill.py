@@ -386,9 +386,10 @@ class BinFill(BaseEnv):
                 "name": "press the button",
                 "subgoal_segment":"press the button at <>",
                 "demonstration": False,
-                "failure_func":lambda :not check_in_bin_number(self,in_bin_list= [self.red_cubes_in_bin, self.blue_cubes_in_bin, self.green_cubes_in_bin],
-                                                            total_number_list=[self.red_cubes_target_number, self.blue_cubes_target_number, self.green_cubes_target_number]),
-                "solve": lambda env, planner: solve_button(env, planner, obj=self.button),
+                "failure_func":lambda  c=self.all_cubes:[not check_in_bin_number(self,in_bin_list= [self.red_cubes_in_bin, self.blue_cubes_in_bin, self.green_cubes_in_bin],
+                                                            total_number_list=[self.red_cubes_target_number, self.blue_cubes_target_number, self.green_cubes_target_number])
+                ,is_any_obj_dropped_onto_delete(self, objects=c, target=self.board_with_hole)],
+                "solve": lambda env, planner: [solve_button(env, planner, obj=self.button)],
                   "segment":self.cap_link 
             })
             self.task_list=tasks

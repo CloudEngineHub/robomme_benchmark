@@ -135,16 +135,13 @@ def get_language_goal(self,historybench_env):
                 language_goal=f'watch the video carefully, then repeatedly pick up and put down the same block that was previously picked up for {word} times, finally press the button to stop'
             else:
                 language_goal=f'watch the video carefully, then pick up the same block that was previously picked up again, finally press the button to stop'
-        elif historybench_env=="PickPeg":
-            language_goal="watch the video carefully, then grasp the same end of the same peg you've picked before and insert it into the same side of the box"
-
         elif historybench_env=="StopCube":
             repeats=getattr(self.env.unwrapped, "stop_time", 1)
             word = num2words_2.get(repeats, str(repeats))
             language_goal=f"press the button to stop the cube just as it reaches the target for the {word} time"
 
         elif historybench_env=="InsertPeg":
-              language_goal=f"watch the video carefully, then insert the same peg into the hole in the same way as you did before"
+              language_goal=f"watch the video carefully, then grasp the same end of the same peg you've picked before and insert it into the same side of the box"
         elif historybench_env=="MoveCube":
               language_goal="watch the video carefully, then move the cube to the target in the same manner as before"
         elif historybench_env=="PatternLock":

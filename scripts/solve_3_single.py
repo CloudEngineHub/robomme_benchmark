@@ -39,7 +39,7 @@ def main():
     """
 
     num_episodes = 1
-    env_id_list=["BinFill"]
+    env_id_list=["PickHighlight"]
     for env_id in env_id_list:
         dataset_path = Path(f"/data/hongzefu/dataset_generate/record_dataset_{env_id}.h5")
         for episode in range(num_episodes):
@@ -57,8 +57,8 @@ def main():
                 HistoryBench_difficulty="hard",
             )
 
-            env_kwargs["historybench_failure_recovery"] = True
-            env_kwargs["historybench_failure_recovery_mode"] = "xy"
+            env_kwargs["historybench_failure_recovery"] = False
+            #env_kwargs["historybench_failure_recovery_mode"] = "xy"
 
 
             env = gym.make(env_id, **env_kwargs)
@@ -67,15 +67,7 @@ def main():
             env = HistoryBenchRecordWrapper(env,HistoryBench_dataset=str(dataset_path),HistoryBench_env=env_id,HistoryBench_episode=episode,HistoryBench_seed=seed,
                                             save_video=True)
             env.reset()
-            #Initialize the motion planner
-            # planner = PandaArmMotionPlanningSolver(
-            #     env,
-            #     debug=False,
-            #     vis=True,
-            #     base_pose=env.unwrapped.agent.robot.pose,
-            #     visualize_target_grasp_pose=False,
-            #     print_env_info=False,
-            # )
+
             if env_id=="PatternLock" or env_id == "RouteStick":
                 planner = FailAwarePandaStickMotionPlanningSolver(
                         env,
