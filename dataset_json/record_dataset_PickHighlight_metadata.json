@@ -5,601 +5,601 @@
     {
       "task": "PickHighlight",
       "episode": 0,
-      "seed": 32000,
+      "seed": 620000,
       "difficulty": "easy"
     },
     {
       "task": "PickHighlight",
       "episode": 1,
-      "seed": 32010,
+      "seed": 620100,
       "difficulty": "easy"
     },
     {
       "task": "PickHighlight",
       "episode": 2,
-      "seed": 32020,
+      "seed": 620200,
       "difficulty": "medium"
     },
     {
       "task": "PickHighlight",
       "episode": 3,
-      "seed": 32030,
+      "seed": 620300,
       "difficulty": "hard"
     },
     {
       "task": "PickHighlight",
       "episode": 4,
-      "seed": 32040,
+      "seed": 620400,
       "difficulty": "easy"
     },
     {
       "task": "PickHighlight",
       "episode": 5,
-      "seed": 32050,
+      "seed": 620500,
       "difficulty": "easy"
     },
     {
       "task": "PickHighlight",
       "episode": 6,
-      "seed": 32060,
+      "seed": 620600,
       "difficulty": "medium"
     },
     {
       "task": "PickHighlight",
       "episode": 7,
-      "seed": 32070,
+      "seed": 620700,
       "difficulty": "hard"
     },
     {
       "task": "PickHighlight",
       "episode": 8,
-      "seed": 32080,
+      "seed": 620800,
       "difficulty": "easy"
     },
     {
       "task": "PickHighlight",
       "episode": 9,
-      "seed": 32090,
+      "seed": 620900,
       "difficulty": "easy"
     },
     {
       "task": "PickHighlight",
       "episode": 10,
-      "seed": 32100,
+      "seed": 621000,
       "difficulty": "medium"
     },
     {
       "task": "PickHighlight",
       "episode": 11,
-      "seed": 32110,
+      "seed": 621100,
       "difficulty": "hard"
     },
     {
       "task": "PickHighlight",
       "episode": 12,
-      "seed": 32120,
+      "seed": 621200,
       "difficulty": "easy"
     },
     {
       "task": "PickHighlight",
       "episode": 13,
-      "seed": 32130,
+      "seed": 621300,
       "difficulty": "easy"
     },
     {
       "task": "PickHighlight",
       "episode": 14,
-      "seed": 32140,
+      "seed": 621400,
       "difficulty": "medium"
     },
     {
       "task": "PickHighlight",
       "episode": 15,
-      "seed": 32150,
+      "seed": 621500,
       "difficulty": "hard"
     },
     {
       "task": "PickHighlight",
       "episode": 16,
-      "seed": 32160,
+      "seed": 621600,
       "difficulty": "easy"
     },
     {
       "task": "PickHighlight",
       "episode": 17,
-      "seed": 32170,
+      "seed": 621700,
       "difficulty": "easy"
     },
     {
       "task": "PickHighlight",
       "episode": 18,
-      "seed": 32180,
+      "seed": 621800,
       "difficulty": "medium"
     },
     {
       "task": "PickHighlight",
       "episode": 19,
-      "seed": 32190,
+      "seed": 621900,
       "difficulty": "hard"
     },
     {
       "task": "PickHighlight",
       "episode": 20,
-      "seed": 32200,
+      "seed": 622000,
       "difficulty": "easy"
     },
     {
       "task": "PickHighlight",
       "episode": 21,
-      "seed": 32210,
+      "seed": 622100,
       "difficulty": "easy"
     },
     {
       "task": "PickHighlight",
       "episode": 22,
-      "seed": 32220,
+      "seed": 622200,
       "difficulty": "medium"
     },
     {
       "task": "PickHighlight",
       "episode": 23,
-      "seed": 32230,
+      "seed": 622300,
       "difficulty": "hard"
     },
     {
       "task": "PickHighlight",
       "episode": 24,
-      "seed": 32240,
+      "seed": 622400,
       "difficulty": "easy"
     },
     {
       "task": "PickHighlight",
       "episode": 25,
-      "seed": 32250,
+      "seed": 622501,
       "difficulty": "easy"
     },
     {
       "task": "PickHighlight",
       "episode": 26,
-      "seed": 32261,
+      "seed": 622600,
       "difficulty": "medium"
     },
     {
       "task": "PickHighlight",
       "episode": 27,
-      "seed": 32270,
+      "seed": 622700,
       "difficulty": "hard"
     },
     {
       "task": "PickHighlight",
       "episode": 28,
-      "seed": 32280,
+      "seed": 622800,
       "difficulty": "easy"
     },
     {
       "task": "PickHighlight",
       "episode": 29,
-      "seed": 32290,
+      "seed": 622900,
       "difficulty": "easy"
     },
     {
       "task": "PickHighlight",
       "episode": 30,
-      "seed": 32300,
+      "seed": 623000,
       "difficulty": "medium"
     },
     {
       "task": "PickHighlight",
       "episode": 31,
-      "seed": 32310,
+      "seed": 623100,
       "difficulty": "hard"
     },
     {
       "task": "PickHighlight",
       "episode": 32,
-      "seed": 32320,
+      "seed": 623200,
       "difficulty": "easy"
     },
     {
       "task": "PickHighlight",
       "episode": 33,
-      "seed": 32330,
+      "seed": 623300,
       "difficulty": "easy"
     },
     {
       "task": "PickHighlight",
       "episode": 34,
-      "seed": 32340,
+      "seed": 623400,
       "difficulty": "medium"
     },
     {
       "task": "PickHighlight",
       "episode": 35,
-      "seed": 32350,
+      "seed": 623500,
       "difficulty": "hard"
     },
     {
       "task": "PickHighlight",
       "episode": 36,
-      "seed": 32360,
+      "seed": 623600,
       "difficulty": "easy"
     },
     {
       "task": "PickHighlight",
       "episode": 37,
-      "seed": 32370,
+      "seed": 623700,
       "difficulty": "easy"
     },
     {
       "task": "PickHighlight",
       "episode": 38,
-      "seed": 32380,
+      "seed": 623800,
       "difficulty": "medium"
     },
     {
       "task": "PickHighlight",
       "episode": 39,
-      "seed": 32390,
+      "seed": 623900,
       "difficulty": "hard"
     },
     {
       "task": "PickHighlight",
       "episode": 40,
-      "seed": 32400,
+      "seed": 624000,
       "difficulty": "easy"
     },
     {
       "task": "PickHighlight",
       "episode": 41,
-      "seed": 32410,
+      "seed": 624100,
       "difficulty": "easy"
     },
     {
       "task": "PickHighlight",
       "episode": 42,
-      "seed": 32420,
+      "seed": 624200,
       "difficulty": "medium"
     },
     {
       "task": "PickHighlight",
       "episode": 43,
-      "seed": 32430,
+      "seed": 624300,
       "difficulty": "hard"
     },
     {
       "task": "PickHighlight",
       "episode": 44,
-      "seed": 32440,
+      "seed": 624400,
       "difficulty": "easy"
     },
     {
       "task": "PickHighlight",
       "episode": 45,
-      "seed": 32450,
+      "seed": 624500,
       "difficulty": "easy"
     },
     {
       "task": "PickHighlight",
       "episode": 46,
-      "seed": 32460,
+      "seed": 624600,
       "difficulty": "medium"
     },
     {
       "task": "PickHighlight",
       "episode": 47,
-      "seed": 32470,
+      "seed": 624700,
       "difficulty": "hard"
     },
     {
       "task": "PickHighlight",
       "episode": 48,
-      "seed": 32480,
+      "seed": 624800,
       "difficulty": "easy"
     },
     {
       "task": "PickHighlight",
       "episode": 49,
-      "seed": 32490,
+      "seed": 624900,
       "difficulty": "easy"
     },
     {
       "task": "PickHighlight",
       "episode": 50,
-      "seed": 32500,
+      "seed": 625000,
       "difficulty": "medium"
     },
     {
       "task": "PickHighlight",
       "episode": 51,
-      "seed": 32510,
+      "seed": 625100,
       "difficulty": "hard"
     },
     {
       "task": "PickHighlight",
       "episode": 52,
-      "seed": 32520,
+      "seed": 625200,
       "difficulty": "easy"
     },
     {
       "task": "PickHighlight",
       "episode": 53,
-      "seed": 32530,
+      "seed": 625300,
       "difficulty": "easy"
     },
     {
       "task": "PickHighlight",
       "episode": 54,
-      "seed": 32540,
+      "seed": 625400,
       "difficulty": "medium"
     },
     {
       "task": "PickHighlight",
       "episode": 55,
-      "seed": 32550,
+      "seed": 625500,
       "difficulty": "hard"
     },
     {
       "task": "PickHighlight",
       "episode": 56,
-      "seed": 32560,
+      "seed": 625600,
       "difficulty": "easy"
     },
     {
       "task": "PickHighlight",
       "episode": 57,
-      "seed": 32570,
+      "seed": 625700,
       "difficulty": "easy"
     },
     {
       "task": "PickHighlight",
       "episode": 58,
-      "seed": 32580,
+      "seed": 625800,
       "difficulty": "medium"
     },
     {
       "task": "PickHighlight",
       "episode": 59,
-      "seed": 32590,
+      "seed": 625900,
       "difficulty": "hard"
     },
     {
       "task": "PickHighlight",
       "episode": 60,
-      "seed": 32600,
+      "seed": 626000,
       "difficulty": "easy"
     },
     {
       "task": "PickHighlight",
       "episode": 61,
-      "seed": 32610,
+      "seed": 626100,
       "difficulty": "easy"
     },
     {
       "task": "PickHighlight",
       "episode": 62,
-      "seed": 32620,
+      "seed": 626200,
       "difficulty": "medium"
     },
     {
       "task": "PickHighlight",
       "episode": 63,
-      "seed": 32630,
+      "seed": 626301,
       "difficulty": "hard"
     },
     {
       "task": "PickHighlight",
       "episode": 64,
-      "seed": 32640,
+      "seed": 626400,
       "difficulty": "easy"
     },
     {
       "task": "PickHighlight",
       "episode": 65,
-      "seed": 32650,
+      "seed": 626500,
       "difficulty": "easy"
     },
     {
       "task": "PickHighlight",
       "episode": 66,
-      "seed": 32660,
+      "seed": 626600,
       "difficulty": "medium"
     },
     {
       "task": "PickHighlight",
       "episode": 67,
-      "seed": 32670,
+      "seed": 626700,
       "difficulty": "hard"
     },
     {
       "task": "PickHighlight",
       "episode": 68,
-      "seed": 32680,
+      "seed": 626800,
       "difficulty": "easy"
     },
     {
       "task": "PickHighlight",
       "episode": 69,
-      "seed": 32690,
+      "seed": 626900,
       "difficulty": "easy"
     },
     {
       "task": "PickHighlight",
       "episode": 70,
-      "seed": 32700,
+      "seed": 627000,
       "difficulty": "medium"
     },
     {
       "task": "PickHighlight",
       "episode": 71,
-      "seed": 32710,
+      "seed": 627100,
       "difficulty": "hard"
     },
     {
       "task": "PickHighlight",
       "episode": 72,
-      "seed": 32720,
+      "seed": 627200,
       "difficulty": "easy"
     },
     {
       "task": "PickHighlight",
       "episode": 73,
-      "seed": 32730,
+      "seed": 627300,
       "difficulty": "easy"
     },
     {
       "task": "PickHighlight",
       "episode": 74,
-      "seed": 32740,
+      "seed": 627400,
       "difficulty": "medium"
     },
     {
       "task": "PickHighlight",
       "episode": 75,
-      "seed": 32750,
+      "seed": 627500,
       "difficulty": "hard"
     },
     {
       "task": "PickHighlight",
       "episode": 76,
-      "seed": 32760,
+      "seed": 627600,
       "difficulty": "easy"
     },
     {
       "task": "PickHighlight",
       "episode": 77,
-      "seed": 32770,
+      "seed": 627700,
       "difficulty": "easy"
     },
     {
       "task": "PickHighlight",
       "episode": 78,
-      "seed": 32780,
+      "seed": 627801,
       "difficulty": "medium"
     },
     {
       "task": "PickHighlight",
       "episode": 79,
-      "seed": 32790,
+      "seed": 627900,
       "difficulty": "hard"
     },
     {
       "task": "PickHighlight",
       "episode": 80,
-      "seed": 32800,
+      "seed": 628000,
       "difficulty": "easy"
     },
     {
       "task": "PickHighlight",
       "episode": 81,
-      "seed": 32810,
+      "seed": 628100,
       "difficulty": "easy"
     },
     {
       "task": "PickHighlight",
       "episode": 82,
-      "seed": 32820,
+      "seed": 628200,
       "difficulty": "medium"
     },
     {
       "task": "PickHighlight",
       "episode": 83,
-      "seed": 32830,
+      "seed": 628301,
       "difficulty": "hard"
     },
     {
       "task": "PickHighlight",
       "episode": 84,
-      "seed": 32840,
+      "seed": 628400,
       "difficulty": "easy"
     },
     {
       "task": "PickHighlight",
       "episode": 85,
-      "seed": 32850,
+      "seed": 628500,
       "difficulty": "easy"
     },
     {
       "task": "PickHighlight",
       "episode": 86,
-      "seed": 32860,
+      "seed": 628600,
       "difficulty": "medium"
     },
     {
       "task": "PickHighlight",
       "episode": 87,
-      "seed": 32870,
+      "seed": 628700,
       "difficulty": "hard"
     },
     {
       "task": "PickHighlight",
       "episode": 88,
-      "seed": 32880,
+      "seed": 628800,
       "difficulty": "easy"
     },
     {
       "task": "PickHighlight",
       "episode": 89,
-      "seed": 32890,
+      "seed": 628900,
       "difficulty": "easy"
     },
     {
       "task": "PickHighlight",
       "episode": 90,
-      "seed": 32900,
+      "seed": 629000,
       "difficulty": "medium"
     },
     {
       "task": "PickHighlight",
       "episode": 91,
-      "seed": 32910,
+      "seed": 629100,
       "difficulty": "hard"
     },
     {
       "task": "PickHighlight",
       "episode": 92,
-      "seed": 32920,
+      "seed": 629200,
       "difficulty": "easy"
     },
     {
       "task": "PickHighlight",
       "episode": 93,
-      "seed": 32930,
+      "seed": 629300,
       "difficulty": "easy"
     },
     {
       "task": "PickHighlight",
       "episode": 94,
-      "seed": 32940,
+      "seed": 629400,
       "difficulty": "medium"
     },
     {
       "task": "PickHighlight",
       "episode": 95,
-      "seed": 32950,
+      "seed": 629500,
       "difficulty": "hard"
     },
     {
       "task": "PickHighlight",
       "episode": 96,
-      "seed": 32960,
+      "seed": 629600,
       "difficulty": "easy"
     },
     {
       "task": "PickHighlight",
       "episode": 97,
-      "seed": 32970,
+      "seed": 629700,
       "difficulty": "easy"
     },
     {
       "task": "PickHighlight",
       "episode": 98,
-      "seed": 32980,
+      "seed": 629800,
       "difficulty": "medium"
     },
     {
       "task": "PickHighlight",
       "episode": 99,
-      "seed": 32990,
+      "seed": 629901,
       "difficulty": "hard"
     }
   ]

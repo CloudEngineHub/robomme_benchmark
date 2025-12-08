@@ -70,7 +70,7 @@ def collect_timestep_subgoals(episode: h5py.Group) -> List[str]:
     transitions: List[str] = []
     last_value: str | None = None
     for key in iter_timesteps_keys(episode):
-        subgoal_dataset = episode[key].get("subgoal")
+        subgoal_dataset = episode[key].get("simple_subgoal")
         if subgoal_dataset is None:
             continue
         subgoal = read_scalar_str(subgoal_dataset)

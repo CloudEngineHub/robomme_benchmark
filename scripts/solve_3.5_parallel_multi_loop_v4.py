@@ -61,25 +61,25 @@ from planner_fail_safe import (
 
 
 DEFAULT_ENVS =[
-# "PickXtimes",
-#"StopCube",
-# "SwingXtimes",
-# "BinFill",
+"PickXtimes",
+"StopCube",
+"SwingXtimes",
+"BinFill",
 
-# "VideoUnmaskSwap",
-# "VideoUnmask",
-# "ButtonUnmaskSwap",
-# "ButtonUnmask",
+"VideoUnmaskSwap",
+"VideoUnmask",
+"ButtonUnmaskSwap",
+"ButtonUnmask",
 
-# "VideoRepick",
-# "VideoPlaceButton",
-# "VideoPlaceOrder",
-# "PickHighlight",
+"VideoRepick",
+"VideoPlaceButton",
+"VideoPlaceOrder",
+"PickHighlight",
 
 "InsertPeg",
-# 'MoveCube',
-# "PatternLock",
-#"RouteStick"
+'MoveCube',
+"PatternLock",
+"RouteStick"
 
 ]
 ENV_ID_TO_CODE = {name: idx + 1 for idx, name in enumerate(DEFAULT_ENVS)}
@@ -318,7 +318,7 @@ def run_env_dataset(
         if difficulty:
             print(f"Episode {episode} assigned difficulty: {difficulty}")
 
-        base_seed = env_code * 1000 + (episode % 100) * 100 # env (2 digits) | episode (2 digits) |
+        base_seed = env_code * 10000 + (episode % 100) * 100 +10000*50    # env (2 digits) | episode (2 digits) |最大160000
         attempt = 0
         while True:
             seed = base_seed + attempt  # unique seed for each attempt
@@ -452,7 +452,7 @@ def parse_args() -> argparse.Namespace:
         "--episodes",
         "-n",
         type=int,
-        default=10,
+        default=100,
         help="Number of episodes to generate per environment (default: 50)",
     )
 

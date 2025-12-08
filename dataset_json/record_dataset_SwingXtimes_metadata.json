@@ -1,534 +1,606 @@
 {
   "env_id": "SwingXtimes",
-  "record_count": 88,
+  "record_count": 100,
   "records": [
     {
       "task": "SwingXtimes",
       "episode": 0,
-      "seed": 23000,
+      "seed": 530000,
       "difficulty": "easy"
     },
     {
       "task": "SwingXtimes",
       "episode": 1,
-      "seed": 23010,
+      "seed": 530100,
       "difficulty": "easy"
     },
     {
       "task": "SwingXtimes",
       "episode": 2,
-      "seed": 23020,
+      "seed": 530200,
       "difficulty": "medium"
     },
     {
       "task": "SwingXtimes",
       "episode": 3,
-      "seed": 23030,
+      "seed": 530300,
       "difficulty": "hard"
     },
     {
       "task": "SwingXtimes",
       "episode": 4,
-      "seed": 23041,
+      "seed": 530400,
       "difficulty": "easy"
     },
     {
       "task": "SwingXtimes",
       "episode": 5,
-      "seed": 23050,
+      "seed": 530500,
       "difficulty": "easy"
     },
     {
       "task": "SwingXtimes",
       "episode": 6,
-      "seed": 23061,
+      "seed": 530600,
       "difficulty": "medium"
     },
     {
       "task": "SwingXtimes",
       "episode": 7,
-      "seed": 23070,
+      "seed": 530700,
       "difficulty": "hard"
     },
     {
       "task": "SwingXtimes",
       "episode": 8,
-      "seed": 23080,
+      "seed": 530801,
       "difficulty": "easy"
     },
     {
       "task": "SwingXtimes",
       "episode": 9,
-      "seed": 23090,
+      "seed": 530900,
       "difficulty": "easy"
     },
     {
       "task": "SwingXtimes",
       "episode": 10,
-      "seed": 23100,
+      "seed": 531000,
       "difficulty": "medium"
     },
     {
       "task": "SwingXtimes",
       "episode": 11,
-      "seed": 23110,
+      "seed": 531100,
       "difficulty": "hard"
     },
     {
       "task": "SwingXtimes",
       "episode": 12,
-      "seed": 23120,
+      "seed": 531201,
       "difficulty": "easy"
     },
     {
       "task": "SwingXtimes",
       "episode": 13,
-      "seed": 23130,
+      "seed": 531300,
       "difficulty": "easy"
     },
     {
       "task": "SwingXtimes",
       "episode": 14,
-      "seed": 23140,
+      "seed": 531401,
       "difficulty": "medium"
     },
     {
       "task": "SwingXtimes",
       "episode": 15,
-      "seed": 23150,
+      "seed": 531500,
       "difficulty": "hard"
     },
     {
       "task": "SwingXtimes",
       "episode": 16,
-      "seed": 23160,
+      "seed": 531600,
       "difficulty": "easy"
     },
     {
       "task": "SwingXtimes",
       "episode": 17,
-      "seed": 23170,
+      "seed": 531700,
       "difficulty": "easy"
     },
     {
       "task": "SwingXtimes",
       "episode": 18,
-      "seed": 23180,
+      "seed": 531800,
       "difficulty": "medium"
     },
     {
       "task": "SwingXtimes",
       "episode": 19,
-      "seed": 23190,
+      "seed": 531900,
       "difficulty": "hard"
     },
     {
       "task": "SwingXtimes",
       "episode": 20,
-      "seed": 23200,
+      "seed": 532000,
       "difficulty": "easy"
     },
     {
       "task": "SwingXtimes",
       "episode": 21,
-      "seed": 23210,
+      "seed": 532100,
       "difficulty": "easy"
     },
     {
       "task": "SwingXtimes",
       "episode": 22,
-      "seed": 23220,
+      "seed": 532200,
       "difficulty": "medium"
     },
     {
       "task": "SwingXtimes",
       "episode": 23,
-      "seed": 23230,
+      "seed": 532300,
       "difficulty": "hard"
     },
     {
       "task": "SwingXtimes",
       "episode": 24,
-      "seed": 23240,
+      "seed": 532400,
       "difficulty": "easy"
     },
     {
       "task": "SwingXtimes",
       "episode": 25,
-      "seed": 23250,
+      "seed": 532500,
       "difficulty": "easy"
     },
     {
       "task": "SwingXtimes",
       "episode": 26,
-      "seed": 23260,
+      "seed": 532601,
       "difficulty": "medium"
     },
     {
       "task": "SwingXtimes",
       "episode": 27,
-      "seed": 23270,
+      "seed": 532700,
       "difficulty": "hard"
     },
     {
       "task": "SwingXtimes",
       "episode": 28,
-      "seed": 23280,
+      "seed": 532800,
       "difficulty": "easy"
     },
     {
       "task": "SwingXtimes",
       "episode": 29,
-      "seed": 23290,
+      "seed": 532900,
       "difficulty": "easy"
     },
     {
       "task": "SwingXtimes",
       "episode": 30,
-      "seed": 23300,
+      "seed": 533000,
       "difficulty": "medium"
     },
     {
       "task": "SwingXtimes",
+      "episode": 31,
+      "seed": 533100,
+      "difficulty": "hard"
+    },
+    {
+      "task": "SwingXtimes",
+      "episode": 32,
+      "seed": 533200,
+      "difficulty": "easy"
+    },
+    {
+      "task": "SwingXtimes",
+      "episode": 33,
+      "seed": 533300,
+      "difficulty": "easy"
+    },
+    {
+      "task": "SwingXtimes",
       "episode": 34,
-      "seed": 23340,
+      "seed": 533401,
       "difficulty": "medium"
     },
     {
       "task": "SwingXtimes",
       "episode": 35,
-      "seed": 23350,
+      "seed": 533500,
       "difficulty": "hard"
     },
     {
       "task": "SwingXtimes",
       "episode": 36,
-      "seed": 23360,
+      "seed": 533600,
       "difficulty": "easy"
     },
     {
       "task": "SwingXtimes",
+      "episode": 37,
+      "seed": 533700,
+      "difficulty": "easy"
+    },
+    {
+      "task": "SwingXtimes",
+      "episode": 38,
+      "seed": 533800,
+      "difficulty": "medium"
+    },
+    {
+      "task": "SwingXtimes",
+      "episode": 39,
+      "seed": 533900,
+      "difficulty": "hard"
+    },
+    {
+      "task": "SwingXtimes",
       "episode": 40,
-      "seed": 23400,
+      "seed": 534000,
       "difficulty": "easy"
     },
     {
       "task": "SwingXtimes",
       "episode": 41,
-      "seed": 23410,
+      "seed": 534100,
       "difficulty": "easy"
     },
     {
       "task": "SwingXtimes",
       "episode": 42,
-      "seed": 23420,
+      "seed": 534200,
       "difficulty": "medium"
     },
     {
       "task": "SwingXtimes",
+      "episode": 43,
+      "seed": 534300,
+      "difficulty": "hard"
+    },
+    {
+      "task": "SwingXtimes",
+      "episode": 44,
+      "seed": 534400,
+      "difficulty": "easy"
+    },
+    {
+      "task": "SwingXtimes",
+      "episode": 45,
+      "seed": 534500,
+      "difficulty": "easy"
+    },
+    {
+      "task": "SwingXtimes",
       "episode": 46,
-      "seed": 23460,
+      "seed": 534600,
       "difficulty": "medium"
     },
     {
       "task": "SwingXtimes",
       "episode": 47,
-      "seed": 23470,
+      "seed": 534700,
       "difficulty": "hard"
     },
     {
       "task": "SwingXtimes",
       "episode": 48,
-      "seed": 23480,
+      "seed": 534800,
       "difficulty": "easy"
     },
     {
       "task": "SwingXtimes",
       "episode": 49,
-      "seed": 23490,
+      "seed": 534900,
       "difficulty": "easy"
     },
     {
       "task": "SwingXtimes",
       "episode": 50,
-      "seed": 23501,
+      "seed": 535000,
       "difficulty": "medium"
     },
     {
       "task": "SwingXtimes",
       "episode": 51,
-      "seed": 23510,
+      "seed": 535100,
       "difficulty": "hard"
     },
     {
       "task": "SwingXtimes",
       "episode": 52,
-      "seed": 23520,
+      "seed": 535200,
       "difficulty": "easy"
     },
     {
       "task": "SwingXtimes",
       "episode": 53,
-      "seed": 23530,
+      "seed": 535301,
       "difficulty": "easy"
     },
     {
       "task": "SwingXtimes",
       "episode": 54,
-      "seed": 23540,
+      "seed": 535400,
       "difficulty": "medium"
     },
     {
       "task": "SwingXtimes",
       "episode": 55,
-      "seed": 23551,
+      "seed": 535500,
       "difficulty": "hard"
     },
     {
       "task": "SwingXtimes",
       "episode": 56,
-      "seed": 23560,
+      "seed": 535600,
       "difficulty": "easy"
     },
     {
       "task": "SwingXtimes",
       "episode": 57,
-      "seed": 23570,
+      "seed": 535700,
       "difficulty": "easy"
     },
     {
       "task": "SwingXtimes",
       "episode": 58,
-      "seed": 23580,
+      "seed": 535800,
       "difficulty": "medium"
     },
     {
       "task": "SwingXtimes",
       "episode": 59,
-      "seed": 23590,
+      "seed": 535900,
       "difficulty": "hard"
     },
     {
       "task": "SwingXtimes",
       "episode": 60,
-      "seed": 23600,
+      "seed": 536000,
       "difficulty": "easy"
     },
     {
       "task": "SwingXtimes",
       "episode": 61,
-      "seed": 23610,
+      "seed": 536100,
       "difficulty": "easy"
     },
     {
       "task": "SwingXtimes",
       "episode": 62,
-      "seed": 23620,
+      "seed": 536200,
       "difficulty": "medium"
     },
     {
       "task": "SwingXtimes",
       "episode": 63,
-      "seed": 23630,
+      "seed": 536300,
       "difficulty": "hard"
     },
     {
       "task": "SwingXtimes",
       "episode": 64,
-      "seed": 23641,
+      "seed": 536400,
       "difficulty": "easy"
     },
     {
       "task": "SwingXtimes",
       "episode": 65,
-      "seed": 23650,
+      "seed": 536500,
       "difficulty": "easy"
     },
     {
       "task": "SwingXtimes",
       "episode": 66,
-      "seed": 23661,
+      "seed": 536600,
       "difficulty": "medium"
     },
     {
       "task": "SwingXtimes",
       "episode": 67,
-      "seed": 23670,
+      "seed": 536700,
       "difficulty": "hard"
     },
     {
       "task": "SwingXtimes",
       "episode": 68,
-      "seed": 23680,
+      "seed": 536800,
       "difficulty": "easy"
     },
     {
       "task": "SwingXtimes",
       "episode": 69,
-      "seed": 23690,
+      "seed": 536900,
       "difficulty": "easy"
     },
     {
       "task": "SwingXtimes",
       "episode": 70,
-      "seed": 23700,
+      "seed": 537000,
       "difficulty": "medium"
     },
     {
       "task": "SwingXtimes",
       "episode": 71,
-      "seed": 23710,
+      "seed": 537101,
       "difficulty": "hard"
     },
     {
       "task": "SwingXtimes",
       "episode": 72,
-      "seed": 23720,
+      "seed": 537200,
       "difficulty": "easy"
     },
     {
       "task": "SwingXtimes",
       "episode": 73,
-      "seed": 23730,
+      "seed": 537300,
       "difficulty": "easy"
     },
     {
       "task": "SwingXtimes",
       "episode": 74,
-      "seed": 23740,
+      "seed": 537400,
       "difficulty": "medium"
     },
     {
       "task": "SwingXtimes",
       "episode": 75,
-      "seed": 23750,
+      "seed": 537500,
       "difficulty": "hard"
     },
     {
       "task": "SwingXtimes",
       "episode": 76,
-      "seed": 23760,
+      "seed": 537600,
       "difficulty": "easy"
     },
     {
       "task": "SwingXtimes",
       "episode": 77,
-      "seed": 23770,
+      "seed": 537700,
       "difficulty": "easy"
     },
     {
       "task": "SwingXtimes",
       "episode": 78,
-      "seed": 23780,
+      "seed": 537800,
       "difficulty": "medium"
     },
     {
       "task": "SwingXtimes",
       "episode": 79,
-      "seed": 23790,
+      "seed": 537900,
       "difficulty": "hard"
     },
     {
       "task": "SwingXtimes",
       "episode": 80,
-      "seed": 23800,
+      "seed": 538000,
       "difficulty": "easy"
     },
     {
       "task": "SwingXtimes",
       "episode": 81,
-      "seed": 23810,
+      "seed": 538100,
       "difficulty": "easy"
     },
     {
       "task": "SwingXtimes",
       "episode": 82,
-      "seed": 23820,
+      "seed": 538200,
       "difficulty": "medium"
     },
     {
       "task": "SwingXtimes",
       "episode": 83,
-      "seed": 23830,
+      "seed": 538300,
       "difficulty": "hard"
     },
     {
       "task": "SwingXtimes",
       "episode": 84,
-      "seed": 23840,
+      "seed": 538400,
       "difficulty": "easy"
     },
     {
       "task": "SwingXtimes",
       "episode": 85,
-      "seed": 23851,
+      "seed": 538500,
       "difficulty": "easy"
     },
     {
       "task": "SwingXtimes",
       "episode": 86,
-      "seed": 23860,
+      "seed": 538601,
       "difficulty": "medium"
     },
     {
       "task": "SwingXtimes",
       "episode": 87,
-      "seed": 23870,
+      "seed": 538700,
       "difficulty": "hard"
     },
     {
       "task": "SwingXtimes",
       "episode": 88,
-      "seed": 23880,
+      "seed": 538800,
       "difficulty": "easy"
     },
     {
       "task": "SwingXtimes",
       "episode": 89,
-      "seed": 23890,
+      "seed": 538900,
       "difficulty": "easy"
     },
     {
       "task": "SwingXtimes",
       "episode": 90,
-      "seed": 23900,
+      "seed": 539000,
       "difficulty": "medium"
     },
     {
       "task": "SwingXtimes",
       "episode": 91,
-      "seed": 23910,
+      "seed": 539100,
       "difficulty": "hard"
     },
     {
       "task": "SwingXtimes",
       "episode": 92,
-      "seed": 23920,
+      "seed": 539200,
       "difficulty": "easy"
     },
     {
       "task": "SwingXtimes",
       "episode": 93,
-      "seed": 23930,
+      "seed": 539300,
       "difficulty": "easy"
     },
     {
       "task": "SwingXtimes",
       "episode": 94,
-      "seed": 23940,
+      "seed": 539400,
       "difficulty": "medium"
     },
     {
       "task": "SwingXtimes",
       "episode": 95,
-      "seed": 23950,
+      "seed": 539500,
       "difficulty": "hard"
     },
     {
       "task": "SwingXtimes",
       "episode": 96,
-      "seed": 23960,
+      "seed": 539600,
       "difficulty": "easy"
+    },
+    {
+      "task": "SwingXtimes",
+      "episode": 97,
+      "seed": 539700,
+      "difficulty": "easy"
+    },
+    {
+      "task": "SwingXtimes",
+      "episode": 98,
+      "seed": 539800,
+      "difficulty": "medium"
+    },
+    {
+      "task": "SwingXtimes",
+      "episode": 99,
+      "seed": 539900,
+      "difficulty": "hard"
     }
   ]
 }
