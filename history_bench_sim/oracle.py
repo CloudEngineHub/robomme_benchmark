@@ -171,6 +171,7 @@ def main():
             
             api.save_conversation()
             api.save_final_video(os.path.join(os.path.dirname(save_dir), f"{success}_ep{episode}_{language_goal}.mp4"))
+            api.clear_uploaded_files()
             del api
             #import pdb; pdb.set_trace()
                       

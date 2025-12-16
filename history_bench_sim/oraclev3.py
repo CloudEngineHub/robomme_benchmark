@@ -39,8 +39,8 @@ def main():
         #"PickXtimes",
         # "StopCube",
         #"SwingXtimes",
-        "BinFill",
-        # "VideoUnmaskSwap",
+        #"BinFill",
+        "VideoUnmaskSwap",
         #"VideoUnmask",
         #"ButtonUnmaskSwap",
         # "ButtonUnmask",
@@ -62,7 +62,7 @@ def main():
             #     continue
 
             env, planner, color_map, language_goal = oracle_resolver.initialize_episode(env_id, episode)
-            model_name = "gpt-5-nano"  # "gemini-2.5-pro" # "gpt-4o-mini", "gemini-er", "qwen-vl"
+            model_name = "gemini-2.5-flash"  # "gemini-2.5-pro" # "gpt-4o-mini", "gemini-er", "qwen-vl"
             success = "fail"
             save_dir = f"oracle_planning/{model_name}/{env_id}/ep{episode}"
                         
@@ -185,6 +185,7 @@ def main():
             
             api.save_conversation()
             api.save_final_video(os.path.join(os.path.dirname(save_dir), f"{success}_ep{episode}_{language_goal}.mp4"))
+            api.clear_uploaded_files()
             del api
             #import pdb; pdb.set_trace()
                       

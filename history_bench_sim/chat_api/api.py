@@ -12,7 +12,7 @@ import numpy as np
 import imageio
 import re
 import base64
-
+import shutil
 import cv2
 
 
@@ -58,6 +58,10 @@ class BaseModel(ABC):
                  use_multi_images_as_video: bool = False,
                  image_size: tuple = (256, 256)):
         self.save_dir = save_dir
+        if save_dir:
+            if os.path.exists(save_dir):
+                shutil.rmtree(save_dir)
+            os.makedirs(save_dir, exist_ok=True)
         self.task_id = task_id
         self.conversation_history = []
         self.model_name = model_name
@@ -276,11 +280,13 @@ class GeminiModel(BaseModel):
             system_instruction=system_prompt
         )
         self.chat = self.model.start_chat(history=[])
+        self.all_uploaded_file_names = []
     
     def _process_image(self, image_path: Union[str, List[str]], 
                       text_query: str = "What should the robot do in this situation?") -> str:
         if isinstance(image_path, list):
             image_files = [genai.upload_file(path=path) for path in image_path]
+            self.all_uploaded_file_names.extend([image_file.name for image_file in image_files])
             while all(file.state.name == "PROCESSING" for file in image_files):
                 time.sleep(0.1)
                 image_files = [genai.get_file(file.name) for file in image_files]
@@ -298,6 +304,7 @@ class GeminiModel(BaseModel):
             })
         else:
             image_file = genai.upload_file(path=image_path)
+            self.all_uploaded_file_names.append(image_file.name)
             
             while image_file.state.name == "PROCESSING":
                 time.sleep(0.1)
@@ -321,6 +328,7 @@ class GeminiModel(BaseModel):
     def _process_video(self, video_path: str, 
                       text_query: str = "What should the robot do based on this video?") -> str:
         video_file = genai.upload_file(path=video_path)
+        self.all_uploaded_file_names.append(video_file.name)
         
         while video_file.state.name == "PROCESSING":
             time.sleep(0.1)
@@ -352,6 +360,15 @@ class GeminiModel(BaseModel):
         })
         
         return response.text
+
+    def clear_uploaded_files(self):
+        try:
+            for file_name in self.all_uploaded_file_names:
+                genai.delete_file(file_name)
+            print(f"Cleared {len(self.all_uploaded_file_names)} uploaded files")
+            self.all_uploaded_file_names = []
+        except Exception as e:
+            print(f"Error clearing uploaded files: {e}")
 
 
 class OpenAIModel(BaseModel):
