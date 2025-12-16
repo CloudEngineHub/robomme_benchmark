@@ -133,13 +133,16 @@ class BaseModel(ABC):
             if image_path is not None:
                 print(f"Processing image: {image_path}")
                 print(f"Text query: {text_query}")
+                print("calling api...")
                 response = self._process_image(image_path, text_query)
             elif video_path is not None:
                 print(f"Processing video: {video_path}")
                 print(f"Text query: {text_query}")
+                print("calling api...")
                 response = self._process_video(video_path, text_query)
             else:
                 print(f"Text query: {text_query}")
+                print("calling api...")
                 response = self._process_text(text_query)
                 
             print(f"\nResponse:\n{response}")
@@ -356,11 +359,10 @@ class OpenAIModel(BaseModel):
     def init_model(self, system_prompt: str, model_name: str):
         self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         
-        # self.client = AzureOpenAI(
-        #     api_version="2024-12-01-preview",
-        #     azure_endpoint="https://minigrid-gpt.openai.azure.com/",
-        #     api_key=os.getenv("AZURE_OPENAI_API_KEY"),
-        # )
+        self.client = OpenAI(
+            api_key=os.getenv("OPENAI_API_KEY"),
+            base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+        )
         self.model_name = model_name
         self.system_prompt = system_prompt
         self.conv = self.client.conversations.create()
@@ -458,3 +460,95 @@ class OpenAIModel(BaseModel):
         })
         
         return assistant_message
+
+class QwenModel(BaseModel):
+    
+    def init_model(self, system_prompt: str, model_name: str):
+        # Use DASHSCOPE_API_KEY if available, else OPENAI_API_KEY
+        api_key = os.getenv("DASHSCOPE_API_KEY") or os.getenv("OPENAI_API_KEY")
+        self.client = OpenAI(
+            api_key=api_key,
+            base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+        )
+        self.model_name = model_name or "qwen-vl-max"
+        self.messages = [{
+            "role": "system",
+            "content": system_prompt
+        }]
+        self.use_multi_images_as_video = True
+
+    def _encode_image(self, image_path: str) -> str:
+        with open(image_path, "rb") as f:
+            b64 = base64.b64encode(f.read()).decode("utf-8")
+        return f"data:image/jpeg;base64,{b64}"
+
+    def _process_image(self, image_path: Union[str, List[str]], 
+                      text_query: str = "What should the robot do in this situation?") -> str:
+        content = []        
+        image_paths = image_path if isinstance(image_path, list) else [image_path]
+        
+        for path in image_paths:
+            base64_image = self._encode_image(path)
+            content.append({
+                "type": "image_url",
+                "image_url": {
+                    "url": base64_image
+                }
+            })
+        content.append({"type": "text", "text": text_query})        
+        
+        self.messages.append({
+            "role": "user",
+            "content": content
+        })
+                
+        response = self.client.chat.completions.create(
+            model=self.model_name,
+            messages=self.messages
+        )
+        
+        assistant_message = response.choices[0].message.content
+        self.messages.append({
+            "role": "assistant",
+            "content": assistant_message
+        })
+                
+        self.conversation_history.append({
+            "turn": len(self.conversation_history) + 1,
+            "type": "image",
+            "path": [os.path.basename(p) for p in image_paths] if isinstance(image_path, list) else os.path.basename(image_path),
+            "query": text_query,
+            "response": assistant_message
+        })
+    
+        return assistant_message
+    
+    def _process_text(self, user_query: str) -> str:
+        self.messages.append({"role": "user", "content": user_query})
+        
+        response = self.client.chat.completions.create(
+            model=self.model_name,
+            messages=self.messages
+        )
+        
+        assistant_message = response.choices[0].message.content
+        self.messages.append({
+            "role": "assistant",
+            "content": assistant_message
+        })
+        
+        self.conversation_history.append({
+            "turn": len(self.conversation_history) + 1,
+            "type": "text",
+            "query": user_query,
+            "response": assistant_message
+        })
+        
+        return assistant_message
+
+    def _process_video(self, video_path: str, text_query: str) -> str:
+        # If this is called, it means use_multi_images_as_video was False or prepare_input_data logic bypassed
+        # For Qwen via OpenAI compatible API, handling video directly is complex (usually frames).
+        # We'll treat it as not implemented or try to use frames if we had them.
+        # But prepare_input_data for BaseModel will handle video->images if configured.
+        raise NotImplementedError("Video processing not directly supported for Qwen via OpenAI API in this implementation. Use image sequence.")

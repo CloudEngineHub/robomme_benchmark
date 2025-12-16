@@ -218,7 +218,7 @@ def _find_best_semantic_match(user_query, options):
     return best_idx, best_score
 
 # --- Core GUI Logic Functions (Retained) ---
-def _prompt_next_task_gui(options, env, selected_target, env_id, seg_vis, seg_raw, base_frames, wrist_frames, fps=12, seg_hw=(360, 480), video_hw=(180, 240), simulated_inputs=None, external_state=None):
+def _prompt_next_task_gui(options, env, selected_target, env_id, seg_vis, seg_raw, base_frames, wrist_frames, fps=12, seg_hw=(255, 255), video_hw=(255, 255), simulated_inputs=None, external_state=None):
     # ... [Same as provided code] ...
     # (Abbreviated to avoid duplication, assuming logic remains identical to original)
     if simulated_inputs is None:
@@ -403,7 +403,21 @@ def step_before(env, planner, env_id, color_map, use_segmentation=False, use_vis
     base_frames = getattr(env, "frames", []) or []
     wrist_frames = getattr(env, "wrist_frames", []) or []
     seg_data = _fetch_segmentation(env)
-    seg_hw = (360, 480)
+    
+    # Detect resolution from env data instead of hardcoding
+    #seg_hw = (360, 480)
+    if base_frames and len(base_frames) > 0:
+        seg_hw = base_frames[-1].shape[:2]
+    elif seg_data is not None:
+        try:
+            temp = seg_data
+            if hasattr(temp, "cpu"): temp = temp.cpu().numpy()
+            temp = np.asarray(temp)
+            if temp.ndim > 2: temp = temp[0]
+            seg_hw = temp.shape[:2]
+        except Exception:
+            pass
+
     seg_vis = None
     seg_raw = None
 
@@ -687,7 +701,7 @@ def main():
         # "VideoRepick",
          #"VideoPlaceButton",
         # "VideoPlaceOrder",
-        "PickHighlight",
+        "VideoPlaceOrder",
          #"InsertPeg",
         #'MoveCube',
         #"PatternLock",
@@ -734,7 +748,8 @@ def main():
                             use_visualize=use_visualization,
                             figures_to_close=figures_to_close
                     )
-                    #command_dict={'action': 'Pick red cube', 'point': (20, 20)}
+                    #command_dict={'action': 'Pick red cube', 'point': (255, 255)}
+                    #command_dict={'action': 'Pick red cube', 'point': (255, 255)}
                  
 
                     # [Step C] 执行逻辑处理并调用求解器

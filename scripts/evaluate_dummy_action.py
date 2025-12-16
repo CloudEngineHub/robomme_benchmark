@@ -33,7 +33,7 @@ def main():
     """
 
     num_episodes = 1
-    gui_render=False
+    gui_render=True
     max_steps=3000
     
 
@@ -115,8 +115,8 @@ def main():
                     print(info["success"])
 
                 if gui_render:
-                    env.render()
-
+                    test=env.render()
+                    print(test)
                 if truncated:
                     print("time limit!")
                     break

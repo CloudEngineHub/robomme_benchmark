@@ -60,7 +60,7 @@ def main():
         for episode in range(num_episodes):
             
             env, planner, color_map, language_goal = oracle_resolver.initialize_episode(env_id, episode)
-            model_name = "gemini-2.5-pro"  # "gemini-2.5-pro" # "gpt-4o-mini", "gemini-er", "qwen-vl"
+            model_name = "gpt-4o-mini"  # "gemini-2.5-pro" # "gpt-4o-mini", "gemini-er", "qwen-vl"
             success = "fail"
             save_dir = f"oracle_planning/{model_name}/{env_id}/ep{episode}"
                         
@@ -76,6 +76,8 @@ def main():
                 api = GeminiModel(save_dir=save_dir, task_id=env_id, model_name=model_name, task_goal=language_goal, subgoal_type="oracle_planner")
             else:
                 api = OpenAIModel(save_dir=save_dir, task_id=env_id, model_name=model_name, task_goal=language_goal, subgoal_type="oracle_planner")
+            #api = GeminiModel(save_dir=save_dir, task_id=env_id, model_name=model_name, task_goal=language_goal, subgoal_type="oracle_planner")
+
 
             step_idx = 0
             frame_idx = 0
@@ -108,6 +110,9 @@ def main():
                         text_query = VIDEO_TEXT_QUERY.format(task_goal=language_goal)
                 
                 input_data = api.prepare_input_data(base_frames[frame_idx:], text_query, step_idx)
+
+                
+
                 response, points = api.call(input_data)
                 
                 if response is None:
@@ -167,7 +172,7 @@ def main():
             api.save_conversation()
             api.save_final_video(os.path.join(os.path.dirname(save_dir), f"{success}_ep{episode}_{language_goal}.mp4"))
             del api
-            import pdb; pdb.set_trace()
+            #import pdb; pdb.set_trace()
                       
     oracle_resolver.close()
     
