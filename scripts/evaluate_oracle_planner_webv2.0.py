@@ -11,6 +11,7 @@ import h5py
 from pathlib import Path
 import torch
 import gradio as gr
+import tempfile
 
 # --- NLP Imports ---
 try:
@@ -401,8 +402,14 @@ def _prompt_next_task_gui(options, env, selected_target, env_id, seg_vis, seg_ra
     return state, display_img
 
 def step_before(env, planner, env_id, color_map, use_segmentation=False, use_visualize=False, figures_to_close=None):
-    base_frames = getattr(env, "frames", []) or []
-    wrist_frames = getattr(env, "wrist_frames", []) or []
+    base_frames = getattr(env, "frames", [])
+    if not base_frames:
+        base_frames = getattr(env.unwrapped, "frames", []) or []
+        
+    wrist_frames = getattr(env, "wrist_frames", [])
+    if not wrist_frames:
+        wrist_frames = getattr(env.unwrapped, "wrist_frames", []) or []
+
     seg_data = _fetch_segmentation(env)
     
     # Detect resolution from env data instead of hardcoding
@@ -682,14 +689,28 @@ class EpisodeConfigResolverForOraclePlanner:
 class OracleGradioService:
     def __init__(self):
         self.oracle_resolver = EpisodeConfigResolverForOraclePlanner(
-            gui_render=False,  # Disable window popups
+            gui_render=False,  # Disable window popups, use rgb_array for streaming
             max_steps_without_demonstration=3000
         )
         self.env_id_list = [
+            "PickXtimes",
+            "StopCube",
+            "SwingXtimes",
+            "BinFill",
+            "VideoUnmaskSwap",
+            "VideoUnmask",
+            "ButtonUnmaskSwap",
+            "ButtonUnmask",
+            "VideoRepick",
+            "VideoPlaceButton",
+            "VideoPlaceOrder",
             "PickHighlight",
-            # Add other envs here if needed
+            "InsertPeg",
+            "MoveCube",
+            "PatternLock",
+            "RouteStick",
         ]
-        self.current_env_id = "PickHighlight"
+        self.current_env_id = self.env_id_list[0]
         self.current_episode = 42
         
         self.env = None
@@ -705,6 +726,143 @@ class OracleGradioService:
         
         self.last_click = (0, 0)
         
+    def _get_video_path(self):
+        if not self.base_frames:
+            return None
+        
+        frames = self.base_frames
+        if len(frames) == 0:
+            return None
+            
+        print(f"Starting video generation for {len(frames)} frames...")
+
+        # Strategy 1: Try imageio (usually more robust)
+        try:
+            import imageio
+            # Create a temp file
+            tfile = tempfile.NamedTemporaryFile(suffix='.mp4', delete=False)
+            tfile.close()
+            video_path = tfile.name
+            
+            print("Attempting to use imageio for video generation...")
+            # imageio expects RGB frames, which matches base_frames format
+            imageio.mimwrite(video_path, frames, fps=12, quality=8, macro_block_size=None)
+            print(f"Video generated successfully using imageio: {video_path}")
+            return video_path
+        except ImportError:
+            print("imageio module not found.")
+        except Exception as e:
+            print(f"imageio generation failed: {e}")
+
+        # Strategy 2: OpenCV VideoWriter
+        try:
+            tfile = tempfile.NamedTemporaryFile(suffix='.mp4', delete=False)
+            tfile.close()
+            video_path = tfile.name
+            
+            h, w = frames[0].shape[:2]
+            print(f"Attempting to use OpenCV VideoWriter ({w}x{h})...")
+            
+            # Try mp4v first as it is more commonly available without extra h264 libs
+            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+            out = cv2.VideoWriter(video_path, fourcc, 12.0, (w, h))
+            
+            if not out.isOpened():
+                print("Failed with mp4v, trying avc1...")
+                fourcc = cv2.VideoWriter_fourcc(*'avc1')
+                out = cv2.VideoWriter(video_path, fourcc, 12.0, (w, h))
+            
+            if out.isOpened():
+                print("VideoWriter opened. Writing frames...")
+                for i, frame in enumerate(frames):
+                    if i % 100 == 0:
+                        print(f"  Writing frame {i}/{len(frames)}")
+                    frame_u8 = np.asarray(frame).astype(np.uint8)
+                    frame_bgr = cv2.cvtColor(frame_u8, cv2.COLOR_RGB2BGR)
+                    out.write(frame_bgr)
+                out.release()
+                print(f"Video generated successfully using OpenCV: {video_path}")
+                return video_path
+            else:
+                print("Failed to open OpenCV VideoWriter with both mp4v and avc1.")
+        except Exception as e:
+            print(f"OpenCV generation failed: {e}")
+
+        # Strategy 3: PIL GIF (Last resort)
+        try:
+            from PIL import Image as PILImage
+            tfile = tempfile.NamedTemporaryFile(suffix='.gif', delete=False)
+            tfile.close()
+            video_path = tfile.name
+            
+            print("Attempting to generate GIF using PIL (fallback)...")
+            pil_frames = [PILImage.fromarray(frame.astype(np.uint8)) for frame in frames]
+            # Save as GIF
+            pil_frames[0].save(
+                video_path,
+                save_all=True,
+                append_images=pil_frames[1:],
+                optimize=False,
+                duration=int(1000/12), # ms per frame
+                loop=0
+            )
+            print(f"GIF generated successfully: {video_path}")
+            return video_path
+        except Exception as e:
+            print(f"PIL GIF generation failed: {e}")
+            
+        return None
+
+    def _get_viewer_snapshot(self):
+        """
+        Rewritten env.render() wrapper to support dynamic streaming.
+        Returns the current environment frame (rgb_array).
+        """
+        if not self.env:
+            return None
+            
+        try:
+            # STRICTLY use env.render() only, as requested.
+            img = self.env.render()
+            
+            if img is None:
+                return None
+
+            if hasattr(img, "cpu"):
+                img = img.cpu().numpy()
+            img = np.asarray(img)
+            
+            # Debug: Print shape if it's unexpected (only once to avoid spam)
+            # print(f"[Viewer] Raw shape: {img.shape}")
+            
+            # Squeeze to remove batch dimensions, e.g. (1, 1, 512, 512, 3) -> (512, 512, 3)
+            img = img.squeeze()
+            
+            # Handle PyTorch convention (C, H, W) -> (H, W, C)
+            # If shape is (3, H, W), transpose.
+            if img.ndim == 3 and img.shape[0] == 3 and img.shape[1] > 3 and img.shape[2] > 3:
+                img = np.transpose(img, (1, 2, 0))
+            
+            # Normalize if float [0, 1]
+            if img.dtype != np.uint8:
+                if img.max() <= 1.0:
+                    img = (img * 255).astype(np.uint8)
+                else:
+                    img = img.astype(np.uint8)
+            
+            # Handle RGBA -> RGB
+            if img.ndim == 3 and img.shape[-1] == 4:
+                img = img[..., :3]
+            
+            # Ensure HxWxC
+            if img.ndim == 2:
+                img = np.stack([img]*3, axis=-1)
+                
+            return img
+        except Exception as e:
+            print(f"[Viewer] Render failed: {e}")
+            return None
+
     def load_env(self, env_id, episode_idx):
         try:
             episode_idx = int(episode_idx)
@@ -720,16 +878,37 @@ class OracleGradioService:
             self.env, self.planner, self.color_map, self.language_goal = self.oracle_resolver.initialize_episode(env_id, episode_idx)
             
             if self.env is None:
-                return f"Failed to load Env: {env_id}, Episode: {episode_idx}", None, [], ""
+                return (
+                    f"Failed to load Env: {env_id}, Episode: {episode_idx}",
+                    None,
+                    None,
+                    None,
+                    gr.Radio(choices=[], value=None),
+                    "",
+                )
                 
             # Perform initial step
             self._update_state()
             
-            return f"Loaded {env_id} Episode {episode_idx}", self._get_display_image(), gr.Radio(choices=self._get_options_labels(), value=None), self.language_goal
+            return (
+                f"Loaded {env_id} Episode {episode_idx}",
+                self._get_display_image(),
+                self._get_video_path(),
+                self._get_viewer_snapshot(),
+                gr.Radio(choices=self._get_options_labels(), value=None),
+                self.language_goal,
+            )
         except Exception as e:
             import traceback
             traceback.print_exc()
-            return f"Error loading: {str(e)}", None, gr.Radio(choices=[], value=None), ""
+            return (
+                f"Error loading: {str(e)}",
+                None,
+                None,
+                None,
+                gr.Radio(choices=[], value=None),
+                "",
+            )
 
     def _update_state(self):
         self.seg_vis, self.seg_raw, self.base_frames, self.wrist_frames, self.available_options = step_before(
@@ -745,7 +924,16 @@ class OracleGradioService:
     def _get_display_image(self):
         if self.seg_vis is not None:
             # CV2 is BGR, Gradio expects RGB
-            return cv2.cvtColor(self.seg_vis, cv2.COLOR_BGR2RGB)
+            display_img = cv2.cvtColor(self.seg_vis.copy(), cv2.COLOR_BGR2RGB)
+            # 在图像上绘制点击位置
+            if self.last_click != (0, 0):
+                x, y = self.last_click
+                # 绘制一个红色圆圈标记点击位置
+                cv2.circle(display_img, (x, y), 8, (255, 0, 0), 2)
+                # 绘制一个十字标记
+                cv2.line(display_img, (x - 10, y), (x + 10, y), (255, 0, 0), 2)
+                cv2.line(display_img, (x, y - 10), (x, y + 10), (255, 0, 0), 2)
+            return display_img
         return np.zeros((256, 256, 3), dtype=np.uint8)
 
     def _get_options_labels(self):
@@ -754,23 +942,54 @@ class OracleGradioService:
 
     def set_click(self, evt: gr.SelectData):
         self.last_click = (evt.index[0], evt.index[1])
-        return f"Selected Coords: {self.last_click}"
+        return (
+            self._get_display_image(),
+            f"Selected Coords: {self.last_click}"
+        )
 
     def run_step(self, option_str):
         if not self.env:
-            return "Environment not loaded.", self._get_display_image(), gr.Radio(choices=[], value=None), ""
+            return (
+                "Environment not loaded.",
+                self._get_display_image(),
+                None,
+                None,
+                gr.Radio(choices=[], value=None),
+                "",
+            )
         
         if not option_str:
-            return "Please select an action.", self._get_display_image(), gr.Radio(choices=self._get_options_labels(), value=None), self.language_goal
+            return (
+                "Please select an action.",
+                self._get_display_image(),
+                self._get_video_path(),
+                self._get_viewer_snapshot(),
+                gr.Radio(choices=self._get_options_labels(), value=None),
+                self.language_goal,
+            )
 
         # Parse option index from string "1. Action Name"
         try:
             idx = int(option_str.split('.')[0]) - 1
         except:
-            return "Invalid option format.", self._get_display_image(), gr.Radio(choices=self._get_options_labels(), value=None), self.language_goal
+            return (
+                "Invalid option format.",
+                self._get_display_image(),
+                self._get_video_path(),
+                self._get_viewer_snapshot(),
+                gr.Radio(choices=self._get_options_labels(), value=None),
+                self.language_goal,
+            )
 
         if not (0 <= idx < len(self.available_options)):
-             return "Option index out of range.", self._get_display_image(), gr.Radio(choices=self._get_options_labels(), value=None), self.language_goal
+             return (
+                 "Option index out of range.",
+                 self._get_display_image(),
+                 self._get_video_path(),
+                 self._get_viewer_snapshot(),
+                 gr.Radio(choices=self._get_options_labels(), value=None),
+                 self.language_goal,
+             )
 
         selected_opt = self.available_options[idx]
         action_name = selected_opt['action']
@@ -800,7 +1019,14 @@ class OracleGradioService:
         except Exception as e:
             import traceback
             traceback.print_exc()
-            return f"Error during execution: {e}", self._get_display_image(), self._get_options_labels(), self.language_goal
+            return (
+                f"Error during execution: {e}",
+                self._get_display_image(),
+                self._get_video_path(),
+                self._get_viewer_snapshot(),
+                gr.Radio(choices=self._get_options_labels(), value=None),
+                self.language_goal,
+            )
 
         status = "Continue"
         if evaluation:
@@ -812,11 +1038,25 @@ class OracleGradioService:
         log_msg += f"Result: {status}\n"
         
         if status in ["SUCCESS", "FAILURE"]:
-            return log_msg + " (End of Episode)", self._get_display_image(), gr.Radio(choices=[], value=None), self.language_goal
+            return (
+                log_msg + " (End of Episode)",
+                self._get_display_image(),
+                self._get_video_path(),
+                self._get_viewer_snapshot(),
+                gr.Radio(choices=[], value=None),
+                self.language_goal,
+            )
         
         # Next Step
         self._update_state()
-        return log_msg, self._get_display_image(), gr.Radio(choices=self._get_options_labels(), value=None), self.language_goal
+        return (
+            log_msg,
+            self._get_display_image(),
+            self._get_video_path(),
+            self._get_viewer_snapshot(),
+            gr.Radio(choices=self._get_options_labels(), value=None),
+            self.language_goal,
+        )
 
 
 def main():
@@ -827,11 +1067,11 @@ def main():
         
         with gr.Row():
             with gr.Column(scale=1):
-                env_dd = gr.Dropdown(choices=service.env_id_list, value="PickHighlight", label="Environment ID")
+                env_dd = gr.Dropdown(choices=service.env_id_list, value=service.current_env_id, label="Environment ID")
                 ep_num = gr.Number(value=42, label="Episode Index", precision=0)
                 load_btn = gr.Button("Load/Reset Episode")
                 
-                goal_box = gr.Textbox(label="Language Goal", interactive=False)
+                goal_box = gr.Textbox(label="Language Goal", interactive=False, lines=3)
                 
                 options_radio = gr.Radio(label="Select Action", choices=[])
                 coords_box = gr.Textbox(label="Selected Coordinates", value="(0, 0)", interactive=False)
@@ -841,25 +1081,38 @@ def main():
                 log_output = gr.Textbox(label="Status/Logs", lines=5)
                 
             with gr.Column(scale=2):
-                img_display = gr.Image(label="Robot View", interactive=True)
+                with gr.Row():
+                    img_display = gr.Image(label="Robot View", interactive=True)
+                    # 将竖向高度压缩到原先的一半左右，避免占用过高空间
+                    video_display = gr.Video(label="Episode History", height=256)
+                with gr.Row():
+                    viewer_display = gr.Image(label="ManiSkill Viewer", interactive=False)
         
         # Event Wiring
         load_btn.click(
             fn=service.load_env,
             inputs=[env_dd, ep_num],
-            outputs=[log_output, img_display, options_radio, goal_box]
+            outputs=[log_output, img_display, video_display, viewer_display, options_radio, goal_box]
         )
         
         img_display.select(
             fn=service.set_click,
             inputs=None,
-            outputs=[coords_box]
+            outputs=[img_display, coords_box]
         )
         
         exec_btn.click(
             fn=service.run_step,
             inputs=[options_radio],
-            outputs=[log_output, img_display, options_radio, goal_box]
+            outputs=[log_output, img_display, video_display, viewer_display, options_radio, goal_box]
+        )
+        
+        # 动态streaming: 使用 gr.Timer 替代 deprecated 的 every 参数
+        timer = gr.Timer(value=0.2)
+        timer.tick(
+            fn=service._get_viewer_snapshot, 
+            inputs=None, 
+            outputs=viewer_display
         )
 
     print("Starting Gradio Server...")

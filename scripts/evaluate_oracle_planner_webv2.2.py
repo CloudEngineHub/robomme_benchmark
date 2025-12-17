@@ -12,6 +12,9 @@ from pathlib import Path
 import torch
 import gradio as gr
 import tempfile
+import shutil
+import imageio
+
 
 # --- NLP Imports ---
 try:
@@ -52,12 +55,20 @@ from historybench.HistoryBench_env.util import *
 from historybench.HistoryBench_env.util import task_goal
 from historybench.HistoryBench_env.util.vqa_options import get_vqa_options
 
+from history_bench_sim.chat_api.api import GeminiModel, QwenModel, OpenAIModel
+from history_bench_sim.chat_api.prompts import *
+
 from mani_skill.examples.motionplanning.panda.motionplanner import (
     PandaArmMotionPlanningSolver,
 )
 from mani_skill.examples.motionplanning.panda.motionplanner_stick import (
     PandaStickMotionPlanningSolver,
 )
+
+TASK_WITH_DEMO = [
+    "VideoUnmask", "VideoUnmaskSwap", "VideoPlaceButton", "VideoPlaceOrder",
+    "VideoRepick", "MoveCube", "InsertPeg", "PatternLock", "RouteStick"
+]
 
 # =============================================================================
 # Helper Functions (Retained)
@@ -689,14 +700,28 @@ class EpisodeConfigResolverForOraclePlanner:
 class OracleGradioService:
     def __init__(self):
         self.oracle_resolver = EpisodeConfigResolverForOraclePlanner(
-            gui_render=False,  # Disable window popups
+            gui_render=False,  # Disable window popups, use rgb_array for streaming
             max_steps_without_demonstration=3000
         )
         self.env_id_list = [
+            "PickXtimes",
+            "StopCube",
+            "SwingXtimes",
+            "BinFill",
+            "VideoUnmaskSwap",
+            "VideoUnmask",
+            "ButtonUnmaskSwap",
+            "ButtonUnmask",
+            "VideoRepick",
+            "VideoPlaceButton",
             "VideoPlaceOrder",
-            # Add other envs here if needed
+            "PickHighlight",
+            "InsertPeg",
+            "MoveCube",
+            "PatternLock",
+            "RouteStick",
         ]
-        self.current_env_id = "VideoPlaceOrder"
+        self.current_env_id = self.env_id_list[0]
         self.current_episode = 42
         
         self.env = None
@@ -711,6 +736,12 @@ class OracleGradioService:
         self.available_options = []
         
         self.last_click = (0, 0)
+        
+        # API related
+        self.api = None
+        self.step_idx = 0
+        self.frame_idx = 0
+        self.save_dir = None
         
     def _get_video_path(self):
         if not self.base_frames:
@@ -799,6 +830,96 @@ class OracleGradioService:
             
         return None
 
+    def _get_viewer_snapshot(self):
+        """
+        Rewritten env.render() wrapper to support dynamic streaming.
+        Returns the current environment frame (rgb_array).
+        """
+        if not self.env:
+            return None
+            
+        try:
+            # STRICTLY use env.render() only, as requested.
+            img = self.env.render()
+            
+            if img is None:
+                return None
+
+            if hasattr(img, "cpu"):
+                img = img.cpu().numpy()
+            img = np.asarray(img)
+            
+            # Debug: Print shape if it's unexpected (only once to avoid spam)
+            # print(f"[Viewer] Raw shape: {img.shape}")
+            
+            # Squeeze to remove batch dimensions, e.g. (1, 1, 512, 512, 3) -> (512, 512, 3)
+            img = img.squeeze()
+            
+            # Handle PyTorch convention (C, H, W) -> (H, W, C)
+            # If shape is (3, H, W), transpose.
+            if img.ndim == 3 and img.shape[0] == 3 and img.shape[1] > 3 and img.shape[2] > 3:
+                img = np.transpose(img, (1, 2, 0))
+            
+            # Normalize if float [0, 1]
+            if img.dtype != np.uint8:
+                if img.max() <= 1.0:
+                    img = (img * 255).astype(np.uint8)
+                else:
+                    img = img.astype(np.uint8)
+            
+            # Handle RGBA -> RGB
+            if img.ndim == 3 and img.shape[-1] == 4:
+                img = img[..., :3]
+            
+            # Ensure HxWxC
+            if img.ndim == 2:
+                img = np.stack([img]*3, axis=-1)
+                
+            return img
+        except Exception as e:
+            print(f"[Viewer] Render failed: {e}")
+            return None
+
+    def _get_wrist_view_snapshot(self):
+        """
+        Fetch the wrist camera view from the environment observation.
+        """
+        if not self.env:
+            return None
+            
+        try:
+            # Use unflattened observation to access sensor data directly
+            obs = self.env.unwrapped.get_obs(unflattened=True)
+            
+            # Check for hand_camera (wrist camera)
+            if "sensor_data" in obs and "hand_camera" in obs["sensor_data"]:
+                img = obs["sensor_data"]["hand_camera"]["rgb"]
+                
+                if hasattr(img, "cpu"):
+                    img = img.cpu().numpy()
+                img = np.asarray(img)
+                
+                # Handle dimensions
+                if img.ndim == 4:
+                    img = img[0]
+                
+                # Normalize
+                if img.dtype != np.uint8:
+                    if img.max() <= 1.0:
+                        img = (img * 255).astype(np.uint8)
+                    else:
+                        img = img.astype(np.uint8)
+                        
+                return img
+        except Exception as e:
+            # print(f"[Wrist View] Failed: {e}")
+            pass
+            
+        return None
+
+    def _get_streaming_views(self):
+        return self._get_viewer_snapshot(), self._get_wrist_view_snapshot()
+
     def load_env(self, env_id, episode_idx):
         try:
             episode_idx = int(episode_idx)
@@ -814,16 +935,61 @@ class OracleGradioService:
             self.env, self.planner, self.color_map, self.language_goal = self.oracle_resolver.initialize_episode(env_id, episode_idx)
             
             if self.env is None:
-                return f"Failed to load Env: {env_id}, Episode: {episode_idx}", None, None, [], ""
+                return (
+                    f"Failed to load Env: {env_id}, Episode: {episode_idx}",
+                    None,
+                    None,
+                    None,
+                    None,
+                    gr.Radio(choices=[], value=None),
+                    "",
+                )
+            
+            # Initialize API
+            model_name = "gemini-2.5-flash"
+            self.save_dir = f"oracle_planning_gui/{model_name}/{env_id}/ep{episode_idx}"
+            if os.path.exists(self.save_dir):
+                shutil.rmtree(self.save_dir)
+            os.makedirs(self.save_dir, exist_ok=True)
+
+            with open(os.path.join(self.save_dir, "language_goal.txt"), "w") as f:
+                f.write(self.language_goal)
+            
+            if "gemini" in model_name:
+                self.api = GeminiModel(save_dir=self.save_dir, task_id=env_id, model_name=model_name, task_goal=self.language_goal, subgoal_type="oracle_planner")
+            elif "qwen" in model_name:
+                self.api = QwenModel(save_dir=self.save_dir, task_id=env_id, model_name=model_name, task_goal=self.language_goal, subgoal_type="oracle_planner")
+            else:
+                self.api = OpenAIModel(save_dir=self.save_dir, task_id=env_id, model_name=model_name, task_goal=self.language_goal, subgoal_type="oracle_planner")
+            
+            self.step_idx = 0
+            self.frame_idx = 0
                 
             # Perform initial step
             self._update_state()
             
-            return f"Loaded {env_id} Episode {episode_idx}", self._get_display_image(), self._get_video_path(), gr.Radio(choices=self._get_options_labels(), value=None), self.language_goal
+            return (
+                f"Loaded {env_id} Episode {episode_idx}",
+                self._get_display_image(),
+                self._get_video_path(),
+                self._get_viewer_snapshot(),
+                self._get_wrist_view_snapshot(),
+                gr.Radio(choices=self._get_options_labels(), value=None),
+                self.language_goal,
+            )
         except Exception as e:
             import traceback
             traceback.print_exc()
-            return f"Error loading: {str(e)}", None, None, gr.Radio(choices=[], value=None), ""
+            return (
+                f"Error loading: {str(e)}",
+                None,
+                None,
+                None,
+                None,
+                None,
+                gr.Radio(choices=[], value=None),
+                "",
+            )
 
     def _update_state(self):
         self.seg_vis, self.seg_raw, self.base_frames, self.wrist_frames, self.available_options = step_before(
@@ -839,7 +1005,16 @@ class OracleGradioService:
     def _get_display_image(self):
         if self.seg_vis is not None:
             # CV2 is BGR, Gradio expects RGB
-            return cv2.cvtColor(self.seg_vis, cv2.COLOR_BGR2RGB)
+            display_img = cv2.cvtColor(self.seg_vis.copy(), cv2.COLOR_BGR2RGB)
+            # 在图像上绘制点击位置
+            if self.last_click != (0, 0):
+                x, y = self.last_click
+                # 绘制一个红色圆圈标记点击位置
+                cv2.circle(display_img, (x, y), 8, (255, 0, 0), 2)
+                # 绘制一个十字标记
+                cv2.line(display_img, (x - 10, y), (x + 10, y), (255, 0, 0), 2)
+                cv2.line(display_img, (x, y - 10), (x, y + 10), (255, 0, 0), 2)
+            return display_img
         return np.zeros((256, 256, 3), dtype=np.uint8)
 
     def _get_options_labels(self):
@@ -848,23 +1023,179 @@ class OracleGradioService:
 
     def set_click(self, evt: gr.SelectData):
         self.last_click = (evt.index[0], evt.index[1])
-        return f"Selected Coords: {self.last_click}"
+        return (
+            self._get_display_image(),
+            f"Selected Coords: {self.last_click}"
+        )
+
+    def call_gemini_prediction(self):
+        if not self.env or not self.api:
+            return (
+                "Environment or API not loaded.",
+                self._get_display_image(),
+                gr.Radio(choices=[], value=None),
+                "(0, 0)"
+            )
+        
+        # Construct Query
+        if self.step_idx == 0:
+            if self.current_env_id in TASK_WITH_DEMO:
+                if self.api.use_multi_images_as_video:
+                    text_query = DEMO_TEXT_QUERY_multi_image.format(task_goal=self.language_goal)
+                else:
+                    text_query = DEMO_TEXT_QUERY.format(task_goal=self.language_goal)
+            else:
+                text_query = IMAGE_TEXT_QUERY.format(task_goal=self.language_goal)
+        else:
+            if self.api.use_multi_images_as_video:
+                text_query = VIDEO_TEXT_QUERY_multi_image.format(task_goal=self.language_goal)
+            else:
+                text_query = VIDEO_TEXT_QUERY.format(task_goal=self.language_goal)
+        
+        input_data = self.api.prepare_input_data(self.base_frames[self.frame_idx:], text_query, self.step_idx)
+        
+        # Check if we have frames
+        frames_slice = self.base_frames[self.frame_idx:]
+        if len(frames_slice) == 0:
+             print(f"Warning: No new frames found since frame_idx {self.frame_idx}. Total frames: {len(self.base_frames)}")
+             # Fallback: use last frame or fail gracefully
+             if len(self.base_frames) > 0:
+                 # Just use the last frame to avoid crash, but this implies logic error elsewhere
+                 frames_slice = [self.base_frames[-1]]
+             else:
+                 return (
+                    "Error: No frames available.",
+                    self._get_display_image(),
+                    gr.Radio(choices=self._get_options_labels(), value=None),
+                    "(0, 0)"
+                )
+        
+        input_data = self.api.prepare_input_data(frames_slice, text_query, self.step_idx)
+        
+        print(f"Calling Gemini... Step: {self.step_idx}, Frame Start: {self.frame_idx}")
+        try:
+            response, points = self.api.call(input_data)
+        except Exception as e:
+             import traceback
+             traceback.print_exc()
+             return (
+                f"API Call Failed: {e}",
+                self._get_display_image(),
+                gr.Radio(choices=self._get_options_labels(), value=None),
+                "(0, 0)"
+            )
+
+        if response is None:
+             return (
+                "API returned None.",
+                self._get_display_image(),
+                gr.Radio(choices=self._get_options_labels(), value=None),
+                "(0, 0)"
+            )
+            
+        # Draw points for debug
+        if points and len(points) > 0:
+            # Update last click to the first point so it shows up in red
+            # points are (row, col) -> (y, x).
+            pt = points[0]
+            # self.last_click = (int(pt[1]), int(pt[0])) # Optional: update click to first point from 'points' list?
+            # actually response['subgoal']['point'] is the main one.
+            
+            # Save debug image
+            anno_image = self.base_frames[-1].copy()
+            for point in points:
+                cv2.circle(anno_image, (point[1], point[0]), 5, (255, 255, 0), -1)
+            imageio.imwrite(os.path.join(self.save_dir, f"anno_step_{self.step_idx}_image.png"), anno_image)
+            self.api.add_frame_hold(anno_image)
+
+        command_dict = response.get('subgoal', {})
+        
+        predicted_action = command_dict.get('action')
+        predicted_point = command_dict.get('point')
+        
+        if predicted_point:
+             # Apply the same flip as in oraclev3.py (y, x) -> (x, y)
+             predicted_point = predicted_point[::-1]
+             self.last_click = (int(predicted_point[0]), int(predicted_point[1]))
+
+        # Find matching option index
+        options = self._get_options_labels()
+        selected_option = None
+        
+        # Helper to strip numbering "1. "
+        def clean_opt(o):
+            return o.split('. ', 1)[1] if '. ' in o else o
+
+        if predicted_action:
+            for opt in options:
+                if clean_opt(opt) == predicted_action:
+                    selected_option = opt
+                    break
+            
+            if not selected_option:
+                # Try loose match
+                for opt in options:
+                    if predicted_action.lower() in opt.lower():
+                        selected_option = opt
+                        break
+        
+        log_msg = f"Gemini Prediction:\nAction: {predicted_action}\nPoint: {predicted_point}\nResponse: {response}"
+        
+        return (
+            log_msg,
+            self._get_display_image(),
+            gr.Radio(choices=options, value=selected_option),
+            f"{self.last_click}"
+        )
 
     def run_step(self, option_str):
         if not self.env:
-            return "Environment not loaded.", self._get_display_image(), None, gr.Radio(choices=[], value=None), ""
+            return (
+                "Environment not loaded.",
+                self._get_display_image(),
+                None,
+                None,
+                None,
+                None,
+                gr.Radio(choices=[], value=None),
+                "",
+            )
         
         if not option_str:
-            return "Please select an action.", self._get_display_image(), self._get_video_path(), gr.Radio(choices=self._get_options_labels(), value=None), self.language_goal
+            return (
+                "Please select an action.",
+                self._get_display_image(),
+                self._get_video_path(),
+                self._get_viewer_snapshot(),
+                self._get_wrist_view_snapshot(),
+                gr.Radio(choices=self._get_options_labels(), value=None),
+                self.language_goal,
+            )
 
         # Parse option index from string "1. Action Name"
         try:
             idx = int(option_str.split('.')[0]) - 1
         except:
-            return "Invalid option format.", self._get_display_image(), self._get_video_path(), gr.Radio(choices=self._get_options_labels(), value=None), self.language_goal
+            return (
+                "Invalid option format.",
+                self._get_display_image(),
+                self._get_video_path(),
+                self._get_viewer_snapshot(),
+                self._get_wrist_view_snapshot(),
+                gr.Radio(choices=self._get_options_labels(), value=None),
+                self.language_goal,
+            )
 
         if not (0 <= idx < len(self.available_options)):
-             return "Option index out of range.", self._get_display_image(), self._get_video_path(), gr.Radio(choices=self._get_options_labels(), value=None), self.language_goal
+             return (
+                 "Option index out of range.",
+                 self._get_display_image(),
+                 self._get_video_path(),
+                 self._get_viewer_snapshot(),
+                self._get_wrist_view_snapshot(),
+                 gr.Radio(choices=self._get_options_labels(), value=None),
+                 self.language_goal,
+             )
 
         selected_opt = self.available_options[idx]
         action_name = selected_opt['action']
@@ -874,6 +1205,11 @@ class OracleGradioService:
             "action": action_name,
             "point": self.last_click
         }
+        
+        # Save current frame count before action execution to correctly set frame_idx later
+        # Note: If self.base_frames is a reference to env.frames, it might grow during step_after.
+        # But at this exact line, step_after hasn't run yet.
+        pre_action_len = len(self.base_frames)
         
         log_msg = f"Executing: {command_dict}\n"
         
@@ -894,7 +1230,15 @@ class OracleGradioService:
         except Exception as e:
             import traceback
             traceback.print_exc()
-            return f"Error during execution: {e}", self._get_display_image(), self._get_video_path(), self._get_options_labels(), self.language_goal
+            return (
+                f"Error during execution: {e}",
+                self._get_display_image(),
+                self._get_video_path(),
+                self._get_viewer_snapshot(),
+                self._get_wrist_view_snapshot(),
+                gr.Radio(choices=self._get_options_labels(), value=None),
+                self.language_goal,
+            )
 
         status = "Continue"
         if evaluation:
@@ -905,12 +1249,72 @@ class OracleGradioService:
         
         log_msg += f"Result: {status}\n"
         
+        # Capture current frame count BEFORE action execution results are fetched
+        # This is the starting point for the NEXT Gemini call (which wants to see the frames generated by THIS action)
+        # Note: self.base_frames is currently holding the frames from BEFORE this action.
+        # But since step_after might have mutated the list in-place (if it's a reference), we need to be careful.
+        # However, _update_state fetches a fresh list/reference. 
+        # The key logic in oraclev3.py is frame_idx = len(base_frames) BEFORE step_after. 
+        # Here step_after is already done.
+        # But we haven't called _update_state yet. 
+        # If self.base_frames is a reference to env.frames, and env.frames grew, then self.base_frames grew too.
+        # In that case len(self.base_frames) is ALREADY the new length.
+        
+        # Let's assume standard ManiSkill behavior where frames list grows.
+        # If we set frame_idx = len(self.base_frames) NOW (before _update_state),
+        # and if self.base_frames GREW, then we are setting it to the NEW length.
+        # This means Gemini will see frames[NEW_LENGTH:] -> Empty.
+        
+        # We need the OLD length.
+        # We can calculate it if we knew how many frames were added, but we don't.
+        # Wait, oraclev3.py sets frame_idx = len(base_frames) BEFORE step_after.
+        
+        # So we should have saved `pre_action_len = len(self.base_frames)` at the START of run_step?
+        # Yes, IF self.base_frames is a reference that mutates.
+        # Let's check step_before again. 
+        # base_frames = getattr(env, "frames", []) or getattr(env.unwrapped, "frames", [])
+        # This is likely a reference to the list in the env.
+        
+        # So, step_after modifies env.frames. self.base_frames (being a ref) also modifies.
+        # So len(self.base_frames) is now larger.
+        
+        # We are stuck because we didn't save the old length.
+        # BUT, we can approximate. The Gemini call used self.frame_idx.
+        # The frames it saw were self.base_frames[self.frame_idx:].
+        # So the NEW frames will start from... where?
+        
+        # Actually, let's fix this by saving the length at the start of run_step.
+        pass
+
         if status in ["SUCCESS", "FAILURE"]:
-            return log_msg + " (End of Episode)", self._get_display_image(), self._get_video_path(), gr.Radio(choices=[], value=None), self.language_goal
+            return (
+                log_msg + " (End of Episode)",
+                self._get_display_image(),
+                self._get_video_path(),
+                self._get_viewer_snapshot(),
+                self._get_wrist_view_snapshot(),
+                gr.Radio(choices=[], value=None),
+                self.language_goal,
+            )
         
         # Next Step
         self._update_state()
-        return log_msg, self._get_display_image(), self._get_video_path(), gr.Radio(choices=self._get_options_labels(), value=None), self.language_goal
+        
+        # CRITICAL FIX: frame_idx should be the index where the NEW frames start.
+        # The new frames were generated during step_after.
+        # So they start at the OLD length.
+        # We saved it in `pre_action_len`.
+        self.frame_idx = pre_action_len
+        self.step_idx += 1
+        return (
+            log_msg,
+            self._get_display_image(),
+            self._get_video_path(),
+            self._get_viewer_snapshot(),
+            self._get_wrist_view_snapshot(),
+            gr.Radio(choices=self._get_options_labels(), value=None),
+            self.language_goal,
+        )
 
 
 def main():
@@ -921,41 +1325,61 @@ def main():
         
         with gr.Row():
             with gr.Column(scale=1):
-                env_dd = gr.Dropdown(choices=service.env_id_list, value="VideoPlaceOrder", label="Environment ID")
+                env_dd = gr.Dropdown(choices=service.env_id_list, value=service.current_env_id, label="Environment ID")
                 ep_num = gr.Number(value=42, label="Episode Index", precision=0)
                 load_btn = gr.Button("Load/Reset Episode")
                 
-                goal_box = gr.Textbox(label="Language Goal", interactive=False)
+                goal_box = gr.Textbox(label="Language Goal", interactive=False, lines=3)
                 
                 options_radio = gr.Radio(label="Select Action", choices=[])
                 coords_box = gr.Textbox(label="Selected Coordinates", value="(0, 0)", interactive=False)
                 
-                exec_btn = gr.Button("Execute Action", variant="primary")
+                with gr.Row():
+                    gemini_btn = gr.Button("Call Gemini", variant="secondary")
+                    exec_btn = gr.Button("Execute Action", variant="primary")
                 
                 log_output = gr.Textbox(label="Status/Logs", lines=5)
                 
             with gr.Column(scale=2):
                 with gr.Row():
                     img_display = gr.Image(label="Robot View", interactive=True)
-                    video_display = gr.Video(label="Episode History")
+                    # 将竖向高度压缩到原先的一半左右，避免占用过高空间
+                    video_display = gr.Video(label="Episode History", height=256)
+                with gr.Row():
+                    viewer_display = gr.Image(label="ManiSkill Viewer", interactive=False)
+                    wrist_display = gr.Image(label="Wrist View", interactive=False)
         
         # Event Wiring
         load_btn.click(
             fn=service.load_env,
             inputs=[env_dd, ep_num],
-            outputs=[log_output, img_display, video_display, options_radio, goal_box]
+            outputs=[log_output, img_display, video_display, viewer_display, wrist_display, options_radio, goal_box]
         )
         
         img_display.select(
             fn=service.set_click,
             inputs=None,
-            outputs=[coords_box]
+            outputs=[img_display, coords_box]
+        )
+        
+        gemini_btn.click(
+            fn=service.call_gemini_prediction,
+            inputs=None,
+            outputs=[log_output, img_display, options_radio, coords_box]
         )
         
         exec_btn.click(
             fn=service.run_step,
             inputs=[options_radio],
-            outputs=[log_output, img_display, video_display, options_radio, goal_box]
+            outputs=[log_output, img_display, video_display, viewer_display, wrist_display, options_radio, goal_box]
+        )
+        
+        # 动态streaming: 使用 gr.Timer 替代 deprecated 的 every 参数
+        timer = gr.Timer(value=0.2)
+        timer.tick(
+            fn=service._get_streaming_views, 
+            inputs=None, 
+            outputs=[viewer_display, wrist_display]
         )
 
     print("Starting Gradio Server...")
