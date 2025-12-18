@@ -1,11 +1,12 @@
 import gradio as gr
 import uuid
 import numpy as np
-import cv2
 import tempfile
 import os
+import traceback
 from PIL import Image, ImageDraw
 from oracle_logic import OracleSession
+from concurrent.futures import ThreadPoolExecutor
 
 # --- Global Session Storage ---
 GLOBAL_SESSIONS = {}
@@ -16,6 +17,9 @@ ENV_IDS = [
     "ButtonUnmask", "VideoRepick", "VideoPlaceButton", "InsertPeg", 
     "MoveCube", "PatternLock", "RouteStick"
 ]
+
+# --- Configuration ---
+RESTRICT_VIDEO_PLAYBACK = False  # Set to False to enable controls
 
 # --- Helper Functions ---
 
@@ -29,42 +33,127 @@ def create_session():
     return uid
 
 def save_video(frames, suffix=""):
-    """Saves frames to a temporary mp4 file and returns the path."""
+    """
+    视频保存函数 - 使用imageio生成视频
+    
+    优化点：
+    1. 使用imageio.mimwrite，不依赖FFmpeg编码器
+    2. 直接处理RGB帧，无需颜色空间转换
+    3. 自动处理编码，简单可靠
+    """
     if not frames or len(frames) == 0:
         return None
     
-    # Prepare frames (ensure uint8 RGB)
-    processed_frames = []
-    for f in frames:
-        if isinstance(f, np.ndarray):
-             # Ensure RGB
-             if f.dtype != np.uint8:
-                 f = (f * 255).astype(np.uint8)
-             processed_frames.append(f)
-        else:
-            processed_frames.append(np.array(f))
-
-    if not processed_frames:
+    try:
+        import imageio
+        
+        # 准备帧：确保是uint8格式的numpy数组
+        processed_frames = []
+        for f in frames:
+            if not isinstance(f, np.ndarray):
+                f = np.array(f)
+            # 确保是uint8格式
+            if f.dtype != np.uint8:
+                if np.max(f) <= 1.0:
+                    f = (f * 255).astype(np.uint8)
+                else:
+                    f = f.clip(0, 255).astype(np.uint8)
+            # 处理灰度图
+            if len(f.shape) == 2:
+                f = np.stack([f] * 3, axis=-1)
+            # imageio期望RGB格式，frames已经是RGB
+            processed_frames.append(f)
+        
+        fd, path = tempfile.mkstemp(suffix=f"_{suffix}.mp4")
+        os.close(fd)
+        
+        # imageio.mimwrite会自动处理编码
+        imageio.mimwrite(path, processed_frames, fps=10.0, quality=8, macro_block_size=None)
+        
+        return path
+    except ImportError:
+        print("Error: imageio module not found. Please install it: pip install imageio imageio-ffmpeg")
+        return None
+    except Exception as e:
+        print(f"Error in save_video: {e}")
+        traceback.print_exc()
         return None
 
-    h, w, _ = processed_frames[0].shape
+def concatenate_frames_horizontally(frames1, frames2):
+    """
+    将两个帧序列左右拼接成一个帧序列
     
-    fd, path = tempfile.mkstemp(suffix=f"_{suffix}.mp4")
-    os.close(fd)
+    Args:
+        frames1: 左侧视频帧列表（base frames）
+        frames2: 右侧视频帧列表（wrist frames）
     
-    # Use cv2 to write video
-    # Note: gradio-minigrid env likely has opencv-python-headless
-    # Try vp09 (VP9) for better browser compatibility
-    fourcc = cv2.VideoWriter_fourcc(*'vp09')
-    out = cv2.VideoWriter(path, fourcc, 10.0, (w, h))
+    Returns:
+        拼接后的帧列表
+    """
+    if not frames1 and not frames2:
+        return []
     
-    for frame in processed_frames:
-        # cv2 expects BGR
-        bgr_frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-        out.write(bgr_frame)
-    out.release()
+    # 确定最大帧数
+    max_frames = max(len(frames1), len(frames2))
+    concatenated_frames = []
     
-    return path
+    for i in range(max_frames):
+        # 获取当前帧，如果某个序列较短，重复最后一帧
+        frame1 = frames1[min(i, len(frames1) - 1)] if frames1 else None
+        frame2 = frames2[min(i, len(frames2) - 1)] if frames2 else None
+        
+        # 转换为numpy数组并确保格式正确
+        if frame1 is not None:
+            if not isinstance(frame1, np.ndarray):
+                frame1 = np.array(frame1)
+            if frame1.dtype != np.uint8:
+                if np.max(frame1) <= 1.0:
+                    frame1 = (frame1 * 255).astype(np.uint8)
+                else:
+                    frame1 = frame1.clip(0, 255).astype(np.uint8)
+            if len(frame1.shape) == 2:
+                frame1 = np.stack([frame1] * 3, axis=-1)
+        else:
+            # 如果frame1为空，创建一个黑色帧
+            if frame2 is not None:
+                h, w = frame2.shape[:2]
+                frame1 = np.zeros((h, w, 3), dtype=np.uint8)
+            else:
+                continue
+        
+        if frame2 is not None:
+            if not isinstance(frame2, np.ndarray):
+                frame2 = np.array(frame2)
+            if frame2.dtype != np.uint8:
+                if np.max(frame2) <= 1.0:
+                    frame2 = (frame2 * 255).astype(np.uint8)
+                else:
+                    frame2 = frame2.clip(0, 255).astype(np.uint8)
+            if len(frame2.shape) == 2:
+                frame2 = np.stack([frame2] * 3, axis=-1)
+        else:
+            # 如果frame2为空，创建一个黑色帧
+            h, w = frame1.shape[:2]
+            frame2 = np.zeros((h, w, 3), dtype=np.uint8)
+        
+        # 确保两个帧的高度相同，如果不同则调整
+        h1, w1 = frame1.shape[:2]
+        h2, w2 = frame2.shape[:2]
+        
+        if h1 != h2:
+            # 调整到相同高度（使用较小的那个）
+            import cv2
+            target_h = min(h1, h2)
+            if h1 != target_h:
+                frame1 = cv2.resize(frame1, (w1, target_h), interpolation=cv2.INTER_LINEAR)
+            if h2 != target_h:
+                frame2 = cv2.resize(frame2, (w2, target_h), interpolation=cv2.INTER_LINEAR)
+        
+        # 左右拼接
+        concatenated_frame = np.concatenate([frame1, frame2], axis=1)
+        concatenated_frames.append(concatenated_frame)
+    
+    return concatenated_frames
 
 def draw_marker(img, x, y):
     """Draws a red circle and cross at (x, y)."""
@@ -111,6 +200,15 @@ def load_env(uid, env_id, ep_num):
     radio_choices = [(opt_label, opt_idx) for opt_label, opt_idx in options]
     
     # Reset video placeholders
+    
+    # Save demonstration video if available
+    demo_video_path = None
+    if session.demonstration_frames:
+        try:
+            demo_video_path = save_video(session.demonstration_frames, "demo")
+        except Exception as e:
+            print(f"Error saving demo video: {e}")
+            
     return (
         uid,
         img, 
@@ -118,8 +216,8 @@ def load_env(uid, env_id, ep_num):
         gr.update(choices=radio_choices, value=None), 
         goal_text, 
         "", # Clear coords
-        None, # Clear base video
-        None  # Clear wrist video
+        None, # Clear combined video
+        demo_video_path # Demonstration video
     )
 
 def on_map_click(uid, evt: gr.SelectData):
@@ -138,49 +236,13 @@ def on_map_click(uid, evt: gr.SelectData):
     coords_str = f"{x}, {y}"
     return marked_img, coords_str
 
-def gemini_predict(uid, goal_text, current_img):
-    """
-    Mock function for Gemini Prediction.
-    In a real scenario, this would send the image and goal to an LLM.
-    """
-    session = get_session(uid)
-    if not session:
-        return gr.update(), "Session Error"
-    
-    # Heuristic / Mock Logic
-    # 1. Try to find semantic match for action
-    # This uses the embedding model loaded in oracle_logic.py if available
-    # but we can't easily access the private _find_best_semantic_match from here 
-    # unless we expose it or copy logic.
-    # For now, we'll just pick the first option.
-    
-    options = session.available_options
-    if not options:
-        return gr.update(), "No actions available"
-    
-    # Mock prediction: Pick random or first
-    import random
-    predicted_idx = options[0][1] # Default to first
-    
-    # Mock coords: Center of image
-    w, h = 255, 255
-    if current_img is not None:
-         w, h = current_img.size
-    pred_x, pred_y = w // 2, h // 2
-    
-    coords_str = f"{pred_x}, {pred_y}"
-    
-    log_msg = f"Gemini Prediction: Selected Option {predicted_idx} at ({pred_x}, {pred_y}) (MOCK)"
-    
-    return gr.update(value=predicted_idx), coords_str, log_msg
-
 def execute_step(uid, option_idx, coords_str):
     session = get_session(uid)
     if not session:
-        return None, "Session Error", None, None
+        return None, "Session Error", None
     
     if option_idx is None:
-        return session.get_pil_image(), "Error: No action selected", None, None
+        return session.get_pil_image(), "Error: No action selected", None
 
     # Parse coords
     click_coords = None
@@ -190,59 +252,49 @@ def execute_step(uid, option_idx, coords_str):
             click_coords = (int(parts[0].strip()), int(parts[1].strip()))
         except:
             pass
+    
+    # 在执行 action 之前记录当前帧数
+    pre_base_frame_count = len(session.base_frames)
+    pre_wrist_frame_count = len(session.wrist_frames)
             
     # Execute
     print(f"Executing step: Opt {option_idx}, Coords {click_coords}")
     img, status, done = session.execute_action(option_idx, click_coords)
     
-    # Get videos from session
-    # Using the frames stored in session object
-    base_video_path = save_video(session.base_frames, suffix="base")
-    wrist_video_path = save_video(session.wrist_frames, suffix="wrist")
+    # 只取新增的帧来生成视频（从 execute action 之后新增的帧开始）
+    new_base_frames = session.base_frames[pre_base_frame_count:]
+    new_wrist_frames = session.wrist_frames[pre_wrist_frame_count:]
+    
+    # 将两个视频左右拼接成一个视频
+    concatenated_frames = concatenate_frames_horizontally(new_base_frames, new_wrist_frames)
+    
+    # 生成拼接后的视频
+    combined_video_path = None
+    try:
+        combined_video_path = save_video(concatenated_frames, "combined")
+    except Exception as e:
+        print(f"Error generating combined video: {e}")
+        traceback.print_exc()
     
     if done:
         status += " [EPISODE COMPLETE]"
         
-    return img, status, base_video_path, wrist_video_path
+    return img, status, combined_video_path
 
-# --- JS for Video Sync ---
-# This script tries to find the video elements by ID and sync them.
-SYNC_JS = """
-function sync_videos() {
-    console.log("Initializing Video Sync...");
-    
-    function setup() {
-        const v1_container = document.querySelector('#base_view');
-        const v2_container = document.querySelector('#wrist_view');
-        
-        if (!v1_container || !v2_container) return;
+# --- JS for Video (no sync needed for single video) ---
+SYNC_JS = ""  # No longer needed since we have a single combined video
 
-        const v1 = v1_container.querySelector('video');
-        const v2 = v2_container.querySelector('video');
-
-        if (v1 && v2) {
-            console.log("Videos found, syncing...");
-            
-            v1.onplay = () => { v2.play(); };
-            v1.onpause = () => { v2.pause(); };
-            v1.onseeking = () => { v2.currentTime = v1.currentTime; };
-            v1.onseeked = () => { v2.currentTime = v1.currentTime; };
-            
-            v2.onplay = () => { v1.play(); };
-            v2.onpause = () => { v1.pause(); };
-            v2.onseeking = () => { v1.currentTime = v2.currentTime; };
-            v2.onseeked = () => { v1.currentTime = v2.currentTime; };
-        }
+CSS = ""
+if RESTRICT_VIDEO_PLAYBACK:
+    CSS = """
+    #demo_video {
+        pointer-events: none;
     }
-
-    // Attempt to setup periodically as Gradio replaces elements
-    setInterval(setup, 1000);
-}
-"""
+    """
 
 # --- UI Construction ---
 
-with gr.Blocks(title="Oracle Planner Interface", js=SYNC_JS) as demo:
+with gr.Blocks(title="Oracle Planner Interface", js=SYNC_JS, css=CSS) as demo:
     gr.Markdown("## HistoryBench Oracle Planner Interface (v2)")
     
     # State
@@ -266,9 +318,7 @@ with gr.Blocks(title="Oracle Planner Interface", js=SYNC_JS) as demo:
                 options_radio = gr.Radio(choices=[], label="Available Actions", type="value")
                 coords_box = gr.Textbox(label="Selected Coordinates (x, y)", value="")
                 
-                with gr.Row():
-                    gemini_btn = gr.Button("Gemini Prediction")
-                    exec_btn = gr.Button("Execute Action", variant="stop")
+                exec_btn = gr.Button("Execute Action", variant="stop")
             
             gr.Markdown("### 4. Logs")
             log_output = gr.Textbox(label="System Log", lines=5, interactive=False)
@@ -279,12 +329,19 @@ with gr.Blocks(title="Oracle Planner Interface", js=SYNC_JS) as demo:
             with gr.Row():
                 img_display = gr.Image(label="Live Observation (Click to Select)", interactive=True, type="pil")
                 # Placeholder for demo video if needed, or maybe just hidden if no data
-                video_display = gr.Video(label="Demonstration", interactive=False, height=300)
+                video_elem_id = "demo_video" if RESTRICT_VIDEO_PLAYBACK else None
+                video_autoplay = True if RESTRICT_VIDEO_PLAYBACK else False
+                
+                video_display = gr.Video(
+                    label="Demonstration", 
+                    interactive=False, 
+                    height=300, 
+                    elem_id=video_elem_id, 
+                    autoplay=video_autoplay
+                )
             
-            # Bottom: Execution Feedback (Base & Wrist)
-            with gr.Row():
-                base_display = gr.Video(label="Desk View", elem_id="base_view", interactive=False, autoplay=True)
-                wrist_display = gr.Video(label="Robot View", elem_id="wrist_view", interactive=False, autoplay=True)
+            # Bottom: Execution Feedback (Combined View)
+            combined_display = gr.Video(label="Desk View (Left) | Robot View (Right)", elem_id="combined_view", interactive=False, autoplay=True)
 
     # --- Event Wiring ---
 
@@ -292,7 +349,7 @@ with gr.Blocks(title="Oracle Planner Interface", js=SYNC_JS) as demo:
     load_btn.click(
         fn=load_env,
         inputs=[uid_state, env_dd, ep_num],
-        outputs=[uid_state, img_display, log_output, options_radio, goal_box, coords_box, base_display, wrist_display]
+        outputs=[uid_state, img_display, log_output, options_radio, goal_box, coords_box, combined_display, video_display]
     )
 
     # 2. Image Click
@@ -302,18 +359,11 @@ with gr.Blocks(title="Oracle Planner Interface", js=SYNC_JS) as demo:
         outputs=[img_display, coords_box]
     )
 
-    # 3. Gemini Prediction
-    gemini_btn.click(
-        fn=gemini_predict,
-        inputs=[uid_state, goal_box, img_display],
-        outputs=[options_radio, coords_box, log_output]
-    )
-
-    # 4. Execute
+    # 3. Execute
     exec_btn.click(
         fn=execute_step,
         inputs=[uid_state, options_radio, coords_box],
-        outputs=[img_display, log_output, base_display, wrist_display]
+        outputs=[img_display, log_output, combined_display]
     )
     
     # 5. Timer for Streaming (Keep-Alive / Real-time view)

@@ -164,8 +164,12 @@ class OracleSession:
         self.seg_raw = None
         self.base_frames = []
         self.wrist_frames = []
+        self.demonstration_frames = []
         self.available_options = []
         self.raw_solve_options = []
+        # Track frame indices for incremental video updates
+        self.last_base_frame_idx = 0
+        self.last_wrist_frame_idx = 0
 
     def load_episode(self, env_id, episode_idx):
         """Initialize environment for a specific episode."""
@@ -190,7 +194,11 @@ class OracleSession:
             self.env.reset()
             self.env_id = env_id
             self.episode_idx = episode_idx
-            self.language_goal = self.env.demonstration_data.get('language goal', 'Unknown Goal')
+            
+            # Demonstration data
+            demonstration_data = getattr(self.env, "demonstration_data", {}) or {}
+            self.language_goal = demonstration_data.get('language goal', 'Unknown Goal')
+            self.demonstration_frames = demonstration_data.get('frames', [])
             
             # Setup Color Map
             self.color_map = _generate_color_map()
@@ -215,6 +223,10 @@ class OracleSession:
             
             # Reset logs
             self.history = []
+            
+            # Reset frame indices
+            self.last_base_frame_idx = 0
+            self.last_wrist_frame_idx = 0
             
             # Initial Observation
             return self.update_observation()
