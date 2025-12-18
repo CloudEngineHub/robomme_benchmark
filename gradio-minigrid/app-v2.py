@@ -54,7 +54,8 @@ def save_video(frames, suffix=""):
     
     # Use cv2 to write video
     # Note: gradio-minigrid env likely has opencv-python-headless
-    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    # Try vp09 (VP9) for better browser compatibility
+    fourcc = cv2.VideoWriter_fourcc(*'vp09')
     out = cv2.VideoWriter(path, fourcc, 10.0, (w, h))
     
     for frame in processed_frames:
