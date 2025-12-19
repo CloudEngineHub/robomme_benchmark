@@ -16,7 +16,11 @@ GLOBAL_SESSIONS = {}
 
 # --- Coordinate Click Tracking (between actions) ---
 # 跟踪每个session从上次action_execute到现在的所有coordinate_click
-COORDINATE_CLICKS = {}  # {uid: [{"x": x, "y": y, "coords_str": "...", "timestamp": "..."}, ...]}
+COORDINATE_CLICKS = {}  # {uid: [{"x": x, "y": y, "coords_str": "...", "image_array": ..., "timestamp": "..."}, ...]}
+
+# --- Option Select Tracking (between actions) ---
+# 跟踪每个session从上次action_execute到现在的所有option_select
+OPTION_SELECTS = {}  # {uid: [{"option_idx": idx, "option_label": label, "timestamp": "..."}, ...]}
 
 ENV_IDS = [
     "VideoPlaceOrder", "PickXtimes", "StopCube", "SwingXtimes", 
@@ -88,9 +92,11 @@ def login_and_load_task(username, uid):
     session = get_session(uid)
     print(f"Loading {env_id} Ep {ep_num} for {uid} (User: {username})")
     
-    # 清空该session的coordinate_clicks（新episode开始）
+    # 清空该session的coordinate_clicks和option_selects（新episode开始）
     if uid in COORDINATE_CLICKS:
         COORDINATE_CLICKS[uid] = []
+    if uid in OPTION_SELECTS:
+        OPTION_SELECTS[uid] = []
     
     img, load_msg = session.load_episode(env_id, int(ep_num))
     
@@ -287,9 +293,11 @@ def load_env(uid, env_id, ep_num):
     session = get_session(uid)
     print(f"Loading {env_id} Ep {ep_num} for {uid}")
     
-    # 清空该session的coordinate_clicks（新episode开始）
+    # 清空该session的coordinate_clicks和option_selects（新episode开始）
     if uid in COORDINATE_CLICKS:
         COORDINATE_CLICKS[uid] = []
+    if uid in OPTION_SELECTS:
+        OPTION_SELECTS[uid] = []
     
     img, msg = session.load_episode(env_id, int(ep_num))
     
@@ -351,9 +359,24 @@ def on_map_click(uid, username, evt: gr.SelectData):
     if uid not in COORDINATE_CLICKS:
         COORDINATE_CLICKS[uid] = []
     
+    # 将 PIL Image 转换为 numpy array (RGB 格式)
+    image_array = None
+    if base_img is not None:
+        try:
+            # 确保是 RGB 格式
+            if base_img.mode != "RGB":
+                base_img = base_img.convert("RGB")
+            # 转换为 numpy array
+            image_array = np.array(base_img, dtype=np.uint8)
+        except Exception as e:
+            print(f"Error converting image to array in on_map_click: {e}")
+            import traceback
+            traceback.print_exc()
+    
     COORDINATE_CLICKS[uid].append({
         "coordinates": {"x": x, "y": y},
         "coords_str": coords_str,
+        "image_array": image_array,  # 新增：图片数组
         "timestamp": datetime.now().isoformat()
     })
     
@@ -383,22 +406,15 @@ def on_option_select(uid, username, option_value):
                     option_label = label
                     break
     
-    # 记录选项选择操作
-    if username and session.env_id is not None and session.episode_idx is not None:
-        try:
-            log_user_action(
-                username=username,
-                env_id=session.env_id,
-                episode_idx=session.episode_idx,
-                action_data={
-                    "action_type": "option_select",
-                    "option_idx": option_idx,
-                    "option_label": option_label
-                }
-            )
-        except Exception as e:
-            print(f"Error logging option select: {e}")
-            traceback.print_exc()
+    # 将选项选择存储到临时列表，等待在action_execute时一起记录
+    if uid not in OPTION_SELECTS:
+        OPTION_SELECTS[uid] = []
+    
+    OPTION_SELECTS[uid].append({
+        "option_idx": option_idx,
+        "option_label": option_label,
+        "timestamp": datetime.now().isoformat()
+    })
 
 def execute_step(uid, username, option_idx, coords_str):
     session = get_session(uid)
@@ -436,10 +452,18 @@ def execute_step(uid, username, option_idx, coords_str):
                         option_label = label
                         break
             
+            # 获取从上次action_execute到现在的所有option_select
+            option_selects_before_execute = []
+            if uid in OPTION_SELECTS:
+                option_selects_before_execute = OPTION_SELECTS[uid].copy()
+                # 清空列表，为下次action做准备
+                OPTION_SELECTS[uid] = []
+            
             # 获取从上次action_execute到现在的所有coordinate_click
-            coordinate_clicks_between_actions = []
+            # 这些点击已经包含了 image_array（在 on_map_click 中添加）
+            coordinate_clicks_before_execute = []
             if uid in COORDINATE_CLICKS:
-                coordinate_clicks_between_actions = COORDINATE_CLICKS[uid].copy()
+                coordinate_clicks_before_execute = COORDINATE_CLICKS[uid].copy()
                 # 清空列表，为下次action做准备
                 COORDINATE_CLICKS[uid] = []
             
@@ -449,11 +473,10 @@ def execute_step(uid, username, option_idx, coords_str):
                 episode_idx=session.episode_idx,
                 action_data={
                     "action_type": "action_execute",
-                    "option_idx": option_idx,
+                    "option_idx": option_idx,  # execute时使用的option（最后一次选择的）
                     "option_label": option_label,
-                    "coordinates": {"x": click_coords[0], "y": click_coords[1]} if click_coords else None,
-                    "coords_str": coords_str if coords_str else "",
-                    "coordinate_clicks_between_actions": coordinate_clicks_between_actions,
+                    "option_selects_before_execute": option_selects_before_execute,  # execute之前所有的option选择
+                    "coordinate_clicks_before_execute": coordinate_clicks_before_execute,  # execute之前所有的坐标点击（已包含 image_array）
                     "status": status,
                     "done": done
                 }
@@ -662,7 +685,7 @@ with gr.Blocks(title="Oracle Planner Interface", js=SYNC_JS, css=CSS) as demo:
     # 2.5. Option Select
     options_radio.change(
         fn=on_option_select,
-        inputs=[uid_state, username_state],
+        inputs=[uid_state, username_state, options_radio],
         outputs=[]
     )
 
