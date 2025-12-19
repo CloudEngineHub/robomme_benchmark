@@ -5,6 +5,7 @@ from datetime import datetime
 from pathlib import Path
 import h5py
 import numpy as np
+import cv2
 from PIL import Image
 
 # 线程锁，防止多用户同时写入时文件损坏
@@ -119,6 +120,19 @@ def _add_coordinate_click_to_hdf5(clicks_group, click_index, coordinates, coords
                 # RGBA 转 RGB
                 image_array = image_array[:, :, :3]
             
+            # 在图片上画圈可视化点击位置
+            try:
+                # 确保数组在内存中是连续的，并且是副本以防副作用
+                if not image_array.flags['C_CONTIGUOUS']:
+                    image_array = np.ascontiguousarray(image_array)
+                else:
+                    image_array = image_array.copy()
+                
+                # 画红色圆圈: 中心点, 半径5, 颜色(255,0,0), 线宽2
+                cv2.circle(image_array, (int(coordinates["x"]), int(coordinates["y"])), 5, (255, 0, 0), 2)
+            except Exception as e:
+                print(f"Error drawing circle on coordinate click image: {e}")
+
             click_group.create_dataset(
                 "image",
                 data=image_array,
@@ -177,9 +191,11 @@ def _add_action_to_hdf5(f, action_index, action_data):
         f: h5py.File 对象
         action_index: 操作索引（用于生成唯一的 action 组名）
         action_data: 操作数据字典，包含：
-            - action_type: "action_execute"
             - option_idx: execute 时使用的选项索引（最后一次选择的）
             - option_label: execute 时使用的选项标签
+            - final_coordinates: 最后执行的坐标 {"x": x, "y": y}（可选）
+            - final_coords_str: 最后执行的坐标字符串（可选）
+            - final_image_array: 最后执行时的图片数组（可选）
             - option_selects_before_execute: 列表，包含 execute 之前所有的选项选择
             - coordinate_clicks_before_execute: 列表，包含 execute 之前所有的坐标点击（每个元素包含 coordinates, coords_str, image_array, timestamp）
             - status: 执行状态
@@ -193,7 +209,6 @@ def _add_action_to_hdf5(f, action_index, action_data):
         action_group = actions_group.create_group(action_name)
         
         # 存储基本属性
-        action_group.create_dataset("action_type", data="action_execute".encode('utf-8'), dtype=h5py.string_dtype(encoding='utf-8'))
         timestamp = action_data.get("timestamp", datetime.now().isoformat())
         action_group.create_dataset("timestamp", data=timestamp.encode('utf-8'), dtype=h5py.string_dtype(encoding='utf-8'))
         
@@ -203,6 +218,52 @@ def _add_action_to_hdf5(f, action_index, action_data):
         
         if "option_label" in action_data and action_data["option_label"] is not None:
             action_group.create_dataset("option_label", data=str(action_data["option_label"]).encode('utf-8'), dtype=h5py.string_dtype(encoding='utf-8'))
+        
+        # 记录最后执行的坐标和图片
+        if "final_coordinates" in action_data and action_data["final_coordinates"] is not None:
+            action_group.create_dataset("final_coordinates", data=np.array([action_data["final_coordinates"]["x"], action_data["final_coordinates"]["y"]], dtype=np.int32))
+        
+        if "final_coords_str" in action_data and action_data["final_coords_str"] is not None:
+            action_group.create_dataset("final_coords_str", data=str(action_data["final_coords_str"]).encode('utf-8'), dtype=h5py.string_dtype(encoding='utf-8'))
+        
+        if "final_image_array" in action_data and action_data["final_image_array"] is not None:
+            image_array = action_data["final_image_array"]
+            # 确保是 uint8 类型
+            if image_array.dtype != np.uint8:
+                image_array = image_array.astype(np.uint8)
+            
+            # 确保是 RGB 格式 [H, W, 3]
+            if len(image_array.shape) == 2:
+                # 灰度图转 RGB
+                image_array = np.stack([image_array] * 3, axis=-1)
+            elif len(image_array.shape) == 3 and image_array.shape[2] == 4:
+                # RGBA 转 RGB
+                image_array = image_array[:, :, :3]
+            
+            # 在图片上画圈可视化点击位置（如果有坐标）
+            if "final_coordinates" in action_data and action_data["final_coordinates"] is not None:
+                try:
+                    final_coords = action_data["final_coordinates"]
+                    # 确保数组在内存中是连续的，并且是副本以防副作用
+                    if not image_array.flags['C_CONTIGUOUS']:
+                        image_array = np.ascontiguousarray(image_array)
+                    else:
+                        image_array = image_array.copy()
+                    
+                    cv2.circle(image_array, (int(final_coords["x"]), int(final_coords["y"])), 5, (255, 0, 0), 2)
+                except Exception as e:
+                    print(f"Error drawing circle on action final image: {e}")
+
+            action_group.create_dataset(
+                "final_image",
+                data=image_array,
+                compression="gzip",
+                compression_opts=9,
+                dtype=np.uint8
+            )
+            
+            # 存储图片尺寸
+            action_group.create_dataset("final_image_shape", data=np.array(image_array.shape, dtype=np.int32))
         
         # 记录 execute 之前所有的选项选择
         option_selects = action_data.get("option_selects_before_execute", [])
@@ -299,9 +360,11 @@ def log_user_action_hdf5(username, env_id, episode_idx, action_data):
         env_id: 环境ID
         episode_idx: Episode索引
         action_data: 操作数据字典，包含：
-            - action_type: "action_execute"
             - option_idx: execute 时使用的选项索引（最后一次选择的）
             - option_label: execute 时使用的选项标签
+            - final_coordinates: 最后执行的坐标 {"x": x, "y": y}（可选）
+            - final_coords_str: 最后执行的坐标字符串（可选）
+            - final_image_array: 最后执行时的图片数组（可选）
             - option_selects_before_execute: 列表，包含 execute 之前所有的选项选择
             - coordinate_clicks_before_execute: 列表，包含 execute 之前所有的坐标点击（每个元素包含 coordinates, coords_str, image_array, timestamp）
             - status: 执行状态
@@ -365,9 +428,11 @@ def log_user_action(username, env_id, episode_idx, action_data):
         env_id: 环境ID
         episode_idx: Episode索引
         action_data: 操作数据字典，包含：
-            - action_type: "action_execute"
             - option_idx: execute 时使用的选项索引（最后一次选择的）
             - option_label: execute 时使用的选项标签
+            - final_coordinates: 最后执行的坐标 {"x": x, "y": y}（可选）
+            - final_coords_str: 最后执行的坐标字符串（可选）
+            - final_image_array: 最后执行时的图片数组（可选）
             - option_selects_before_execute: 列表，包含 execute 之前所有的选项选择
             - coordinate_clicks_before_execute: 列表，包含 execute 之前所有的坐标点击（每个元素包含 coordinates, coords_str, image_array, timestamp）
             - status: 执行状态

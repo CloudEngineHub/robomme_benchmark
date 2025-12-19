@@ -436,6 +436,20 @@ def execute_step(uid, username, option_idx, coords_str):
     # 在执行 action 之前记录当前帧数
     pre_base_frame_count = len(session.base_frames)
     pre_wrist_frame_count = len(session.wrist_frames)
+    
+    # 在执行前获取当前图片（用于记录最后执行的坐标对应的图片）
+    pre_execute_image = None
+    if click_coords:
+        try:
+            pre_execute_pil = session.get_pil_image()
+            # 转换为 numpy array (RGB格式)
+            pre_execute_image = np.array(pre_execute_pil)
+            if len(pre_execute_image.shape) == 2:
+                pre_execute_image = np.stack([pre_execute_image] * 3, axis=-1)
+            elif len(pre_execute_image.shape) == 3 and pre_execute_image.shape[2] == 4:
+                pre_execute_image = pre_execute_image[:, :, :3]
+        except Exception as e:
+            print(f"Error getting pre-execute image: {e}")
             
     # Execute
     print(f"Executing step: Opt {option_idx}, Coords {click_coords}")
@@ -467,14 +481,25 @@ def execute_step(uid, username, option_idx, coords_str):
                 # 清空列表，为下次action做准备
                 COORDINATE_CLICKS[uid] = []
             
+            # 获取最后执行的坐标和图片
+            final_coordinates = None
+            final_coords_str = None
+            final_image_array = None
+            if click_coords:
+                final_coordinates = {"x": click_coords[0], "y": click_coords[1]}
+                final_coords_str = f"{click_coords[0]},{click_coords[1]}"
+                final_image_array = pre_execute_image  # 使用执行前的图片
+            
             log_user_action(
                 username=username,
                 env_id=session.env_id,
                 episode_idx=session.episode_idx,
                 action_data={
-                    "action_type": "action_execute",
                     "option_idx": option_idx,  # execute时使用的option（最后一次选择的）
                     "option_label": option_label,
+                    "final_coordinates": final_coordinates,  # 最后执行的坐标
+                    "final_coords_str": final_coords_str,  # 最后执行的坐标字符串
+                    "final_image_array": final_image_array,  # 最后执行时的图片
                     "option_selects_before_execute": option_selects_before_execute,  # execute之前所有的option选择
                     "coordinate_clicks_before_execute": coordinate_clicks_before_execute,  # execute之前所有的坐标点击（已包含 image_array）
                     "status": status,
