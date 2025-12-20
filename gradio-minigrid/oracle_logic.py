@@ -403,12 +403,30 @@ class OracleSession:
         
         pass 
 
-    def get_pil_image(self):
-        if self.seg_vis is None:
-            return Image.new('RGB', (255, 255), color='gray')
-        # Convert BGR (OpenCV) to RGB (PIL)
-        rgb = cv2.cvtColor(self.seg_vis, cv2.COLOR_BGR2RGB)
-        return Image.fromarray(rgb)
+    def get_pil_image(self, use_segmented=True):
+        """
+        获取PIL图像
+        
+        Args:
+            use_segmented: 如果为True，返回分割视图(seg_vis)；如果为False，返回原图(base_frames)
+        """
+        if use_segmented:
+            # 返回分割视图
+            if self.seg_vis is None:
+                return Image.new('RGB', (255, 255), color='gray')
+            # Convert BGR (OpenCV) to RGB (PIL)
+            rgb = cv2.cvtColor(self.seg_vis, cv2.COLOR_BGR2RGB)
+            return Image.fromarray(rgb)
+        else:
+            # 返回原图
+            if not self.base_frames or len(self.base_frames) == 0:
+                return Image.new('RGB', (255, 255), color='gray')
+            # 获取最后一帧
+            frame = self.base_frames[-1]
+            # 准备帧（确保格式正确）
+            frame = _prepare_frame(frame)
+            # frame 已经是 RGB 格式，直接转换为 PIL Image
+            return Image.fromarray(frame)
 
     def close(self):
         if self.env:

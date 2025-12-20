@@ -33,8 +33,10 @@ ENV_IDS = [
     "MoveCube", "PatternLock", "RouteStick"
 ]
 
+
 # --- Configuration ---
-RESTRICT_VIDEO_PLAYBACK = False  # Set to False to enable controls
+RESTRICT_VIDEO_PLAYBACK = True  # Set to False to enable controls
+USE_SEGMENTED_VIEW = False  # Set to True to use segmented view, False to use original image
 
 # --- Helper Functions ---
 
@@ -46,6 +48,22 @@ def create_session():
     session = OracleSession()
     GLOBAL_SESSIONS[uid] = session
     return uid
+
+def get_image_with_view_mode(uid, use_segmented=True):
+    """
+    根据视图模式获取图片
+    
+    Args:
+        uid: session ID
+        use_segmented: 是否使用分割视图
+    
+    Returns:
+        PIL Image
+    """
+    session = get_session(uid)
+    if not session:
+        return None
+    return session.get_pil_image(use_segmented=use_segmented)
 
 # --- User Management Helpers ---
 
@@ -70,7 +88,9 @@ def login_and_load_task(username, uid):
             "", "", # goal, coords
             None, None, # combined_video, demo_video
             "", "", # task_info, progress_info
-            gr.update(interactive=True) # login_btn
+            gr.update(interactive=True), # login_btn
+            gr.update(interactive=False), # next_task_btn
+            gr.update(interactive=False) # exec_btn
         )
     
     # Login success - Load current task
@@ -92,7 +112,9 @@ def login_and_load_task(username, uid):
             "All tasks completed.", "", 
             None, None,
             "No active task", f"Progress: {total}/{total}",
-            gr.update(interactive=True)
+            gr.update(interactive=True),
+            gr.update(interactive=False),
+            gr.update(interactive=False) # exec_btn
         )
 
     current_task = status["current_task"]
@@ -129,7 +151,9 @@ def login_and_load_task(username, uid):
             "", "", 
             None, None,
             f"Task: {env_id} (Ep {ep_num})", f"Progress: {task_idx + 1}/{total}",
-            gr.update(interactive=True)
+            gr.update(interactive=True),
+            gr.update(interactive=False),
+            gr.update(interactive=False) # exec_btn
         )
         
     # Success loading
@@ -153,6 +177,9 @@ def login_and_load_task(username, uid):
     task_idx = TASK_INDEX_MAP[uid]["task_index"]
     total = TASK_INDEX_MAP[uid]["total_tasks"]
     
+    # 根据视图模式重新获取图片
+    img = session.get_pil_image(use_segmented=USE_SEGMENTED_VIEW)
+    
     return (
         uid,
         gr.update(visible=False), # Login hidden
@@ -167,7 +194,9 @@ def login_and_load_task(username, uid):
         demo_video_path,
         f"Current Task: {env_id} (Episode {ep_num})",
         f"Progress: {task_idx + 1}/{total}",
-        gr.update(interactive=True)
+        gr.update(interactive=True),
+        gr.update(interactive=False),
+        gr.update(interactive=True) # exec_btn
     )
 
 def load_next_task_wrapper(username, uid):
@@ -390,7 +419,7 @@ def on_map_click(uid, username, evt: gr.SelectData):
     x, y = evt.index[0], evt.index[1]
     
     # Get clean image from session
-    base_img = session.get_pil_image()
+    base_img = session.get_pil_image(use_segmented=USE_SEGMENTED_VIEW)
     
     # Draw marker
     marked_img = draw_marker(base_img, x, y)
@@ -458,13 +487,67 @@ def on_option_select(uid, username, option_value):
         "timestamp": datetime.now().isoformat()
     })
 
+def init_app(request: gr.Request):
+    """
+    Handle initial page load. 
+    If 'user' query parameter is present, automatically login as that user.
+    """
+    params = request.query_params
+    username = params.get('user')
+    
+    # Default outputs if no auto-login
+    # uid, loading_group, login_group, main_interface, login_msg, img, log, options, goal, coords, combined, video, task, progress, login_btn, next_btn, exec_btn, username_state
+    default_outputs = (
+        None, 
+        gr.update(visible=False), # loading_group (hide it)
+        gr.update(visible=True), # login_group (show it)
+        gr.update(visible=False), # main_interface
+        "", 
+        None, None, 
+        gr.update(choices=[], value=None), 
+        "", "", 
+        None, None, 
+        "", "", 
+        gr.update(interactive=True), 
+        gr.update(interactive=False), 
+        gr.update(interactive=False),
+        "" 
+    )
+    
+    if username:
+        # Check if user exists
+        if username in user_manager.user_tasks:
+            # Auto login
+            # We need to pass a uid. Let's create one or pass None and let logic handle it.
+            # login_and_load_task handles uid=None by creating a new one.
+            results = login_and_load_task(username, None)
+            
+            # results[0] is uid
+            # results[1] is login_group update
+            # results[2] is main_interface update
+            
+            # New structure:
+            # (uid, loading_group=False, login_group=False, main_interface=True, ...rest...)
+            
+            # Since login_and_load_task returns login_group update as results[1], we can use it but maybe force it to False just in case
+            # Actually results[1] should be visible=False from login_and_load_task on success
+            
+            new_results = (
+                results[0],                 # uid
+                gr.update(visible=False),   # loading_group
+            ) + results[1:] + (username,)
+            
+            return new_results
+    
+    return default_outputs
+
 def execute_step(uid, username, option_idx, coords_str):
     session = get_session(uid)
     if not session:
-        return None, "Session Error", None, gr.update(), gr.update()
+        return None, "Session Error", None, gr.update(), gr.update(), gr.update(interactive=False), gr.update(interactive=False)
     
     if option_idx is None:
-        return session.get_pil_image(), "Error: No action selected", None, gr.update(), gr.update()
+        return session.get_pil_image(use_segmented=USE_SEGMENTED_VIEW), "Error: No action selected", None, gr.update(), gr.update(), gr.update(interactive=False), gr.update(interactive=True)
 
     # Parse coords
     click_coords = None
@@ -483,7 +566,7 @@ def execute_step(uid, username, option_idx, coords_str):
     pre_execute_image = None
     if click_coords:
         try:
-            pre_execute_pil = session.get_pil_image()
+            pre_execute_pil = session.get_pil_image(use_segmented=USE_SEGMENTED_VIEW)
             # 转换为 numpy array (RGB格式)
             pre_execute_image = np.array(pre_execute_pil)
             if len(pre_execute_image.shape) == 2:
@@ -607,8 +690,13 @@ def execute_step(uid, username, option_idx, coords_str):
                     next_ep = user_status["current_task"]["episode_idx"]
                     task_update = f"Task Completed! Next: {next_env} (Ep {next_ep})"
                     # progress_update 保持为 gr.update()，不改变
+    
+    # 根据视图模式重新获取图片
+    img = session.get_pil_image(use_segmented=USE_SEGMENTED_VIEW)
         
-    return img, status, combined_video_path, task_update, progress_update
+    next_task_update = gr.update(interactive=True) if done else gr.update(interactive=False)
+    exec_btn_update = gr.update(interactive=False) if done else gr.update(interactive=True)
+    return img, status, combined_video_path, task_update, progress_update, next_task_update, exec_btn_update
 
 # --- JS for Video (no sync needed for single video) ---
 SYNC_JS = ""  # No longer needed since we have a single combined video
@@ -635,8 +723,12 @@ with gr.Blocks(title="Oracle Planner Interface", js=SYNC_JS, css=CSS) as demo:
     uid_state = gr.State(value=None)
     username_state = gr.State(value="")
     
+    # --- Loading Section (Visible initially) ---
+    with gr.Group(visible=True) as loading_group:
+        gr.Markdown("### Logging in and setting up environment... Please wait.")
+
     # --- Login Section ---
-    with gr.Group(visible=True) as login_group:
+    with gr.Group(visible=False) as login_group:
         gr.Markdown("### User Login")
         with gr.Row():
             # Get available usernames from user_manager
@@ -698,7 +790,7 @@ with gr.Blocks(title="Oracle Planner Interface", js=SYNC_JS, css=CSS) as demo:
         # --- Bottom Container: Operation Zone (60-65% Height) ---
         with gr.Row():
             # Left: Live Observation (Main)
-            with gr.Column(scale=8):
+            with gr.Column(scale=1):
                  gr.Markdown("### Live Observation (交互主视图)")
                  img_display = gr.Image(
                     label="Live Observation", 
@@ -712,17 +804,22 @@ with gr.Blocks(title="Oracle Planner Interface", js=SYNC_JS, css=CSS) as demo:
             with gr.Column(scale=2, elem_id="control_panel"):
                  gr.Markdown("### Control Panel")
                  
-                 gr.Markdown("**1. Action**")
-                 options_radio = gr.Radio(choices=[], label="Action", type="value", show_label=False)
-                 
-                 gr.Markdown("**2. Coords**")
-                 coords_box = gr.Textbox(label="Coords", value="", interactive=False, show_label=False)
-                 
-                 gr.Markdown("**3. Execute**")
-                 exec_btn = gr.Button("EXECUTE", variant="stop", size="lg")
-                 
-                 gr.Markdown("---")
-                 next_task_btn = gr.Button("Next Task / Refresh", variant="secondary")
+                 with gr.Row():
+                     # Left sub-column: Actions
+                     with gr.Column(scale=1):
+                         gr.Markdown("**1. Action**")
+                         options_radio = gr.Radio(choices=[], label="Action", type="value", show_label=False)
+                     
+                     # Right sub-column: Coords & Execute
+                     with gr.Column(scale=1):
+                         gr.Markdown("**2. Coords**")
+                         coords_box = gr.Textbox(label="Coords", value="", interactive=False, show_label=False)
+                         
+                         gr.Markdown("**3. Execute**")
+                         exec_btn = gr.Button("EXECUTE", variant="stop", size="lg")
+                         
+                         gr.Markdown("---")
+                         next_task_btn = gr.Button("Next Task", variant="secondary", interactive=False)
 
     # --- Event Wiring ---
 
@@ -744,7 +841,9 @@ with gr.Blocks(title="Oracle Planner Interface", js=SYNC_JS, css=CSS) as demo:
             video_display,
             task_info_box,
             progress_info_box,
-            login_btn
+            login_btn,
+            next_task_btn,
+            exec_btn
         ]
     ).then(
         fn=lambda u: u,
@@ -770,7 +869,9 @@ with gr.Blocks(title="Oracle Planner Interface", js=SYNC_JS, css=CSS) as demo:
             video_display,
             task_info_box,
             progress_info_box,
-            login_btn
+            login_btn,
+            next_task_btn,
+            exec_btn
         ]
     )
 
@@ -792,7 +893,7 @@ with gr.Blocks(title="Oracle Planner Interface", js=SYNC_JS, css=CSS) as demo:
     exec_btn.click(
         fn=execute_step,
         inputs=[uid_state, username_state, options_radio, coords_box],
-        outputs=[img_display, log_output, combined_display, task_info_box, progress_info_box]
+        outputs=[img_display, log_output, combined_display, task_info_box, progress_info_box, next_task_btn, exec_btn]
     )
     
     # 5. Timer for Streaming (Keep-Alive / Real-time view)
@@ -805,6 +906,32 @@ with gr.Blocks(title="Oracle Planner Interface", js=SYNC_JS, css=CSS) as demo:
         pass 
         
     timer.tick(_get_streaming_views, inputs=[uid_state], outputs=[])
+
+    # 6. Auto Login on Load
+    demo.load(
+        fn=init_app,
+        inputs=[],
+        outputs=[
+            uid_state,
+            loading_group,
+            login_group, 
+            main_interface, 
+            login_msg, 
+            img_display, 
+            log_output, 
+            options_radio, 
+            goal_box, 
+            coords_box, 
+            combined_display, 
+            video_display,
+            task_info_box,
+            progress_info_box,
+            login_btn,
+            next_task_btn,
+            exec_btn,
+            username_state
+        ]
+    )
 
 if __name__ == "__main__":
     # Ensure session created for imports
@@ -820,4 +947,29 @@ if __name__ == "__main__":
         
     port = find_free_port()
     print(f"Starting server on port {port}")
-    demo.launch(server_name="0.0.0.0", server_port=port, share=False)
+    
+    # Launch with prevent_thread_lock=True so we can print links
+    _, local_url, share_url = demo.launch(server_name="0.0.0.0", server_port=port, share=True, prevent_thread_lock=True)
+    
+    print("\n" + "="*60)
+    print("USER SPECIFIC LINKS:")
+    print("="*60)
+    
+    # Use share_url if available, otherwise local_url
+    target_url = share_url if share_url else local_url
+    
+    if target_url:
+        # Sort users for better readability
+        sorted_users = sorted(list(user_manager.user_tasks.keys()))
+        for username in sorted_users:
+            # quote username just in case, though usually simple strings
+            import urllib.parse
+            safe_username = urllib.parse.quote(username)
+            print(f"User: {username:<15} -> {target_url}?user={safe_username}")
+    else:
+        print("Could not determine base URL.")
+        
+    print("="*60 + "\n")
+    
+    # Keep the server running
+    demo.block_thread()
