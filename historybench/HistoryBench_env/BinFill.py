@@ -413,6 +413,9 @@ class BinFill(BaseEnv):
 
     def evaluate(self,solve_complete_eval=False):
         self.successflag=torch.tensor([False])
+        # 在调用sequential_task_check之前，先保存current_task_failure的状态
+        # 这是因为失败可能在step()过程中被检测到，但sequential_task_check可能会重置它
+        previous_failure = getattr(self, "current_task_failure", False)
         self.failureflag = torch.tensor([False])
 
 
@@ -433,9 +436,14 @@ class BinFill(BaseEnv):
         all_tasks_completed, current_task_name, task_failed ,self.current_task_specialflag= sequential_task_check(self, self.task_list,allow_subgoal_change_this_timestep=allow_subgoal_change_this_timestep)
 
         # 如果任务失败，立即标记失败
-        if task_failed:
+        # 或者如果之前已经检测到失败（previous_failure），也标记为失败
+        if task_failed or previous_failure:
             self.failureflag = torch.tensor([True])
-            print(f"Task failed: {current_task_name}")
+            if task_failed:
+                print(f"Task failed: {current_task_name}")
+            elif previous_failure:
+                # 如果是因为previous_failure而标记失败，确保current_task_failure也被设置
+                self.current_task_failure = True
 
         # 如果static_check成功或者所有任务完成，则设置成功标志
         if all_tasks_completed and not task_failed:

@@ -15,7 +15,83 @@ BASE_DIR = Path(__file__).parent.absolute()
 LOG_FILE = str(BASE_DIR / "data" / "experiment_logs.jsonl")
 USER_ACTION_LOG_DIR = str(BASE_DIR / "data" / "user_action_logs")
 
-def _ensure_hdf5_file(username, env_id, episode_idx):
+def _get_current_attempt_index(f):
+    """
+    获取当前最新的 attempt 索引。
+    
+    Args:
+        f: h5py.File 对象
+    
+    Returns:
+        int: 当前 attempt 索引，如果没有则返回 -1
+    """
+    attempt_indices = []
+    for key in f.keys():
+        if key.startswith("attempt_"):
+            try:
+                idx = int(key.split("_")[1])
+                attempt_indices.append(idx)
+            except (ValueError, IndexError):
+                pass
+    
+    if not attempt_indices:
+        return -1
+    return max(attempt_indices)
+
+def _get_or_create_attempt(f, attempt_idx, username, env_id, episode_idx):
+    """
+    获取或创建指定索引的 attempt 组。
+    
+    Args:
+        f: h5py.File 对象
+        attempt_idx: attempt 索引（如果为 None，则创建新的）
+        username: 用户名
+        env_id: 环境ID
+        episode_idx: Episode索引
+    
+    Returns:
+        h5py.Group: attempt 组对象
+    """
+    if attempt_idx is None:
+        # 创建新的 attempt
+        current_max = _get_current_attempt_index(f)
+        attempt_idx = current_max + 1
+    
+    attempt_name = f"attempt_{attempt_idx}"
+    
+    if attempt_name not in f:
+        # 创建新的 attempt 组
+        attempt_group = f.create_group(attempt_name)
+        
+        # 创建 metadata 组
+        metadata = attempt_group.create_group("metadata")
+        metadata.create_dataset("username", data=username.encode('utf-8'), dtype=h5py.string_dtype(encoding='utf-8'))
+        metadata.create_dataset("env_id", data=env_id.encode('utf-8'), dtype=h5py.string_dtype(encoding='utf-8'))
+        metadata.create_dataset("episode_idx", data=np.int32(episode_idx))
+        metadata.create_dataset("attempt_idx", data=np.int32(attempt_idx))
+        created_at = datetime.now().isoformat()
+        metadata.create_dataset("created_at", data=created_at.encode('utf-8'), dtype=h5py.string_dtype(encoding='utf-8'))
+        metadata.create_dataset("last_updated", data=created_at.encode('utf-8'), dtype=h5py.string_dtype(encoding='utf-8'))
+        
+        # 创建 actions 组
+        attempt_group.create_group("actions")
+    else:
+        # 获取现有的 attempt 组
+        attempt_group = f[attempt_name]
+        
+        # 更新最后更新时间
+        if "metadata" in attempt_group:
+            metadata_group = attempt_group["metadata"]
+            try:
+                if "last_updated" in metadata_group:
+                    del metadata_group["last_updated"]
+            except (KeyError, TypeError):
+                pass
+            metadata_group.create_dataset("last_updated", data=datetime.now().isoformat().encode('utf-8'), dtype=h5py.string_dtype(encoding='utf-8'))
+    
+    return attempt_group
+
+def _ensure_hdf5_file(username, env_id, episode_idx, create_new_attempt=False):
     """
     确保 HDF5 文件存在并初始化必要的组结构。
     
@@ -23,12 +99,13 @@ def _ensure_hdf5_file(username, env_id, episode_idx):
         username: 用户名
         env_id: 环境ID
         episode_idx: Episode索引
+        create_new_attempt: 是否创建新的 attempt（用于 refresh）
     
     Returns:
-        h5py.File 对象（需要在使用后关闭）或 None（如果出错）
+        tuple: (h5py.File 对象, h5py.Group attempt_group, int attempt_idx) 或 (None, None, -1)（如果出错）
     """
     if not username or not env_id or episode_idx is None:
-        return None
+        return None, None, -1
     
     # 构建文件路径
     user_dir = os.path.join(USER_ACTION_LOG_DIR, username)
@@ -42,45 +119,29 @@ def _ensure_hdf5_file(username, env_id, episode_idx):
         # 以追加模式打开（如果不存在则创建）
         f = h5py.File(hdf5_file, "a")
         
-        # 如果文件是新创建的，初始化元数据和组结构
-        if not file_exists:
-            # 创建 metadata 组
-            if "metadata" not in f:
-                metadata = f.create_group("metadata")
-                metadata.create_dataset("username", data=username.encode('utf-8'), dtype=h5py.string_dtype(encoding='utf-8'))
-                metadata.create_dataset("env_id", data=env_id.encode('utf-8'), dtype=h5py.string_dtype(encoding='utf-8'))
-                metadata.create_dataset("episode_idx", data=np.int32(episode_idx))
-                created_at = datetime.now().isoformat()
-                metadata.create_dataset("created_at", data=created_at.encode('utf-8'), dtype=h5py.string_dtype(encoding='utf-8'))
-                metadata.create_dataset("last_updated", data=created_at.encode('utf-8'), dtype=h5py.string_dtype(encoding='utf-8'))
-            else:
-                # 更新最后更新时间
-                metadata_group = f["metadata"]
-                try:
-                    if "last_updated" in metadata_group:
-                        del metadata_group["last_updated"]
-                except (KeyError, TypeError):
-                    pass
-                metadata_group.create_dataset("last_updated", data=datetime.now().isoformat().encode('utf-8'), dtype=h5py.string_dtype(encoding='utf-8'))
-            
-            # 创建 actions 组
-            if "actions" not in f:
-                f.create_group("actions")
+        # 获取或创建 attempt
+        if create_new_attempt:
+            # 创建新的 attempt
+            attempt_group = _get_or_create_attempt(f, None, username, env_id, episode_idx)
+            attempt_idx = _get_current_attempt_index(f)
         else:
-            # 更新最后更新时间
-            if "metadata" in f:
-                metadata_group = f["metadata"]
-                try:
-                    if "last_updated" in metadata_group:
-                        del metadata_group["last_updated"]
-                except (KeyError, TypeError):
-                    pass
-                metadata_group.create_dataset("last_updated", data=datetime.now().isoformat().encode('utf-8'), dtype=h5py.string_dtype(encoding='utf-8'))
+            # 获取当前最新的 attempt，如果不存在则创建 attempt_0
+            current_attempt_idx = _get_current_attempt_index(f)
+            if current_attempt_idx == -1:
+                # 文件存在但没有 attempt，创建 attempt_0
+                attempt_group = _get_or_create_attempt(f, 0, username, env_id, episode_idx)
+                attempt_idx = 0
+            else:
+                # 使用当前最新的 attempt
+                attempt_group = _get_or_create_attempt(f, current_attempt_idx, username, env_id, episode_idx)
+                attempt_idx = current_attempt_idx
         
-        return f
+        return f, attempt_group, attempt_idx
     except Exception as e:
         print(f"Error ensuring HDF5 file {hdf5_file}: {e}")
-        return None
+        import traceback
+        traceback.print_exc()
+        return None, None, -1
 
 def _add_coordinate_click_to_hdf5(clicks_group, click_index, coordinates, coords_str, image_array, timestamp):
     """
@@ -180,15 +241,15 @@ def _add_option_select_to_hdf5(option_selects_group, select_index, option_idx, o
         import traceback
         traceback.print_exc()
 
-def _add_action_to_hdf5(f, action_index, action_data):
+def _add_action_to_hdf5(attempt_group, action_index, action_data):
     """
-    将操作记录添加到 HDF5 文件。
+    将操作记录添加到 HDF5 文件的 attempt 组中。
     
     新的数据格式：
     每个 action 组记录一次 execute action，包含 execute 之前所有的 click 和选择的 option。
     
     Args:
-        f: h5py.File 对象
+        attempt_group: h5py.Group 对象，表示 attempt 组
         action_index: 操作索引（用于生成唯一的 action 组名）
         action_data: 操作数据字典，包含：
             - option_idx: execute 时使用的选项索引（最后一次选择的）
@@ -202,7 +263,7 @@ def _add_action_to_hdf5(f, action_index, action_data):
             - done: 是否完成
     """
     try:
-        actions_group = f["actions"]
+        actions_group = attempt_group["actions"]
         action_name = f"action_{action_index}"
         
         # 创建 action 组
@@ -371,7 +432,7 @@ def log_user_action_hdf5(username, env_id, episode_idx, action_data):
             - done: 是否完成
     
     文件路径: data/user_action_logs/{username}/{env_id}_{episode_idx}.h5
-    文件格式: HDF5，包含 actions 组，每个 action 记录一次 execute，包含 execute 之前所有的 option_select 和 coordinate_clicks
+    文件格式: HDF5，包含 attempt_N 组，每个 attempt 包含 metadata 和 actions 组
     """
     if not username or not env_id or episode_idx is None:
         print(f"Warning: Missing required parameters for log_user_action_hdf5: username={username}, env_id={env_id}, episode_idx={episode_idx}")
@@ -385,25 +446,22 @@ def log_user_action_hdf5(username, env_id, episode_idx, action_data):
     
     # 使用线程锁确保并发安全
     with lock:
-        f = _ensure_hdf5_file(username, env_id, episode_idx)
-        if f is None:
+        f, attempt_group, attempt_idx = _ensure_hdf5_file(username, env_id, episode_idx, create_new_attempt=False)
+        if f is None or attempt_group is None:
             print(f"Error: Failed to open HDF5 file for {username}/{env_id}_{episode_idx}")
             return
         
         try:
-            # 获取当前 action 索引
-            actions_group = f["actions"]
+            # 获取当前 attempt 的 actions 组
+            actions_group = attempt_group["actions"]
             # 计算现有 action 的数量
-            # 使用 len() 获取子组数量，h5py.Group 支持此操作
             action_index = len(actions_group)  # type: ignore
             
-            # 添加操作记录
-            _add_action_to_hdf5(f, action_index, action_data_with_timestamp)
+            # 添加操作记录到当前 attempt
+            _add_action_to_hdf5(attempt_group, action_index, action_data_with_timestamp)
             
             # 强制刷新以确保所有数据都被写入
             f.flush()
-            # 确保所有数据都被写入磁盘
-            # HDF5 文件在 close() 时会自动保存所有更改，但显式 flush 可以确保数据立即写入
         except Exception as e:
             print(f"Error writing to HDF5 file: {e}")
             import traceback
@@ -415,6 +473,86 @@ def log_user_action_hdf5(username, env_id, episode_idx, action_data):
                 except:
                     pass
                 f.close()  # 关闭文件，这会自动保存所有更改
+
+def has_existing_actions(username, env_id, episode_idx):
+    """
+    检查指定任务是否已有 actions 记录。
+    
+    Args:
+        username: 用户名
+        env_id: 环境ID
+        episode_idx: Episode索引
+    
+    Returns:
+        bool: 如果存在 actions 则返回 True，否则返回 False
+    """
+    if not username or not env_id or episode_idx is None:
+        return False
+    
+    user_dir = os.path.join(USER_ACTION_LOG_DIR, username)
+    hdf5_file = os.path.join(user_dir, f"{env_id}_{episode_idx}.h5")
+    
+    if not os.path.exists(hdf5_file):
+        return False
+    
+    try:
+        with h5py.File(hdf5_file, "r") as f:
+            current_attempt_idx = _get_current_attempt_index(f)
+            if current_attempt_idx == -1:
+                return False
+            
+            attempt_name = f"attempt_{current_attempt_idx}"
+            if attempt_name not in f:
+                return False
+            
+            attempt_group = f[attempt_name]
+            if "actions" not in attempt_group:
+                return False
+            
+            actions_group = attempt_group["actions"]
+            return len(actions_group) > 0
+    except Exception as e:
+        print(f"Error checking existing actions: {e}")
+        return False
+
+def create_new_attempt(username, env_id, episode_idx):
+    """
+    为指定的任务创建新的 attempt。
+    在 refresh 时调用此函数来创建新的 attempt。
+    
+    Args:
+        username: 用户名
+        env_id: 环境ID
+        episode_idx: Episode索引
+    
+    Returns:
+        int: 新创建的 attempt 索引，如果失败返回 -1
+    """
+    if not username or not env_id or episode_idx is None:
+        return -1
+    
+    with lock:
+        f, attempt_group, attempt_idx = _ensure_hdf5_file(username, env_id, episode_idx, create_new_attempt=True)
+        if f is None or attempt_group is None:
+            print(f"Error: Failed to create new attempt for {username}/{env_id}_{episode_idx}")
+            return -1
+        
+        try:
+            f.flush()
+            print(f"Created new attempt_{attempt_idx} for {username}/{env_id}_{episode_idx}")
+            return attempt_idx
+        except Exception as e:
+            print(f"Error creating new attempt: {e}")
+            import traceback
+            traceback.print_exc()
+            return -1
+        finally:
+            if f is not None:
+                try:
+                    f.flush()
+                except:
+                    pass
+                f.close()
 
 def log_user_action(username, env_id, episode_idx, action_data):
     """

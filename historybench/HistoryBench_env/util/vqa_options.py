@@ -496,7 +496,27 @@ def _options_routestick(env, planner, require_target, base) -> List[dict]:
 
         
         if not side_candidates:
-            raise ValueError("RouteStick: failed to determine a target for the selected side.")
+            # Fallback: if no candidate on the requested side, pick the nearest available candidate
+            # from the general 'candidates' list (which excludes the reference/current button).
+            fallback_target = None
+            min_dist = float('inf')
+            for idx, actor in allowed_candidates:
+                xy = _actor_xy(actor)
+                if xy is not None and tcp_xy is not None:
+                    d = np.linalg.norm(xy - tcp_xy)
+                    if d < min_dist:
+                        min_dist = d
+                        fallback_target = actor
+            
+            if fallback_target is None:
+                # Should typically not happen if candidates is not empty
+                if candidates:
+                    fallback_target = allowed_candidates[0][1]
+                else:
+                    raise ValueError("RouteStick: failed to determine a target for the selected side.")
+
+            print(f"RouteStick: failed to determine a target for side '{side_l}'. Fallback to nearest target.")
+            return solve_swingonto(env, planner, target=fallback_target)
 
         # Pick the closest candidate by index in the requested direction (no distance check).
         if side_l == "left":
@@ -508,6 +528,7 @@ def _options_routestick(env, planner, require_target, base) -> List[dict]:
         return solve_swingonto_withDirection(
             env, planner, target=target, radius=swing_radius, direction=direction_norm
         )
+
 
     options: List[dict] = []
     option_defs = [
@@ -707,23 +728,79 @@ def _options_stopcube(env, planner, require_target, base) -> List[dict]:
         )
 
     steps_press = getattr(base, "steps_press", None)
-    # if steps_press is not None:
-    #     interval = getattr(base, "interval", 30)
-    #     abs_timestep = max(0, int(steps_press - interval))
-    #     options.append(
-    #         {
-    #             "label": "remain static",
-    #             "solve": lambda abs_timestep=abs_timestep: solve_hold_obj_absTimestep(
-    #                 env, planner, absTimestep=abs_timestep
-    #             ),
-    #         }
-    #     )
-    options.append(
-                {
-                    "label": "remain static",
-                    "solve": lambda: solve_hold_obj(env, planner,static_steps=10),
-                }
-            )
+    if steps_press is not None:
+        interval = getattr(base, "interval", 30)
+        final_target = max(0, int(steps_press - interval))
+        
+        def solve_with_incremental_steps():
+            current_step = int(getattr(env, "elapsed_steps", 0))
+            
+            # 获取或初始化调用计数器
+            call_count_key = "_hold_obj_incremental_call_count"
+            call_count = getattr(base, call_count_key, 0)
+            
+            # 获取保存的配置
+            num_calls_key = "_hold_obj_incremental_num_calls"
+            increment_step_key = "_hold_obj_incremental_step"
+            last_target_key = "_hold_obj_incremental_last_target"
+            initial_step_key = "_hold_obj_incremental_initial_step"
+            
+            num_calls = getattr(base, num_calls_key, None)
+            increment_step = getattr(base, increment_step_key, None)
+            last_target = getattr(base, last_target_key, None)
+            initial_step = getattr(base, initial_step_key, None)
+            
+            # 如果是第一次调用，初始化配置
+            if num_calls is None:
+                num_calls = np.random.randint(2, 5)  # 总共2-3次调用 (randint(2,4) 生成 2 或 3)
+                
+                # 生成固定的递增步长：final_target / num_calls
+                # 保持恒定，不管是否超过、等于或小于最终目标，都使用相同的递增步长
+                increment_step = int(final_target / num_calls)
+                # 确保步长至少为1
+                if increment_step < 1:
+                    increment_step = 1
+                
+                setattr(base, num_calls_key, num_calls)
+                setattr(base, increment_step_key, increment_step)
+                setattr(base, initial_step_key, current_step)
+                setattr(base, last_target_key, current_step)
+                setattr(base, call_count_key, 0)
+                call_count = 0
+                last_target = current_step
+            
+            # 确定本次调用的目标值
+            # 确保 increment_step 和 last_target 不为 None（第一次调用后它们都会被设置）
+            if increment_step is None or last_target is None:
+                # 这种情况理论上不应该发生，但为了安全起见
+                increment_step = 10
+                last_target = current_step
+            
+            if call_count < num_calls - 1:
+                # 小于 num_calls 次数：按照递增步长递增（允许超过 final_target）
+                target = last_target + increment_step
+            elif call_count == num_calls - 1:
+                # 等于 num_calls 次：必须精确达到 final_target
+                target = final_target
+            else:
+                # 大于 num_calls 之后：继续按照之前定下来的间隔递增
+                target = last_target + increment_step
+            
+            # 调用原有的 solve_hold_obj_absTimestep 函数
+            solve_hold_obj_absTimestep(env, planner, absTimestep=target)
+            
+            # 更新调用计数和最后的目标值
+            setattr(base, call_count_key, call_count + 1)
+            setattr(base, last_target_key, target)
+            
+            return None
+        
+        options.append(
+            {
+                "label": "remain static",
+                "solve": solve_with_incremental_steps,
+            }
+        )
 
     if button_obj is not None:
         options.append(

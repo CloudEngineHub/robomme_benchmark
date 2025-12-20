@@ -9,10 +9,14 @@ from PIL import Image, ImageDraw
 from oracle_logic import OracleSession
 from concurrent.futures import ThreadPoolExecutor
 from user_manager import user_manager
-from logger import log_session, log_user_action
+from logger import log_session, log_user_action, create_new_attempt, has_existing_actions
 
 # --- Global Session Storage ---
 GLOBAL_SESSIONS = {}
+
+# --- Task Index Storage (for Progress display) ---
+# 存储每个session的任务索引和总任务数，用于直接读取Progress
+TASK_INDEX_MAP = {}  # {uid: {"task_index": int, "total_tasks": int}}
 
 # --- Coordinate Click Tracking (between actions) ---
 # 跟踪每个session从上次action_execute到现在的所有coordinate_click
@@ -71,6 +75,13 @@ def login_and_load_task(username, uid):
     
     # Login success - Load current task
     if status["is_done_all"]:
+        # 保存任务索引（已完成所有任务）
+        TASK_INDEX_MAP[uid] = {
+            "task_index": status['total_tasks'] - 1,  # 最后一个任务的索引
+            "total_tasks": status['total_tasks']
+        }
+        task_idx = TASK_INDEX_MAP[uid]["task_index"]
+        total = TASK_INDEX_MAP[uid]["total_tasks"]
         return (
             uid,
             gr.update(visible=False), # login_group
@@ -80,7 +91,7 @@ def login_and_load_task(username, uid):
             gr.update(choices=[], value=None),
             "All tasks completed.", "", 
             None, None,
-            "No active task", f"Progress: {status['completed_count']}/{status['total_tasks']} (100%)",
+            "No active task", f"Progress: {total}/{total}",
             gr.update(interactive=True)
         )
 
@@ -101,6 +112,13 @@ def login_and_load_task(username, uid):
     img, load_msg = session.load_episode(env_id, int(ep_num))
     
     if img is None:
+         # 即使加载失败，也保存任务索引
+         TASK_INDEX_MAP[uid] = {
+             "task_index": status['current_index'],
+             "total_tasks": status['total_tasks']
+         }
+         task_idx = TASK_INDEX_MAP[uid]["task_index"]
+         total = TASK_INDEX_MAP[uid]["total_tasks"]
          return (
             uid,
             gr.update(visible=False),
@@ -110,7 +128,7 @@ def login_and_load_task(username, uid):
             gr.update(choices=[], value=None),
             "", "", 
             None, None,
-            f"Task: {env_id} (Ep {ep_num})", f"Progress: {status['current_index'] + 1}/{status['total_tasks']}",
+            f"Task: {env_id} (Ep {ep_num})", f"Progress: {task_idx + 1}/{total}",
             gr.update(interactive=True)
         )
         
@@ -119,31 +137,55 @@ def login_and_load_task(username, uid):
     options = session.available_options
     radio_choices = [(opt_label, opt_idx) for opt_label, opt_idx in options]
     
+    # 保存任务索引到全局映射，供Progress直接读取
+    TASK_INDEX_MAP[uid] = {
+        "task_index": status['current_index'],
+        "total_tasks": status['total_tasks']
+    }
+    
     demo_video_path = None
     if session.demonstration_frames:
         try:
             demo_video_path = save_video(session.demonstration_frames, "demo")
         except: pass
 
+    # 从TASK_INDEX_MAP直接读取Progress
+    task_idx = TASK_INDEX_MAP[uid]["task_index"]
+    total = TASK_INDEX_MAP[uid]["total_tasks"]
+    
     return (
         uid,
         gr.update(visible=False), # Login hidden
         gr.update(visible=True),  # Main visible
         f"Logged in as {username}", 
         img, 
-        f"Ready. Task {status['current_index'] + 1}/{status['total_tasks']}: {env_id}",
+        f"Ready. Task {task_idx + 1}/{total}: {env_id}",
         gr.update(choices=radio_choices, value=None),
         goal_text, 
         "", 
         None, 
         demo_video_path,
         f"Current Task: {env_id} (Episode {ep_num})",
-        f"Progress: {status['current_index'] + 1}/{status['total_tasks']} Completed: {status['completed_count']}",
+        f"Progress: {task_idx + 1}/{total}",
         gr.update(interactive=True)
     )
 
 def load_next_task_wrapper(username, uid):
-    """Wrapper to just reload the user's current status (which should be next task if updated)."""
+    """
+    Wrapper to just reload the user's current status (which should be next task if updated).
+    如果当前任务已有 actions，则创建新的 attempt。
+    """
+    if username:
+        success, msg, status = user_manager.login(username)
+        if success and not status["is_done_all"]:
+            current_task = status["current_task"]
+            env_id = current_task["env_id"]
+            ep_num = current_task["episode_idx"]
+            
+            # 检查当前任务是否已有 actions，如果有则创建新的 attempt
+            if has_existing_actions(username, env_id, ep_num):
+                create_new_attempt(username, env_id, ep_num)
+    
     return login_and_load_task(username, uid)
 
 def save_video(frames, suffix=""):
@@ -525,12 +567,17 @@ def execute_step(uid, username, option_idx, coords_str):
         print(f"Error generating combined video: {e}")
         traceback.print_exc()
     
-    progress_update = gr.update()
+    progress_update = gr.update()  # 不更新 progress，保持原值
     task_update = gr.update()
     
     if done:
         status += " [EPISODE COMPLETE]"
         
+        # Determine final status for logging
+        final_log_status = "failed"
+        if "SUCCESS" in status:
+            final_log_status = "success"
+
         # Log session data to experiment_logs.jsonl
         try:
             log_session({
@@ -542,33 +589,38 @@ def execute_step(uid, username, option_idx, coords_str):
                 "total_steps": len(session.history) if hasattr(session, 'history') and session.history else 0,
                 "total_frames": len(session.base_frames) if hasattr(session, 'base_frames') else 0,
                 "finished": True,
-                "status": "completed"
+                "status": final_log_status
             })
         except Exception as e:
             print(f"Error logging session: {e}")
             traceback.print_exc()
         
-        # Update user progress
+        # Update user progress (但不更新 progress_info_box，等用户按 next task/refresh 时再更新)
         if username:
             user_status = user_manager.complete_current_task(username)
             if user_status:
                 if user_status["is_done_all"]:
                     task_update = "All tasks completed!"
-                    progress_update = f"Progress: {user_status['completed_count']}/{user_status['total_tasks']} (100%)"
+                    # progress_update 保持为 gr.update()，不改变
                 else:
                     next_env = user_status["current_task"]["env_id"]
                     next_ep = user_status["current_task"]["episode_idx"]
                     task_update = f"Task Completed! Next: {next_env} (Ep {next_ep})"
-                    progress_update = f"Progress: {user_status['current_index'] + 1}/{user_status['total_tasks']} Completed: {user_status['completed_count']}"
+                    # progress_update 保持为 gr.update()，不改变
         
     return img, status, combined_video_path, task_update, progress_update
 
 # --- JS for Video (no sync needed for single video) ---
 SYNC_JS = ""  # No longer needed since we have a single combined video
 
-CSS = ""
+CSS = """
+#live_obs { border: 4px solid #3b82f6; border-radius: 8px; }
+#control_panel { border: 1px solid #e5e7eb; padding: 15px; border-radius: 8px; background-color: #f9fafb; }
+.compact-log textarea { max-height: 120px !important; font-family: monospace; font-size: 0.85em; }
+.ref-zone { border-bottom: 2px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 10px; }
+"""
 if RESTRICT_VIDEO_PLAYBACK:
-    CSS = """
+    CSS += """
     #demo_video {
         pointer-events: none;
     }
@@ -599,56 +651,78 @@ with gr.Blocks(title="Oracle Planner Interface", js=SYNC_JS, css=CSS) as demo:
 
     # --- Main Interface (Hidden initially) ---
     with gr.Group(visible=False) as main_interface:
-        with gr.Row():
-            # --- Left Column: Controls (Scale 1) ---
-            with gr.Column(scale=1):
+        
+        # --- Top Container: Reference Zone (35-40% Height) ---
+        with gr.Row(elem_classes="ref-zone"):
+            # Left: Text Info (30%)
+            with gr.Column(scale=3):
                 with gr.Group():
-                    gr.Markdown("### 1. Task Info")
-                    task_info_box = gr.Textbox(label="Current Task", interactive=False)
-                    progress_info_box = gr.Textbox(label="Progress", interactive=False)
-                    
-                    with gr.Row():
-                        next_task_btn = gr.Button("Load Next / Current Task", variant="secondary")
-                    
-                    # Hidden fields for compatibility if needed, or just remove usage
-                    # keeping them defined but hidden/unused for now to minimize structure change impact if referenced elsewhere
-                    # env_dd = gr.Dropdown(choices=ENV_IDS, value="PickXtimes", label="Environment ID", visible=False)
-                    # ep_num = gr.Number(value=0, label="Episode Index", precision=0, visible=False)
-                    # load_btn = gr.Button("Load Environment", variant="primary", visible=False)
+                     gr.Markdown("### 1. Task Info")
+                     with gr.Row():
+                         task_info_box = gr.Textbox(label="Current Task", interactive=False, show_label=False, scale=2)
+                         progress_info_box = gr.Textbox(label="Progress", interactive=False, show_label=False, scale=1)
                 
                 with gr.Group():
-                    gr.Markdown("### 2. Task Goal")
-                    goal_box = gr.Textbox(label="Instruction", lines=2, interactive=False)
+                     gr.Markdown("### 2. Task Goal")
+                     goal_box = gr.Textbox(label="Instruction", lines=3, interactive=False, show_label=False)
                 
                 with gr.Group():
-                    gr.Markdown("### 3. Action & Interaction")
-                    options_radio = gr.Radio(choices=[], label="Available Actions", type="value")
-                    coords_box = gr.Textbox(label="Selected Coordinates (x, y)", value="")
-                    
-                    exec_btn = gr.Button("Execute Action", variant="stop")
-                
-                gr.Markdown("### 4. Logs")
-                log_output = gr.Textbox(label="System Log", lines=5, interactive=False)
+                     gr.Markdown("### 3. System Log")
+                     log_output = gr.Textbox(label="Log", lines=6, interactive=False, elem_classes="compact-log", show_label=False)
 
-            # --- Right Column: Visuals (Scale 2) ---
-            with gr.Column(scale=2):
-                # Top: Image & Demo Video
-                with gr.Row():
-                    img_display = gr.Image(label="Live Observation (Click to Select)", interactive=True, type="pil")
-                    # Placeholder for demo video if needed, or maybe just hidden if no data
-                    video_elem_id = "demo_video" if RESTRICT_VIDEO_PLAYBACK else None
-                    video_autoplay = True if RESTRICT_VIDEO_PLAYBACK else False
-                    
-                    video_display = gr.Video(
-                        label="Demonstration", 
+            # Right: Reference Views (70%)
+            with gr.Column(scale=7):
+                 gr.Markdown("### Reference Views")
+                 with gr.Row():
+                     # Demo Video
+                     video_elem_id = "demo_video" if RESTRICT_VIDEO_PLAYBACK else None
+                     video_autoplay = True if RESTRICT_VIDEO_PLAYBACK else False
+                     
+                     video_display = gr.Video(
+                        label="Demonstration (示范)", 
                         interactive=False, 
                         height=300, 
                         elem_id=video_elem_id, 
                         autoplay=video_autoplay
-                    )
-                
-                # Bottom: Execution Feedback (Combined View)
-                combined_display = gr.Video(label="Desk View (Left) | Robot View (Right)", elem_id="combined_view", interactive=False, autoplay=True)
+                     )
+                     
+                     # Desk + Robot View (Combined)
+                     combined_display = gr.Video(
+                        label="Desk View (侧视) | Robot View (第一人称)", 
+                        interactive=False, 
+                        autoplay=True, 
+                        height=300,
+                        elem_id="combined_view"
+                     )
+
+        # --- Bottom Container: Operation Zone (60-65% Height) ---
+        with gr.Row():
+            # Left: Live Observation (Main)
+            with gr.Column(scale=8):
+                 gr.Markdown("### Live Observation (交互主视图)")
+                 img_display = gr.Image(
+                    label="Live Observation", 
+                    interactive=True, 
+                    type="pil", 
+                    elem_id="live_obs",
+                    show_label=False
+                 )
+
+            # Right: Control Panel
+            with gr.Column(scale=2, elem_id="control_panel"):
+                 gr.Markdown("### Control Panel")
+                 
+                 gr.Markdown("**1. Action**")
+                 options_radio = gr.Radio(choices=[], label="Action", type="value", show_label=False)
+                 
+                 gr.Markdown("**2. Coords**")
+                 coords_box = gr.Textbox(label="Coords", value="", interactive=False, show_label=False)
+                 
+                 gr.Markdown("**3. Execute**")
+                 exec_btn = gr.Button("EXECUTE", variant="stop", size="lg")
+                 
+                 gr.Markdown("---")
+                 next_task_btn = gr.Button("Next Task / Refresh", variant="secondary")
 
     # --- Event Wiring ---
 

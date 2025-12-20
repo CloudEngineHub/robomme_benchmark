@@ -340,10 +340,14 @@ class StopCube(BaseEnv):
         #超过没按直接错误
         current_step = int(getattr(self, "elapsed_steps", 0))
         if current_step > self.move_interval * self.stop_time:
-            task_failed = True
+            if not all_tasks_completed:
+                #The issue is that the environment continues running after the task is successfully completed, 
+                # eventually triggering a timeout check that incorrectly marks the episode as a failure.
+                task_failed = True
 
 
 #################################################
+
         # 如果任务失败，立即标记失败
         if task_failed:
             self._task_failed_persistent = True

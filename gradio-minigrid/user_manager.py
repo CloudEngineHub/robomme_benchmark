@@ -147,15 +147,7 @@ class UserManager:
         
         return self.get_user_status(username)
 
-    def skip_task(self, username):
-        """Skip current task (move to next without marking complete? Or just move index).
-        For now, let's treat 'next' button as just moving index, but usually we only move if completed.
-        If requirement is 'one by one', maybe we shouldn't allow skip unless completed.
-        But user might want to revisit? 
-        The prompt says 'user one by one do tasks', 'can exit and re-enter'.
-        Let's assume we advance index only on completion.
-        """
-        pass # Not implementing explicit skip unless requested.
+
 
     def set_task_index(self, username, index):
         """Manually set task index (if needed)."""

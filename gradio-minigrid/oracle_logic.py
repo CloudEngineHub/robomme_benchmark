@@ -415,6 +415,32 @@ class OracleSession:
             self.env.close()
 
     def execute_action(self, action_idx, click_coords):
+
+# 用户点击EXECUTE
+#   ↓
+# execute_step() 调用 session.execute_action()
+#   ↓
+# execute_action() 执行 solve()
+#   ↓ (在solve()执行过程中，step()可能检测到失败)
+#   ↓
+# evaluate(solve_complete_eval=True) 被调用
+#   ↓
+# BinFill.evaluate() 检查失败状态
+#   - 保存 previous_failure
+#   - 调用 sequential_task_check
+#   - 如果 previous_failure=True 或 task_failed=True，设置 failureflag=True
+#   ↓
+# oracle_logic.py 获取 evaluation 结果
+#   - 如果 is_fail=False，额外检查 failureflag 和 current_task_failure
+#   - 设置 done = is_success or is_fail
+#   ↓
+# execute_step() 检查 done
+#   - 如果 done=True，调用 complete_current_task()
+#   ↓
+# complete_current_task() 更新任务索引
+#   - current_idx: 0 -> 1 (episode: 0 -> 1)
+
+
         """
         The real step logic.
         """
@@ -492,6 +518,19 @@ class OracleSession:
         
         is_success = _tensor_to_bool(evaluation.get("success", False))
         is_fail = _tensor_to_bool(evaluation.get("fail", False))
+        
+        # 如果evaluate()没有检测到失败，但环境已经设置了failureflag，则使用failureflag
+        # 这是因为失败可能在solve()执行过程中的step()里被检测到，但evaluate()可能还没有反映
+        failureflag = getattr(self.env.unwrapped, "failureflag", None)
+        current_task_failure = getattr(self.env.unwrapped, "current_task_failure", False)
+        
+        if not is_fail:
+            if failureflag is not None:
+                failureflag_bool = _tensor_to_bool(failureflag)
+                if failureflag_bool:
+                    is_fail = True
+            elif current_task_failure:
+                is_fail = True
         
         if is_success: status_msg += " | SUCCESS"
         if is_fail: status_msg += " | FAILED"
