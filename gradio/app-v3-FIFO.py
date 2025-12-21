@@ -34,7 +34,7 @@ OPTION_SELECTS = {}  # {uid: [{"option_idx": idx, "option_label": label, "timest
 FRAME_QUEUES = {}
 
 # --- Streaming Configuration ---
-STREAMING_READ_FPS = 10.0  # 读取fps（可配置）
+STREAMING_READ_FPS = 30.0  # 读取fps（可配置）
 STREAMING_INTERVAL = 1.0 / STREAMING_READ_FPS  # Timer间隔
 STREAMING_MONITOR_INTERVAL = 0.1  # 监控线程检查间隔（秒）
 
@@ -468,19 +468,16 @@ def cleanup_frame_queue(uid):
             except queue.Empty:
                 break
         queue_info["streaming_active"] = False
-        # 清理累积帧列表（如果存在）
-        if "accumulated_frames" in queue_info:
-            queue_info["accumulated_frames"] = []
 
 def stream_frames_from_queue(uid):
     """
-    从队列读取帧并返回视频更新
+    从队列读取单帧并返回图片更新（严格FIFO，每次只取一张）
     
     Args:
         uid: session ID
     
     Returns:
-        gr.update: 视频更新对象
+        numpy array 或 gr.update(): 单帧图片或无更新
     """
     if not uid or uid not in FRAME_QUEUES:
         return gr.update()  # 无更新
@@ -488,41 +485,16 @@ def stream_frames_from_queue(uid):
     queue_info = FRAME_QUEUES[uid]
     frame_queue = queue_info["frame_queue"]
     
-    # 初始化累积帧列表（如果不存在）
-    if "accumulated_frames" not in queue_info:
-        queue_info["accumulated_frames"] = []
-    
-    # 收集队列中的所有新帧（非阻塞）
-    new_frames = []
-    queue_size_before = frame_queue.qsize()
-    
-    # 如果队列有帧，读取所有帧
-    if queue_size_before > 0:
-        while not frame_queue.empty():
-            try:
-                frame = frame_queue.get_nowait()
-                new_frames.append(frame)
-            except queue.Empty:
-                break
-    
-    # 将新帧添加到累积列表
-    if new_frames:
-        queue_info["accumulated_frames"].extend(new_frames)
-    
-    # 生成包含所有累积帧的视频
-    # 关键：只要有累积帧就更新，不管是否有新帧，不管streaming_active状态
-    # 这样可以确保在执行过程中实时显示
-    if queue_info["accumulated_frames"]:
+    # 只取队列中的第一张（队头），严格FIFO
+    if not frame_queue.empty():
         try:
-            video_path = save_video(queue_info["accumulated_frames"], f"streaming_{uid}")
-            # 返回视频路径，Gradio会自动更新Video组件
-            return video_path
-        except Exception as e:
-            print(f"Error in stream_frames_from_queue: {e}")
-            traceback.print_exc()
-            return gr.update()
+            frame = frame_queue.get_nowait()  # 只取一张
+            # 直接返回 numpy 数组
+            return frame
+        except queue.Empty:
+            return gr.update()  # 无更新
     
-    return gr.update()  # 如果没有累积帧，返回无更新
+    return gr.update()  # 队列为空，返回无更新
 
 # --- Callback Functions ---
 
@@ -832,21 +804,18 @@ def execute_step(uid, username, option_idx, coords_str):
             "frame_queue": queue.Queue(),
             "last_base_count": pre_base_frame_count,
             "last_wrist_count": pre_wrist_frame_count,
-            "streaming_active": True,
-            "accumulated_frames": []
+            "streaming_active": True
         }
     else:
         FRAME_QUEUES[uid]["streaming_active"] = True
         FRAME_QUEUES[uid]["last_base_count"] = pre_base_frame_count
         FRAME_QUEUES[uid]["last_wrist_count"] = pre_wrist_frame_count
-        # 清空之前的队列和累积帧（新action开始）
+        # 清空之前的队列（新action开始）
         while not FRAME_QUEUES[uid]["frame_queue"].empty():
             try:
                 FRAME_QUEUES[uid]["frame_queue"].get_nowait()
             except queue.Empty:
                 break
-        # 清空累积帧列表，开始新的流式输出
-        FRAME_QUEUES[uid]["accumulated_frames"] = []
     
     # 启动监控线程（在执行过程中监控）
     monitor_thread = threading.Thread(
@@ -1240,10 +1209,9 @@ with gr.Blocks(title="Oracle Planner Interface", js=SYNC_JS, css=CSS) as demo:
                      )
                      
                      # Desk + Robot View (Combined)
-                     combined_display = gr.Video(
+                     combined_display = gr.Image(
                         label="Desk View (侧视) | Robot View (第一人称)", 
                         interactive=False, 
-                        autoplay=True, 
                         height=300,
                         elem_id="combined_view"
                      )

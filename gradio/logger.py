@@ -10,7 +10,7 @@ from PIL import Image
 
 # 线程锁，防止多用户同时写入时文件损坏
 lock = threading.Lock()
-# 使用基于 logger.py 文件位置的绝对路径，确保日志文件始终保存在 gradio-minigrid/data/ 目录下
+# 使用基于 logger.py 文件位置的绝对路径，确保日志文件始终保存在 gradio/data/ 目录下
 BASE_DIR = Path(__file__).parent.absolute()
 LOG_FILE = str(BASE_DIR / "data" / "experiment_logs.jsonl")
 USER_ACTION_LOG_DIR = str(BASE_DIR / "data" / "user_action_logs")
