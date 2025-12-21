@@ -4,6 +4,9 @@ import numpy as np
 import tempfile
 import os
 import traceback
+import queue
+import threading
+import time
 from datetime import datetime
 from PIL import Image, ImageDraw
 from oracle_logic import OracleSession
@@ -25,6 +28,15 @@ COORDINATE_CLICKS = {}  # {uid: [{"x": x, "y": y, "coords_str": "...", "image_ar
 # --- Option Select Tracking (between actions) ---
 # 跟踪每个session从上次action_execute到现在的所有option_select
 OPTION_SELECTS = {}  # {uid: [{"option_idx": idx, "option_label": label, "timestamp": "..."}, ...]}
+
+# --- Frame Queue Storage for Streaming ---
+# 全局队列存储：{uid: {"frame_queue": queue.Queue, "last_base_count": int, "last_wrist_count": int, "streaming_active": bool}}
+FRAME_QUEUES = {}
+
+# --- Streaming Configuration ---
+STREAMING_READ_FPS = 10.0  # 读取fps（可配置）
+STREAMING_INTERVAL = 1.0 / STREAMING_READ_FPS  # Timer间隔
+STREAMING_MONITOR_INTERVAL = 0.1  # 监控线程检查间隔（秒）
 
 ENV_IDS = [
     "VideoPlaceOrder", "PickXtimes", "StopCube", "SwingXtimes", 
@@ -125,6 +137,9 @@ def login_and_load_task(username, uid):
     # Load the environment
     session = get_session(uid)
     print(f"Loading {env_id} Ep {ep_num} for {uid} (User: {username})")
+    
+    # 清理帧队列（新episode开始）
+    cleanup_frame_queue(uid)
     
     # 清空该session的coordinate_clicks和option_selects（新episode开始）
     if uid in COORDINATE_CLICKS:
@@ -363,6 +378,152 @@ def draw_marker(img, x, y):
     draw.line((x, y-r, x, y+r), fill="red", width=2)
     return img
 
+# --- Frame Streaming Functions ---
+
+def monitor_frames_and_enqueue(uid, pre_base_count, pre_wrist_count):
+    """
+    监控session的帧变化，将新帧加入队列
+    
+    Args:
+        uid: session ID
+        pre_base_count: 上次检查时的base_frames数量
+        pre_wrist_count: 上次检查时的wrist_frames数量
+    
+    Returns:
+        (current_base_count, current_wrist_count): 当前帧数
+    """
+    session = get_session(uid)
+    if not session or uid not in FRAME_QUEUES:
+        return pre_base_count, pre_wrist_count
+    
+    queue_info = FRAME_QUEUES[uid]
+    if not queue_info["streaming_active"]:
+        return pre_base_count, pre_wrist_count
+    
+    # 检查新帧
+    current_base_count = len(session.base_frames)
+    current_wrist_count = len(session.wrist_frames)
+    
+    # 获取新增的帧
+    if current_base_count > pre_base_count or current_wrist_count > pre_wrist_count:
+        new_base = session.base_frames[pre_base_count:current_base_count] if current_base_count > pre_base_count else []
+        new_wrist = session.wrist_frames[pre_wrist_count:current_wrist_count] if current_wrist_count > pre_wrist_count else []
+        
+        # 拼接并加入队列
+        if new_base or new_wrist:
+            concatenated = concatenate_frames_horizontally(new_base, new_wrist)
+            frames_added = 0
+            for frame in concatenated:
+                try:
+                    queue_info["frame_queue"].put(frame, block=False)
+                    frames_added += 1
+                except queue.Full:
+                    # 队列已满，跳过此帧（可选：可以限制队列大小）
+                    print(f"Warning: Frame queue full for {uid}, dropping frame")
+                    break
+    
+    return current_base_count, current_wrist_count
+
+def continuous_frame_monitor(uid, pre_base_count, pre_wrist_count):
+    """
+    持续监控帧变化并加入队列的线程函数
+    
+    Args:
+        uid: session ID
+        pre_base_count: 执行前的base_frames数量
+        pre_wrist_count: 执行前的wrist_frames数量
+    """
+    last_base_count = pre_base_count
+    last_wrist_count = pre_wrist_count
+    
+    while True:
+        if uid not in FRAME_QUEUES:
+            break
+        
+        queue_info = FRAME_QUEUES[uid]
+        if not queue_info["streaming_active"]:
+            break
+        
+        # 监控帧变化
+        last_base_count, last_wrist_count = monitor_frames_and_enqueue(
+            uid, last_base_count, last_wrist_count
+        )
+        
+        # 等待一段时间后再次检查
+        time.sleep(STREAMING_MONITOR_INTERVAL)
+
+def cleanup_frame_queue(uid):
+    """
+    清理指定session的队列
+    
+    Args:
+        uid: session ID
+    """
+    if uid in FRAME_QUEUES:
+        queue_info = FRAME_QUEUES[uid]
+        # 清空队列
+        while not queue_info["frame_queue"].empty():
+            try:
+                queue_info["frame_queue"].get_nowait()
+            except queue.Empty:
+                break
+        queue_info["streaming_active"] = False
+        # 清理累积帧列表（如果存在）
+        if "accumulated_frames" in queue_info:
+            queue_info["accumulated_frames"] = []
+
+def stream_frames_from_queue(uid):
+    """
+    从队列读取帧并返回视频更新
+    
+    Args:
+        uid: session ID
+    
+    Returns:
+        gr.update: 视频更新对象
+    """
+    if not uid or uid not in FRAME_QUEUES:
+        return gr.update()  # 无更新
+    
+    queue_info = FRAME_QUEUES[uid]
+    frame_queue = queue_info["frame_queue"]
+    
+    # 初始化累积帧列表（如果不存在）
+    if "accumulated_frames" not in queue_info:
+        queue_info["accumulated_frames"] = []
+    
+    # 收集队列中的所有新帧（非阻塞）
+    new_frames = []
+    queue_size_before = frame_queue.qsize()
+    
+    # 如果队列有帧，读取所有帧
+    if queue_size_before > 0:
+        while not frame_queue.empty():
+            try:
+                frame = frame_queue.get_nowait()
+                new_frames.append(frame)
+            except queue.Empty:
+                break
+    
+    # 将新帧添加到累积列表
+    if new_frames:
+        queue_info["accumulated_frames"].extend(new_frames)
+    
+    # 生成包含所有累积帧的视频
+    # 关键：只要有累积帧就更新，不管是否有新帧，不管streaming_active状态
+    # 这样可以确保在执行过程中实时显示
+    if queue_info["accumulated_frames"]:
+        try:
+            video_path = save_video(queue_info["accumulated_frames"], f"streaming_{uid}")
+            # 返回视频路径，Gradio会自动更新Video组件
+            return video_path
+        except Exception as e:
+            print(f"Error in stream_frames_from_queue: {e}")
+            traceback.print_exc()
+            return gr.update()
+    
+    return gr.update()  # 如果没有累积帧，返回无更新
+
 # --- Callback Functions ---
 
 def load_env(uid, env_id, ep_num):
@@ -371,6 +532,9 @@ def load_env(uid, env_id, ep_num):
     
     session = get_session(uid)
     print(f"Loading {env_id} Ep {ep_num} for {uid}")
+    
+    # 清理帧队列（新episode开始）
+    cleanup_frame_queue(uid)
     
     # 清空该session的coordinate_clicks和option_selects（新episode开始）
     if uid in COORDINATE_CLICKS:
@@ -662,6 +826,36 @@ def execute_step(uid, username, option_idx, coords_str):
     pre_base_frame_count = len(session.base_frames)
     pre_wrist_frame_count = len(session.wrist_frames)
     
+    # 初始化队列和启动监控线程（用于流式输出）
+    if uid not in FRAME_QUEUES:
+        FRAME_QUEUES[uid] = {
+            "frame_queue": queue.Queue(),
+            "last_base_count": pre_base_frame_count,
+            "last_wrist_count": pre_wrist_frame_count,
+            "streaming_active": True,
+            "accumulated_frames": []
+        }
+    else:
+        FRAME_QUEUES[uid]["streaming_active"] = True
+        FRAME_QUEUES[uid]["last_base_count"] = pre_base_frame_count
+        FRAME_QUEUES[uid]["last_wrist_count"] = pre_wrist_frame_count
+        # 清空之前的队列和累积帧（新action开始）
+        while not FRAME_QUEUES[uid]["frame_queue"].empty():
+            try:
+                FRAME_QUEUES[uid]["frame_queue"].get_nowait()
+            except queue.Empty:
+                break
+        # 清空累积帧列表，开始新的流式输出
+        FRAME_QUEUES[uid]["accumulated_frames"] = []
+    
+    # 启动监控线程（在执行过程中监控）
+    monitor_thread = threading.Thread(
+        target=continuous_frame_monitor,
+        args=(uid, pre_base_frame_count, pre_wrist_frame_count),
+        daemon=True
+    )
+    monitor_thread.start()
+    
     # 在执行前获取当前图片（用于记录最后执行的坐标对应的图片）
     pre_execute_image = None
     if click_coords:
@@ -679,6 +873,22 @@ def execute_step(uid, username, option_idx, coords_str):
     # Execute
     print(f"Executing step: Opt {option_idx}, Coords {click_coords}")
     img, status, done = session.execute_action(option_idx, click_coords)
+    
+    # 执行完成后，确保所有帧都已入队
+    monitor_frames_and_enqueue(uid, pre_base_frame_count, pre_wrist_frame_count)
+    
+    # 等待一小段时间，确保所有帧都被监控线程处理
+    time.sleep(0.2)
+    
+    # 最后检查一次，确保所有帧都已入队
+    monitor_frames_and_enqueue(uid, pre_base_frame_count, pre_wrist_frame_count)
+    
+    # 标记流式输出完成（但延迟一点，让Timer有机会读取最后的帧）
+    if uid in FRAME_QUEUES:
+        # 不立即停止，让Timer有机会读取最后的帧
+        # 使用延迟停止：设置一个标志，Timer在下次调用时如果队列为空且streaming_active为True，则停止
+        # 但为了简单，我们直接停止，因为最后一次monitor_frames_and_enqueue已经处理了所有帧
+        FRAME_QUEUES[uid]["streaming_active"] = False
     
     # 记录执行操作（包含从上次action到这次action之间的所有coordinate_click）
     if username and session.env_id is not None and session.episode_idx is not None:
@@ -735,20 +945,10 @@ def execute_step(uid, username, option_idx, coords_str):
             print(f"Error logging action execute: {e}")
             traceback.print_exc()
     
-    # 只取新增的帧来生成视频（从 execute action 之后新增的帧开始）
-    new_base_frames = session.base_frames[pre_base_frame_count:]
-    new_wrist_frames = session.wrist_frames[pre_wrist_frame_count:]
-    
-    # 将两个视频左右拼接成一个视频
-    concatenated_frames = concatenate_frames_horizontally(new_base_frames, new_wrist_frames)
-    
-    # 生成拼接后的视频
-    combined_video_path = None
-    try:
-        combined_video_path = save_video(concatenated_frames, "combined")
-    except Exception as e:
-        print(f"Error generating combined video: {e}")
-        traceback.print_exc()
+    # 注意：不再在这里生成完整视频，而是通过流式输出
+    # 保留combined_video_path为None，让streaming函数处理
+    # 但是不能返回None，否则会覆盖Timer的更新，应该返回gr.update()保持原值
+    combined_video_path = gr.update()  # 不更新，保持Timer的流式更新
     
     progress_update = gr.update()  # 不更新 progress，保持原值
     task_update = gr.update()
@@ -1153,16 +1353,19 @@ with gr.Blocks(title="Oracle Planner Interface", js=SYNC_JS, css=CSS) as demo:
         outputs=[img_display, log_output, combined_display, task_info_box, progress_info_box, next_task_btn, exec_btn]
     )
     
-    # 5. Timer for Streaming (Keep-Alive / Real-time view)
-    timer = gr.Timer(value=2.0)
+    # 5. Timer for Streaming Reference Views
+    timer = gr.Timer(value=STREAMING_INTERVAL)
     
-    def _get_streaming_views(uid):
-        # This function can be used to pull latest frames if the backend is running asynchronously
-        # For this synchronous Oracle setup, we just return nothing or keep alive.
-        # If we return values, we might overwrite the user's annotation on the image.
-        pass 
-        
-    timer.tick(_get_streaming_views, inputs=[uid_state], outputs=[])
+    def timer_wrapper(uid):
+        """Timer包装函数"""
+        return stream_frames_from_queue(uid)
+    
+    timer.tick(
+        timer_wrapper,
+        inputs=[uid_state],
+        outputs=[combined_display],
+        queue=False  # 关键：设置queue=False，确保Timer不会被execute_step阻塞
+    )
 
     # 6. Auto Login on Load
     demo.load(
