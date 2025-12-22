@@ -15,9 +15,112 @@ from gradio_callbacks import (
     confirm_demo_watched
 )
 
-# --- JS for Video (no sync needed for single video) ---
 SYNC_JS = """
 (function() {
+    // 全局变量：记录用户是否已经与页面交互过
+    let userInteracted = false;
+    
+    // 监听用户的第一次交互，立即播放视频一次（之后不再自动恢复）
+    function initUserInteractionListener() {
+        if (window.userInteractionListenerInitialized) return;
+        window.userInteractionListenerInitialized = true;
+        
+        const playVideoOnce = () => {
+            if (!userInteracted) {
+                userInteracted = true;
+                // 立即尝试播放所有视频（仅一次）
+                const videoWrapper = document.getElementById('demo_video');
+                if (videoWrapper) {
+                    const vids = videoWrapper.querySelectorAll('video');
+                    vids.forEach(v => {
+                        if (v.readyState >= 2 && v.paused) {
+                            v.muted = true;
+                            v.setAttribute('muted', 'true');
+                            const playPromise = v.play();
+                            if (playPromise && playPromise.catch) {
+                                playPromise.catch(() => {});
+                            }
+                        }
+                    });
+                }
+            }
+        };
+        
+        // 监听多种用户交互事件（只触发一次）
+        ['click', 'touchstart', 'keydown', 'mousedown'].forEach(eventType => {
+            document.addEventListener(eventType, playVideoOnce, { once: true, passive: true });
+        });
+    }
+    
+    function setupVideoAutoplay(v) {
+        // 确保muted属性始终为true
+        v.muted = true;
+        v.setAttribute('muted', 'true');
+        v.autoplay = false; // 不自动播放，等待用户交互
+        v.setAttribute('autoplay', 'false');
+        v.loop = true;
+        v.setAttribute('loop', 'true');
+        v.controls = false; // 禁用用户控制
+        v.setAttribute('controls', 'false');
+        v.playsInline = true;
+        v.setAttribute('playsinline', 'true');
+        v.style.pointerEvents = 'none'; // 禁用所有鼠标交互
+        
+        // 阻止用户通过键盘控制视频（空格键暂停/播放等）
+        v.addEventListener('keydown', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+        }, true);
+        
+        // 阻止右键菜单
+        v.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+        }, true);
+        
+        // 初始化用户交互监听器（只在第一次交互时播放一次）
+        initUserInteractionListener();
+        
+        // 使用MutationObserver监听muted属性的变化，确保它始终保持为true
+        if (!v.dataset.mutedObserverAttached) {
+            const mutedObserver = new MutationObserver((mutations) => {
+                mutations.forEach((mutation) => {
+                    if (mutation.type === 'attributes' && mutation.attributeName === 'muted') {
+                        if (!v.muted) {
+                            v.muted = true;
+                            v.setAttribute('muted', 'true');
+                        }
+                    }
+                });
+            });
+            mutedObserver.observe(v, {
+                attributes: true,
+                attributeFilter: ['muted']
+            });
+            v.dataset.mutedObserverAttached = 'true';
+        }
+    }
+    
+    function ensureDemoVideoAutoplay() {
+        const videoWrapper = document.getElementById('demo_video');
+        if (!videoWrapper) return;
+        
+        const vids = videoWrapper.querySelectorAll('video');
+        if (vids.length === 0) return;
+        
+        vids.forEach((v) => {
+            if (!v.dataset.autoplaySetup) {
+                setupVideoAutoplay(v);
+                v.dataset.autoplaySetup = 'true';
+            } else {
+                if (!v.muted) {
+                    v.muted = true;
+                    v.setAttribute('muted', 'true');
+                }
+            }
+        });
+    }
+
     function findCoordsBox() {
         // 尝试多种选择器查找包含"please click the image"的textarea
         const selectors = [
@@ -92,6 +195,24 @@ SYNC_JS = """
         
         // 立即执行一次, 处理已经加载的按钮
         setTimeout(attachToExecuteButtons, 2000);
+        // 也尝试强制示范视频自动播放
+        setTimeout(ensureDemoVideoAutoplay, 1500);
+        setInterval(ensureDemoVideoAutoplay, 4000);
+        
+        // 监听视频元素添加到DOM的事件
+        const videoObserver = new MutationObserver(function(mutations) {
+            const videoWrapper = document.getElementById('demo_video');
+            if (videoWrapper) {
+                const vids = videoWrapper.querySelectorAll('video');
+                if (vids.length > 0) {
+                    ensureDemoVideoAutoplay();
+                }
+            }
+        });
+        videoObserver.observe(document.body, {
+            childList: true,
+            subtree: true
+        });
     }
     
     // 监听 Gradio 错误, 捕获 LeaseLost 错误
@@ -393,7 +514,7 @@ def create_ui_blocks():
     """
     # 注意：在 Gradio 6.0+ 中，css 和 js 参数应该传递给 launch() 或 mount_gradio_app()，而不是 Blocks 构造函数
     with gr.Blocks(title="Oracle Planner Interface") as demo:
-        gr.Markdown("## HistoryBench Oracle Planner Interface (v2)")
+        gr.Markdown("## HistoryBench Human Evaluation 🚀🚀🚀")
         
         # State
         uid_state = gr.State(value=None)
@@ -425,40 +546,43 @@ def create_ui_blocks():
                 # Left: Text Info (30%)
                 with gr.Column(scale=3):
                     with gr.Group():
-                         gr.Markdown("### 1. Task Info")
+                         gr.Markdown("### 1. Progress Tracker 📊🥳")
                          with gr.Row():
                              task_info_box = gr.Textbox(label="Current Task", interactive=False, show_label=False, scale=2)
                              progress_info_box = gr.Textbox(label="Progress", interactive=False, show_label=False, scale=1)
                     
                     with gr.Group():
-                         gr.Markdown("### 2. Task Goal")
+                         gr.Markdown("### 2. Task Goal 🏅")
                          goal_box = gr.Textbox(label="Instruction", lines=3, interactive=False, show_label=False)
                     
                     with gr.Group():
-                         gr.Markdown("### 3. System Log")
+                         gr.Markdown("### 3. System Log 📝")
                          log_output = gr.Textbox(label="Log", lines=6, interactive=False, elem_classes="compact-log", show_label=False)
 
                 # Right: Reference Views (70%)
                 with gr.Column(scale=7):
-                     gr.Markdown("### Reference Views")
-                     
                      # Demo Video Group (第一阶段显示)
                      with gr.Group(visible=True) as demo_video_group:
+                         gr.Markdown("### Watch video and remember robot actions 👀✍️")
+                         
                          video_elem_id = "demo_video" if RESTRICT_VIDEO_PLAYBACK else None
-                         video_autoplay = True if RESTRICT_VIDEO_PLAYBACK else False
+                         video_autoplay = True  # 保持自动播放
                          
                          video_display = gr.Video(
-                            label="Demonstration (示范)", 
-                            interactive=False, 
+                            label="Demonstration Video", 
+                            interactive=False,  # 禁用用户控制
                             height=300, 
                             elem_id=video_elem_id, 
-                            autoplay=video_autoplay
+                            autoplay=video_autoplay,
+                            show_label=False,
+                            visible=True
                          )
                          
                          confirm_demo_btn = gr.Button("Confirm - Start Task", variant="primary", size="lg", visible=True, interactive=True)
                      
                      # Combined View Group (第一阶段隐藏)
                      with gr.Group(visible=False) as combined_view_group:
+                         gr.Markdown("### Execution LiveStream 🦾")
                          # Desk + Robot View (Combined) - 使用 HTML 组件显示 MJPEG 流
                          combined_display = gr.HTML(
                             value="<div id='combined_view_html'><p>等待视频流...</p></div>",
@@ -471,7 +595,7 @@ def create_ui_blocks():
                 with gr.Row():
                     # Left: Live Observation (Main)
                     with gr.Column(scale=LIVE_OBSERVATION_SCALE):
-                         gr.Markdown("### Live Observation (交互主视图)")
+                         gr.Markdown("### Keypoint Selection 🎯")
                          img_display = gr.Image(
                             label="Live Observation", 
                             interactive=False, 
@@ -482,23 +606,23 @@ def create_ui_blocks():
 
                     # Middle: Action Selection
                     with gr.Column(scale=ACTION_SCALE):
-                         gr.Markdown("### Action")
+                         gr.Markdown("### Action Selection 🧠")
                          options_radio = gr.Radio(choices=[], label="Action", type="value", show_label=False, elem_id="action_radio")
 
                     # Right: Control Panel
                     with gr.Column(scale=CONTROL_SCALE):
-                         gr.Markdown("### Control")
+                         gr.Markdown("### Control Panel 🎛️")
                          
                          # Coords Group (conditionally visible)
                          with gr.Group(visible=False, elem_id="coords_group") as coords_group:
-                             gr.Markdown("**Coords**")
+                             gr.Markdown("**Coords** 📍")
                              coords_box = gr.Textbox(label="Coords", value="", interactive=False, show_label=False, elem_id="coords_box")
                          
-                         gr.Markdown("**Execute**")
-                         exec_btn = gr.Button("EXECUTE", variant="stop", size="lg", elem_id="exec_btn")
+                         gr.Markdown("---")
+                         exec_btn = gr.Button("EXECUTE 🤖", variant="stop", size="lg", elem_id="exec_btn")
                          
                          gr.Markdown("---")
-                         next_task_btn = gr.Button("Next Task", variant="secondary", interactive=False)
+                         next_task_btn = gr.Button("Next Task 🔄", variant="secondary", interactive=False)
 
         # --- Event Wiring ---
 
@@ -599,7 +723,7 @@ def create_ui_blocks():
             outputs=[img_display, log_output, task_info_box, progress_info_box, next_task_btn, exec_btn, coords_group]
         )
         
-        # 5. Auto Login on Load (Timer 已移除，使用 MJPEG 流式传输)
+        # 5. Auto Login on Load
         demo.load(
             fn=init_app,
             inputs=[],

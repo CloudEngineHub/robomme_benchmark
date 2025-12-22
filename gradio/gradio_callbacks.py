@@ -7,6 +7,7 @@ import numpy as np
 import time
 import traceback
 import queue
+import os
 from datetime import datetime
 from state_manager import (
     get_session,
@@ -19,7 +20,6 @@ from state_manager import (
     get_option_selects,
     clear_option_selects,
     add_option_select,
-    get_ui_phase,
     set_ui_phase,
     reset_ui_phase,
 )
@@ -154,6 +154,7 @@ def login_and_load_task(username, uid):
             has_demo_video = True
         except: pass
 
+
     # 从TASK_INDEX_MAP直接读取Progress
     task_info = get_task_index(uid)
     task_idx = task_info["task_index"]
@@ -196,6 +197,7 @@ def login_and_load_task(username, uid):
     else:
         # 没有示范视频：直接进入执行阶段
         set_ui_phase(uid, "executing_task")
+
         
         # 初始化Reference Views队列（如果没有demo video，需要立即显示Reference Views）
         if session.base_frames or session.wrist_frames:
@@ -205,11 +207,6 @@ def login_and_load_task(username, uid):
             # 传入当前frames数量，这样监控线程就知道这些frames已存在，不会将它们作为"新"frames加入队列
             current_base_count = len(session.base_frames) if session.base_frames else 0
             current_wrist_count = len(session.wrist_frames) if session.wrist_frames else 0
-            
-            # #region agent log
-            with open('/data/hongzefu/.cursor/debug.log', 'a') as f:
-                f.write(f'{{"id":"log_login_no_demo_init","timestamp":{int(time.time()*1000)},"location":"gradio_callbacks.py:207","message":"login_and_load_task (no demo): initializing queue","data":{{"uid":"{uid}","base_count":{current_base_count},"wrist_count":{current_wrist_count}}},"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}}\n')
-            # #endregion
             
             if uid not in FRAME_QUEUES:
                 FrameQueueManager.init_queue(uid, current_base_count, current_wrist_count)
@@ -239,10 +236,6 @@ def login_and_load_task(username, uid):
                             frames_added += 1
                         except queue.Full:
                             break
-                    # #region agent log
-                    with open('/data/hongzefu/.cursor/debug.log', 'a') as f:
-                        f.write(f'{{"id":"log_login_no_demo_add_last","timestamp":{int(time.time()*1000)},"location":"gradio_callbacks.py:224","message":"login_and_load_task (no demo): added last frame to queue","data":{{"uid":"{uid}","frames_added":{frames_added},"queue_size":{queue_info["frame_queue"].qsize()}}},"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}}\n')
-                    # #endregion
         
         return (
             uid,
@@ -293,11 +286,6 @@ def confirm_demo_watched(uid, username):
         current_base_count = len(session.base_frames) if session.base_frames else 0
         current_wrist_count = len(session.wrist_frames) if session.wrist_frames else 0
         
-        # #region agent log
-        with open('/data/hongzefu/.cursor/debug.log', 'a') as f:
-            f.write(f'{{"id":"log_confirm_demo_init","timestamp":{int(time.time()*1000)},"location":"gradio_callbacks.py:275","message":"confirm_demo_watched: initializing queue","data":{{"uid":"{uid}","base_count":{current_base_count},"wrist_count":{current_wrist_count}}},"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}}\n')
-        # #endregion
-        
         if uid not in FRAME_QUEUES:
             FrameQueueManager.init_queue(uid, current_base_count, current_wrist_count)
         
@@ -326,10 +314,6 @@ def confirm_demo_watched(uid, username):
                         frames_added += 1
                     except queue.Full:
                         break
-                # #region agent log
-                with open('/data/hongzefu/.cursor/debug.log', 'a') as f:
-                    f.write(f'{{"id":"log_confirm_demo_add_last","timestamp":{int(time.time()*1000)},"location":"gradio_callbacks.py:292","message":"confirm_demo_watched: added last frame to queue","data":{{"uid":"{uid}","frames_added":{frames_added},"queue_size":{queue_info["frame_queue"].qsize()}}},"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}}\n')
-                # #endregion
     
     # 返回UI更新：隐藏示范视频，显示Combined View和操作区域
     # 同时更新 exec_btn 为可交互状态
@@ -490,11 +474,22 @@ def on_option_select(uid, username, option_value):
 
 def init_app(request: gr.Request):
     """
-    Handle initial page load. 
-    If 'user' query parameter is present, automatically login as that user.
+    处理初始页面加载。
+    如果URL中包含 'user' 或 'username' 查询参数，自动使用该用户名登录。
+    
+    支持的URL格式：
+    - http://host:port/?user=username
+    - http://host:port/?username=username
+    
+    Args:
+        request: Gradio Request 对象，包含查询参数
+    
+    Returns:
+        根据是否自动登录返回不同的UI状态
     """
-    params = request.query_params
-    username = params.get('user')
+    params = request.query_params if request else {}
+    # 支持 'user' 和 'username' 两种参数名称
+    username = params.get('user') or params.get('username')
     
     # Default outputs if no auto-login
     # uid, loading_group, login_group, main_interface, login_msg, img, log, options, goal, coords, combined, video, task, progress, login_btn, next_btn, exec_btn, username_state, demo_video_group, combined_view_group, operation_zone_group, confirm_demo_btn, coords_group
@@ -521,29 +516,58 @@ def init_app(request: gr.Request):
     )
     
     if username:
-        # Check if user exists
+        # 检查用户是否存在
         if username in user_manager.user_tasks:
-            # Auto login
-            # We need to pass a uid. Let's create one or pass None and let logic handle it.
-            # login_and_load_task handles uid=None by creating a new one.
+            # 自动登录
+            print(f"自动登录: 从URL参数检测到用户名 '{username}'，正在自动登录...")
+            # login_and_load_task 会在 uid=None 时自动创建新的 session
             results = login_and_load_task(username, None)
             
             # results[0] is uid
             # results[1] is login_group update
             # results[2] is main_interface update
+            # ...
+            # results[15] is exec_btn update
+            # results[16] is demo_video_group update
+            # ...
+            # results[20] is coords_group update
             
-            # New structure:
-            # (uid, loading_group=False, login_group=False, main_interface=True, ...rest...)
-            
-            # Since login_and_load_task returns login_group update as results[1], we can use it but maybe force it to False just in case
-            # Actually results[1] should be visible=False from login_and_load_task on success
-            
+            # 构建返回结果，确保 loading_group 隐藏，并在正确位置插入 username_state
+            # outputs 顺序: uid, loading_group, login_group, ..., exec_btn, username_state, demo_video_group, ..., coords_group
             new_results = (
-                results[0],                 # uid
-                gr.update(visible=False),   # loading_group
-            ) + results[1:] + (username,)
+                results[0],                 # uid (outputs[0])
+                gr.update(visible=False),   # loading_group (outputs[1])
+            ) + results[1:16] + (           # login_group 到 exec_btn (outputs[2:17])
+                username,                   # username_state (outputs[17])
+            ) + results[16:]                # demo_video_group 到 coords_group (outputs[18:23])
             
+            print(f"自动登录成功: 用户 '{username}' (uid: {results[0]})")
             return new_results
+        else:
+            # 用户名不存在，显示错误消息但仍显示登录界面
+            print(f"自动登录失败: 用户名 '{username}' 不存在于用户列表中")
+            error_msg = f"⚠️ 用户名 '{username}' 不存在。请从下拉列表中选择有效的用户名。"
+            return (
+                None,
+                gr.update(visible=False),  # loading_group
+                gr.update(visible=True),   # login_group (显示登录界面)
+                gr.update(visible=False),  # main_interface
+                error_msg,                 # login_msg (显示错误消息)
+                gr.update(value=None, interactive=False), None,
+                gr.update(choices=[], value=None),
+                "", "No need for coordinates",
+                gr.update(value="<div id='combined_view_html'><p>等待登录...</p></div>"), None,
+                "", "",
+                gr.update(interactive=True),
+                gr.update(interactive=False),
+                gr.update(interactive=False),
+                "",  # username_state
+                gr.update(visible=False), # demo_video_group
+                gr.update(visible=False), # combined_view_group
+                gr.update(visible=False), # operation_zone_group
+                gr.update(visible=False), # confirm_demo_btn
+                gr.update(visible=False)  # coords_group
+            )
     
     return default_outputs
 
@@ -577,11 +601,6 @@ def execute_step(uid, username, option_idx, coords_str):
             current_base_count = len(session.base_frames) if session.base_frames else 0
             current_wrist_count = len(session.wrist_frames) if session.wrist_frames else 0
             
-            # #region agent log
-            with open('/data/hongzefu/.cursor/debug.log', 'a') as f:
-                f.write(f'{{"id":"log_execute_no_frames_init","timestamp":{int(time.time()*1000)},"location":"gradio_callbacks.py:539","message":"execute_step (no frames): initializing queue","data":{{"uid":"{uid}","base_count":{current_base_count},"wrist_count":{current_wrist_count}}},"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}}\n')
-            # #endregion
-            
             if uid not in FRAME_QUEUES:
                 FrameQueueManager.init_queue(uid, current_base_count, current_wrist_count)
             
@@ -610,20 +629,11 @@ def execute_step(uid, username, option_idx, coords_str):
                             frames_added += 1
                         except queue.Full:
                             break
-                    # #region agent log
-                    with open('/data/hongzefu/.cursor/debug.log', 'a') as f:
-                        f.write(f'{{"id":"log_execute_no_frames_add_last","timestamp":{int(time.time()*1000)},"location":"gradio_callbacks.py:581","message":"execute_step (no frames): added last frame to queue","data":{{"uid":"{uid}","frames_added":{frames_added},"queue_size":{queue_info["frame_queue"].qsize()}}},"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}}\n')
-                    # #endregion
     elif frames_exist and not queue_exists:
         # frames存在但队列不存在，初始化队列并加入最后一帧
         # 初始化队列（传入当前frames数量，这样监控线程就知道这些frames已存在）
         current_base_count = len(session.base_frames) if session.base_frames else 0
         current_wrist_count = len(session.wrist_frames) if session.wrist_frames else 0
-        
-        # #region agent log
-        with open('/data/hongzefu/.cursor/debug.log', 'a') as f:
-            f.write(f'{{"id":"log_execute_queue_missing_init","timestamp":{int(time.time()*1000)},"location":"gradio_callbacks.py:562","message":"execute_step (queue missing): initializing queue","data":{{"uid":"{uid}","base_count":{current_base_count},"wrist_count":{current_wrist_count}}},"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}}\n')
-        # #endregion
         
         FrameQueueManager.init_queue(uid, current_base_count, current_wrist_count)
         
@@ -652,10 +662,6 @@ def execute_step(uid, username, option_idx, coords_str):
                         frames_added += 1
                     except queue.Full:
                         break
-                # #region agent log
-                with open('/data/hongzefu/.cursor/debug.log', 'a') as f:
-                    f.write(f'{{"id":"log_execute_queue_missing_add_last","timestamp":{int(time.time()*1000)},"location":"gradio_callbacks.py:590","message":"execute_step (queue missing): added last frame to queue","data":{{"uid":"{uid}","frames_added":{frames_added},"queue_size":{queue_info["frame_queue"].qsize()}}},"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}}\n')
-                # #endregion
     
     if option_idx is None:
         return session.get_pil_image(use_segmented=USE_SEGMENTED_VIEW), "Error: No action selected", gr.update(), gr.update(), gr.update(interactive=False), gr.update(interactive=True), gr.update(visible=False)

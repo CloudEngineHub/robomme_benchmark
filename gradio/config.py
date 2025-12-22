@@ -2,7 +2,8 @@
 配置常量模块
 """
 # --- Configuration ---
-RESTRICT_VIDEO_PLAYBACK = True  # Set to False to enable controls
+RESTRICT_VIDEO_PLAYBACK = True  # Restrict controls; we will force autoplay via JS
+VIDEO_PLAYBACK_FPS = 60.0  # Frame rate for demonstration video playback
 USE_SEGMENTED_VIEW = False  # Set to True to use segmented view, False to use original image
 REFERENCE_VIEW_HEIGHT = "40vh"  # Height of the reference view image
 

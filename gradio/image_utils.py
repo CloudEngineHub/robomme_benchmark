@@ -8,6 +8,7 @@ import os
 import traceback
 from PIL import Image, ImageDraw
 import cv2
+from config import VIDEO_PLAYBACK_FPS
 
 
 def save_video(frames, suffix=""):
@@ -46,8 +47,8 @@ def save_video(frames, suffix=""):
         os.close(fd)
         
         # imageio.mimwrite会自动处理编码
-        imageio.mimwrite(path, processed_frames, fps=10.0, quality=8, macro_block_size=None)
-        
+        imageio.mimwrite(path, processed_frames, fps=VIDEO_PLAYBACK_FPS, quality=8, macro_block_size=None)
+
         return path
     except ImportError:
         print("Error: imageio module not found. Please install it: pip install imageio imageio-ffmpeg")

@@ -124,6 +124,7 @@ from fastapi import FastAPI
 from streaming_service import create_video_feed_route
 from ui_layout import create_ui_blocks, CSS, SYNC_JS
 from state_manager import create_session
+from user_manager import user_manager
 
 
 def find_free_port(start_port=7860):
@@ -167,6 +168,21 @@ if __name__ == "__main__":
     print("="*60)
     print(f"FastAPI + Gradio server running on http://0.0.0.0:{port}")
     print(f"MJPEG stream endpoint: http://0.0.0.0:{port}/video_feed/{{uid}}")
+    print("="*60)
+    
+    # 打印每个用户的登录链接
+    available_users = list(user_manager.user_tasks.keys())
+    if available_users:
+        print("\n用户登录链接:")
+        print("-" * 60)
+        for username in sorted(available_users):
+            login_link = f"http://0.0.0.0:{port}/?user={username}"
+            print(f"  {username:20s} -> {login_link}")
+        print("-" * 60)
+        print(f"共 {len(available_users)} 个用户")
+    else:
+        print("\n⚠️  警告: 未找到任何用户配置")
+    
     print("="*60 + "\n")
     
     # 使用 uvicorn 运行 FastAPI 应用

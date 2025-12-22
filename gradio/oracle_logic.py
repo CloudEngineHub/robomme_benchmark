@@ -145,7 +145,7 @@ class OracleSession:
     def __init__(self, dataset_root=DEFAULT_DATASET_ROOT, gui_render=False):
         """
         gui_render: If True, uses 'human' render mode (pops up window). 
-                    For Gradio, we usually want False (rgb_array) unless debugging locally.
+                    For Gradio, we usually want False (rgb_array).
         """
         self.dataset_root = Path(dataset_root)
         self.gui_render = gui_render # Usually False for web app
