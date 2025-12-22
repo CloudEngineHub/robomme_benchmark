@@ -101,14 +101,28 @@ def monitor_frames_and_enqueue(uid, pre_base_count, pre_wrist_count):
     current_base_count = len(session.base_frames)
     current_wrist_count = len(session.wrist_frames)
     
+    # #region agent log
+    with open('/data/hongzefu/.cursor/debug.log', 'a') as f:
+        f.write(f'{{"id":"log_monitor_check","timestamp":{int(time.time()*1000)},"location":"streaming_service.py:105","message":"monitor_frames_and_enqueue: checking frames","data":{{"uid":"{uid}","pre_base":{pre_base_count},"pre_wrist":{pre_wrist_count},"current_base":{current_base_count},"current_wrist":{current_wrist_count}}},"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}}\n')
+    # #endregion
+    
     # 获取新增的帧
     if current_base_count > pre_base_count or current_wrist_count > pre_wrist_count:
         new_base = session.base_frames[pre_base_count:current_base_count] if current_base_count > pre_base_count else []
         new_wrist = session.wrist_frames[pre_wrist_count:current_wrist_count] if current_wrist_count > pre_wrist_count else []
         
+        # #region agent log
+        with open('/data/hongzefu/.cursor/debug.log', 'a') as f:
+            f.write(f'{{"id":"log_monitor_new_frames","timestamp":{int(time.time()*1000)},"location":"streaming_service.py:110","message":"monitor_frames_and_enqueue: found new frames","data":{{"uid":"{uid}","new_base_count":{len(new_base)},"new_wrist_count":{len(new_wrist)}}},"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}}\n')
+        # #endregion
+        
         # 拼接并加入队列
         if new_base or new_wrist:
             concatenated = concatenate_frames_horizontally(new_base, new_wrist)
+            # #region agent log
+            with open('/data/hongzefu/.cursor/debug.log', 'a') as f:
+                f.write(f'{{"id":"log_monitor_enqueue","timestamp":{int(time.time()*1000)},"location":"streaming_service.py:114","message":"monitor_frames_and_enqueue: enqueueing frames","data":{{"uid":"{uid}","concatenated_count":{len(concatenated)}}},"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}}\n')
+            # #endregion
             for frame in concatenated:
                 try:
                     queue_info["frame_queue"].put(frame, block=False)

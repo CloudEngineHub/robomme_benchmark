@@ -69,7 +69,7 @@ def login_and_load_task(username, uid):
         task_idx = task_info["task_index"]
         total = task_info["total_tasks"]
         # 生成 HTML 内容，包含 MJPEG 流
-        combined_html = f'<div id="combined_view_html"><img src="/video_feed/{uid}" style="max-width: 100%; height: {REFERENCE_VIEW_HEIGHT}; width: auto; margin: 0 auto; display: block; border: 2px solid #3b82f6; border-radius: 8px; object-fit: contain;" alt="Desk View | Robot View" /></div>'
+        combined_html = f'<div id="combined_view_html"><img src="/video_feed/{uid}" style="max-width: 100%; height: {REFERENCE_VIEW_HEIGHT}; width: auto; margin: 0 auto; display: block; border-radius: 8px; object-fit: contain;" alt="Desk View | Robot View" /></div>'
         # 已完成所有任务，直接显示操作区域
         set_ui_phase(uid, "executing_task")
         return (
@@ -115,7 +115,7 @@ def login_and_load_task(username, uid):
          task_idx = task_info["task_index"]
          total = task_info["total_tasks"]
          # 生成 HTML 内容，包含 MJPEG 流
-         combined_html = f'<div id="combined_view_html"><img src="/video_feed/{uid}" style="max-width: 100%; height: {REFERENCE_VIEW_HEIGHT}; width: auto; margin: 0 auto; display: block; border: 2px solid #3b82f6; border-radius: 8px; object-fit: contain;" alt="Desk View | Robot View" /></div>'
+         combined_html = f'<div id="combined_view_html"><img src="/video_feed/{uid}" style="max-width: 100%; height: {REFERENCE_VIEW_HEIGHT}; width: auto; margin: 0 auto; display: block; border-radius: 8px; object-fit: contain;" alt="Desk View | Robot View" /></div>'
          # 加载失败，直接进入执行阶段
          set_ui_phase(uid, "executing_task")
          return (
@@ -163,7 +163,7 @@ def login_and_load_task(username, uid):
     img = session.get_pil_image(use_segmented=USE_SEGMENTED_VIEW)
     
     # 生成 HTML 内容，包含 MJPEG 流
-    combined_html = f'<div id="combined_view_html"><img src="/video_feed/{uid}" style="max-width: 100%; height: {REFERENCE_VIEW_HEIGHT}; width: auto; margin: 0 auto; display: block; border: 2px solid #3b82f6; border-radius: 8px; object-fit: contain;" alt="Desk View | Robot View" /></div>'
+    combined_html = f'<div id="combined_view_html"><img src="/video_feed/{uid}" style="max-width: 100%; height: {REFERENCE_VIEW_HEIGHT}; width: auto; margin: 0 auto; display: block; border-radius: 8px; object-fit: contain;" alt="Desk View | Robot View" /></div>'
     
     # 根据是否有示范视频决定UI阶段
     if has_demo_video:
@@ -202,24 +202,47 @@ def login_and_load_task(username, uid):
             from state_manager import FRAME_QUEUES
             
             # 初始化队列（如果还没有）
-            # 注意：使用0作为pre_base_count/pre_wrist_count，表示这是初始frames，不应该被清空
+            # 传入当前frames数量，这样监控线程就知道这些frames已存在，不会将它们作为"新"frames加入队列
+            current_base_count = len(session.base_frames) if session.base_frames else 0
+            current_wrist_count = len(session.wrist_frames) if session.wrist_frames else 0
+            
+            # #region agent log
+            with open('/data/hongzefu/.cursor/debug.log', 'a') as f:
+                f.write(f'{{"id":"log_login_no_demo_init","timestamp":{int(time.time()*1000)},"location":"gradio_callbacks.py:207","message":"login_and_load_task (no demo): initializing queue","data":{{"uid":"{uid}","base_count":{current_base_count},"wrist_count":{current_wrist_count}}},"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}}\n')
+            # #endregion
+            
             if uid not in FRAME_QUEUES:
-                FrameQueueManager.init_queue(uid, 0, 0)
+                FrameQueueManager.init_queue(uid, current_base_count, current_wrist_count)
             
-            # 拼接初始frames
-            initial_frames = concatenate_frames_horizontally(
-                session.base_frames, 
-                session.wrist_frames
-            )
+            # 只获取最后一帧并拼接
+            last_base_frame = session.base_frames[-1] if session.base_frames else None
+            last_wrist_frame = session.wrist_frames[-1] if session.wrist_frames else None
             
-            # 将初始frames加入队列
-            queue_info = FRAME_QUEUES.get(uid)
-            if queue_info:
-                for frame in initial_frames:
-                    try:
-                        queue_info["frame_queue"].put(frame, block=False)
-                    except queue.Full:
-                        break
+            if last_base_frame is not None or last_wrist_frame is not None:
+                # 使用concatenate_frames_horizontally处理单帧（传入只包含最后一帧的列表）
+                last_frames = concatenate_frames_horizontally(
+                    [last_base_frame] if last_base_frame is not None else [],
+                    [last_wrist_frame] if last_wrist_frame is not None else []
+                )
+                
+                # 只加入最后一帧（重复多次以确保持续显示）
+                queue_info = FRAME_QUEUES.get(uid)
+                if queue_info and last_frames:
+                    last_frame = last_frames[0]
+                    # 重复加入最后一帧10次，确保即使被快速消费也能持续显示
+                    frames_added = 0
+                    for _ in range(10):
+                        try:
+                            # 复制帧以避免引用问题
+                            frame_copy = np.copy(last_frame) if isinstance(last_frame, np.ndarray) else last_frame
+                            queue_info["frame_queue"].put(frame_copy, block=False)
+                            frames_added += 1
+                        except queue.Full:
+                            break
+                    # #region agent log
+                    with open('/data/hongzefu/.cursor/debug.log', 'a') as f:
+                        f.write(f'{{"id":"log_login_no_demo_add_last","timestamp":{int(time.time()*1000)},"location":"gradio_callbacks.py:224","message":"login_and_load_task (no demo): added last frame to queue","data":{{"uid":"{uid}","frames_added":{frames_added},"queue_size":{queue_info["frame_queue"].qsize()}}},"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}}\n')
+                    # #endregion
         
         return (
             uid,
@@ -266,24 +289,47 @@ def confirm_demo_watched(uid, username):
         from state_manager import FRAME_QUEUES
         
         # 初始化队列（如果还没有）
-        # 使用0作为pre_base_count/pre_wrist_count，表示这是初始frames
+        # 传入当前frames数量，这样监控线程就知道这些frames已存在，不会将它们作为"新"frames加入队列
+        current_base_count = len(session.base_frames) if session.base_frames else 0
+        current_wrist_count = len(session.wrist_frames) if session.wrist_frames else 0
+        
+        # #region agent log
+        with open('/data/hongzefu/.cursor/debug.log', 'a') as f:
+            f.write(f'{{"id":"log_confirm_demo_init","timestamp":{int(time.time()*1000)},"location":"gradio_callbacks.py:275","message":"confirm_demo_watched: initializing queue","data":{{"uid":"{uid}","base_count":{current_base_count},"wrist_count":{current_wrist_count}}},"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}}\n')
+        # #endregion
+        
         if uid not in FRAME_QUEUES:
-            FrameQueueManager.init_queue(uid, 0, 0)
+            FrameQueueManager.init_queue(uid, current_base_count, current_wrist_count)
         
-        # 拼接初始frames
-        initial_frames = concatenate_frames_horizontally(
-            session.base_frames, 
-            session.wrist_frames
-        )
+        # 只获取最后一帧并拼接
+        last_base_frame = session.base_frames[-1] if session.base_frames else None
+        last_wrist_frame = session.wrist_frames[-1] if session.wrist_frames else None
         
-        # 将初始frames加入队列
-        queue_info = FRAME_QUEUES.get(uid)
-        if queue_info:
-            for frame in initial_frames:
-                try:
-                    queue_info["frame_queue"].put(frame, block=False)
-                except queue.Full:
-                    break
+        if last_base_frame is not None or last_wrist_frame is not None:
+            # 使用concatenate_frames_horizontally处理单帧（传入只包含最后一帧的列表）
+            last_frames = concatenate_frames_horizontally(
+                [last_base_frame] if last_base_frame is not None else [],
+                [last_wrist_frame] if last_wrist_frame is not None else []
+            )
+            
+            # 只加入最后一帧（重复多次以确保持续显示）
+            queue_info = FRAME_QUEUES.get(uid)
+            if queue_info and last_frames:
+                last_frame = last_frames[0]
+                # 重复加入最后一帧10次，确保即使被快速消费也能持续显示
+                frames_added = 0
+                for _ in range(10):
+                    try:
+                        # 复制帧以避免引用问题
+                        frame_copy = np.copy(last_frame) if isinstance(last_frame, np.ndarray) else last_frame
+                        queue_info["frame_queue"].put(frame_copy, block=False)
+                        frames_added += 1
+                    except queue.Full:
+                        break
+                # #region agent log
+                with open('/data/hongzefu/.cursor/debug.log', 'a') as f:
+                    f.write(f'{{"id":"log_confirm_demo_add_last","timestamp":{int(time.time()*1000)},"location":"gradio_callbacks.py:292","message":"confirm_demo_watched: added last frame to queue","data":{{"uid":"{uid}","frames_added":{frames_added},"queue_size":{queue_info["frame_queue"].qsize()}}},"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}}\n')
+                # #endregion
     
     # 返回UI更新：隐藏示范视频，显示Combined View和操作区域
     # 同时更新 exec_btn 为可交互状态
@@ -523,46 +569,93 @@ def execute_step(uid, username, option_idx, coords_str):
         # 从环境中读取初始frames
         session.update_observation(use_segmentation=USE_SEGMENTED_VIEW)
         
-        # 如果有frames了，将初始frames加入队列
+        # 如果有frames了，将最后一帧加入队列
         if session.base_frames or session.wrist_frames:
             
             # 初始化队列（如果还没有）
-            if uid not in FRAME_QUEUES:
-                FrameQueueManager.init_queue(uid, 0, 0)
+            # 传入当前frames数量，这样监控线程就知道这些frames已存在，不会将它们作为"新"frames加入队列
+            current_base_count = len(session.base_frames) if session.base_frames else 0
+            current_wrist_count = len(session.wrist_frames) if session.wrist_frames else 0
             
-            # 拼接初始frames
-            initial_frames = concatenate_frames_horizontally(
-                session.base_frames, 
-                session.wrist_frames
+            # #region agent log
+            with open('/data/hongzefu/.cursor/debug.log', 'a') as f:
+                f.write(f'{{"id":"log_execute_no_frames_init","timestamp":{int(time.time()*1000)},"location":"gradio_callbacks.py:539","message":"execute_step (no frames): initializing queue","data":{{"uid":"{uid}","base_count":{current_base_count},"wrist_count":{current_wrist_count}}},"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}}\n')
+            # #endregion
+            
+            if uid not in FRAME_QUEUES:
+                FrameQueueManager.init_queue(uid, current_base_count, current_wrist_count)
+            
+            # 只获取最后一帧并拼接
+            last_base_frame = session.base_frames[-1] if session.base_frames else None
+            last_wrist_frame = session.wrist_frames[-1] if session.wrist_frames else None
+            
+            if last_base_frame is not None or last_wrist_frame is not None:
+                # 使用concatenate_frames_horizontally处理单帧（传入只包含最后一帧的列表）
+                last_frames = concatenate_frames_horizontally(
+                    [last_base_frame] if last_base_frame is not None else [],
+                    [last_wrist_frame] if last_wrist_frame is not None else []
+                )
+                
+                # 只加入最后一帧（重复多次以确保持续显示）
+                queue_info = FRAME_QUEUES.get(uid)
+                if queue_info and last_frames:
+                    last_frame = last_frames[0]
+                    # 重复加入最后一帧10次，确保即使被快速消费也能持续显示
+                    frames_added = 0
+                    for _ in range(10):
+                        try:
+                            # 复制帧以避免引用问题
+                            frame_copy = np.copy(last_frame) if isinstance(last_frame, np.ndarray) else last_frame
+                            queue_info["frame_queue"].put(frame_copy, block=False)
+                            frames_added += 1
+                        except queue.Full:
+                            break
+                    # #region agent log
+                    with open('/data/hongzefu/.cursor/debug.log', 'a') as f:
+                        f.write(f'{{"id":"log_execute_no_frames_add_last","timestamp":{int(time.time()*1000)},"location":"gradio_callbacks.py:581","message":"execute_step (no frames): added last frame to queue","data":{{"uid":"{uid}","frames_added":{frames_added},"queue_size":{queue_info["frame_queue"].qsize()}}},"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}}\n')
+                    # #endregion
+    elif frames_exist and not queue_exists:
+        # frames存在但队列不存在，初始化队列并加入最后一帧
+        # 初始化队列（传入当前frames数量，这样监控线程就知道这些frames已存在）
+        current_base_count = len(session.base_frames) if session.base_frames else 0
+        current_wrist_count = len(session.wrist_frames) if session.wrist_frames else 0
+        
+        # #region agent log
+        with open('/data/hongzefu/.cursor/debug.log', 'a') as f:
+            f.write(f'{{"id":"log_execute_queue_missing_init","timestamp":{int(time.time()*1000)},"location":"gradio_callbacks.py:562","message":"execute_step (queue missing): initializing queue","data":{{"uid":"{uid}","base_count":{current_base_count},"wrist_count":{current_wrist_count}}},"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}}\n')
+        # #endregion
+        
+        FrameQueueManager.init_queue(uid, current_base_count, current_wrist_count)
+        
+        # 只获取最后一帧并拼接
+        last_base_frame = session.base_frames[-1] if session.base_frames else None
+        last_wrist_frame = session.wrist_frames[-1] if session.wrist_frames else None
+        
+        if last_base_frame is not None or last_wrist_frame is not None:
+            # 使用concatenate_frames_horizontally处理单帧（传入只包含最后一帧的列表）
+            last_frames = concatenate_frames_horizontally(
+                [last_base_frame] if last_base_frame is not None else [],
+                [last_wrist_frame] if last_wrist_frame is not None else []
             )
             
-            # 将初始frames加入队列
+            # 只加入最后一帧（重复多次以确保持续显示）
             queue_info = FRAME_QUEUES.get(uid)
-            if queue_info:
-                for frame in initial_frames:
+            if queue_info and last_frames:
+                last_frame = last_frames[0]
+                # 重复加入最后一帧10次，确保即使被快速消费也能持续显示
+                frames_added = 0
+                for _ in range(10):
                     try:
-                        queue_info["frame_queue"].put(frame, block=False)
+                        # 复制帧以避免引用问题
+                        frame_copy = np.copy(last_frame) if isinstance(last_frame, np.ndarray) else last_frame
+                        queue_info["frame_queue"].put(frame_copy, block=False)
+                        frames_added += 1
                     except queue.Full:
                         break
-    elif frames_exist and not queue_exists:
-        # frames存在但队列不存在，初始化队列并加入frames
-        # 初始化队列
-        FrameQueueManager.init_queue(uid, len(session.base_frames), len(session.wrist_frames))
-        
-        # 拼接初始frames
-        initial_frames = concatenate_frames_horizontally(
-            session.base_frames, 
-            session.wrist_frames
-        )
-        
-        # 将初始frames加入队列
-        queue_info = FRAME_QUEUES.get(uid)
-        if queue_info:
-            for frame in initial_frames:
-                try:
-                    queue_info["frame_queue"].put(frame, block=False)
-                except queue.Full:
-                    break
+                # #region agent log
+                with open('/data/hongzefu/.cursor/debug.log', 'a') as f:
+                    f.write(f'{{"id":"log_execute_queue_missing_add_last","timestamp":{int(time.time()*1000)},"location":"gradio_callbacks.py:590","message":"execute_step (queue missing): added last frame to queue","data":{{"uid":"{uid}","frames_added":{frames_added},"queue_size":{queue_info["frame_queue"].qsize()}}},"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}}\n')
+                # #endregion
     
     if option_idx is None:
         return session.get_pil_image(use_segmented=USE_SEGMENTED_VIEW), "Error: No action selected", gr.update(), gr.update(), gr.update(interactive=False), gr.update(interactive=True), gr.update(visible=False)

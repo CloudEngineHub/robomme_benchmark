@@ -332,7 +332,10 @@ CSS = f"""#live_obs {{ }}
 #control_panel {{ border: 1px solid #e5e7eb; padding: 15px; border-radius: 8px; background-color: #f9fafb; }}
 .compact-log textarea {{ max-height: 120px !important; font-family: monospace; font-size: 0.85em; }}
 .ref-zone {{ border-bottom: 2px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 10px; }}
-#combined_view_html img {{ max-width: 100%; height: {REFERENCE_VIEW_HEIGHT}; width: auto; margin: 0 auto; display: block; border: 2px solid #3b82f6; border-radius: 8px; object-fit: contain; }}
+#combined_view_html {{ border: none !important; }}
+#combined_view_html img {{ max-width: 100%; height: {REFERENCE_VIEW_HEIGHT}; width: auto; margin: 0 auto; display: block; border: none !important; border-radius: 8px; object-fit: contain; }}
+#demo_video {{ border: none !important; }}
+#demo_video video {{ border: none !important; }}
 /* Action Radio - 每个选项占满一行 */
 #action_radio .form-radio {{
     display: block !important;
