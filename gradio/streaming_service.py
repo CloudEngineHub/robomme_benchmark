@@ -70,6 +70,8 @@ class FrameQueueManager:
                 except queue.Empty:
                     break
             queue_info["streaming_active"] = False
+            # 彻底删除队列条目，强制终止旧的 MJPEG 生成器（它们会检测 uid not in FRAME_QUEUES）
+            del FRAME_QUEUES[uid]
     
     @staticmethod
     def get_queue_info(uid):
@@ -220,19 +222,26 @@ def generate_mjpeg_stream(uid: str):
             
             if success:
                 # 按照 MJPEG 格式发送帧
-                yield (b'--' + boundary + b'\r\n'
-                       b'Content-Type: image/jpeg\r\n'
-                       b'Content-Length: ' + str(len(jpeg_bytes)).encode() + b'\r\n\r\n' +
-                       jpeg_bytes.tobytes() + b'\r\n')
+                try:
+                    yield (b'--' + boundary + b'\r\n'
+                           b'Content-Type: image/jpeg\r\n'
+                           b'Content-Length: ' + str(len(jpeg_bytes)).encode() + b'\r\n\r\n' +
+                           jpeg_bytes.tobytes() + b'\r\n')
+                except GeneratorExit:
+                    # 客户端断开连接
+                    print(f"Client disconnected for {uid}")
+                    break
+                except Exception as e:
+                    print(f"Error sending frame for {uid}: {e}")
+                    break
             else:
                 # 编码失败，跳过此帧
                 continue
                 
         except Exception as e:
-            # 发生错误，记录并继续
+            # 发生错误，记录并退出（防止僵尸线程窃取队列数据）
             print(f"Error in MJPEG stream generator for {uid}: {e}")
-            time.sleep(0.1)
-            continue
+            break
 
 
 def create_video_feed_route(fastapi_app):

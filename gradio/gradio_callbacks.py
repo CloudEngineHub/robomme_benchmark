@@ -68,8 +68,8 @@ def login_and_load_task(username, uid):
         task_info = get_task_index(uid)
         task_idx = task_info["task_index"]
         total = task_info["total_tasks"]
-        # 生成 HTML 内容，包含 MJPEG 流
-        combined_html = f'<div id="combined_view_html"><img src="/video_feed/{uid}" style="max-width: 100%; height: {REFERENCE_VIEW_HEIGHT}; width: auto; margin: 0 auto; display: block; border-radius: 8px; object-fit: contain;" alt="Desk View | Robot View" /></div>'
+        # 生成 HTML 内容，包含 MJPEG 流（添加时间戳防止缓存）
+        combined_html = f'<div id="combined_view_html"><img src="/video_feed/{uid}?t={int(time.time()*1000)}" style="max-width: 100%; height: {REFERENCE_VIEW_HEIGHT}; width: auto; margin: 0 auto; display: block; border-radius: 8px; object-fit: contain;" alt="Desk View | Robot View" /></div>'
         # 已完成所有任务，直接显示操作区域
         set_ui_phase(uid, "executing_task")
         return (
@@ -281,12 +281,14 @@ def confirm_demo_watched(uid, username):
     if session and (session.base_frames or session.wrist_frames):
         from state_manager import FRAME_QUEUES
         
-        # 初始化队列（如果还没有）
+        # 初始化队列（如果还没有，或者队列存在但不活跃）
         # 传入当前frames数量，这样监控线程就知道这些frames已存在，不会将它们作为"新"frames加入队列
         current_base_count = len(session.base_frames) if session.base_frames else 0
         current_wrist_count = len(session.wrist_frames) if session.wrist_frames else 0
         
-        if uid not in FRAME_QUEUES:
+        # 检查队列是否存在且活跃，如果不存在或不活跃，则初始化
+        queue_info = FRAME_QUEUES.get(uid)
+        if not queue_info or not queue_info.get("streaming_active", False):
             FrameQueueManager.init_queue(uid, current_base_count, current_wrist_count)
         
         # 只获取最后一帧并拼接
