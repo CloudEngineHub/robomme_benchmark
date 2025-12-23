@@ -58,7 +58,8 @@ def login_and_load_task(username, uid):
             gr.update(visible=False), # demo_video_group
             gr.update(visible=False), # combined_view_group
             gr.update(visible=False), # operation_zone_group
-            gr.update(visible=False)  # confirm_demo_btn
+            gr.update(visible=False),  # confirm_demo_btn
+            gr.update(visible=False, interactive=True)  # play_video_btn
         )
     
     # Login success - Load current task
@@ -88,7 +89,8 @@ def login_and_load_task(username, uid):
             gr.update(visible=False), # demo_video_group
             gr.update(visible=False), # combined_view_group
             gr.update(visible=True),  # operation_zone_group
-            gr.update(visible=False)  # confirm_demo_btn
+            gr.update(visible=False),  # confirm_demo_btn
+            gr.update(visible=False, interactive=True)  # play_video_btn
         )
 
     current_task = status["current_task"]
@@ -134,7 +136,8 @@ def login_and_load_task(username, uid):
             gr.update(visible=False), # demo_video_group
             gr.update(visible=False), # combined_view_group
             gr.update(visible=True),  # operation_zone_group
-            gr.update(visible=False)  # confirm_demo_btn
+            gr.update(visible=False),  # confirm_demo_btn
+            gr.update(visible=False, interactive=True)  # play_video_btn
         )
         
     # Success loading
@@ -192,6 +195,7 @@ def login_and_load_task(username, uid):
             gr.update(visible=False), # combined_view_group (第一阶段隐藏，正确)
             gr.update(visible=False), # operation_zone_group (第一阶段隐藏)
             gr.update(visible=True),  # confirm_demo_btn (第一阶段显示)
+            gr.update(visible=True, interactive=True),  # play_video_btn (第一阶段显示)
             gr.update(visible=False)  # coords_group (初始化时隐藏)
         )
     else:
@@ -258,8 +262,17 @@ def login_and_load_task(username, uid):
             gr.update(visible=True),  # combined_view_group (修复：应该显示)
             gr.update(visible=True),  # operation_zone_group (直接显示)
             gr.update(visible=False), # confirm_demo_btn (无视频，隐藏)
+            gr.update(visible=False, interactive=True),  # play_video_btn
             gr.update(visible=False)  # coords_group (初始化时隐藏)
         )
+
+
+def play_demo_video(play_btn):
+    """
+    播放示范视频并禁用按钮
+    """
+    # 返回禁用状态的按钮
+    return gr.update(interactive=False)
 
 
 def confirm_demo_watched(uid, username):
@@ -324,6 +337,7 @@ def confirm_demo_watched(uid, username):
         gr.update(visible=True),   # combined_view_group (修复：应该显示)
         gr.update(visible=True),   # operation_zone_group
         gr.update(visible=False),  # confirm_demo_btn
+        gr.update(visible=False, interactive=False),  # play_video_btn (确认后隐藏)
         gr.update(interactive=True),  # exec_btn - 启用执行按钮
         gr.update(visible=False)   # coords_group (确认demo后，还未选择选项，隐藏)
     )
@@ -469,7 +483,7 @@ def on_option_select(uid, username, option_value):
     if 0 <= option_idx < len(session.raw_solve_options):
         opt = session.raw_solve_options[option_idx]
         if opt.get("available"):
-             return "please click the image", gr.update(interactive=True), gr.update(visible=True)
+             return "please click the keypoint selection image", gr.update(interactive=True), gr.update(visible=True)
     
     return default_msg, gr.update(interactive=False), gr.update(visible=False)
 
@@ -514,6 +528,7 @@ def init_app(request: gr.Request):
         gr.update(visible=False), # combined_view_group
         gr.update(visible=False), # operation_zone_group
         gr.update(visible=False), # confirm_demo_btn
+        gr.update(visible=False, interactive=True),  # play_video_btn
         gr.update(visible=False)  # coords_group (初始化时隐藏)
     )
     
@@ -568,6 +583,7 @@ def init_app(request: gr.Request):
                 gr.update(visible=False), # combined_view_group
                 gr.update(visible=False), # operation_zone_group
                 gr.update(visible=False), # confirm_demo_btn
+                gr.update(visible=False, interactive=True),  # play_video_btn
                 gr.update(visible=False)  # coords_group
             )
     
@@ -685,7 +701,7 @@ def execute_step(uid, username, option_idx, coords_str):
                 x = int(parts[0].strip())
                 y = int(parts[1].strip())
                 # 如果成功解析为数字，且不是提示信息，则认为是有效坐标
-                if coords_str.strip() not in ["please click the image", "No need for coordinates"]:
+                if coords_str.strip() not in ["please click the keypoint selection image", "No need for coordinates"]:
                     is_valid_coords = True
             except:
                 pass
@@ -693,7 +709,7 @@ def execute_step(uid, username, option_idx, coords_str):
         # 如果需要坐标但没有有效坐标，返回错误提示
         if not is_valid_coords:
             current_img = session.get_pil_image(use_segmented=USE_SEGMENTED_VIEW)
-            error_msg = "please click the image before execute!"
+            error_msg = "please click the keypoint selection image before execute!"
             return current_img, error_msg, gr.update(), gr.update(), gr.update(interactive=False), gr.update(interactive=True), gr.update(visible=True)
 
     # Parse coords

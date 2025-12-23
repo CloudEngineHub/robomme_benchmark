@@ -12,45 +12,13 @@ from gradio_callbacks import (
     on_option_select,
     execute_step,
     init_app,
-    confirm_demo_watched
+    confirm_demo_watched,
+    play_demo_video
 )
 
 SYNC_JS = """
 (function() {
-    // 全局变量：记录用户是否已经与页面交互过
-    let userInteracted = false;
-    
-    // 监听用户的第一次交互，立即播放视频一次（之后不再自动恢复）
-    function initUserInteractionListener() {
-        if (window.userInteractionListenerInitialized) return;
-        window.userInteractionListenerInitialized = true;
-        
-        const playVideoOnce = () => {
-            if (!userInteracted) {
-                userInteracted = true;
-                // 立即尝试播放所有视频（仅一次）
-                const videoWrapper = document.getElementById('demo_video');
-                if (videoWrapper) {
-                    const vids = videoWrapper.querySelectorAll('video');
-                    vids.forEach(v => {
-                        if (v.readyState >= 2 && v.paused) {
-                            v.muted = true;
-                            v.setAttribute('muted', 'true');
-                            const playPromise = v.play();
-                            if (playPromise && playPromise.catch) {
-                                playPromise.catch(() => {});
-                            }
-                        }
-                    });
-                }
-            }
-        };
-        
-        // 监听多种用户交互事件（只触发一次）
-        ['click', 'touchstart', 'keydown', 'mousedown'].forEach(eventType => {
-            document.addEventListener(eventType, playVideoOnce, { once: true, passive: true });
-        });
-    }
+    // 不再自动播放视频，只有点击按钮才播放
     
     function setupVideoAutoplay(v) {
         // 确保muted属性始终为true
@@ -78,8 +46,7 @@ SYNC_JS = """
             e.stopPropagation();
         }, true);
         
-        // 初始化用户交互监听器（只在第一次交互时播放一次）
-        initUserInteractionListener();
+        // 不再自动播放，只有点击按钮才播放
         
         // 使用MutationObserver监听muted属性的变化，确保它始终保持为true
         if (!v.dataset.mutedObserverAttached) {
@@ -122,7 +89,7 @@ SYNC_JS = """
     }
 
     function findCoordsBox() {
-        // 尝试多种选择器查找包含"please click the image"的textarea
+        // 尝试多种选择器查找包含"please click the keypoint selection image"的textarea
         const selectors = [
             '#coords_box textarea',
             '[id*="coords_box"] textarea',
@@ -134,7 +101,7 @@ SYNC_JS = """
             const elements = document.querySelectorAll(selector);
             for (const el of elements) {
                 const value = el.value || '';
-                if (value.trim() === 'please click the image') {
+                if (value.trim() === 'please click the keypoint selection image') {
                     return el;
                 }
             }
@@ -146,9 +113,9 @@ SYNC_JS = """
         const coordsBox = findCoordsBox();
         if (coordsBox) {
             const coordsValue = coordsBox.value || '';
-            // 如果值是"please click the image", 说明需要坐标但用户没有点击
-            if (coordsValue.trim() === 'please click the image') {
-                alert('please click the image before execute!');
+            // 如果值是"please click the keypoint selection image", 说明需要坐标但用户没有点击
+            if (coordsValue.trim() === 'please click the keypoint selection image') {
+                alert('please click the keypoint selection image before execute!');
                 return false; // 阻止执行
             }
         }
@@ -168,6 +135,77 @@ SYNC_JS = """
             }, true);
             btn.dataset.coordsCheckAttached = 'true';
         }
+    }
+    
+    // 播放视频的函数（只在点击按钮时调用）
+    function playDemoVideo() {
+        const videoWrapper = document.getElementById('demo_video');
+        if (videoWrapper) {
+            const vids = videoWrapper.querySelectorAll('video');
+            vids.forEach(v => {
+                // 确保视频设置正确
+                v.muted = true;
+                v.setAttribute('muted', 'true');
+                v.loop = true;
+                v.setAttribute('loop', 'true');
+                
+                // 尝试播放视频
+                if (v.readyState >= 2) {
+                    // 视频已加载，直接播放
+                    const playPromise = v.play();
+                    if (playPromise && playPromise.catch) {
+                        playPromise.catch(() => {});
+                    }
+                } else {
+                    // 如果视频还没准备好，等待加载完成后再播放
+                    v.addEventListener('loadeddata', function() {
+                        const playPromise = v.play();
+                        if (playPromise && playPromise.catch) {
+                            playPromise.catch(() => {});
+                        }
+                    }, { once: true });
+                    // 也监听 canplay 事件作为备选
+                    v.addEventListener('canplay', function() {
+                        const playPromise = v.play();
+                        if (playPromise && playPromise.catch) {
+                            playPromise.catch(() => {});
+                        }
+                    }, { once: true });
+                }
+            });
+        }
+    }
+    
+    // 监听播放视频按钮（唯一触发视频播放的方式）
+    function initPlayVideoButtonListener() {
+        function attachToPlayVideoButton() {
+            const playBtn = document.getElementById('play_video_btn');
+            if (playBtn && !playBtn.dataset.playVideoAttached) {
+                playBtn.addEventListener('click', function(e) {
+                    // 检查按钮是否可交互
+                    if (playBtn.disabled || playBtn.hasAttribute('disabled')) {
+                        return;
+                    }
+                    // 点击按钮后立即播放视频
+                    playDemoVideo();
+                });
+                playBtn.dataset.playVideoAttached = 'true';
+            }
+        }
+        
+        // 使用MutationObserver等待Gradio加载完成
+        const observer = new MutationObserver(function(mutations) {
+            attachToPlayVideoButton();
+        });
+        
+        // 开始观察
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true
+        });
+        
+        // 立即执行一次
+        setTimeout(attachToPlayVideoButton, 2000);
     }
     
     // 监听所有按钮点击, 找到EXECUTE按钮并添加检查
@@ -195,24 +233,7 @@ SYNC_JS = """
         
         // 立即执行一次, 处理已经加载的按钮
         setTimeout(attachToExecuteButtons, 2000);
-        // 也尝试强制示范视频自动播放
-        setTimeout(ensureDemoVideoAutoplay, 1500);
-        setInterval(ensureDemoVideoAutoplay, 4000);
-        
-        // 监听视频元素添加到DOM的事件
-        const videoObserver = new MutationObserver(function(mutations) {
-            const videoWrapper = document.getElementById('demo_video');
-            if (videoWrapper) {
-                const vids = videoWrapper.querySelectorAll('video');
-                if (vids.length > 0) {
-                    ensureDemoVideoAutoplay();
-                }
-            }
-        });
-        videoObserver.observe(document.body, {
-            childList: true,
-            subtree: true
-        });
+        // 不再自动播放视频，只有点击按钮才播放
     }
     
     // 监听 Gradio 错误, 捕获 LeaseLost 错误
@@ -331,7 +352,7 @@ SYNC_JS = """
                 // Check if coords_box value indicates that point selection is complete
                 const coordsTextarea = coordsBox.querySelector('textarea') || coordsBox;
                 const coordsValue = (coordsTextarea.value || '').trim();
-                const isCoordsSelected = coordsValue !== 'please click the image';
+                const isCoordsSelected = coordsValue !== 'please click the keypoint selection image';
                 
                 // Find the direct parent group that contains coords_box
                 let parentGroup = coordsBox.parentElement;
@@ -357,7 +378,7 @@ SYNC_JS = """
                     
                     // Don't highlight if:
                     // 1. coords_group is hidden (not visible)
-                    // 2. coords are already selected (value is not "please click the image")
+                    // 2. coords are already selected (value is not "please click the keypoint selection image")
                     if (!isVisible || isCoordsSelected) {
                         // Remove highlight if it exists
                         const hasBluePulseAnimation = parentGroup.style.animation && parentGroup.style.animation.includes('bluePulse');
@@ -435,6 +456,7 @@ SYNC_JS = """
         document.addEventListener('DOMContentLoaded', function() {
             initExecuteButtonListener();
             initLeaseLostHandler();
+            initPlayVideoButtonListener();
             setTimeout(() => {
                 applyCoordsGroupHighlight();
             }, 2000);
@@ -442,6 +464,7 @@ SYNC_JS = """
     } else {
         initExecuteButtonListener();
         initLeaseLostHandler();
+        initPlayVideoButtonListener();
         setTimeout(() => {
             applyCoordsGroupHighlight();
         }, 2000);
@@ -502,6 +525,13 @@ CSS = f"""#live_obs {{ }}
 #next_task_btn[disabled],
 #next_task_btn.disabled {{
     opacity: 0.5 !important;
+}}
+/* Play Video Button - 禁用时变灰 */
+#play_video_btn:disabled,
+#play_video_btn[disabled],
+#play_video_btn.disabled {{
+    opacity: 0.5 !important;
+    cursor: not-allowed !important;
 }}"""
 if RESTRICT_VIDEO_PLAYBACK:
     CSS += """
@@ -572,7 +602,7 @@ def create_ui_blocks():
                          gr.Markdown("### Watch video and remember robot actions 👀✍️")
                          
                          video_elem_id = "demo_video" if RESTRICT_VIDEO_PLAYBACK else None
-                         video_autoplay = True  # 保持自动播放
+                         video_autoplay = False  # 不自动播放，等待用户点击按钮
                          
                          video_display = gr.Video(
                             label="Demonstration Video", 
@@ -584,7 +614,9 @@ def create_ui_blocks():
                             visible=True
                          )
                          
-                         confirm_demo_btn = gr.Button("Confirm - Start Task", variant="primary", size="lg", visible=True, interactive=True)
+                         play_video_btn = gr.Button("Start Demonstration Video🎬", variant="primary", size="lg", visible=True, interactive=True, elem_id="play_video_btn")
+                         
+                         confirm_demo_btn = gr.Button("Start Task", variant="secondary", size="lg", visible=True, interactive=True)
                      
                      # Combined View Group (第一阶段隐藏)
                      with gr.Group(visible=False) as combined_view_group:
@@ -657,6 +689,7 @@ def create_ui_blocks():
                 combined_view_group,
                 operation_zone_group,
                 confirm_demo_btn,
+                play_video_btn,
                 coords_group
             ]
         ).then(
@@ -690,8 +723,16 @@ def create_ui_blocks():
                 combined_view_group,
                 operation_zone_group,
                 confirm_demo_btn,
+                play_video_btn,
                 coords_group
             ]
+        )
+        
+        # 1.5 Play Demo Video
+        play_video_btn.click(
+            fn=play_demo_video,
+            inputs=[play_video_btn],
+            outputs=[play_video_btn]
         )
         
         # 1.6 Confirm Demo Watched
@@ -703,6 +744,7 @@ def create_ui_blocks():
                 combined_view_group,
                 operation_zone_group,
                 confirm_demo_btn,
+                play_video_btn,
                 exec_btn,
                 coords_group
             ]
@@ -756,6 +798,7 @@ def create_ui_blocks():
                 combined_view_group,
                 operation_zone_group,
                 confirm_demo_btn,
+                play_video_btn,
                 coords_group
             ]
         )

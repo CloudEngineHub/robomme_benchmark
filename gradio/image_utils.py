@@ -6,7 +6,7 @@ import numpy as np
 import tempfile
 import os
 import traceback
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont
 import cv2
 from config import VIDEO_PLAYBACK_FPS
 
@@ -128,8 +128,57 @@ def concatenate_frames_horizontally(frames1, frames2):
             if h2 != target_h:
                 frame2 = cv2.resize(frame2, (w2, target_h), interpolation=cv2.INTER_LINEAR)
         
-        # 左右拼接
-        concatenated_frame = np.concatenate([frame1, frame2], axis=1)
+        # 获取调整后的实际宽度和高度
+        actual_h, actual_w1 = frame1.shape[:2]
+        _, actual_w2 = frame2.shape[:2]
+        
+        # 在中间添加垂直黑边分隔
+        border_width = 10  # 中间黑边宽度
+        middle_border = np.zeros((actual_h, border_width, 3), dtype=np.uint8)
+        
+        # 左右拼接（包含中间黑边）
+        concatenated_frame = np.concatenate([frame1, middle_border, frame2], axis=1)
+        
+        # 添加底部黑边用于标注
+        h, w = concatenated_frame.shape[:2]
+        border_height = 40  # 黑边高度
+        # 创建带黑边的图像
+        frame_with_border = np.zeros((h + border_height, w, 3), dtype=np.uint8)
+        frame_with_border[:h, :] = concatenated_frame
+        
+        # 转换为PIL图像以便添加文字
+        pil_img = Image.fromarray(frame_with_border)
+        draw = ImageDraw.Draw(pil_img)
+        
+        # 尝试加载字体，如果失败则使用默认字体
+        try:
+            font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 20)
+        except:
+            try:
+                font = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", 20)
+            except:
+                font = ImageFont.load_default()
+        
+        # 在左侧黑边区域添加 "base camera" 标注
+        left_text = "base camera"
+        left_text_bbox = draw.textbbox((0, 0), left_text, font=font)
+        left_text_width = left_text_bbox[2] - left_text_bbox[0]
+        left_text_height = left_text_bbox[3] - left_text_bbox[1]
+        left_x = actual_w1 // 2 - left_text_width // 2  # 左侧图像中心位置
+        left_y = h + (border_height - left_text_height) // 2
+        draw.text((left_x, left_y), left_text, fill="white", font=font)
+        
+        # 在右侧黑边区域添加 "wrist camera" 标注
+        right_text = "wrist camera"
+        right_text_bbox = draw.textbbox((0, 0), right_text, font=font)
+        right_text_width = right_text_bbox[2] - right_text_bbox[0]
+        right_text_height = right_text_bbox[3] - right_text_bbox[1]
+        right_x = actual_w1 + border_width + actual_w2 // 2 - right_text_width // 2  # 右侧图像中心位置（考虑中间黑边）
+        right_y = h + (border_height - right_text_height) // 2
+        draw.text((right_x, right_y), right_text, fill="white", font=font)
+        
+        # 转换回numpy数组
+        concatenated_frame = np.array(pil_img)
         concatenated_frames.append(concatenated_frame)
     
     return concatenated_frames
