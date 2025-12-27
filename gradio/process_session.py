@@ -20,12 +20,28 @@ import sys
 import os
 
 # 添加父目录到路径（逻辑复制自 oracle_logic.py）
+from pathlib import Path
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(current_dir)
 if parent_dir not in sys.path:
     sys.path.insert(0, parent_dir)
 
 from oracle_logic import OracleSession, DEFAULT_DATASET_ROOT
+
+# Import ScrewPlanFailure for exception handling
+scripts_dir = Path(parent_dir) / "scripts"
+if scripts_dir.exists() and str(scripts_dir) not in sys.path:
+    sys.path.insert(0, str(scripts_dir))
+try:
+    from planner_fail_safe import ScrewPlanFailure
+except ImportError:
+    # Fallback if import fails
+    ScrewPlanFailure = RuntimeError
+
+# Custom exception for screw plan failures (to be caught in gradio_callbacks)
+class ScrewPlanFailureError(RuntimeError):
+    """Exception raised when screw plan fails, to be caught and displayed via gr.Info popup"""
+    pass
 
 # 定义命令常量
 CMD_LOAD_EPISODE = "load_episode"
@@ -130,7 +146,16 @@ def session_worker_loop(cmd_queue, result_queue, stream_queue, dataset_root, gui
                 
             elif cmd == CMD_EXECUTE_ACTION:
                 # 执行动作（重计算任务）
-                res = session.execute_action(*args, **kwargs)
+                try:
+                    res = session.execute_action(*args, **kwargs)
+                except ScrewPlanFailure as e:
+                    # 捕获 ScrewPlanFailure 并作为特殊状态传递到主进程，用于显示弹窗
+                    result_queue.put({"status": "screw_plan_failure", "message": str(e)})
+                    continue
+                except Exception as e:
+                    # 捕获所有其他异常并传递到主进程，用于显示弹窗
+                    result_queue.put({"status": "execution_error", "message": str(e)})
+                    continue
                 
                 # 增量帧同步：只发送新增的帧
                 new_base = session.base_frames[session.last_base_frame_idx:]
@@ -303,7 +328,11 @@ class ProcessSessionProxy:
             # 等待结果（重任务如加载/执行可能需要较长时间，设置600秒超时）
             res = self.result_queue.get(timeout=600) 
             
-            # 检查错误状态
+            # 检查错误状态并转换为异常，以便在 gradio_callbacks 中捕获并显示弹窗
+            if res.get("status") == "screw_plan_failure":
+                raise ScrewPlanFailureError(f"screw plan failed: {res.get('message', 'unknown error')}")
+            if res.get("status") == "execution_error":
+                raise RuntimeError(f"Execution error: {res.get('message', 'unknown error')}")
             if res.get("status") == "fatal":
                 raise RuntimeError(f"工作进程致命错误: {res.get('message')}")
             if res.get("status") == "error":

@@ -147,6 +147,7 @@ def _options_button_unmask_swap(env, planner, require_target, base) -> List[dict
                 env, planner, obj=require_target()
             ),
             "available": env.spawned_bins,
+            #"available": env.spawned_bins+[env.button_right],#test gradio execution error
         },
         {
             "label": "put down the container",

@@ -28,6 +28,7 @@ from image_utils import draw_marker, save_video, concatenate_frames_horizontally
 from user_manager import user_manager, LeaseLost
 from logger import log_session, log_user_action, create_new_attempt, has_existing_actions
 from config import USE_SEGMENTED_VIEW, REFERENCE_VIEW_HEIGHT, should_show_demo_video
+from process_session import ScrewPlanFailureError
 
 
 def login_and_load_task(username, uid):
@@ -762,8 +763,30 @@ def execute_step(uid, username, option_idx, coords_str):
             print(f"Error getting pre-execute image: {e}")
             
     # Execute
+    # 异常处理：所有异常（ScrewPlanFailure 和其他执行错误）都会显示弹窗通知
     print(f"Executing step: Opt {option_idx}, Coords {click_coords}")
-    img, status, done = session.execute_action(option_idx, click_coords)
+    try:
+        img, status, done = session.execute_action(option_idx, click_coords)
+    except ScrewPlanFailureError as e:
+        # 捕获 screw plan 失败异常，显示弹窗通知
+        error_message = str(e)
+        gr.Info(f"Robot cannot reach position")
+        # 返回当前状态，在状态消息中显示错误信息
+        current_img = session.get_pil_image(use_segmented=USE_SEGMENTED_VIEW)
+        status = f"Screw plan failed: {error_message}"
+        done = False
+        # 继续正常返回流程
+        img = current_img
+    except RuntimeError as e:
+        # 捕获所有其他执行错误，显示弹窗通知
+        error_message = str(e)
+        gr.Info(f"Cannot find suitable target")
+        # 返回当前状态，在状态消息中显示错误信息
+        current_img = session.get_pil_image(use_segmented=USE_SEGMENTED_VIEW)
+        status = f"Error: {error_message}"
+        done = False
+        # 继续正常返回流程
+        img = current_img
     
     # 等待一小段时间，确保continuous_frame_monitor线程处理完所有帧
     # 不再手动调用monitor_frames_and_enqueue，因为continuous_frame_monitor线程已经在处理
@@ -832,14 +855,25 @@ def execute_step(uid, username, option_idx, coords_str):
     task_update = gr.update()
     
     if done:
-        status += " [EPISODE COMPLETE]"
-        
-        # Determine final status for logging
+        # 确定最终状态用于日志记录
         final_log_status = "failed"
         if "SUCCESS" in status:
             final_log_status = "success"
+        
+        # Episode完成时，格式化System Log的状态消息
+        # 使用固定模板，所有行长度一致（32个字符）
+        if final_log_status == "success":
+            status = """********************************
+****   episode success      ****
+********************************
+  ---please press next task----   """
+        else:
+            status = """********************************
+****   episode failed       ****
+********************************
+  ---please press next task----   """
 
-        # Log session data to experiment_logs.jsonl
+        # 记录会话数据到 experiment_logs.jsonl
         try:
             log_session({
                 "uid": uid,

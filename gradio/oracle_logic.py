@@ -35,6 +35,24 @@ from historybench.HistoryBench_env.util.vqa_options import get_vqa_options
 from mani_skill.examples.motionplanning.panda.motionplanner import PandaArmMotionPlanningSolver
 from mani_skill.examples.motionplanning.panda.motionplanner_stick import PandaStickMotionPlanningSolver
 
+# --- FailAware Planner Imports ---
+# Import from scripts directory (parent_dir/scripts)
+scripts_dir = Path(parent_dir) / "scripts"
+if scripts_dir.exists() and str(scripts_dir) not in sys.path:
+    sys.path.insert(0, str(scripts_dir))
+try:
+    from planner_fail_safe import (
+        FailAwarePandaArmMotionPlanningSolver,
+        FailAwarePandaStickMotionPlanningSolver,
+        ScrewPlanFailure,
+    )
+except ImportError as e:
+    print(f"Warning: Failed to import FailAware planners: {e}")
+    # Fallback to regular planners
+    FailAwarePandaArmMotionPlanningSolver = PandaArmMotionPlanningSolver
+    FailAwarePandaStickMotionPlanningSolver = PandaStickMotionPlanningSolver
+    ScrewPlanFailure = RuntimeError
+
 # --- Constants ---
 DEFAULT_DATASET_ROOT = Path(parent_dir) / "dataset_json"
 
@@ -206,16 +224,16 @@ class OracleSession:
             self.color_map = _generate_color_map()
             _sync_table_color(self.env, self.color_map)
             
-            # Initialize Planner
+            # Initialize Planner (using FailAware versions)
             if env_id in ("PatternLock", "RouteStick"):
-                self.planner = PandaStickMotionPlanningSolver(
+                self.planner = FailAwarePandaStickMotionPlanningSolver(
                     self.env, debug=False, vis=self.gui_render,
                     base_pose=self.env.unwrapped.agent.robot.pose,
                     visualize_target_grasp_pose=False, print_env_info=False,
                     joint_vel_limits=0.3,
                 )
             else:
-                self.planner = PandaArmMotionPlanningSolver(
+                self.planner = FailAwarePandaArmMotionPlanningSolver(
                     self.env, debug=False, vis=self.gui_render,
                     base_pose=self.env.unwrapped.agent.robot.pose,
                     visualize_target_grasp_pose=False, print_env_info=False,
@@ -409,13 +427,26 @@ class OracleSession:
                   target_ref["click_point"] = (int(cx), int(cy))
 
         # 3. Execute Solve
+        # 异常处理流程：
+        #   任何异常发生 (ScrewPlanFailure 或其他异常)
+        #   ↓
+        #   oracle_logic.py: 重新抛出异常
+        #   ↓
+        #   process_session.py: 捕获并传递到主进程
+        #   ↓
+        #   gradio_callbacks.py: 捕获并显示弹窗 (gr.Info)
         status_msg = f"Executing: {chosen_opt.get('label')}"
         try:
             chosen_opt.get("solve")()
+        except ScrewPlanFailure as e:
+            # Re-raise ScrewPlanFailure so it can be handled in process_session and displayed as popup
+            print(f"Screw Plan Failure")
+            raise
         except Exception as e:
-            print(f"Execution Error: {e}")
-            return self.get_pil_image(), f"Error: {e}", False
-
+            # Re-raise all other exceptions so they can be displayed as popup too
+            print(f"Execution Error")
+            raise
+            
         # 4. Evaluate
         self.env.unwrapped.evaluate()
         evaluation = self.env.unwrapped.evaluate(solve_complete_eval=True)
