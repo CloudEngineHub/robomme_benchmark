@@ -1,8 +1,8 @@
 import json
 import os
 import datetime
-from pathlib import Path
 import threading
+from state_manager import cleanup_session
 
 
 class LeaseLost(Exception):
@@ -23,8 +23,9 @@ class UserManager:
         self.user_tasks = {}
         self.user_progress = {}
         
-        # Session management: track active uid for each username
-        # {username: active_uid} - maps username to the uid that currently owns the lease
+        # 会话管理：跟踪每个用户名的活跃 uid
+        # {username: active_uid} - 将用户名映射到当前拥有租约的 uid
+        # 当同一用户重复登录时，旧会话会被自动清理
         self.active_uid = {}  # {username: uid}
         
         self.load_tasks()
@@ -108,12 +109,17 @@ class UserManager:
 
     def login(self, username, uid=None):
         """
-        Validate user and return their session info.
-        If username is already in use by another uid, force takeover (kick old session).
+        验证用户并返回会话信息。
+        如果用户名已被另一个 uid 使用，强制接管并清理旧会话的所有资源。
+        
+        当检测到同一用户重复登录时：
+        1. 自动清理旧会话的工作进程（释放 RAM/VRAM）
+        2. 清理旧会话的所有状态数据（任务索引、坐标点击、选项选择、帧队列等）
+        3. 终止旧的 MJPEG 流
         
         Args:
-            username: The username to login
-            uid: The session uid requesting login (optional, but recommended)
+            username: 要登录的用户名
+            uid: 请求登录的会话 uid（可选，但建议提供）
         
         Returns: (success, message, progress_info)
         """
@@ -130,28 +136,31 @@ class UserManager:
                 "completed_tasks": set()
             }
         
-        # Force takeover: if username is already in use by another uid, override it
-        # The old uid will fail on next assert_lease() call
+        # 强制接管：如果用户名已被另一个 uid 使用，覆盖它并清理旧会话资源
+        # 清理旧会话的工作进程（释放 RAM/VRAM）和所有状态数据
         if uid:
             with self.lock:
                 old_uid = self.active_uid.get(username)
                 if old_uid and old_uid != uid:
-                    print(f"Force takeover: {username} was used by {old_uid}, now taken by {uid}")
+                    print(f"强制接管: 用户 {username} 的旧会话 {old_uid} 被新会话 {uid} 接管")
+                    # 清理旧会话的所有资源（进程、RAM、VRAM、状态数据等）
+                    print(f"正在清理用户 {username} 的旧会话 {old_uid}...")
+                    cleanup_session(old_uid)
                 self.active_uid[username] = uid
             
         return True, f"Welcome, {username}!", self.get_user_status(username)
     
     def assert_lease(self, username, uid):
         """
-        Assert that the given uid owns the lease for the username.
-        Raises LeaseLost exception if the lease is not owned by this uid.
+        断言给定的 uid 拥有该用户名的租约。
+        如果该 uid 不拥有租约（例如用户在其他地方登录），则抛出 LeaseLost 异常。
         
         Args:
-            username: The username to check
-            uid: The uid claiming the lease
+            username: 要检查的用户名
+            uid: 声称拥有租约的 uid
         
         Raises:
-            LeaseLost: If the uid does not own the lease for this username
+            LeaseLost: 如果该 uid 不拥有该用户名的租约
         """
         if not username or not uid:
             raise LeaseLost(f"Invalid username or uid")
