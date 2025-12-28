@@ -2,7 +2,7 @@ import json
 import os
 import datetime
 import threading
-from state_manager import cleanup_session
+from state_manager import cleanup_session, get_task_start_time, clear_task_start_time
 
 
 class LeaseLost(Exception):
@@ -84,14 +84,61 @@ class UserManager:
         except Exception as e:
             print(f"Error loading progress directory: {e}")
 
-    def save_progress_record(self, username, current_index, completed_tasks):
-        """Append a progress record to the user-specific JSONL file."""
+    def save_progress_record(self, username, current_index, completed_tasks, 
+                            env_id=None, episode_idx=None, status=None, 
+                            difficulty=None, language_goal=None, seed=None,
+                            start_time=None, end_time=None, timestamp=None):
+        """
+        Append a progress record to the user-specific JSONL file.
+        
+        Args:
+            username: 用户名
+            current_index: 当前任务索引
+            completed_tasks: 已完成任务集合
+            env_id: 环境ID（可选）
+            episode_idx: Episode索引（可选）
+            status: 任务状态（可选）
+            difficulty: 难度（可选）
+            language_goal: 语言目标（可选）
+            seed: 随机种子（可选）
+            start_time: 任务开始时间，ISO格式字符串（可选）
+            end_time: 任务结束时间，ISO格式字符串（可选）
+            timestamp: 向后兼容参数，如果提供且start_time/end_time为None，则同时设置为start_time和end_time
+        """
         record = {
-            "username": username,
-            "current_task_index": current_index,
-            "completed_tasks": list(completed_tasks),
-            "timestamp": datetime.datetime.now().isoformat()
+            "username": username
         }
+        
+        # 处理时间戳：优先使用 start_time 和 end_time，向后兼容 timestamp
+        if start_time is not None:
+            record["start_time"] = start_time
+        if end_time is not None:
+            record["end_time"] = end_time
+        
+        # 向后兼容：如果只提供了 timestamp，则同时设置为 start_time 和 end_time
+        if timestamp is not None:
+            if start_time is None:
+                record["start_time"] = timestamp
+            if end_time is None:
+                record["end_time"] = timestamp
+        elif start_time is None and end_time is None:
+            # 如果都没有提供，使用当前时间作为结束时间
+            current_time = datetime.datetime.now().isoformat()
+            record["end_time"] = current_time
+        
+        # 添加 episode 相关信息（如果提供）
+        if env_id is not None:
+            record["env_id"] = env_id
+        if episode_idx is not None:
+            record["episode_idx"] = episode_idx
+        if status is not None:
+            record["status"] = status
+        if difficulty is not None:
+            record["difficulty"] = difficulty
+        if language_goal is not None:
+            record["language_goal"] = language_goal
+        if seed is not None:
+            record["seed"] = seed
         
         with self.lock:
             try:
@@ -199,13 +246,14 @@ class UserManager:
             "tasks": tasks
         }
 
-    def complete_current_task(self, username):
+    def complete_current_task(self, username, env_id=None, episode_idx=None, 
+                             status=None, difficulty=None, language_goal=None, seed=None):
         """Mark current task as complete and move to next."""
-        status = self.get_user_status(username)
-        if not status or status["is_done_all"]:
+        user_status = self.get_user_status(username)
+        if not user_status or user_status["is_done_all"]:
             return None
             
-        current_idx = status["current_index"]
+        current_idx = user_status["current_index"]
         completed = self.user_progress[username]["completed_tasks"]
         
         # Mark as completed
@@ -214,8 +262,30 @@ class UserManager:
         # Move to next task
         next_idx = current_idx + 1
         
-        # Save persistence
-        self.save_progress_record(username, next_idx, completed)
+        # 获取任务开始时间（如果存在）
+        start_time = None
+        if env_id is not None and episode_idx is not None:
+            start_time = get_task_start_time(username, env_id, episode_idx)
+        
+        # 获取任务结束时间
+        end_time = datetime.datetime.now().isoformat()
+        
+        # Save persistence with episode information
+        self.save_progress_record(
+            username, next_idx, completed,
+            env_id=env_id,
+            episode_idx=episode_idx,
+            status=status,
+            difficulty=difficulty,
+            language_goal=language_goal,
+            seed=seed,
+            start_time=start_time,
+            end_time=end_time
+        )
+        
+        # 清理任务开始时间记录（避免内存泄漏）
+        if env_id is not None and episode_idx is not None:
+            clear_task_start_time(username, env_id, episode_idx)
         
         return self.get_user_status(username)
 

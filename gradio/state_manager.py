@@ -50,6 +50,12 @@ UI_PHASE_MAP = {}  # {uid: "watching_demo" | "executing_task"}
 # 键格式: "{username}:{env_id}:{episode_idx}"
 EXECUTE_COUNTS = {}  # {task_key: count}
 
+# --- 任务开始时间跟踪 ---
+# 跟踪每个任务的开始时间
+# 键格式: "{username}:{env_id}:{episode_idx}"
+# 值: ISO 格式的时间字符串
+TASK_START_TIMES = {}  # {task_key: "2025-12-28T14:01:25.372278"}
+
 # 线程锁，用于保护全局状态的访问
 _state_lock = threading.Lock()
 
@@ -227,6 +233,53 @@ def reset_execute_count(username, env_id, episode_idx):
     with _state_lock:
         task_key = _get_task_key(username, env_id, episode_idx)
         EXECUTE_COUNTS[task_key] = 0
+
+
+def get_task_start_time(username, env_id, episode_idx):
+    """
+    获取指定任务的开始时间
+    
+    Args:
+        username: 用户名
+        env_id: 环境ID
+        episode_idx: Episode索引
+        
+    Returns:
+        str: ISO 格式的时间字符串，如果任务不存在则返回 None
+    """
+    with _state_lock:
+        task_key = _get_task_key(username, env_id, episode_idx)
+        return TASK_START_TIMES.get(task_key)
+
+
+def set_task_start_time(username, env_id, episode_idx, start_time):
+    """
+    设置指定任务的开始时间
+    
+    Args:
+        username: 用户名
+        env_id: 环境ID
+        episode_idx: Episode索引
+        start_time: ISO 格式的时间字符串
+    """
+    with _state_lock:
+        task_key = _get_task_key(username, env_id, episode_idx)
+        TASK_START_TIMES[task_key] = start_time
+
+
+def clear_task_start_time(username, env_id, episode_idx):
+    """
+    清除指定任务的开始时间记录
+    
+    Args:
+        username: 用户名
+        env_id: 环境ID
+        episode_idx: Episode索引
+    """
+    with _state_lock:
+        task_key = _get_task_key(username, env_id, episode_idx)
+        if task_key in TASK_START_TIMES:
+            del TASK_START_TIMES[task_key]
 
 
 def cleanup_session(uid):

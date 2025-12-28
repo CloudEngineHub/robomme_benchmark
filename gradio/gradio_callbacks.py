@@ -25,11 +25,12 @@ from state_manager import (
     get_execute_count,
     increment_execute_count,
     reset_execute_count,
+    set_task_start_time,
 )
 from streaming_service import FrameQueueManager, cleanup_frame_queue
 from image_utils import draw_marker, save_video, concatenate_frames_horizontally
 from user_manager import user_manager, LeaseLost
-from logger import log_session, log_user_action, create_new_attempt, has_existing_actions
+from logger import log_user_action, create_new_attempt, has_existing_actions
 from config import USE_SEGMENTED_VIEW, REFERENCE_VIEW_HEIGHT, should_show_demo_video
 from process_session import ScrewPlanFailureError
 
@@ -118,6 +119,11 @@ def login_and_load_task(username, uid):
     reset_execute_count(username, env_id, int(ep_num))
     
     img, load_msg = session.load_episode(env_id, int(ep_num))
+    
+    # 成功加载 episode 后，记录任务开始时间
+    if img is not None:
+        start_time = datetime.now().isoformat()
+        set_task_start_time(username, env_id, int(ep_num), start_time)
     
     if img is None:
          # 即使加载失败，也保存任务索引
@@ -603,6 +609,9 @@ def init_app(request: gr.Request):
 
 
 def execute_step(uid, username, option_idx, coords_str):
+    # 记录用户按下 execute 按钮的瞬间时间戳
+    execute_timestamp = datetime.now().isoformat()
+    
     # Check lease first
     if username:
         try:
@@ -875,11 +884,29 @@ def execute_step(uid, username, option_idx, coords_str):
                 final_coords_str = f"{click_coords[0]},{click_coords[1]}"
                 final_image_array = pre_execute_image  # 使用执行前的图片
             
+            # 获取 option_list（从 session.raw_solve_options 获取）
+            option_list = None
+            if hasattr(session, 'raw_solve_options') and session.raw_solve_options:
+                option_list = session.raw_solve_options
+            
+            # 获取任务元数据（从 session 对象获取）
+            task_status = status  # 使用当前执行状态
+            task_difficulty = None
+            if hasattr(session, 'difficulty') and session.difficulty is not None:
+                task_difficulty = session.difficulty
+            task_language_goal = None
+            if hasattr(session, 'language_goal') and session.language_goal is not None:
+                task_language_goal = session.language_goal
+            task_seed = None
+            if hasattr(session, 'seed') and session.seed is not None:
+                task_seed = session.seed
+            
             log_user_action(
                 username=username,
                 env_id=session.env_id,
                 episode_idx=session.episode_idx,
                 action_data={
+                    "execute_timestamp": execute_timestamp,  # 用户按下 execute 按钮的瞬间时间戳
                     "option_idx": option_idx,  # execute时使用的option（最后一次选择的）
                     "option_label": option_label,
                     "final_coordinates": final_coordinates,  # 最后执行的坐标
@@ -889,7 +916,12 @@ def execute_step(uid, username, option_idx, coords_str):
                     "coordinate_clicks_before_execute": coordinate_clicks_before_execute,  # execute之前所有的坐标点击（已包含 image_array）
                     "status": status,
                     "done": done
-                }
+                },
+                option_list=option_list,
+                status=task_status,
+                difficulty=task_difficulty,
+                language_goal=task_language_goal,
+                seed=task_seed
             )
         except Exception as e:
             print(f"Error logging action execute: {e}")
@@ -921,25 +953,20 @@ def execute_step(uid, username, option_idx, coords_str):
 ********************************
   ---please press next task----   """
 
-        # 记录会话数据到 experiment_logs.jsonl
-        try:
-            log_session({
-                "uid": uid,
-                "username": username if username else "unknown",
-                "env_id": session.env_id,
-                "episode_idx": session.episode_idx,
-                "language_goal": session.language_goal,
-                "difficulty": session.difficulty if hasattr(session, 'difficulty') and session.difficulty is not None else None,
-                "finished": True,
-                "status": final_log_status
-            })
-        except Exception as e:
-            print(f"Error logging session: {e}")
-            traceback.print_exc()
-        
         # Update user progress (但不更新 progress_info_box，等用户按 next task/refresh 时再更新)
         if username:
-            user_status = user_manager.complete_current_task(username)
+            # 获取 seed（直接使用 session.seed，如果不存在则为 None）
+            seed = getattr(session, 'seed', None)
+            
+            user_status = user_manager.complete_current_task(
+                username,
+                env_id=session.env_id,
+                episode_idx=session.episode_idx,
+                status=final_log_status,
+                difficulty=session.difficulty if hasattr(session, 'difficulty') and session.difficulty is not None else None,
+                language_goal=session.language_goal,
+                seed=seed
+            )
             if user_status:
                 if user_status["is_done_all"]:
                     task_update = "All tasks completed!"

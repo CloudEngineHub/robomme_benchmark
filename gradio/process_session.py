@@ -134,6 +134,7 @@ def session_worker_loop(cmd_queue, result_queue, stream_queue, dataset_root, gui
                     "episode_idx": session.episode_idx,
                     "language_goal": session.language_goal,
                     "difficulty": session.difficulty,
+                    "seed": session.seed,
                     "demonstration_frames": session.demonstration_frames,
                     "base_frames": session.base_frames,  # 加载时完整同步
                     "wrist_frames": session.wrist_frames,  # 加载时完整同步
@@ -269,6 +270,7 @@ class ProcessSessionProxy:
         self.episode_idx = None
         self.language_goal = ""
         self.difficulty = None
+        self.seed = None
         self.demonstration_frames = []
         self.base_frames = []  # 由后台同步线程持续更新
         self.wrist_frames = []  # 由后台同步线程持续更新

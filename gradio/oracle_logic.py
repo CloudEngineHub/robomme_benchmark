@@ -176,6 +176,7 @@ class OracleSession:
         self.episode_idx = None
         self.language_goal = ""
         self.difficulty = None
+        self.seed = None
         self.history = [] # Logs interaction steps
         
         # State caches
@@ -215,6 +216,8 @@ class OracleSession:
             self.env_id = env_id
             self.episode_idx = episode_idx
             self.difficulty = difficulty
+            # 保存 seed（直接使用 resolver 返回的 seed）
+            self.seed = seed
             
             # Demonstration data
             demonstration_data = getattr(self.env, "demonstration_data", {}) or {}
