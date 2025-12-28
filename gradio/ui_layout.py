@@ -5,6 +5,7 @@ UI布局模块
 import gradio as gr
 from user_manager import user_manager
 from config import RESTRICT_VIDEO_PLAYBACK, REFERENCE_VIEW_HEIGHT, LIVE_OBSERVATION_SCALE, ACTION_SCALE, CONTROL_SCALE
+from note_content import get_coordinate_information, get_task_hint
 from gradio_callbacks import (
     login_and_load_task,
     load_next_task_wrapper,
@@ -617,21 +618,51 @@ def create_ui_blocks():
                          play_video_btn = gr.Button("Start Demonstration Video🎬", variant="primary", size="lg", visible=True, interactive=True, elem_id="play_video_btn")
                          
                          confirm_demo_btn = gr.Button("Start Task", variant="secondary", size="lg", visible=True, interactive=False)
-                     
+
                      # Combined View Group (第一阶段隐藏)
                      with gr.Group(visible=False) as combined_view_group:
-                         gr.Markdown("### Execution LiveStream 🦾")
-                         # Desk + Robot View (Combined) - 使用 HTML 组件显示 MJPEG 流
-                         combined_display = gr.HTML(
-                            value="<div id='combined_view_html'><p>等待视频流...</p></div>",
-                            elem_id="combined_view_html"
-                         )
+                         # Title row - all titles at the same height
+                         with gr.Row():
+                             with gr.Column(scale=1):
+                                 gr.Markdown("### Coordinate Information 🗺️")
+                             with gr.Column(scale=3):
+                                 gr.Markdown("### Execution LiveStream 🦾")
+                             with gr.Column(scale=1):
+                                 gr.Markdown("### Task Hint 💡")
+                         
+                         # Content row
+                         with gr.Row():
+                             # Left: Note 1
+                             with gr.Column(scale=1):
+                                 note1 = gr.Markdown(
+                                     value=get_coordinate_information(),
+                                     elem_id="note1"
+                                 )
+                             
+                             # Middle: Desk + Robot View (Combined) - 使用 HTML 组件显示 MJPEG 流
+                             with gr.Column(scale=3):
+                                 combined_display = gr.HTML(
+                                    value="<div id='combined_view_html'><p>等待视频流...</p></div>",
+                                    elem_id="combined_view_html"
+                                 )
+                             
+                             # Right: Note 2
+                             with gr.Column(scale=1):
+                                 note2 = gr.Markdown(
+                                     value=get_task_hint(""),
+                                     elem_id="note2"
+                                 )
 
             # --- Bottom Container: Operation Zone (60-65% Height) ---
             # Operation Zone Group (第一阶段隐藏)
             with gr.Group(visible=False) as operation_zone_group:
                 with gr.Row():
-                    # Left: Live Observation (Main)
+                    # Left: Action Selection
+                    with gr.Column(scale=ACTION_SCALE):
+                         gr.Markdown("### Action Selection 🧠")
+                         options_radio = gr.Radio(choices=[], label="Action", type="value", show_label=False, elem_id="action_radio")
+
+                    # Middle: Live Observation (Main)
                     with gr.Column(scale=LIVE_OBSERVATION_SCALE):
                          gr.Markdown("### Keypoint Selection 🎯")
                          img_display = gr.Image(
@@ -641,11 +672,6 @@ def create_ui_blocks():
                             elem_id="live_obs",
                             show_label=False
                          )
-
-                    # Middle: Action Selection
-                    with gr.Column(scale=ACTION_SCALE):
-                         gr.Markdown("### Action Selection 🧠")
-                         options_radio = gr.Radio(choices=[], label="Action", type="value", show_label=False, elem_id="action_radio")
 
                     # Right: Control Panel
                     with gr.Column(scale=CONTROL_SCALE):
@@ -690,7 +716,9 @@ def create_ui_blocks():
                 operation_zone_group,
                 confirm_demo_btn,
                 play_video_btn,
-                coords_group
+                coords_group,
+                note1,
+                note2
             ]
         ).then(
             fn=lambda u: u,
@@ -724,7 +752,9 @@ def create_ui_blocks():
                 operation_zone_group,
                 confirm_demo_btn,
                 play_video_btn,
-                coords_group
+                coords_group,
+                note1,
+                note2
             ]
         )
         
@@ -746,7 +776,9 @@ def create_ui_blocks():
                 confirm_demo_btn,
                 play_video_btn,
                 exec_btn,
-                coords_group
+                coords_group,
+                note1,
+                note2
             ]
         )
 
