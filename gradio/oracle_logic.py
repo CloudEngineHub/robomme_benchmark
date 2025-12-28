@@ -189,6 +189,7 @@ class OracleSession:
         # Track frame indices for incremental video updates
         self.last_base_frame_idx = 0
         self.last_wrist_frame_idx = 0
+        self.non_demonstration_task_length = None  # 从 DemonstrationWrapper 读取
 
     def load_episode(self, env_id, episode_idx):
         """Initialize environment for a specific episode."""
@@ -240,6 +241,9 @@ class OracleSession:
                 )
             
             self.env.unwrapped.evaluate() # Initial eval check
+            
+            # 从 DemonstrationWrapper 读取 non_demonstration_task_length（如果存在）
+            self.non_demonstration_task_length = getattr(self.env, 'non_demonstration_task_length', None)
             
             # Reset logs
             self.history = []

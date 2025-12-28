@@ -40,7 +40,10 @@ from ..HistoryBench_env.util import reset_panda
 
 
 def load_episode_metadata(metadata_path: Union[str, Path, None]) -> Dict[Tuple[str, int], Dict[str, object]]:
-    """Read per-episode metadata from JSON; returns empty dict if missing/invalid."""
+    """
+    从 JSON 文件读取每集的元数据（metadata）；如果缺失或无效则返回空字典。
+    用于恢复特定 episode 的配置（如 seed、难度等）。
+    """
 
     metadata_index: Dict[Tuple[str, int], Dict[str, object]] = {}
     if not metadata_path:
@@ -82,7 +85,7 @@ def get_episode_metadata(
     task: str,
     episode: int,
 ) -> Optional[Dict[str, object]]:
-    """Lookup metadata entry for a specific (task, episode) pair."""
+    """查找特定 (task, episode) 配对的元数据条目。"""
 
     if not metadata_index:
         return None
@@ -90,7 +93,12 @@ def get_episode_metadata(
 
 
 class EpisodeConfigResolver:
-    """Helper to resolve seed/difficulty per episode and build wrapped envs."""
+    """
+    Episode 配置解析器。
+    
+    辅助类，用于解析每个 episode 的种子（seed）和难度（difficulty），并构建包装好的环境。
+    数据来源可以是已有的 HDF5 数据集，也可以是元数据文件。
+    """
 
     def __init__(
         self,
@@ -117,6 +125,7 @@ class EpisodeConfigResolver:
             self.env_dataset = dataset[env_group]
 
     def resolve_episode(self, episode: int):
+        """根据 dataset 或 metadata 解析 episode 的配置。"""
         episode_dataset = None
         seed = None
         difficulty_hint = None
@@ -142,6 +151,7 @@ class EpisodeConfigResolver:
         return seed, difficulty_hint, episode_dataset
 
     def make_env_for_episode(self, episode: int):
+        """为特定 episode 创建并配置环境。"""
         seed, difficulty_hint, episode_dataset = self.resolve_episode(episode)
         env_kwargs = dict(
             obs_mode="rgb+depth+segmentation",
@@ -169,6 +179,14 @@ class EpisodeConfigResolver:
 
 
 class DemonstrationWrapper(gym.Wrapper):
+    """
+    Demonstration 包装器。
+    
+    主要功能：
+    1. 在环境 reset 后自动生成演示轨迹（Trajectory），使用 Motion Planner。
+    2. 记录演示过程中的帧、动作、状态等数据。
+    3. 支持视频录制，可视化演示过程。
+    """
     def __init__(self, env,max_steps_without_demonstration,gui_render,save_video=False):
         self.max_steps_without_demonstration=max_steps_without_demonstration
         self.gui_render=gui_render
@@ -219,7 +237,8 @@ class DemonstrationWrapper(gym.Wrapper):
 
     def reset(self, **kwargs):
         obs = super().reset(**kwargs)
-        # Automatically generate demonstration trajectory after reset
+        # Reset 后自动调用 get_demonstration_trajectory 生成演示轨迹
+        # 这确保了每次 episode 开始时都有对应的演示数据
         self.demonstration_data = self.get_demonstration_trajectory()
 
         if self.unwrapped.spec.id=="PatternLock" or self.unwrapped.spec.id == "RouteStick":
@@ -351,9 +370,11 @@ class DemonstrationWrapper(gym.Wrapper):
                 segmentation_result = segmentation_2d
             segmentation_result_2d = segmentation_result.squeeze()
 
+        # 处理子目标分割和占位符填充逻辑
         current_subgoal_segment = getattr(self.unwrapped, 'current_subgoal_segment', None)
         if current_subgoal_segment != self.previous_subgoal_segment:
             def compute_center_from_ids(wrapper_self, segmentation_mask, ids):
+                """计算指定 ID 集合的分割掩码中心点。"""
                 if not ids:
                     return None
                 mask = np.isin(segmentation_mask, ids)
@@ -382,6 +403,7 @@ class DemonstrationWrapper(gym.Wrapper):
                         )
                 self.segmentation_points = [center for center in segment_centers if center is not None]
 
+                # 如果存在子目标文本，尝试替换其中的占位符（如 <target>）为具体坐标
                 if current_subgoal_segment:
                     import re
                     subgoal_text = getattr(self, 'current_task_name', 'Unknown')
@@ -551,6 +573,7 @@ class DemonstrationWrapper(gym.Wrapper):
         return obs, reward, terminated, truncated, info
 
     def close(self):
+        # 保存演示视频到 replay_videos 目录
         if self.save_video and len(self.video_frames)>0:
             videos_dir = Path("/data/hongzefu/dataset_generate/replay_videos")
             videos_dir.mkdir(parents=True, exist_ok=True)
@@ -589,6 +612,16 @@ class DemonstrationWrapper(gym.Wrapper):
         return None
 
     def get_demonstration_trajectory(self):
+        """
+        生成演示轨迹（Demonstration Trajectory）。
+        
+        流程：
+        1. 根据环境 ID 选择合适的 Motion Planner（PandaArm 或 PandaStick）。
+        2. 遍历任务列表（task_list），找到标记为 demonstration 的任务。
+        3. 对每个演示任务，调用其 solve 回调函数，让 Motion Planner 执行规划。
+        4. 记录执行过程中的帧、动作、状态等。
+        5. 返回收集到的轨迹数据。
+        """
         #######for video demonstration
         if self.unwrapped.spec.id=="PatternLock" or self.unwrapped.spec.id == "RouteStick":
                     planner = PandaStickMotionPlanningSolver(
@@ -610,7 +643,13 @@ class DemonstrationWrapper(gym.Wrapper):
                             print_env_info=False,
                         )
         tasks = getattr(self, 'task_list', [])
+
+        self.task_list_length = len(tasks)#记录任务列表长度
+        print(f"Task list length: {self.task_list_length}")
+
         demonstration_tasks = [task for task in tasks if task.get("demonstration", False)]
+        self.non_demonstration_task_length = len(tasks) - len(demonstration_tasks)  # 记录非demonstration任务长度
+        print(f"Non-demonstration task length: {self.non_demonstration_task_length}")
 
         for idx, task_entry in enumerate(demonstration_tasks):
             self.unwrapped.demonstration_record_traj=True

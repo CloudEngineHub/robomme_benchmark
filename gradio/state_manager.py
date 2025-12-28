@@ -45,6 +45,11 @@ FRAME_QUEUES = {}
 # 存储每个session的UI阶段："watching_demo" 或 "executing_task"
 UI_PHASE_MAP = {}  # {uid: "watching_demo" | "executing_task"}
 
+# --- Execute 次数跟踪 ---
+# 跟踪每个用户每个任务的 execute 次数
+# 键格式: "{username}:{env_id}:{episode_idx}"
+EXECUTE_COUNTS = {}  # {task_key: count}
+
 # 线程锁，用于保护全局状态的访问
 _state_lock = threading.Lock()
 
@@ -169,6 +174,61 @@ def reset_ui_phase(uid):
         UI_PHASE_MAP[uid] = "watching_demo"
 
 
+def _get_task_key(username, env_id, episode_idx):
+    """生成任务键（用于跟踪 execute 次数）"""
+    return f"{username}:{env_id}:{episode_idx}"
+
+
+def get_execute_count(username, env_id, episode_idx):
+    """
+    获取指定任务的 execute 次数
+    
+    Args:
+        username: 用户名
+        env_id: 环境ID
+        episode_idx: Episode索引
+        
+    Returns:
+        int: execute 次数，如果任务不存在则返回 0
+    """
+    with _state_lock:
+        task_key = _get_task_key(username, env_id, episode_idx)
+        return EXECUTE_COUNTS.get(task_key, 0)
+
+
+def increment_execute_count(username, env_id, episode_idx):
+    """
+    增加指定任务的 execute 次数
+    
+    Args:
+        username: 用户名
+        env_id: 环境ID
+        episode_idx: Episode索引
+        
+    Returns:
+        int: 增加后的 execute 次数
+    """
+    with _state_lock:
+        task_key = _get_task_key(username, env_id, episode_idx)
+        current_count = EXECUTE_COUNTS.get(task_key, 0)
+        EXECUTE_COUNTS[task_key] = current_count + 1
+        return EXECUTE_COUNTS[task_key]
+
+
+def reset_execute_count(username, env_id, episode_idx):
+    """
+    重置指定任务的 execute 次数为 0
+    
+    Args:
+        username: 用户名
+        env_id: 环境ID
+        episode_idx: Episode索引
+    """
+    with _state_lock:
+        task_key = _get_task_key(username, env_id, episode_idx)
+        EXECUTE_COUNTS[task_key] = 0
+
+
 def cleanup_session(uid):
     """
     清理指定会话的所有资源
@@ -253,5 +313,8 @@ def cleanup_session(uid):
         if uid in UI_PHASE_MAP:
             del UI_PHASE_MAP[uid]
             print(f"Session {uid}: UI phase cleaned up")
+        
+        # 注意：不清理 EXECUTE_COUNTS，因为它是按任务跟踪的，不是按 session 跟踪的
+        # 如果需要清理，应该在任务切换时调用 reset_execute_count
     
     print(f"Session {uid}: all resources cleaned up successfully")

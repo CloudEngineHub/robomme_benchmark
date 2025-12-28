@@ -22,6 +22,9 @@ from state_manager import (
     add_option_select,
     set_ui_phase,
     reset_ui_phase,
+    get_execute_count,
+    increment_execute_count,
+    reset_execute_count,
 )
 from streaming_service import FrameQueueManager, cleanup_frame_queue
 from image_utils import draw_marker, save_video, concatenate_frames_horizontally
@@ -110,6 +113,9 @@ def login_and_load_task(username, uid):
     # 清空该session的coordinate_clicks和option_selects（新episode开始）
     clear_coordinate_clicks(uid)
     clear_option_selects(uid)
+    
+    # 重置该任务的 execute 计数（新任务开始）
+    reset_execute_count(username, env_id, int(ep_num))
     
     img, load_msg = session.load_episode(env_id, int(ep_num))
     
@@ -608,6 +614,19 @@ def execute_step(uid, username, option_idx, coords_str):
     if not session:
         return None, "Session Error", gr.update(), gr.update(), gr.update(interactive=False), gr.update(interactive=False), gr.update(visible=False)
     
+    # 检查 execute 次数限制（在执行前检查，如果达到限制则模拟失败状态）
+    execute_limit_reached = False
+    if username and session.env_id is not None and session.episode_idx is not None:
+        # 从 session 读取 non_demonstration_task_length，如果存在则加1作为限制，否则不设置限制
+        max_execute = None
+        if hasattr(session, 'non_demonstration_task_length') and session.non_demonstration_task_length is not None:
+            max_execute = session.non_demonstration_task_length + 1
+        
+        if max_execute is not None:
+            current_count = get_execute_count(username, session.env_id, session.episode_idx)
+            if current_count >= max_execute:
+                execute_limit_reached = True
+    
     # 检查并初始化Reference Views（如果frames为空或队列不存在）
     from state_manager import FRAME_QUEUES
     frames_exist = session.base_frames or session.wrist_frames
@@ -763,30 +782,59 @@ def execute_step(uid, username, option_idx, coords_str):
             print(f"Error getting pre-execute image: {e}")
             
     # Execute
-    # 异常处理：所有异常（ScrewPlanFailure 和其他执行错误）都会显示弹窗通知
-    print(f"Executing step: Opt {option_idx}, Coords {click_coords}")
-    try:
-        img, status, done = session.execute_action(option_idx, click_coords)
-    except ScrewPlanFailureError as e:
-        # 捕获 screw plan 失败异常，显示弹窗通知
-        error_message = str(e)
-        gr.Info(f"Robot cannot reach position")
-        # 返回当前状态，在状态消息中显示错误信息
-        current_img = session.get_pil_image(use_segmented=USE_SEGMENTED_VIEW)
-        status = f"Screw plan failed: {error_message}"
-        done = False
-        # 继续正常返回流程
-        img = current_img
-    except RuntimeError as e:
-        # 捕获所有其他执行错误，显示弹窗通知
-        error_message = str(e)
-        gr.Info(f"Cannot find suitable target")
-        # 返回当前状态，在状态消息中显示错误信息
-        current_img = session.get_pil_image(use_segmented=USE_SEGMENTED_VIEW)
-        status = f"Error: {error_message}"
-        done = False
-        # 继续正常返回流程
-        img = current_img
+    # 如果达到 execute 次数限制，模拟失败状态（使用和任务失败一样的机制）
+    if execute_limit_reached:
+        # 获取选项标签用于状态消息
+        option_label = None
+        if session.available_options:
+            for label, idx in session.available_options:
+                if idx == option_idx:
+                    option_label = label
+                    break
+        
+        # 模拟失败状态，使用和 oracle_logic.py 中任务失败一样的格式
+        status = f"Executing: {option_label or 'Action'}"
+        status += " | FAILED"  # 和任务失败一样的格式
+        done = True  # 设置为完成，触发任务完成流程
+        
+        # 获取当前图片
+        img = session.get_pil_image(use_segmented=USE_SEGMENTED_VIEW)
+        
+        # 增加 execute 计数（因为这也算一次尝试）
+        if username and session.env_id is not None and session.episode_idx is not None:
+            new_count = increment_execute_count(username, session.env_id, session.episode_idx)
+            print(f"Execute limit reached for {username}:{session.env_id}:{session.episode_idx} (count: {new_count})")
+    else:
+        # 正常执行
+        # 异常处理：所有异常（ScrewPlanFailure 和其他执行错误）都会显示弹窗通知
+        print(f"Executing step: Opt {option_idx}, Coords {click_coords}")
+        try:
+            img, status, done = session.execute_action(option_idx, click_coords)
+        except ScrewPlanFailureError as e:
+            # 捕获 screw plan 失败异常，显示弹窗通知
+            error_message = str(e)
+            gr.Info(f"Robot cannot reach position")
+            # 返回当前状态，在状态消息中显示错误信息
+            current_img = session.get_pil_image(use_segmented=USE_SEGMENTED_VIEW)
+            status = f"Screw plan failed: {error_message}"
+            done = False
+            # 继续正常返回流程
+            img = current_img
+        except RuntimeError as e:
+            # 捕获所有其他执行错误，显示弹窗通知
+            error_message = str(e)
+            gr.Info(f"Cannot find suitable target")
+            # 返回当前状态，在状态消息中显示错误信息
+            current_img = session.get_pil_image(use_segmented=USE_SEGMENTED_VIEW)
+            status = f"Error: {error_message}"
+            done = False
+            # 继续正常返回流程
+            img = current_img
+        
+        # 增加 execute 计数（无论成功或失败都计数，因为用户已经执行了一次操作）
+        if username and session.env_id is not None and session.episode_idx is not None:
+            new_count = increment_execute_count(username, session.env_id, session.episode_idx)
+            print(f"Execute count for {username}:{session.env_id}:{session.episode_idx} = {new_count}")
     
     # 等待一小段时间，确保continuous_frame_monitor线程处理完所有帧
     # 不再手动调用monitor_frames_and_enqueue，因为continuous_frame_monitor线程已经在处理

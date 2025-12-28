@@ -12,6 +12,7 @@ LIVE_OBSERVATION_SCALE = 3  # Live Observation 列的宽度比例
 ACTION_SCALE = 3  # Action 列的宽度比例
 CONTROL_SCALE = 3  # Control 列的宽度比例
 
+
 ENV_IDS = [
     "VideoPlaceOrder", "PickXtimes", "StopCube", "SwingXtimes", 
     "BinFill", "VideoUnmaskSwap", "VideoUnmask", "ButtonUnmaskSwap", 

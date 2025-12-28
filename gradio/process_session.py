@@ -140,7 +140,8 @@ def session_worker_loop(cmd_queue, result_queue, stream_queue, dataset_root, gui
                     "available_options": session.available_options,
                     "raw_solve_options": _sanitize_options(session.raw_solve_options),
                     "seg_vis": session.seg_vis,
-                    "is_demonstration": is_demonstration
+                    "is_demonstration": is_demonstration,
+                    "non_demonstration_task_length": session.non_demonstration_task_length  # 同步非demonstration任务长度
                 }
                 result_queue.put({"status": "success", "result": res, "state": state_update})
                 
@@ -275,6 +276,7 @@ class ProcessSessionProxy:
         self.raw_solve_options = []
         self.seg_vis = None
         self.is_demonstration = False  # 演示模式标志
+        self.non_demonstration_task_length = None  # 从工作进程同步的非demonstration任务长度
         
         # 帧同步线程：从流队列接收新帧并更新本地缓存
         self.stop_sync = False

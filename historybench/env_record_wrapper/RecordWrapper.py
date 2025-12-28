@@ -31,12 +31,19 @@ from ..HistoryBench_env.util.segmentation_utils import (
     create_segmentation_visuals,
 )
 class FailsafeTimeout(RuntimeError):
-    """Raised when the HistoryBench failsafe stops an episode early."""
+    """当 HistoryBench failsafe 提前终止 episode 时抛出的异常。"""
     pass
 
 
 class HistoryBenchRecordWrapper(gym.Wrapper):
-    """Wrapper that logs HistoryBench rollouts into HDF5 and optional videos."""
+    """
+    HistoryBench 记录包装器。
+    
+    主要功能：
+    1. 将 HistoryBench 的 rollout 数据（观测、动作、状态等）记录到 HDF5 文件中。
+    2. 生成包含 base/wrist 相机视角、分割掩码、可视化结果的合成视频。
+    3. 处理分割（segmentation）逻辑，包括目标识别和中心点计算。
+    """
     def __init__(self, env,
      HistoryBench_dataset=None,HistoryBench_env=None,HistoryBench_episode=None,HistoryBench_seed=None,save_video=False):
         # 先初始化父类，确保 self.env 存在
@@ -54,24 +61,25 @@ class HistoryBenchRecordWrapper(gym.Wrapper):
 
 
 
-        # Track whether the failsafe has been triggered to avoid repeated exceptions
+        # 追踪 failsafe 是否已被触发，避免重复抛出异常
         self._failsafe_triggered = False
 
         # 新增：用于暂存数据的缓冲区，在 write() 前批量写入
+        # 避免每一步都进行 IO 操作，提高效率
         self.buffer = []
         self.episode_success = False
 
-        # Cache for subgoal segment tracking
+        # 用于子目标分割跟踪的缓存
         self.previous_subgoal_segment = None
         self.current_subgoal_segment_filled = None
-        self.segmentation_points = []  # Cache for segmentation center point(s)
+        self.segmentation_points = []  # 缓存分割中心点
         self.previous_subgoal_segment_online = None
         self.current_subgoal_segment_online_filled = None
-        self.segmentation_points_online = []  # Cache for online segmentation targets
+        self.segmentation_points_online = []  # 缓存即使在线分割目标点
 
         # 视频缓冲区
         self.video_frames = []  # 存储组合后的视频帧
-        self.no_object_video_frames = []  # 视频帧中缺失目标时单独保存
+        self.no_object_video_frames = []  # 视频帧中缺失目标时单独保存，用于调试
 
         self.h5_file = None
 
@@ -98,6 +106,7 @@ class HistoryBenchRecordWrapper(gym.Wrapper):
         self.dataset_path = self.hdf5_dir / h5_filename
 
         # 按照 env/episode/seed 约定生成唯一文件名，便于后续批量分析
+        # 使用 'a' 模式打开，如果文件损坏则删除重建
         try:
             self.h5_file = h5py.File(self.dataset_path, "a")
         except OSError as exc:
@@ -111,8 +120,8 @@ class HistoryBenchRecordWrapper(gym.Wrapper):
         print(f"Recording data to {self.dataset_path}")
         print(f"HDF5 files will be saved in folder: {self.hdf5_dir}")
 
-                # Color map: assign different colors to different segmentation IDs
         # 颜色查找表在初始化时生成一次，避免 step 中不断构造
+        # 用于给不同的分割 ID 分配固定颜色
         def generate_color_map(n=100, s_min=0.70, s_max=0.95, v_min=0.78, v_max=0.95):
             """
             生成 1..n 的颜色字典，值为 [R,G,B]（0-255）。
@@ -135,7 +144,7 @@ class HistoryBenchRecordWrapper(gym.Wrapper):
         self.color_map=color_map
 
     def _add_red_border(self, frame, border_width=10):
-        """Add a red border around the frame."""
+        """给图像添加红色边框，通常用于标记 Demonstration 阶段。"""
         frame_with_border = frame.copy()
         # Add red border (RGB: 255, 0, 0)
         frame_with_border[:border_width, :] = [255, 0, 0]  # Top
@@ -145,12 +154,13 @@ class HistoryBenchRecordWrapper(gym.Wrapper):
         return frame_with_border
 
     def _add_text_to_frame(self, frame, text, position='top_right'):
-        """Create a padded text area following the requested wrapping logic and stack it above the frame.
-
+        """
+        在帧上方创建一个填充的文本区域，并根据需要自动换行。
+        
         Args:
-            frame: The image frame to add text to
-            text: Either a single string or a list of strings. Each list item will be displayed on separate lines.
-            position: Position parameter (retained for compatibility)
+            frame: 要添加文本的图像帧
+            text: 单个字符串或字符串列表。列表中的每一项将显示在不同的行上。
+            position: 位置参数（保留用于兼容性，实际总是堆叠在上方）
         """
         if not text:
             return frame
@@ -212,9 +222,12 @@ class HistoryBenchRecordWrapper(gym.Wrapper):
         wrist_camera_frame = obs['sensor_data']['hand_camera']['rgb'][0].cpu().numpy()
         segmentation=obs['sensor_data']['base_camera']['segmentation'].cpu().numpy()[0]
 
+        # 获取当前子目标名称和在线规划子目标名称
         current_subgoal_segment = getattr(self.unwrapped, 'current_subgoal_segment', None)
         current_subgoal_segment_online = getattr(self.unwrapped, 'current_subgoal_segment_online', None)
         current_task_name_online = getattr(self.unwrapped, 'current_task_name_online', getattr(self, 'current_task_name_online', 'Unknown'))
+        
+        # 处理离线规划的分割信息：生成可视化结果、计算目标中心点、填充子目标文本中的占位符
         segmentation_output = process_segmentation(
             segmentation=segmentation,
             segmentation_id_map=getattr(self, "segmentation_id_map", None),
@@ -237,6 +250,7 @@ class HistoryBenchRecordWrapper(gym.Wrapper):
         ]
         self.vis_obj_id_list = segmentation_output["vis_obj_id_list"]
 
+        # 处理在线规划的分割信息（逻辑同上，但针对 online 目标）
         segmentation_output_online = process_segmentation(
             segmentation=segmentation,
             segmentation_id_map=getattr(self, "segmentation_id_map", None),
@@ -250,6 +264,10 @@ class HistoryBenchRecordWrapper(gym.Wrapper):
         )
         segmentation_result_online = segmentation_output_online["segmentation_result"]
         self.segmentation_points_online = segmentation_output_online["segmentation_points"]
+        self.current_subgoal_segment_filled = segmentation_output[
+            "current_subgoal_segment_filled"
+        ]
+        # 注意：这里可能应该是 online 的填充结果？但原代码是复写了 self.current_subgoal_segment_online_filled
         self.current_subgoal_segment_online_filled = segmentation_output_online[
             "current_subgoal_segment_filled"
         ]
@@ -260,6 +278,8 @@ class HistoryBenchRecordWrapper(gym.Wrapper):
         self.vis_obj_id_list_online = segmentation_output_online["vis_obj_id_list"]
 
         current_task=self.current_task_name if hasattr(self, 'current_task_name') else "Unknown"
+        
+        # 视频录制逻辑：仅在任务名称不为 NO RECORD 且启用视频保存时执行
         if self.save_video and current_task!='NO RECORD':
                 
             # 如果是 demonstration 任务，添加红色边框（仅用于视频，不影响HDF5）
@@ -276,7 +296,7 @@ class HistoryBenchRecordWrapper(gym.Wrapper):
             segmentation_result_for_video=copy.deepcopy(segmentation_result)
             segmentation_result_online_for_video=copy.deepcopy(segmentation_result_online)
 
-
+            # 调整 wrist 相机图像大小以匹配 base 相机
             if base_camera_frame_for_video.shape[:2] != wrist_camera_frame_for_video.shape[:2]:
                 wrist_camera_frame_for_video = cv2.resize(
                     wrist_camera_frame_for_video,
@@ -284,6 +304,7 @@ class HistoryBenchRecordWrapper(gym.Wrapper):
                     interpolation=cv2.INTER_LINEAR,
                 )
 
+            # 生成分割可视化图像（上色）和带红点的目标图像
             (
                 segmentation_vis,
                 segmentation_result_vis,
@@ -314,10 +335,10 @@ class HistoryBenchRecordWrapper(gym.Wrapper):
             combined_online=np.hstack([base_camera_frame_for_video, wrist_camera_frame_for_video,
                               segmentation_vis_online, segmentation_result_vis_online,target_for_video_online])
 
-            # 为第一行添加 subgoal_text 和 grounded_subgoal 文本
+            # 为第一行添加 subgoal_text 和 grounded_subgoal 文本（PLANNER 视角）
             combined = self._add_text_to_frame(combined, ["PLANNER:",subgoal_text, self.current_subgoal_segment_filled], position='top_right')
 
-            # 为第二行添加 ONLINE: 标记和 subgoal_online_text 和 grounded_subgoal_online 文本
+            # 为第二行添加 ONLINE: 标记和 subgoal_online_text 和 grounded_subgoal_online 文本（ONLINE 视角）
             combined_online = self._add_text_to_frame(combined_online, ["ONLINE:", subgoal_online_text, self.current_subgoal_segment_online_filled], position='top_right')
 
             # 将两行视频流垂直堆叠
@@ -327,7 +348,7 @@ class HistoryBenchRecordWrapper(gym.Wrapper):
             #                   ])
 
 
-
+            # 如果是演示阶段，给整个帧加红框
             if is_demonstration:
                 combined = self._add_red_border(combined)
 
@@ -381,6 +402,7 @@ class HistoryBenchRecordWrapper(gym.Wrapper):
 
         # Failsafe: enforce a hard cap on episode length so planners can't run forever
         # 仍使用英文注释保留原含义：当 planner 卡住不结束时强制截断，保护录制流程
+        # 如果环境步数超过预设的安全限制（2000步），则强制终止 episode
         fail_safe_limit = 2000
         env_steps = int(getattr(self.env.unwrapped, "elapsed_steps", getattr(self.env, "elapsed_steps", 0)))
         #print(env_steps)
@@ -492,7 +514,7 @@ class HistoryBenchRecordWrapper(gym.Wrapper):
                 ts_group.create_dataset("state", data=record_data['state'])
                 ts_group.create_dataset("velocity", data=record_data['velocity'])
 
-                # 处理字符串任务名
+                # 处理字符串任务名，确保编码正确
                 task_name = record_data['simple_subgoal']
                 if isinstance(task_name, str):
                     task_name_encoded = task_name.encode('utf-8')
@@ -523,7 +545,7 @@ class HistoryBenchRecordWrapper(gym.Wrapper):
 
                 ts_group.create_dataset("demonstration", data=record_data['demonstration'])
 
-            # 写入 setup 信息
+            # 写入 setup 信息（种子、难度、任务列表）
             setup_group = episode_group.create_group(f"setup")
             setup_group.create_dataset("seed", data=self.HistoryBench_seed)
             setup_group.create_dataset(
