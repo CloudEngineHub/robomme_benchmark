@@ -362,7 +362,7 @@ def main():
         # "PickXtimes",
         # "StopCube",
         # "SwingXtimes",
-        "BinFill",
+        #"BinFill",
 
         #"VideoUnmaskSwap",
         #"VideoUnmask",
@@ -371,7 +371,7 @@ def main():
 
         # "VideoRepick",
         # "VideoPlaceButton",
-        # "VideoPlaceOrder",
+         "VideoPlaceOrder",
         # "PickHighlight",
 
         # "InsertPeg",
@@ -388,7 +388,7 @@ def main():
             #     continue
 
             env, planner, color_map, language_goal = oracle_resolver.initialize_episode(env_id, episode)
-            model_name = "gemini-2.5-pro"  # "gemini-2.5-pro" # "gpt-4o-mini", "gemini-er", "qwen-vl"
+            model_name = "gemini-2.5-flash"  # "gemini-2.5-pro" # "gpt-4o-mini", "gemini-er", "qwen-vl"
             success = "fail"
             save_dir = f"oracle_planning/{model_name}/{env_id}/ep{episode}"
                         
