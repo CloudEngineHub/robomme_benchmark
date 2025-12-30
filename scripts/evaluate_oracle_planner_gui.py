@@ -12,17 +12,9 @@ from pathlib import Path
 import torch
 
 # --- NLP Imports ---
-try:
-    from sentence_transformers import SentenceTransformer, util as st_util
-except ImportError as exc:
-    raise ImportError(
-        "Missing dependency 'sentence-transformers'."
-        " Semantic matching relies on it; please install via `pip install sentence-transformers`."
-    ) from exc
-
-print("Loading NLP Model (all-MiniLM-L6-v2)...")
-_NLP_MODEL = SentenceTransformer('all-MiniLM-L6-v2')
-print("NLP Model loaded.")
+# NLP 语义匹配（基于字符的 Edit Distance）
+from rapidfuzz import process, fuzz
+print("Loading NLP Module (rapidfuzz Edit Distance)...")
 
 try:
     from PIL import Image, ImageDraw, ImageFont
@@ -194,9 +186,7 @@ def _register_figure_for_cleanup(figures, window_name):
         figures.append(window_name)
 
 def _find_best_semantic_match(user_query, options):
-    if _NLP_MODEL is None:
-        return -1, 0.0
-    
+    """使用基于字符的编辑距离（rapidfuzz）找到最佳选项"""
     if not options:
         return -1, 0.0
 
@@ -204,16 +194,22 @@ def _find_best_semantic_match(user_query, options):
     query_text = str(user_query or "").strip()
 
     try:
-        query_embedding = _NLP_MODEL.encode(query_text, convert_to_tensor=True)
-        corpus_embeddings = _NLP_MODEL.encode(labels, convert_to_tensor=True)
-        cos_scores = st_util.cos_sim(query_embedding, corpus_embeddings)[0]
-        best_idx = torch.argmax(cos_scores).item()
-        best_score = cos_scores[best_idx].item()
+        # 使用 rapidfuzz 提取最佳匹配
+        # process.extractOne 返回 (match, score, index)
+        # score 范围 0-100
+        result = process.extractOne(query_text, labels, scorer=fuzz.ratio)
+        
+        if result:
+            match_text, score, best_idx = result
+            best_score = score / 100.0
+        else:
+            return -1, 0.0
+
     except Exception as exc:
-        print(f"  [NLP] Semantic match failed ({exc}); defaulting to option 1.")
+        print(f"  [NLP] Edit Distance match failed ({exc}); defaulting to option 1.")
         return 0, 0.0
 
-    print(f"  [NLP] Closest Match: '{query_text}' -> '{labels[best_idx]}' (Score: {best_score:.4f})")
+    print(f"  [NLP] Closest Match (Edit Distance): '{query_text}' -> '{labels[best_idx]}' (Score: {best_score:.4f})")
     
     return best_idx, best_score
 

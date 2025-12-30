@@ -13,19 +13,9 @@ import torch
 from historybench.HistoryBench_env.util.vqa_options import get_vqa_options
 
 
-# NLP 语义匹配（可选）
-_NLP_MODEL = None
-_ST_UTIL = None
-try:
-    from sentence_transformers import SentenceTransformer, util as st_util
-    print("Loading NLP Model (all-MiniLM-L6-v2)...")
-    _NLP_MODEL = SentenceTransformer('all-MiniLM-L6-v2')
-    _ST_UTIL = st_util
-    print("NLP Model loaded.")
-except ImportError:
-    print("Warning: sentence-transformers not found. NLP matching will fail.")
-except Exception as e:
-    print(f"Error loading NLP model: {e}")
+# NLP 语义匹配（基于字符的 Edit Distance）
+from rapidfuzz import process, fuzz
+print("Loading NLP Module (rapidfuzz Edit Distance)...")
 
 
 # =============================================================================
@@ -90,10 +80,7 @@ def _build_solve_options(env, planner, selected_target, env_id):
 
 
 def _find_best_semantic_match(user_query, options):
-    """使用 NLP 语义匹配找到最佳选项"""
-    if _NLP_MODEL is None or _ST_UTIL is None:
-        return -1, 0.0
-    
+    """使用基于字符的编辑距离（rapidfuzz）找到最佳选项"""
     if not options:
         return -1, 0.0
 
@@ -101,16 +88,22 @@ def _find_best_semantic_match(user_query, options):
     query_text = str(user_query or "").strip()
 
     try:
-        query_embedding = _NLP_MODEL.encode(query_text, convert_to_tensor=True)
-        corpus_embeddings = _NLP_MODEL.encode(labels, convert_to_tensor=True)
-        cos_scores = _ST_UTIL.cos_sim(query_embedding, corpus_embeddings)[0]
-        best_idx = int(torch.argmax(cos_scores).item())
-        best_score = float(cos_scores[best_idx].item())
+        # 使用 rapidfuzz 提取最佳匹配
+        # process.extractOne 返回 (match, score, index)
+        # score 范围 0-100
+        result = process.extractOne(query_text, labels, scorer=fuzz.ratio)
+        
+        if result:
+            match_text, score, best_idx = result
+            best_score = score / 100.0
+        else:
+            return -1, 0.0
+
     except Exception as exc:
-        print(f"  [NLP] Semantic match failed ({exc}); defaulting to option 1.")
+        print(f"  [NLP] Edit Distance match failed ({exc}); defaulting to option 1.")
         return 0, 0.0
 
-    print(f"  [NLP] Closest Match: '{query_text}' -> '{labels[best_idx]}' (Score: {best_score:.4f})")
+    print(f"  [NLP] Closest Match (Edit Distance): '{query_text}' -> '{labels[best_idx]}' (Score: {best_score:.4f})")
     
     return best_idx, best_score
 

@@ -163,6 +163,10 @@ class BaseModel(ABC):
     
     def prepare_input_data(self, image_query: Union[np.ndarray, List[np.ndarray]], text_query: str, step_idx: int) -> dict:
         """Prepare input data for the model"""
+        # 检查空列表情况
+        if isinstance(image_query, list) and len(image_query) == 0:
+            raise ValueError(f"image_query is empty at step {step_idx}. Cannot prepare input data without images.")
+        
         if not isinstance(image_query, list) or (isinstance(image_query, list) and len(image_query) <= 3):
             # will consider it as a single image, take the last one
             imageio.imwrite(os.path.join(self.save_dir, f"step_{step_idx}_image.png"), image_query[-1])
@@ -478,6 +482,11 @@ class OpenAIModel(BaseModel):
         
         return assistant_message
 
+    def clear_uploaded_files(self):
+        """Placeholder method for compatibility with other model classes.
+        OpenAIModel doesn't upload files to external services, so this is a no-op."""
+        pass
+
 class QwenModel(BaseModel):
     
     def init_model(self, system_prompt: str, model_name: str):
@@ -569,3 +578,106 @@ class QwenModel(BaseModel):
         # We'll treat it as not implemented or try to use frames if we had them.
         # But prepare_input_data for BaseModel will handle video->images if configured.
         raise NotImplementedError("Video processing not directly supported for Qwen via OpenAI API in this implementation. Use image sequence.")
+
+    def clear_uploaded_files(self):
+        """Placeholder method for compatibility with other model classes.
+        QwenModel doesn't upload files to external services, so this is a no-op."""
+        pass
+
+class LocalModel(BaseModel):
+    
+    def init_model(self, system_prompt: str, model_name: str):
+        self.client = OpenAI(
+            api_key="EMPTY",
+            base_url="http://localhost:22003/v1",
+            timeout=3600
+        )
+        # 如果 model_name 是 "local"，使用默认模型路径；否则使用传入的 model_name
+        if model_name == "local" or not model_name:
+            self.model_name = "/nfs/turbo/coe-chaijy-unreplicated/pre-trained-weights/Qwen3-VL-32B-Instruct"
+        else:
+            self.model_name = model_name
+        self.messages = [{
+            "role": "system",
+            "content": system_prompt
+        }]
+        self.use_multi_images_as_video = True
+
+    def _encode_image(self, image_path: str) -> str:
+        with open(image_path, "rb") as f:
+            b64 = base64.b64encode(f.read()).decode("utf-8")
+        return f"data:image/jpeg;base64,{b64}"
+
+    def _process_image(self, image_path: Union[str, List[str]], 
+                      text_query: str = "What should the robot do in this situation?") -> str:
+        content = []        
+        image_paths = image_path if isinstance(image_path, list) else [image_path]
+        
+        for path in image_paths:
+            base64_image = self._encode_image(path)
+            content.append({
+                "type": "image_url",
+                "image_url": {
+                    "url": base64_image
+                }
+            })
+        content.append({"type": "text", "text": text_query})        
+        
+        self.messages.append({
+            "role": "user",
+            "content": content
+        })
+                
+        response = self.client.chat.completions.create(
+            model=self.model_name,
+            messages=self.messages,
+            max_tokens=2048
+        )
+        
+        assistant_message = response.choices[0].message.content
+        self.messages.append({
+            "role": "assistant",
+            "content": assistant_message
+        })
+                
+        self.conversation_history.append({
+            "turn": len(self.conversation_history) + 1,
+            "type": "image",
+            "path": [os.path.basename(p) for p in image_paths] if isinstance(image_path, list) else os.path.basename(image_path),
+            "query": text_query,
+            "response": assistant_message
+        })
+    
+        return assistant_message
+    
+    def _process_text(self, user_query: str) -> str:
+        self.messages.append({"role": "user", "content": user_query})
+        
+        response = self.client.chat.completions.create(
+            model=self.model_name,
+            messages=self.messages,
+            max_tokens=2048
+        )
+        
+        assistant_message = response.choices[0].message.content
+        self.messages.append({
+            "role": "assistant",
+            "content": assistant_message
+        })
+        
+        self.conversation_history.append({
+            "turn": len(self.conversation_history) + 1,
+            "type": "text",
+            "query": user_query,
+            "response": assistant_message
+        })
+        
+        return assistant_message
+
+    def _process_video(self, video_path: str, text_query: str) -> str:
+        raise NotImplementedError("Video processing not directly supported for LocalModel in this implementation. Use image sequence.")
+
+    def clear_uploaded_files(self):
+        """Placeholder method for compatibility with other model classes.
+        LocalModel doesn't upload files to external services, so this is a no-op."""
+        pass

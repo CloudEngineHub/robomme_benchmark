@@ -47,36 +47,37 @@ def main():
     )
     
     env_id_list = [
-        # "PickXtimes",
-        # "StopCube",
-        # "SwingXtimes",
-        #"BinFill",
+        "PickXtimes",
+        "StopCube",
+        "SwingXtimes",
+        "BinFill",
 
-        #"VideoUnmaskSwap",
-        #"VideoUnmask",
-        # "ButtonUnmaskSwap",
-        # "ButtonUnmask",
+        "VideoUnmaskSwap",
+        "VideoUnmask",
+        "ButtonUnmaskSwap",
+        "ButtonUnmask",
 
-        # "VideoRepick",
-        # "VideoPlaceButton",
+        "VideoRepick",
+        "VideoPlaceButton",
          "VideoPlaceOrder",
-        # "PickHighlight",
+        "PickHighlight",
 
-        # "InsertPeg",
-        # 'MoveCube',
-        # "PatternLock",
-        # "RouteStick"
+        "InsertPeg",
+        'MoveCube',
+        "PatternLock",
+        "RouteStick"
     ]
 
     for env_id in env_id_list:
         num_episodes = oracle_resolver.get_num_episodes(env_id)
 
-        for episode in range(10):
+        for episode in range(num_episodes):
+        #for episode in range(10):
             # if episode !=2:
             #     continue
 
             env, planner, color_map, language_goal = oracle_resolver.initialize_episode(env_id, episode)
-            model_name = "gemini-2.5-flash"  # "gemini-2.5-pro" # "gpt-4o-mini", "gemini-er", "qwen-vl"
+            model_name = "local"  # "gemini-2.5-pro" # "gpt-4o-mini", "gemini-er", "qwen-vl"
             success = "fail"
             save_dir = os.path.join("history_bench_sim", "oracle_planning", model_name, env_id, f"ep{episode}")
                         
@@ -92,13 +93,15 @@ def main():
                 api = GeminiModel(save_dir=save_dir, task_id=env_id, model_name=model_name, task_goal=language_goal, subgoal_type="oracle_planner")
             elif "qwen" in model_name:
                 api = QwenModel(save_dir=save_dir, task_id=env_id, model_name=model_name, task_goal=language_goal, subgoal_type="oracle_planner")
+            elif "local" in model_name:
+                api = LocalModel(save_dir=save_dir, task_id=env_id, model_name=model_name, task_goal=language_goal, subgoal_type="oracle_planner")
             else:
                 api = OpenAIModel(save_dir=save_dir, task_id=env_id, model_name=model_name, task_goal=language_goal, subgoal_type="oracle_planner")
 
 
             step_idx = 0
             frame_idx = 0
-            max_query_times = 10
+            max_query_times = 20
             
             while True:
                 if step_idx >= max_query_times:
@@ -114,6 +117,11 @@ def main():
                 print("num of base_frames", len(base_frames)-frame_idx)
                 print("num of wrist_frames", len(wrist_frames)-frame_idx)
                 print(available_options)
+                
+                # 检查是否有新的帧可用
+                if len(base_frames) <= frame_idx:
+                    print(f"Warning: No new frames available at step {step_idx}. Skipping API call.")
+                    continue
                 
                 # ------------------------ Call Gemini API ------------------------------------
             
@@ -199,7 +207,7 @@ def main():
             
             api.save_conversation()
             api.save_final_video(os.path.join(os.path.dirname(save_dir), f"{success}_ep{episode}_{language_goal}.mp4"))
-            api.clear_uploaded_files()
+            api.clear_uploaded_files() #only for gemini
             del api
             #import pdb; pdb.set_trace()
                       
