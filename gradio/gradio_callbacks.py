@@ -33,7 +33,7 @@ from user_manager import user_manager, LeaseLost
 from logger import log_user_action, create_new_attempt, has_existing_actions
 from config import USE_SEGMENTED_VIEW, REFERENCE_VIEW_HEIGHT, should_show_demo_video
 from process_session import ScrewPlanFailureError
-from note_content import get_coordinate_information, get_task_hint
+from note_content import get_task_hint
 
 
 def login_and_load_task(username, uid):
@@ -67,7 +67,6 @@ def login_and_load_task(username, uid):
             gr.update(visible=False),  # confirm_demo_btn
             gr.update(visible=False, interactive=True),  # play_video_btn
             gr.update(visible=False),  # coords_group
-            gr.update(value=get_coordinate_information()),  # note1
             gr.update(value=get_task_hint("")),  # note2
             gr.update(value=get_task_hint(""))  # note2_demo
         )
@@ -104,7 +103,6 @@ def login_and_load_task(username, uid):
             gr.update(visible=False),  # confirm_demo_btn
             gr.update(visible=False, interactive=True),  # play_video_btn
             gr.update(visible=False),  # coords_group
-            gr.update(value=get_coordinate_information()),  # note1
             gr.update(value=get_task_hint("")),  # note2
             gr.update(value=get_task_hint(""))  # note2_demo
         )
@@ -165,7 +163,6 @@ def login_and_load_task(username, uid):
             gr.update(visible=False),  # confirm_demo_btn
             gr.update(visible=False, interactive=True),  # play_video_btn
             gr.update(visible=False),  # coords_group
-            gr.update(value=get_coordinate_information()),  # note1
             gr.update(value=get_task_hint(env_id)),  # note2
             gr.update(value=get_task_hint(env_id))  # note2_demo
         )
@@ -243,7 +240,6 @@ def login_and_load_task(username, uid):
             gr.update(visible=True, interactive=False),  # confirm_demo_btn (第一阶段显示，初始禁用)
             gr.update(visible=True, interactive=True),  # play_video_btn (第一阶段显示)
             gr.update(visible=False),  # coords_group (初始化时隐藏)
-            gr.update(value=get_coordinate_information()),  # note1
             gr.update(value=get_task_hint(env_id)),  # note2
             gr.update(value=get_task_hint(env_id))  # note2_demo
         )
@@ -272,9 +268,11 @@ def login_and_load_task(username, uid):
             last_wrist_frame = session.wrist_frames[-1] if session.wrist_frames else None
             
             if last_base_frame is not None or last_wrist_frame is not None:
+                env_id = getattr(session, 'env_id', None)
                 last_frames = concatenate_frames_horizontally(
                     [last_base_frame] if last_base_frame is not None else [],
-                    [last_wrist_frame] if last_wrist_frame is not None else []
+                    [last_wrist_frame] if last_wrist_frame is not None else [],
+                    env_id=env_id
                 )
                 
                 queue_info = FRAME_QUEUES.get(uid)
@@ -311,7 +309,6 @@ def login_and_load_task(username, uid):
             gr.update(visible=False), # confirm_demo_btn (无视频，隐藏)
             gr.update(visible=False, interactive=True),  # play_video_btn
             gr.update(visible=False),  # coords_group (初始化时隐藏)
-            gr.update(value=get_coordinate_information()),  # note1
             gr.update(value=get_task_hint(env_id)),  # note2
             gr.update(value=get_task_hint(env_id))  # note2_demo
         )
@@ -391,7 +388,6 @@ def confirm_demo_watched(uid, username):
         gr.update(visible=False, interactive=False),  # play_video_btn (确认后隐藏)
         gr.update(interactive=True),  # exec_btn - 启用执行按钮
         gr.update(visible=False),   # coords_group (确认demo后，还未选择选项，隐藏)
-        gr.update(value=get_coordinate_information()),  # note1
         gr.update(value=get_task_hint(env_id)),  # note2
         gr.update(value=get_task_hint(env_id))  # note2_demo
     )
@@ -562,7 +558,7 @@ def init_app(request: gr.Request):
     username = params.get('user') or params.get('username')
     
     # Default outputs if no auto-login
-    # uid, loading_group, login_group, main_interface, login_msg, img, log, options, goal, coords, combined, video, task, progress, login_btn, next_btn, exec_btn, username_state, demo_video_group, combined_view_group, operation_zone_group, confirm_demo_btn, coords_group, note1, note2
+    # uid, loading_group, login_group, main_interface, login_msg, img, log, options, goal, coords, combined, video, task, progress, login_btn, next_btn, exec_btn, username_state, demo_video_group, combined_view_group, operation_zone_group, confirm_demo_btn, coords_group, note2, note2_demo
     default_outputs = (
         None, 
         gr.update(visible=False), # loading_group (hide it)
@@ -584,7 +580,6 @@ def init_app(request: gr.Request):
         gr.update(visible=False), # confirm_demo_btn
         gr.update(visible=False, interactive=True),  # play_video_btn
         gr.update(visible=False),  # coords_group (初始化时隐藏)
-        gr.update(value=get_coordinate_information()),  # note1
         gr.update(value=get_task_hint("")),  # note2
         gr.update(value=get_task_hint(""))  # note2_demo
     )
@@ -641,7 +636,9 @@ def init_app(request: gr.Request):
                 gr.update(visible=False), # operation_zone_group
                 gr.update(visible=False), # confirm_demo_btn
                 gr.update(visible=False, interactive=True),  # play_video_btn
-                gr.update(visible=False)  # coords_group
+                gr.update(visible=False),  # coords_group
+                gr.update(value=get_task_hint("")),  # note2
+                gr.update(value=get_task_hint(""))  # note2_demo
             )
     
     return default_outputs

@@ -167,7 +167,8 @@ def monitor_frames_and_enqueue(uid, pre_base_count, pre_wrist_count):
         
         # 拼接并加入队列
         if new_base or new_wrist:
-            concatenated = concatenate_frames_horizontally(new_base, new_wrist)
+            env_id = getattr(session, 'env_id', None)
+            concatenated = concatenate_frames_horizontally(new_base, new_wrist, env_id=env_id)
             for frame in concatenated:
                 try:
                     queue_info["frame_queue"].put(frame, block=False)
@@ -296,9 +297,11 @@ def generate_mjpeg_stream(uid: str):
                             last_wrist_frame = session.wrist_frames[-1] if session.wrist_frames else None
                             
                             if last_base_frame is not None or last_wrist_frame is not None:
+                                env_id = getattr(session, 'env_id', None)
                                 current_frames = concatenate_frames_horizontally(
                                     [last_base_frame] if last_base_frame is not None else [],
-                                    [last_wrist_frame] if last_wrist_frame is not None else []
+                                    [last_wrist_frame] if last_wrist_frame is not None else [],
+                                    env_id=env_id
                                 )
                                 if current_frames:
                                     frame_to_send = current_frames[0]

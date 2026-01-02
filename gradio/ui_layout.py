@@ -5,7 +5,7 @@ UI布局模块
 import gradio as gr
 from user_manager import user_manager
 from config import RESTRICT_VIDEO_PLAYBACK, REFERENCE_VIEW_HEIGHT, LIVE_OBSERVATION_SCALE, ACTION_SCALE, CONTROL_SCALE
-from note_content import get_coordinate_information, get_task_hint
+from note_content import get_task_hint
 from gradio_callbacks import (
     login_and_load_task,
     load_next_task_wrapper,
@@ -602,71 +602,56 @@ def create_ui_blocks():
                      with gr.Group(visible=True) as demo_video_group:
                          # Title row
                          with gr.Row():
-                             with gr.Column(scale=3):
+                             with gr.Column(scale=1):
                                  gr.Markdown("### Watch video and remember robot actions 👀✍️")
-                             with gr.Column(scale=1):
-                                 gr.Markdown("### Task Hint 💡")
                          
-                         # Content row
-                         with gr.Row():
-                             with gr.Column(scale=3):
-                                 video_elem_id = "demo_video" if RESTRICT_VIDEO_PLAYBACK else None
-                                 video_autoplay = False  # 不自动播放，等待用户点击按钮
-                                 
-                                 video_display = gr.Video(
-                                    label="Demonstration Video", 
-                                    interactive=False,  # 禁用用户控制
-                                    height=300, 
-                                    elem_id=video_elem_id, 
-                                    autoplay=video_autoplay,
-                                    show_label=False,
-                                    visible=True
-                                 )
-                                 
-                                 play_video_btn = gr.Button("Start Demonstration Video🎬", variant="primary", size="lg", visible=True, interactive=True, elem_id="play_video_btn")
-                                 
-                                 confirm_demo_btn = gr.Button("Start Task", variant="secondary", size="lg", visible=True, interactive=False)
-                             
-                             # Right: Task Hint for demo video group
-                             with gr.Column(scale=1):
+                         # Content row - 单列布局，Hint 在视频上方
+                         with gr.Column(scale=1):
+                             # Task Hint (Accordion) - 默认收起
+                             with gr.Accordion("Task Hint 💡 (点击展开查看提示)", open=False):
                                  note2_demo = gr.Markdown(
                                      value=get_task_hint(""),
                                      elem_id="note2_demo"
                                  )
+                             
+                             video_elem_id = "demo_video" if RESTRICT_VIDEO_PLAYBACK else None
+                             video_autoplay = False  # 不自动播放，等待用户点击按钮
+                             
+                             video_display = gr.Video(
+                                label="Demonstration Video", 
+                                interactive=False,  # 禁用用户控制
+                                height=300, 
+                                elem_id=video_elem_id, 
+                                autoplay=video_autoplay,
+                                show_label=False,
+                                visible=True
+                             )
+                             
+                             play_video_btn = gr.Button("Start Demonstration Video🎬", variant="primary", size="lg", visible=True, interactive=True, elem_id="play_video_btn")
+                             
+                             confirm_demo_btn = gr.Button("Start Task", variant="secondary", size="lg", visible=True, interactive=False)
 
                      # Combined View Group (第一阶段隐藏)
                      with gr.Group(visible=False) as combined_view_group:
                          # Title row - all titles at the same height
                          with gr.Row():
                              with gr.Column(scale=1):
-                                 gr.Markdown("### Coordinate Information 🗺️")
-                             with gr.Column(scale=3):
                                  gr.Markdown("### Execution LiveStream 🦾")
-                             with gr.Column(scale=1):
-                                 gr.Markdown("### Task Hint 💡")
                          
-                         # Content row
-                         with gr.Row():
-                             # Left: Note 1
-                             with gr.Column(scale=1):
-                                 note1 = gr.Markdown(
-                                     value=get_coordinate_information(),
-                                     elem_id="note1"
-                                 )
-                             
-                             # Middle: Desk + Robot View (Combined) - 使用 HTML 组件显示 MJPEG 流
-                             with gr.Column(scale=3):
-                                 combined_display = gr.HTML(
-                                    value="<div id='combined_view_html'><p>等待视频流...</p></div>",
-                                    elem_id="combined_view_html"
-                                 )
-                             
-                             # Right: Note 2
-                             with gr.Column(scale=1):
+                         # Content row - 单列布局，Hint 在视频上方
+                         with gr.Column(scale=1):
+                             # Task Hint (Accordion) - 默认收起
+                             with gr.Accordion("Task Hint 💡 (点击展开查看提示)", open=False):
                                  note2 = gr.Markdown(
                                      value=get_task_hint(""),
                                      elem_id="note2"
                                  )
+                             
+                             # Main: Desk + Robot View (Combined) - 使用 HTML 组件显示 MJPEG 流
+                             combined_display = gr.HTML(
+                                value="<div id='combined_view_html'><p>等待视频流...</p></div>",
+                                elem_id="combined_view_html"
+                             )
 
             # --- Bottom Container: Operation Zone (60-65% Height) ---
             # Operation Zone Group (第一阶段隐藏)
@@ -732,7 +717,6 @@ def create_ui_blocks():
                 confirm_demo_btn,
                 play_video_btn,
                 coords_group,
-                note1,
                 note2,
                 note2_demo
             ]
@@ -769,7 +753,6 @@ def create_ui_blocks():
                 confirm_demo_btn,
                 play_video_btn,
                 coords_group,
-                note1,
                 note2,
                 note2_demo
             ]
@@ -794,7 +777,6 @@ def create_ui_blocks():
                 play_video_btn,
                 exec_btn,
                 coords_group,
-                note1,
                 note2,
                 note2_demo
             ]
@@ -850,7 +832,6 @@ def create_ui_blocks():
                 confirm_demo_btn,
                 play_video_btn,
                 coords_group,
-                note1,
                 note2,
                 note2_demo
             ]
