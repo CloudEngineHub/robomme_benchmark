@@ -660,6 +660,10 @@ def log_user_action(username, env_id, episode_idx, action_data, option_list=None
     文件路径: data/user_action_logs/{username}/{env_id}_{episode_idx}.h5
     文件格式: HDF5，包含 actions 组，每个 action 记录一次 execute，包含 execute 之前所有的 option_select 和 coordinate_clicks
     """
+    # 如果 episode_idx 为 99，则不记录任何操作信息
+    if episode_idx == 99:
+        return
+    
     # 直接调用 HDF5 版本
     log_user_action_hdf5(username, env_id, episode_idx, action_data, option_list=option_list,
                          status=status, difficulty=difficulty, language_goal=language_goal, seed=seed)

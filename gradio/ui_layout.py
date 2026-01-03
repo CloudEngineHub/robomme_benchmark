@@ -1,10 +1,82 @@
 """
 UI布局模块
 定义Gradio界面组件、CSS和JS
+
+界面组件总结：
+==================
+
+【主要界面组】
+1. loading_group - 加载界面（初始显示）
+2. landing_group - 模式选择界面（落地页）
+3. login_group - 登录界面
+4. env_selection_group - 环境ID选择界面（仅测试模式）
+5. main_interface - 主界面（执行界面）
+
+【模式选择界面 (landing_group)】
+- test_btn - 自由尝试模式按钮
+- record_btn - 录制模式按钮
+
+【登录界面 (login_group)】
+- username_input - 用户名下拉选择框
+- login_btn - 登录按钮
+- login_msg - 登录消息显示
+
+【环境选择界面 (env_selection_group)】
+- env_buttons[] - 环境ID按钮列表（15个按钮，每行5个）
+- env_selection_msg - 环境选择消息
+
+【主界面 (main_interface)】
+├─ 顶部容器：参考区域 (Reference Zone)
+│  ├─ 左侧列 (30%)：
+│  │  ├─ task_info_box - 当前任务信息框
+│  │  ├─ progress_info_box - 进度信息框
+│  │  ├─ goal_box - 任务目标/指令框
+│  │  └─ log_output - 系统日志输出
+│  │
+│  └─ 右侧列 (70%)：
+│     ├─ demo_video_group - 演示视频组（第一阶段显示）
+│     │  ├─ note2_demo - 任务提示（可折叠手风琴）
+│     │  ├─ video_display - 演示视频播放器
+│     │  ├─ play_video_btn - 播放演示视频按钮
+│     │  └─ confirm_demo_btn - 开始任务按钮
+│     │
+│     └─ combined_view_group - 组合视图组（执行阶段显示）
+│        ├─ note2 - 任务提示（可折叠手风琴）
+│        └─ combined_display - 执行实时流显示（HTML组件）
+│
+└─ 底部容器：操作区域 (Operation Zone)
+   ├─ 左侧列：动作选择 (Action Selection)
+   │  └─ options_radio - 动作单选按钮组
+   │
+   ├─ 中间列：关键点选择 (Keypoint Selection)
+   │  └─ img_display - 实时观察图像显示（可点击）
+   │
+   └─ 右侧列：控制面板 (Control Panel)
+      ├─ coords_group - 坐标组（条件显示）
+      │  └─ coords_box - 坐标文本框
+      ├─ exec_btn - 执行按钮
+      ├─ next_task_btn - 下一个任务按钮
+      └─ back_to_landing_btn - 返回模式选择按钮
+
+【状态变量】
+- uid_state - 用户唯一标识符状态
+- username_state - 用户名状态
+
+【CSS样式类】
+- .ref-zone - 参考区域样式
+- .compact-log - 紧凑日志样式
+- .coords-group-highlight - 坐标组高亮样式
+- .live-obs-highlight - 实时观察高亮样式
+
+【JavaScript功能】
+- 视频自动播放控制（仅点击按钮播放）
+- 坐标选择检查（执行前验证）
+- LeaseLost错误处理
+- 坐标组和实时观察的高亮动画
 """
 import gradio as gr
 from user_manager import user_manager
-from config import RESTRICT_VIDEO_PLAYBACK, REFERENCE_VIEW_HEIGHT, LIVE_OBSERVATION_SCALE, ACTION_SCALE, CONTROL_SCALE
+from config import RESTRICT_VIDEO_PLAYBACK, REFERENCE_VIEW_HEIGHT, LIVE_OBSERVATION_SCALE, ACTION_SCALE, CONTROL_SCALE, ENV_IDS
 from note_content import get_task_hint
 from gradio_callbacks import (
     login_and_load_task,
@@ -14,7 +86,11 @@ from gradio_callbacks import (
     execute_step,
     init_app,
     confirm_demo_watched,
-    play_demo_video
+    play_demo_video,
+    select_env_id,
+    switch_to_record_mode,
+    switch_to_test_mode,
+    back_to_landing_page  # 回退到模式选择页面的函数
 )
 
 SYNC_JS = """
@@ -533,6 +609,16 @@ CSS = f"""#live_obs {{ }}
 #play_video_btn.disabled {{
     opacity: 0.5 !important;
     cursor: not-allowed !important;
+}}
+/* Back to Mode Selection Button - 白色样式 */
+#back_to_landing_btn {{
+    background-color: #ffffff !important;
+    color: #000000 !important;
+    border: 1px solid #d1d5db !important;
+}}
+#back_to_landing_btn:hover {{
+    background-color: #f9fafb !important;
+    border-color: #9ca3af !important;
 }}"""
 if RESTRICT_VIDEO_PLAYBACK:
     CSS += """
@@ -561,6 +647,14 @@ def create_ui_blocks():
         with gr.Group(visible=True) as loading_group:
             gr.Markdown("### Logging in and setting up environment... Please wait.")
 
+        # --- Landing Section (For URL login choice) ---
+        with gr.Group(visible=False) as landing_group:
+            gr.Markdown("### Select Mode")
+            gr.Markdown("Please choose how you want to proceed:")
+            with gr.Row():
+                test_btn = gr.Button("Free Try Mode! 🤔", variant="secondary")
+                record_btn = gr.Button("Record Mode 📝", variant="primary")
+
         # --- Login Section ---
         with gr.Group(visible=False) as login_group:
             gr.Markdown("### User Login")
@@ -574,6 +668,21 @@ def create_ui_blocks():
                 )
                 login_btn = gr.Button("Login", variant="primary")
             login_msg = gr.Markdown("")
+
+        # --- Env ID Selection Section (for user_test only) ---
+        with gr.Group(visible=False) as env_selection_group:
+            gr.Markdown("### Select Environment")
+            gr.Markdown("Please select an environment ID to start the task")
+            env_buttons = []
+            # 创建15个按钮，每行5个
+            for i in range(0, len(ENV_IDS), 5):
+                with gr.Row():
+                    for j in range(5):
+                        if i + j < len(ENV_IDS):
+                            env_id = ENV_IDS[i + j]
+                            btn = gr.Button(env_id, variant="secondary", size="lg")
+                            env_buttons.append(btn)
+            env_selection_msg = gr.Markdown("")
 
         # --- Main Interface (Hidden initially) ---
         with gr.Group(visible=False) as main_interface:
@@ -608,7 +717,7 @@ def create_ui_blocks():
                          # Content row - 单列布局，Hint 在视频上方
                          with gr.Column(scale=1):
                              # Task Hint (Accordion) - 默认收起
-                             with gr.Accordion("Task Hint 💡 (点击展开查看提示)", open=False):
+                             with gr.Accordion("Task Hint 💡 (Click to expand)", open=False):
                                  note2_demo = gr.Markdown(
                                      value=get_task_hint(""),
                                      elem_id="note2_demo"
@@ -640,18 +749,18 @@ def create_ui_blocks():
                          
                          # Content row - 单列布局，Hint 在视频上方
                          with gr.Column(scale=1):
-                             # Task Hint (Accordion) - 默认收起
-                             with gr.Accordion("Task Hint 💡 (点击展开查看提示)", open=False):
-                                 note2 = gr.Markdown(
-                                     value=get_task_hint(""),
-                                     elem_id="note2"
-                                 )
-                             
-                             # Main: Desk + Robot View (Combined) - 使用 HTML 组件显示 MJPEG 流
-                             combined_display = gr.HTML(
-                                value="<div id='combined_view_html'><p>等待视频流...</p></div>",
+                            # Task Hint (Accordion) - 默认收起
+                            with gr.Accordion("Task Hint 💡 (Click to expand)", open=False):
+                                note2 = gr.Markdown(
+                                    value=get_task_hint(""),
+                                    elem_id="note2"
+                                )
+                            
+                            # Main: Desk + Robot View (Combined) - 使用 HTML 组件显示 MJPEG 流
+                            combined_display = gr.HTML(
+                                value="<div id='combined_view_html'><p>Waiting for video stream...</p></div>",
                                 elem_id="combined_view_html"
-                             )
+                            )
 
             # --- Bottom Container: Operation Zone (60-65% Height) ---
             # Operation Zone Group (第一阶段隐藏)
@@ -687,6 +796,10 @@ def create_ui_blocks():
                          
                          gr.Markdown("---")
                          next_task_btn = gr.Button("Next Task 🔄", variant="primary", interactive=False, elem_id="next_task_btn")
+                         
+                         gr.Markdown("---")
+                         # 回退到模式选择页面按钮：允许用户从执行界面返回到模式选择页面，重新选择测试模式或录制模式
+                         back_to_landing_btn = gr.Button("Back to Mode Selection 🔙", variant="secondary", interactive=True, elem_id="back_to_landing_btn")
 
         # --- Event Wiring ---
 
@@ -697,6 +810,7 @@ def create_ui_blocks():
             outputs=[
                 uid_state, 
                 login_group, 
+                env_selection_group,
                 main_interface, 
                 login_msg, 
                 img_display, 
@@ -726,13 +840,16 @@ def create_ui_blocks():
             outputs=[username_state]
         )
         
-        # 1.5 Next Task
-        next_task_btn.click(
-            fn=load_next_task_wrapper,
+        # 1.1 Landing Page - Record Mode
+        # 1.1 落地页 - 录制模式
+        record_btn.click(
+            fn=switch_to_record_mode,
             inputs=[username_state, uid_state],
             outputs=[
                 uid_state, 
+                landing_group, 
                 login_group, 
+                env_selection_group,
                 main_interface, 
                 login_msg, 
                 img_display, 
@@ -755,6 +872,149 @@ def create_ui_blocks():
                 coords_group,
                 note2,
                 note2_demo
+            ]
+        )
+        
+        # 1.2 Landing Page - Test Mode
+        # 1.2 落地页 - 测试模式
+        test_btn.click(
+            fn=switch_to_test_mode,
+            inputs=[username_state, uid_state],
+            outputs=[
+                uid_state, 
+                landing_group, 
+                login_group, 
+                env_selection_group,
+                main_interface, 
+                login_msg, 
+                img_display, 
+                log_output, 
+                options_radio, 
+                goal_box, 
+                coords_box, 
+                combined_display, 
+                video_display,
+                task_info_box,
+                progress_info_box,
+                login_btn,
+                next_task_btn,
+                exec_btn,
+                username_state,  # ADDED THIS: 更新前端用户名状态 / Update frontend username state
+                demo_video_group,
+                combined_view_group,
+                operation_zone_group,
+                confirm_demo_btn,
+                play_video_btn,
+                coords_group,
+                note2,
+                note2_demo
+            ]
+        )
+        
+        # 1.3 Env ID Selection (for user_test)
+        # 1.3 环境 ID 选择（针对 user_test）
+        for i, btn in enumerate(env_buttons):
+            env_id = ENV_IDS[i]
+            btn.click(
+                fn=lambda u, uid, eid=env_id: select_env_id(u, uid, eid),
+                inputs=[username_state, uid_state],
+                outputs=[
+                    uid_state,
+                    login_group,
+                    env_selection_group,
+                    main_interface,
+                    login_msg,
+                    img_display,
+                    log_output,
+                    options_radio,
+                    goal_box,
+                    coords_box,
+                    combined_display,
+                    video_display,
+                    task_info_box,
+                    progress_info_box,
+                    login_btn,
+                    next_task_btn,
+                    exec_btn,
+                    demo_video_group,
+                    combined_view_group,
+                    operation_zone_group,
+                    confirm_demo_btn,
+                    play_video_btn,
+                    coords_group,
+                    note2,
+                    note2_demo
+                ]
+            )
+        
+        # 1.5 Next Task
+        next_task_btn.click(
+            fn=load_next_task_wrapper,
+            inputs=[username_state, uid_state],
+            outputs=[
+                uid_state, 
+                login_group,
+                env_selection_group,
+                main_interface, 
+                login_msg, 
+                img_display, 
+                log_output, 
+                options_radio, 
+                goal_box, 
+                coords_box, 
+                combined_display, 
+                video_display,
+                task_info_box,
+                progress_info_box,
+                login_btn,
+                next_task_btn,
+                exec_btn,
+                demo_video_group,
+                combined_view_group,
+                operation_zone_group,
+                confirm_demo_btn,
+                play_video_btn,
+                coords_group,
+                note2,
+                note2_demo
+            ]
+        )
+        
+        # 1.5.1 回退到模式选择页面
+        # 绑定回退按钮的点击事件：当用户点击"返回模式选择"按钮时，调用 back_to_landing_page 函数
+        # 该函数会提取原始用户名（去掉 _test 后缀），并将界面重置为模式选择页面
+        back_to_landing_btn.click(
+            fn=back_to_landing_page,  # 回调函数：回退到模式选择页面
+            inputs=[username_state, uid_state],  # 输入：当前用户名状态和会话唯一标识符
+            outputs=[
+                uid_state,              # 会话唯一标识符
+                loading_group,          # 加载组
+                landing_group,          # 模式选择组（关键：显示模式选择页面）
+                login_group,           # 登录组
+                env_selection_group,    # 环境选择组
+                main_interface,        # 主界面
+                login_msg,             # 登录消息
+                img_display,           # 图片显示
+                log_output,            # 日志输出
+                options_radio,         # 选项单选
+                goal_box,              # 目标框
+                coords_box,            # 坐标框
+                combined_display,      # 组合视图
+                video_display,         # 视频显示
+                task_info_box,         # 任务信息
+                progress_info_box,     # 进度信息
+                login_btn,             # 登录按钮
+                next_task_btn,         # 下一个任务按钮
+                exec_btn,              # 执行按钮
+                username_state,        # 用户名状态（更新为原始用户名）
+                demo_video_group,      # 演示视频组
+                combined_view_group,   # 组合视图组
+                operation_zone_group,  # 操作区域组
+                confirm_demo_btn,      # 确认演示按钮
+                play_video_btn,        # 播放视频按钮
+                coords_group,          # 坐标组
+                note2,                 # 提示信息
+                note2_demo            # 演示提示信息
             ]
         )
         
@@ -810,7 +1070,9 @@ def create_ui_blocks():
             outputs=[
                 uid_state,
                 loading_group,
-                login_group, 
+                landing_group,
+                login_group,
+                env_selection_group,
                 main_interface, 
                 login_msg, 
                 img_display, 

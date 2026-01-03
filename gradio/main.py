@@ -118,7 +118,7 @@ config.py (配置层)
       - 便于统一修改配置
       - 无依赖，可被任何模块导入
 
-多进程架构说明：
+多进程架构说明：  
 1. 主进程（Main Process）：
    - 运行 FastAPI/Gradio Web 服务器
    - 处理所有 HTTP/WebSocket 请求
