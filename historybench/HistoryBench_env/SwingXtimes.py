@@ -352,7 +352,11 @@ class SwingXtimes(BaseEnv):
                 "subgoal_segment":f"move to the top of the right-side target at <> for the {ordinal} time",
                 "demonstration": False,
                 "failure_func": lambda:  [is_any_obj_pickup(self, self.non_target_cubes),is_button_pressed(self, obj=self.button),too_many_swings(self)],
+                # "solve": lambda env, planner: [solve_swingonto_whenhold(env, planner,target=self.target_right,height=0.1),
+                #                             ],
                 "solve": lambda env, planner: [solve_swingonto_whenhold(env, planner,target=self.target_right,height=0.1),
+                                                # solve_swingonto_whenhold(env, planner,target=self.target_right,height=0.15),
+                                                # solve_swingonto_whenhold(env, planner,target=self.target_right,height=0.1),
                                             ],
                 'segment':self.target_right,
             })
@@ -488,9 +492,51 @@ class SwingXtimes(BaseEnv):
 
 
         obs, reward, terminated, truncated, info = super().step(action)
-        # 先检测当前帧是否“落”在左右目标上，用于高亮与计数
-        on_right = is_obj_swing_onto(self,obj=self.target_cube,target=self.target_right,distance_threshold=0.03,z_threshold=0.12)
-        on_left = is_obj_swing_onto(self,obj=self.target_cube,target=self.target_left,distance_threshold=0.03,z_threshold=0.12)
+        # 先检测当前帧是否"落"在左右目标上，用于高亮与计数
+        # 注意：policy 在 z 轴上下抖动时，is_obj_swing_onto 的 z_threshold 判定可能导致 on/off 反复翻转，
+        # 从而触发多次 "False->True" 边沿，造成重复计数。这里用 enter/exit 滞回阈值缓解抖动。
+        # 为防止 z 轴在阈值附近抖动造成 on/off 反复翻转、重复计数：
+        # 使用 enter/exit 两套阈值（滞回 hysteresis）。
+        # - enter 更严格：进入目标区域才算一次落点
+        # - exit 更宽松：在目标区域内的小抖动不会被误判为离开
+        swing_enter_distance_threshold = 0.03
+        swing_exit_distance_threshold = 0.04  # >= enter
+        swing_enter_z_threshold = 0.12
+        swing_exit_z_threshold = 0.3  # >= enter
+        
+        if self._was_on_right:
+            on_right = is_obj_swing_onto(
+                self,
+                obj=self.target_cube,
+                target=self.target_right,
+                distance_threshold=swing_exit_distance_threshold,
+                z_threshold=swing_exit_z_threshold,
+            )
+        else:
+            on_right = is_obj_swing_onto(
+                self,
+                obj=self.target_cube,
+                target=self.target_right,
+                distance_threshold=swing_enter_distance_threshold,
+                z_threshold=swing_enter_z_threshold,
+            )
+
+        if self._was_on_left:
+            on_left = is_obj_swing_onto(
+                self,
+                obj=self.target_cube,
+                target=self.target_left,
+                distance_threshold=swing_exit_distance_threshold,
+                z_threshold=swing_exit_z_threshold,
+            )
+        else:
+            on_left = is_obj_swing_onto(
+                self,
+                obj=self.target_cube,
+                target=self.target_left,
+                distance_threshold=swing_enter_distance_threshold,
+                z_threshold=swing_enter_z_threshold,
+            )
         if on_right:
              self.highlight_right_start=int(self.elapsed_steps[0].item())
              # 只在“首次”落点时累计一次摆动次数，避免连续帧重复累计

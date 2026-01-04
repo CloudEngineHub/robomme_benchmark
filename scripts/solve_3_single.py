@@ -50,7 +50,7 @@ def main():
             env_kwargs = dict(
                 obs_mode="rgb+depth+segmentation",
                 control_mode="pd_joint_pos",
-                render_mode="rgb_array",  # 使用 rgb_array 而不是 human，避免在无头服务器上创建窗口
+                render_mode="human",  
                 reward_mode="dense",
                 HistoryBench_seed=33000,
                 max_episode_steps=200,
@@ -82,7 +82,7 @@ def main():
                 planner = FailAwarePandaArmMotionPlanningSolver(
                         env,
                         debug=False,
-                        vis=False,
+                        vis=True,
                         base_pose=env.unwrapped.agent.robot.pose,
                         visualize_target_grasp_pose=False,
                         print_env_info=False,
@@ -129,10 +129,12 @@ def main():
                     evaluation = env.unwrapped.evaluate(solve_complete_eval=True)
                     fail_flag = evaluation.get("fail", False)
                     success_flag = evaluation.get("success", False)
+                    # 也检查 current_task_failure 标志
+                    current_task_failure = getattr(env.unwrapped, 'current_task_failure', False)
 
                     print(evaluation)
 
-                    if screw_failed or _tensor_to_bool(fail_flag):
+                    if screw_failed or _tensor_to_bool(fail_flag) or current_task_failure:
                         print("Encountered failure condition; stopping task sequence.")
                         break
 

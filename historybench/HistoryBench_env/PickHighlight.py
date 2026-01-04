@@ -272,11 +272,10 @@ class PickHighlight(BaseEnv):
                     "name": task_name,
                     "subgoal_segment": task_subgoal,
                     "demonstration": False,
-                    "failure_func": lambda:
+                    "failure_func": lambda idx=cube_idx:
                         [is_any_obj_pickup(self,[cube for cube in self.all_cubes if cube not in self.target_cubes] ),
-                        timewindow(self,lambda: is_button_pressed(self, obj=self.button),min_steps=50,max_steps=500,timewindow_timer=0,),],
-                    #"solve": lambda env, planner, c=cube: solve_pickup(env, planner, obj=c),
-                    "solve": lambda env, planner:solve_button(env, planner, obj=self.button),
+                       ],
+                    "solve": lambda env, planner, c=cube: solve_pickup(env, planner, obj=c),
                     "segment":cube,
                 })
                 if cube_idx!=num_targets-1:
@@ -285,9 +284,9 @@ class PickHighlight(BaseEnv):
                         "name": f"place the cube onto the table",
                         "subgoal_segment":"place the cube onto the table",
                         "demonstration": False,
-                        "failure_func": lambda:
+                        "failure_func": lambda idx=cube_idx:
                         [ is_any_obj_pickup(self,[cube for cube in self.all_cubes if cube not in self.target_cubes] ),
-                            timewindow(self,lambda: is_button_pressed(self, obj=self.button),min_steps=50,max_steps=500,timewindow_timer=1,),],
+                           ],
                         "solve": lambda env, planner, c=cube: [solve_putdown_whenhold(env, planner, release_z=0.01),
                                                         # solve_pickup(env, planner, obj=c),
                                                         # solve_putdown_whenhold(env, planner, obj=c,release_z=0.01)#测试用
@@ -328,7 +327,16 @@ class PickHighlight(BaseEnv):
 
     def evaluate(self,solve_complete_eval=False):
         self.successflag=torch.tensor([False])
-        self.failureflag = torch.tensor([False])
+        # 保留之前的失败状态（一旦失败，永远失败）
+        if not hasattr(self, 'failureflag') or self.failureflag is None:
+            self.failureflag = torch.tensor([False])
+        previous_failure = bool(self.failureflag.detach().cpu().item()) if isinstance(self.failureflag, torch.Tensor) else False
+        # 如果之前已经失败，不要重置，保持失败状态；否则重置
+        if previous_failure:
+            # 保持失败状态，不重置
+            pass
+        else:
+            self.failureflag = torch.tensor([False])
 
 
 
@@ -349,6 +357,10 @@ class PickHighlight(BaseEnv):
         if task_failed:
             self.failureflag = torch.tensor([True])
             print(f"Task failed: {current_task_name}")
+        
+        # 如果之前已经失败，保持失败状态
+        if previous_failure:
+            self.failureflag = torch.tensor([True])
 
 
         #############上升沿检测 必须放在fail检测之前
