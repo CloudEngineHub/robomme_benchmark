@@ -650,6 +650,52 @@ CSS = f"""#live_obs {{ }}
 #back_to_landing_btn:hover {{
     background-color: #f9fafb !important;
     border-color: #9ca3af !important;
+}}
+/* ============================================
+   Loading Overlay 全屏加载遮罩层样式
+   ============================================
+   功能说明：
+   - 在用户点击登录/加载任务等按钮时，显示全屏半透明遮罩层
+   - 遮罩层包含加载提示信息，防止用户在加载过程中进行其他操作
+   - 加载完成后，通过更新 HTML 组件内容为空字符串来隐藏遮罩层
+   
+   样式说明：
+   - .loading-overlay: 全屏遮罩层容器，固定在视口顶部，覆盖整个屏幕
+   - .loading-content: 遮罩层中央的白色卡片，包含加载提示文本
+   - .loading-spinner: 旋转动画类（预留，可用于添加旋转图标）
+   ============================================ */
+/* 全屏遮罩层容器样式 */
+.loading-overlay {{
+    position: fixed;        /* 固定定位，不随页面滚动 */
+    top: 0;                 /* 从页面顶部开始 */
+    left: 0;                /* 从页面左侧开始 */
+    width: 100vw;           /* 宽度占满整个视口宽度 */
+    height: 100vh;          /* 高度占满整个视口高度 */
+    background: rgba(0, 0, 0, 0.5);  /* 半透明黑色背景，透明度50% */
+    display: flex;          /* 使用 Flexbox 布局 */
+    justify-content: center;  /* 水平居中 */
+    align-items: center;    /* 垂直居中 */
+    z-index: 9999;          /* 设置极高的层级，确保遮罩层显示在所有内容之上 */
+}}
+/* 遮罩层中央的白色卡片样式 */
+.loading-content {{
+    position: relative;     /* 相对定位，确保 z-index 生效 */
+    background: #ffffff;    /* 纯白色背景，完全不透明 */
+    padding: 30px 50px;      /* 内边距：上下30px，左右50px */
+    border-radius: 10px;    /* 圆角边框，半径10px */
+    text-align: center;      /* 文本居中对齐 */
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);  /* 阴影效果，增加立体感 */
+    opacity: 1;             /* 确保卡片完全不透明 */
+    z-index: 10000;         /* 设置更高的层级，确保显示在最上层（高于父元素的 9999） */
+}}
+/* 旋转动画样式（预留，可用于添加旋转加载图标） */
+.loading-spinner {{
+    animation: spin 1s linear infinite;  /* 旋转动画：1秒一圈，线性，无限循环 */
+}}
+/* 旋转动画关键帧定义 */
+@keyframes spin {{
+    from {{ transform: rotate(0deg); }}    /* 起始角度：0度 */
+    to {{ transform: rotate(360deg); }}    /* 结束角度：360度（完整旋转一圈） */
 }}"""
 if RESTRICT_VIDEO_PLAYBACK:
     CSS += """
@@ -669,6 +715,27 @@ def create_ui_blocks():
     # 注意：在 Gradio 6.0+ 中，css 和 js 参数应该传递给 launch() 或 mount_gradio_app()，而不是 Blocks 构造函数
     with gr.Blocks(title="Oracle Planner Interface") as demo:
         gr.Markdown("## HistoryBench Human Evaluation 🚀🚀🚀")
+        
+        # ============================================
+        # Loading Overlay 全屏加载遮罩层组件
+        # ============================================
+        # 功能说明：
+        # - 这是一个 HTML 组件，用于显示全屏加载遮罩层
+        # - 初始值为空字符串（隐藏状态）
+        # - 当用户点击登录/加载任务等按钮时，show_loading_info() 函数会返回包含遮罩层 HTML 的字符串
+        # - 加载完成后，回调函数返回空字符串，清空组件内容，遮罩层自动隐藏
+        # 
+        # 工作原理：
+        # 1. 显示：通过更新组件内容为包含 .loading-overlay 的 HTML 字符串来显示遮罩层
+        # 2. 隐藏：通过更新组件内容为空字符串 "" 来隐藏遮罩层
+        # 
+        # 使用场景：
+        # - 用户点击 Login 按钮时
+        # - 用户点击 Record Mode / Test Mode 按钮时
+        # - 用户选择环境 ID 时
+        # - 用户点击 Next Task 按钮时
+        # ============================================
+        loading_overlay = gr.HTML(value="", elem_id="loading_overlay")
         
         # State
         uid_state = gr.State(value=None)
@@ -927,10 +994,30 @@ def create_ui_blocks():
 
         # --- Event Wiring ---
 
-        # 1. Login
-        login_btn.click(fn=show_loading_info).then(
+        # ============================================
+        # 1. Login 按钮事件绑定
+        # ============================================
+        # 功能说明：
+        # - 用户点击 Login 按钮时，首先显示全屏加载遮罩层
+        # - 然后执行登录和任务加载操作
+        # - 加载完成后，自动隐藏遮罩层
+        # 
+        # 事件链流程：
+        # 1. click 事件：调用 show_loading_info() 显示遮罩层
+        # 2. .then() 链：调用 login_and_load_task() 执行登录和加载
+        # 3. login_and_load_task() 返回时，loading_overlay 被设置为空字符串，遮罩层消失
+        # ============================================
+        login_btn.click(
+            # 第一步：显示加载遮罩层
+            # 调用 show_loading_info() 函数，返回包含遮罩层 HTML 的字符串
+            # 该字符串会更新到 loading_overlay 组件，从而显示全屏遮罩层
+            fn=show_loading_info,
+            outputs=[loading_overlay]  # 输出到 loading_overlay 组件，显示遮罩层
+        ).then(
+            # 第二步：执行登录和任务加载
+            # 在遮罩层显示后，执行实际的登录和任务加载操作
             fn=login_and_load_task,
-            inputs=[username_input, uid_state],
+            inputs=[username_input, uid_state],  # 输入：用户名和会话ID
             outputs=[
                 uid_state, 
                 login_group, 
@@ -956,7 +1043,8 @@ def create_ui_blocks():
                 play_video_btn,
                 coords_group,
                 note2,
-                note2_demo
+                note2_demo,
+                loading_overlay  # 【关键】加载完成后返回空字符串，清空 overlay 组件内容，遮罩层自动隐藏
             ]
         ).then(
             fn=lambda u: u,
@@ -964,11 +1052,28 @@ def create_ui_blocks():
             outputs=[username_state]
         )
         
-        # 1.1 Landing Page - Record Mode
-        # 1.1 落地页 - 录制模式
-        record_btn.click(fn=show_loading_info).then(
+        # ============================================
+        # 1.1 Landing Page - Record Mode 按钮事件绑定
+        # ============================================
+        # 功能说明：
+        # - 用户在模式选择页面点击 "Record Mode" 按钮时触发
+        # - 首先显示全屏加载遮罩层
+        # - 然后切换到录制模式并执行登录和任务加载
+        # - 加载完成后，自动隐藏遮罩层
+        # 
+        # 事件链流程：
+        # 1. click 事件：调用 show_loading_info() 显示遮罩层
+        # 2. .then() 链：调用 switch_to_record_mode() 切换到录制模式并加载任务
+        # 3. switch_to_record_mode() 返回时，loading_overlay 被设置为空字符串，遮罩层消失
+        # ============================================
+        record_btn.click(
+            # 第一步：显示加载遮罩层
+            fn=show_loading_info,
+            outputs=[loading_overlay]  # 输出到 loading_overlay 组件，显示遮罩层
+        ).then(
+            # 第二步：切换到录制模式并加载任务
             fn=switch_to_record_mode,
-            inputs=[username_state, uid_state],
+            inputs=[username_state, uid_state],  # 输入：用户名状态和会话ID
             outputs=[
                 uid_state, 
                 landing_group, 
@@ -995,15 +1100,33 @@ def create_ui_blocks():
                 play_video_btn,
                 coords_group,
                 note2,
-                note2_demo
+                note2_demo,
+                loading_overlay  # 【关键】加载完成后返回空字符串，清空 overlay 组件内容，遮罩层自动隐藏
             ]
         )
         
-        # 1.2 Landing Page - Test Mode
-        # 1.2 落地页 - 测试模式
-        test_btn.click(fn=show_loading_info).then(
+        # ============================================
+        # 1.2 Landing Page - Test Mode 按钮事件绑定
+        # ============================================
+        # 功能说明：
+        # - 用户在模式选择页面点击 "Free Try Mode" 按钮时触发
+        # - 首先显示全屏加载遮罩层
+        # - 然后切换到测试模式（用户名后添加 _test 后缀）并执行登录和任务加载
+        # - 加载完成后，自动隐藏遮罩层
+        # 
+        # 事件链流程：
+        # 1. click 事件：调用 show_loading_info() 显示遮罩层
+        # 2. .then() 链：调用 switch_to_test_mode() 切换到测试模式并加载任务
+        # 3. switch_to_test_mode() 返回时，loading_overlay 被设置为空字符串，遮罩层消失
+        # ============================================
+        test_btn.click(
+            # 第一步：显示加载遮罩层
+            fn=show_loading_info,
+            outputs=[loading_overlay]  # 输出到 loading_overlay 组件，显示遮罩层
+        ).then(
+            # 第二步：切换到测试模式并加载任务
             fn=switch_to_test_mode,
-            inputs=[username_state, uid_state],
+            inputs=[username_state, uid_state],  # 输入：用户名状态和会话ID
             outputs=[
                 uid_state, 
                 landing_group, 
@@ -1031,24 +1154,43 @@ def create_ui_blocks():
                 play_video_btn,
                 coords_group,
                 note2,
-                note2_demo
+                note2_demo,
+                loading_overlay  # 【关键】加载完成后返回空字符串，清空 overlay 组件内容，遮罩层自动隐藏
             ]
         )
         
-        # 1.3 Env ID Selection (for user_test)
-        # 1.3 环境 ID 选择（针对 user_test）
-        # 【环境按钮事件绑定】
-        # 为所有环境选择按钮绑定点击事件
-        # 注意：由于布局从列表改为2x2网格，事件绑定逻辑已更新：
-        # - 原来：通过遍历ENV_IDS列表和env_buttons列表的索引来匹配
-        # - 现在：直接使用env_buttons_with_ids列表，其中每个元素包含(按钮对象, 环境ID)元组
-        # 这样避免了依赖ENV_IDS的顺序，使代码更加健壮和清晰
+        # ============================================
+        # 1.3 环境 ID 选择按钮事件绑定（针对 user_test 用户）
+        # ============================================
+        # 功能说明：
+        # - 在测试模式下，用户需要从环境选择界面选择一个环境 ID
+        # - 为所有环境选择按钮（如 PickXtimes、VideoPlaceOrder 等）绑定点击事件
+        # - 用户点击环境按钮时，首先显示全屏加载遮罩层
+        # - 然后加载对应的环境任务
+        # - 加载完成后，自动隐藏遮罩层
+        # 
+        # 事件链流程：
+        # 1. click 事件：调用 show_loading_info() 显示遮罩层
+        # 2. .then() 链：调用 select_env_id() 加载选定的环境任务
+        # 3. select_env_id() 返回时，loading_overlay 被设置为空字符串，遮罩层消失
+        # 
+        # 技术说明：
+        # - 使用 env_buttons_with_ids 列表，每个元素包含 (按钮对象, 环境ID) 元组
+        # - 使用 lambda 函数捕获当前循环的 env_id，确保每个按钮调用时传入正确的环境ID
+        # - 这样避免了依赖 ENV_IDS 的顺序，使代码更加健壮和清晰
+        # ============================================
         for btn, env_id in env_buttons_with_ids:
-            # 为每个按钮绑定select_env_id函数
-            # 使用lambda函数捕获当前循环的env_id，确保每个按钮调用时传入正确的环境ID
-            btn.click(fn=show_loading_info).then(
+            # 为每个环境选择按钮绑定点击事件
+            # 使用 lambda 函数捕获当前循环的 env_id，确保每个按钮调用时传入正确的环境ID
+            btn.click(
+                # 第一步：显示加载遮罩层
+                fn=show_loading_info,
+                outputs=[loading_overlay]  # 输出到 loading_overlay 组件，显示遮罩层
+            ).then(
+                # 第二步：加载选定的环境任务
+                # 使用 lambda 函数捕获当前循环的 env_id，确保每个按钮调用时传入正确的环境ID
                 fn=lambda u, uid, eid=env_id: select_env_id(u, uid, eid),
-                inputs=[username_state, uid_state],
+                inputs=[username_state, uid_state],  # 输入：用户名状态和会话ID
                 outputs=[
                     uid_state,
                     login_group,
@@ -1074,14 +1216,38 @@ def create_ui_blocks():
                     play_video_btn,
                     coords_group,
                     note2,
-                    note2_demo
+                    note2_demo,
+                    loading_overlay  # 【关键】加载完成后返回空字符串，清空 overlay 组件内容，遮罩层自动隐藏
                 ]
             )
         
-        # 1.5 Next Task
-        next_task_btn.click(fn=show_loading_info).then(
+        # ============================================
+        # 1.5 Next Task 按钮事件绑定
+        # ============================================
+        # 功能说明：
+        # - 用户完成当前任务后，点击 "Next Task" 按钮加载下一个任务
+        # - 首先显示全屏加载遮罩层
+        # - 然后加载下一个任务（如果当前任务已有 actions，则创建新的 attempt）
+        # - 对于 user_test 用户，next task 时会跳转回环境 ID 选择界面
+        # - 加载完成后，自动隐藏遮罩层
+        # 
+        # 事件链流程：
+        # 1. click 事件：调用 show_loading_info() 显示遮罩层
+        # 2. .then() 链：调用 load_next_task_wrapper() 加载下一个任务
+        # 3. load_next_task_wrapper() 返回时，loading_overlay 被设置为空字符串，遮罩层消失
+        # 
+        # 特殊处理：
+        # - 如果当前任务已有 actions，会自动创建新的 attempt
+        # - 对于 user_test 用户，会跳转回环境 ID 选择界面，而不是直接加载下一个任务
+        # ============================================
+        next_task_btn.click(
+            # 第一步：显示加载遮罩层
+            fn=show_loading_info,
+            outputs=[loading_overlay]  # 输出到 loading_overlay 组件，显示遮罩层
+        ).then(
+            # 第二步：加载下一个任务
             fn=load_next_task_wrapper,
-            inputs=[username_state, uid_state],
+            inputs=[username_state, uid_state],  # 输入：用户名状态和会话ID
             outputs=[
                 uid_state, 
                 login_group,
@@ -1107,7 +1273,8 @@ def create_ui_blocks():
                 play_video_btn,
                 coords_group,
                 note2,
-                note2_demo
+                note2_demo,
+                loading_overlay  # 【关键】加载完成后返回空字符串，清空 overlay 组件内容，遮罩层自动隐藏
             ]
         )
         

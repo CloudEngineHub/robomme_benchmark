@@ -86,14 +86,46 @@ def show_task_hint(uid, current_hint=""):
 
 def show_loading_info():
     """
-    显示加载环境的提示信息
-    Show loading environment notification
+    显示加载环境的全屏遮罩层提示信息
+    
+    功能说明：
+    - 此函数在用户点击登录/加载任务等按钮时被调用
+    - 返回包含全屏遮罩层的 HTML 字符串，用于显示加载提示
+    - 遮罩层会覆盖整个页面，防止用户在加载过程中进行其他操作
+    - 加载完成后，回调函数会返回空字符串 "" 来清空 loading_overlay 组件，从而隐藏遮罩层
+    
+    工作流程：
+    1. 用户点击按钮（如 Login、Next Task 等）
+    2. 按钮的 click 事件首先调用此函数，显示遮罩层
+    3. 然后通过 .then() 链式调用实际的加载函数（如 login_and_load_task）
+    4. 加载函数执行完成后，返回空字符串给 loading_overlay，遮罩层消失
     
     Returns:
-        None (Uses gr.Info to show toast notification)
+        str: 包含全屏遮罩层 HTML 的字符串
+            - 返回 HTML 字符串时：显示遮罩层
+            - 返回空字符串 "" 时：隐藏遮罩层（由回调函数在加载完成后返回）
+    
+    样式说明：
+    - 使用 .loading-overlay 类作为全屏遮罩层容器
+    - 使用 .loading-content 类作为中央的白色提示卡片
+    - 显示英文提示信息："Loading environment, please wait..."
     """
-    gr.Info("正在加载环境，请稍候... / Loading environment, please wait...")
-    return
+    # 构建全屏遮罩层的 HTML 结构
+    # 外层 div 使用 .loading-overlay 类，实现全屏半透明遮罩效果
+    # 内层 div 使用 .loading-content 类，显示中央的白色提示卡片
+    overlay_html = '''
+    <div class="loading-overlay">
+        <div class="loading-content">
+            <!-- 加载图标：使用时钟表情符号 ⏳ 作为视觉提示，完全不透明 -->
+            <div style="font-size: 40px; margin-bottom: 15px; opacity: 1;">⏳</div>
+            <!-- 加载提示文本：英文提示，完全不透明，使用深色确保清晰可见 -->
+            <div style="font-size: 18px; color: #000000; opacity: 1;">
+                Loading environment, please wait...
+            </div>
+        </div>
+    </div>
+    '''
+    return overlay_html
 
 
 def login_and_load_task(username, uid):
@@ -137,7 +169,8 @@ def login_and_load_task(username, uid):
             # 【修改】任务提示改为延迟加载：不再在登录失败时自动加载提示内容
             # 初始值设为空字符串，用户需要点击"Show Hint"按钮才会显示提示
             gr.update(value=""),  # note2 - 任务提示（延迟加载，初始为空）
-            gr.update(value="")  # note2_demo - 演示任务提示（延迟加载，初始为空）
+            gr.update(value=""),  # note2_demo - 演示任务提示（延迟加载，初始为空）
+            ""  # loading_overlay - 【关键】清空加载遮罩层：返回空字符串，清空 loading_overlay 组件内容，使全屏遮罩层自动隐藏
         )
     
     # 特殊处理：如果是 user_test，显示 env_id 选择界面
@@ -164,7 +197,8 @@ def login_and_load_task(username, uid):
             gr.update(visible=False, interactive=True),  # play_video_btn
             gr.update(visible=False),  # coords_group
             gr.update(value=""),  # note2
-            gr.update(value="")  # note2_demo
+            gr.update(value=""),  # note2_demo
+            ""  # loading_overlay - 【关键】清空加载遮罩层：返回空字符串，清空 loading_overlay 组件内容，使全屏遮罩层自动隐藏
         )
     
     # Login success - Load current task
@@ -201,7 +235,8 @@ def login_and_load_task(username, uid):
             gr.update(visible=False, interactive=True),  # play_video_btn
             gr.update(visible=False),  # coords_group
             gr.update(value=""),  # note2
-            gr.update(value="")  # note2_demo
+            gr.update(value=""),  # note2_demo
+            ""  # loading_overlay - 【关键】清空加载遮罩层：返回空字符串，清空 loading_overlay 组件内容，使全屏遮罩层自动隐藏
         )
 
     current_task = status["current_task"]
@@ -275,7 +310,8 @@ def login_and_load_task(username, uid):
             gr.update(visible=False, interactive=True),  # play_video_btn
             gr.update(visible=False),  # coords_group
             gr.update(value=""),  # note2
-            gr.update(value="")  # note2_demo
+            gr.update(value=""),  # note2_demo
+            ""  # loading_overlay - 【关键】清空加载遮罩层：返回空字符串，清空 loading_overlay 组件内容，使全屏遮罩层自动隐藏
         )
         
     # Success loading
@@ -357,7 +393,8 @@ def login_and_load_task(username, uid):
             # 现在：初始值设为空字符串，用户需要点击"Show Hint"按钮才会通过 show_task_hint() 函数加载并显示提示
             # 这样可以减少不必要的计算，提升页面加载速度，同时让用户按需查看提示
             gr.update(value=""),  # note2 - 任务提示（延迟加载，初始为空，点击按钮后显示）
-            gr.update(value="")  # note2_demo - 演示任务提示（延迟加载，初始为空，点击按钮后显示）
+            gr.update(value=""),  # note2_demo - 演示任务提示（延迟加载，初始为空，点击按钮后显示）
+            ""  # loading_overlay - 【关键】清空加载遮罩层：返回空字符串，清空 loading_overlay 组件内容，使全屏遮罩层自动隐藏
         )
     else:
         # 没有示范视频：直接进入执行阶段
@@ -431,7 +468,8 @@ def login_and_load_task(username, uid):
             # 现在：初始值设为空字符串，用户需要点击"Show Hint"按钮才会通过 show_task_hint() 函数加载并显示提示
             # 这样可以减少不必要的计算，提升页面加载速度，同时让用户按需查看提示
             gr.update(value=""),  # note2 - 任务提示（延迟加载，初始为空，点击按钮后显示）
-            gr.update(value="")  # note2_demo - 演示任务提示（延迟加载，初始为空，点击按钮后显示）
+            gr.update(value=""),  # note2_demo - 演示任务提示（延迟加载，初始为空，点击按钮后显示）
+            ""  # loading_overlay - 【关键】清空加载遮罩层：返回空字符串，清空 loading_overlay 组件内容，使全屏遮罩层自动隐藏
         )
 
 
@@ -555,7 +593,8 @@ def select_env_id(username, uid, env_id):
             gr.update(visible=False, interactive=True),  # play_video_btn
             gr.update(visible=False),  # coords_group
             gr.update(value=""),  # note2
-            gr.update(value="")  # note2_demo
+            gr.update(value=""),  # note2_demo
+            ""  # loading_overlay - 【关键】清空加载遮罩层：返回空字符串，清空 loading_overlay 组件内容，使全屏遮罩层自动隐藏
         )
     
     if not uid:
@@ -631,7 +670,8 @@ def select_env_id(username, uid, env_id):
             # 之前：任务加载失败时也会调用 get_task_hint(env_id) 显示提示内容
             # 现在：初始值设为空字符串，用户需要点击"Show Hint"按钮才会通过 show_task_hint() 函数加载并显示提示
             gr.update(value=""),  # note2 - 任务提示（延迟加载，初始为空）
-            gr.update(value="")  # note2_demo - 演示任务提示（延迟加载，初始为空）
+            gr.update(value=""),  # note2_demo - 演示任务提示（延迟加载，初始为空）
+            ""  # loading_overlay - 【关键】清空加载遮罩层：返回空字符串，清空 loading_overlay 组件内容，使全屏遮罩层自动隐藏
         )
     
     # Success loading
@@ -701,7 +741,8 @@ def select_env_id(username, uid, env_id):
             # 之前：任务加载时自动调用 get_task_hint(env_id) 显示提示内容
             # 现在：初始值设为空字符串，用户需要点击"Show Hint"按钮才会通过 show_task_hint() 函数加载并显示提示
             gr.update(value=""),  # note2 - 任务提示（延迟加载，初始为空）
-            gr.update(value="")  # note2_demo - 演示任务提示（延迟加载，初始为空）
+            gr.update(value=""),  # note2_demo - 演示任务提示（延迟加载，初始为空）
+            ""  # loading_overlay - 【关键】清空加载遮罩层：返回空字符串，清空 loading_overlay 组件内容，使全屏遮罩层自动隐藏
         )
     else:
         # 没有示范视频：直接进入执行阶段
@@ -768,7 +809,8 @@ def select_env_id(username, uid, env_id):
             # 之前：任务加载时自动调用 get_task_hint(env_id) 显示提示内容
             # 现在：初始值设为空字符串，用户需要点击"Show Hint"按钮才会通过 show_task_hint() 函数加载并显示提示
             gr.update(value=""),  # note2 - 任务提示（延迟加载，初始为空）
-            gr.update(value="")  # note2_demo - 演示任务提示（延迟加载，初始为空）
+            gr.update(value=""),  # note2_demo - 演示任务提示（延迟加载，初始为空）
+            ""  # loading_overlay - 【关键】清空加载遮罩层：返回空字符串，清空 loading_overlay 组件内容，使全屏遮罩层自动隐藏
         )
 
 
@@ -803,7 +845,8 @@ def load_next_task_wrapper(username, uid):
             gr.update(visible=False, interactive=True),  # play_video_btn
             gr.update(visible=False),  # coords_group
             gr.update(value=""),  # note2
-            gr.update(value="")  # note2_demo
+            gr.update(value=""),  # note2_demo
+            ""  # loading_overlay - 【关键】清空加载遮罩层：返回空字符串，清空 loading_overlay 组件内容，使全屏遮罩层自动隐藏
         )
     
     if username:
@@ -962,9 +1005,19 @@ def switch_to_record_mode(username, uid):
     """
     Switch to record mode: proceed with login using original username.
     切换到记录模式：使用原始用户名继续登录。
+    
+    功能说明：
+    - 用户在模式选择页面点击 "Record Mode" 按钮时调用此函数
+    - 使用原始用户名（不含 _test 后缀）调用 login_and_load_task() 进行登录和任务加载
+    - 返回值中包含 loading_overlay 的输出（空字符串），用于清空加载遮罩层
+    
+    返回值说明：
+    - 返回 login_and_load_task() 的结果，但将 landing_group 设置为隐藏
+    - 最后一个返回值是 loading_overlay（空字符串），用于清空遮罩层
     """
     if not username:
-        return (None, gr.update(visible=True)) + (gr.update(visible=True),) + tuple([gr.update()] * 23)
+        # 如果没有用户名，返回默认状态，包括 loading_overlay 的空字符串
+        return (None, gr.update(visible=True)) + (gr.update(visible=True),) + tuple([gr.update()] * 23) + ("",)  # 最后一个是 loading_overlay - 清空遮罩层
 
     # Call login_and_load_task with original username
     # 使用原始用户名调用 login_and_load_task
@@ -982,9 +1035,21 @@ def switch_to_test_mode(username, uid):
     """
     Switch to test mode: append _test to username and proceed with login.
     切换到测试模式：在用户名后附加 _test 并继续登录。
+    
+    功能说明：
+    - 用户在模式选择页面点击 "Free Try Mode" 按钮时调用此函数
+    - 在用户名后添加 _test 后缀，构造测试用户名（如 user1 -> user1_test）
+    - 使用测试用户名调用 login_and_load_task() 进行登录和任务加载
+    - 返回值中包含 loading_overlay 的输出（空字符串），用于清空加载遮罩层
+    
+    返回值说明：
+    - 返回 login_and_load_task() 的结果，但将 landing_group 设置为隐藏
+    - 在 exec_btn 和 demo_video_group 之间插入 test_username 到 username_state
+    - 最后一个返回值是 loading_overlay（空字符串），用于清空遮罩层
     """
     if not username:
-        return (None, gr.update(visible=True)) + (gr.update(visible=True),) + tuple([gr.update()] * 23)
+        # 如果没有用户名，返回默认状态，包括 loading_overlay 的空字符串
+        return (None, gr.update(visible=True)) + (gr.update(visible=True),) + tuple([gr.update()] * 23) + ("",)  # 最后一个是 loading_overlay - 清空遮罩层
 
     # Construct test username
     # 构造测试用户名
