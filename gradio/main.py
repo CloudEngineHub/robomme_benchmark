@@ -317,9 +317,13 @@ if __name__ == "__main__":
     print("="*60 + "\n")
     
     # 使用 uvicorn 运行 FastAPI 应用
+    # 确保所有日志（包括 uvicorn 的访问日志和错误日志）都输出到标准输出
+    # 这样后台运行时所有日志都会被捕获到日志文件中
     uvicorn.run(
         fastapi_app,
         host="0.0.0.0",
         port=port,
-        log_level="info"
+        log_level="info",
+        access_log=True,  # 启用访问日志
+        use_colors=False  # 禁用颜色输出，确保日志文件可读
     )
