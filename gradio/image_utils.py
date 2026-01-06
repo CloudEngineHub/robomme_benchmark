@@ -153,6 +153,98 @@ def concatenate_frames_horizontally(frames1, frames2=None, env_id=None):
     return concatenated_frames
 
 
+def draw_semicircle(draw, center, radius, color, width=2, half="lower", start_pos="left", end_pos="right", arrow_position="end", arrow_size=6):
+    """
+    绘制半圆封装函数
+    
+    Args:
+        draw: PIL ImageDraw object
+        center: (x, y) 圆心坐标
+        radius: 半径
+        color: 颜色
+        width: 线宽
+        half: "upper" (上半圆) or "lower" (下半圆)
+        start_pos: "left" or "right" (起始位置)
+        end_pos: "left" or "right" (结束位置)
+        arrow_position: "start" (箭头在起始位置) or "end" (箭头在结束位置) or None
+        arrow_size: 箭头大小
+    """
+    cx, cy = center
+    
+    # 确定角度范围
+    # 在图像坐标系中(y向下):
+    # lower: 0-180度 (y > cy)
+    # upper: 180-360度 (y < cy)
+    
+    angle_map = {
+        "lower": {"right": 0, "left": 180},
+        "upper": {"right": 360, "left": 180}
+    }
+    
+    start_angle = angle_map[half].get(start_pos, 0)
+    end_angle = angle_map[half].get(end_pos, 180)
+    
+    # 确定步长
+    step = 5
+    if start_angle > end_angle:
+        step = -5
+        
+    points = []
+    # 生成点
+    # 注意range不包含end，所以要根据step方向加减1
+    for a in range(start_angle, end_angle + (1 if step > 0 else -1), step):
+        rad = math.radians(a)
+        x = cx + radius * math.cos(rad)
+        y = cy + radius * math.sin(rad)
+        points.append((x, y))
+        
+    if len(points) < 2:
+        return
+        
+    # 绘制圆弧
+    draw.line(points, fill=color, width=width)
+    
+    # 绘制箭头
+    if arrow_position:
+        if arrow_position == "start":
+            # 箭头在起点，方向指向路径方向
+            arrow_center = points[0]  # 箭头中心点位于半圆端点
+            next_pt = points[1]
+            dx = next_pt[0] - arrow_center[0]
+            dy = next_pt[1] - arrow_center[1]
+        else: # end
+            # 箭头在终点，方向指向路径方向
+            arrow_center = points[-1]  # 箭头中心点位于半圆端点
+            prev_pt = points[-2]
+            dx = arrow_center[0] - prev_pt[0]
+            dy = arrow_center[1] - prev_pt[1]
+
+        angle = math.atan2(dy, dx)
+        
+        # 箭头参数
+        arrow_len = arrow_size * 1.5
+        arrow_wing = arrow_size
+        
+        # 箭头中心点在半圆端点，箭头沿路径方向延伸
+        # 计算箭头尖端（沿方向向前）
+        tip_x = arrow_center[0] + arrow_len * math.cos(angle)
+        tip_y = arrow_center[1] + arrow_len * math.sin(angle)
+        tip_pt = (tip_x, tip_y)
+        
+        # 计算箭头尾部中心（沿方向向后）
+        bx = arrow_center[0] - arrow_len * math.cos(angle)
+        by = arrow_center[1] - arrow_len * math.sin(angle)
+        
+        # 计算两翼（从尾部中心向两侧展开）
+        w1x = bx + arrow_wing * math.cos(angle + math.pi/2)
+        w1y = by + arrow_wing * math.sin(angle + math.pi/2)
+        
+        w2x = bx + arrow_wing * math.cos(angle - math.pi/2)
+        w2y = by + arrow_wing * math.sin(angle - math.pi/2)
+        
+        draw.polygon([tip_pt, (w1x, w1y), (w2x, w2y)], fill=color)
+
+
 def draw_coordinate_axes(img, position="right", rotate_180=False, env_id=None):
     """
     在图片外的黑色区域绘制坐标系，标注 forward/backward/left/right
@@ -177,8 +269,8 @@ def draw_coordinate_axes(img, position="right", rotate_180=False, env_id=None):
     
     # 如果是 RouteStick 任务且位置在右侧，绘制旋转方向示意图
     if env_id == "RouteStick" and position == "right":
-        # 绘制四个半圆箭头示意图（2×2 网格）
-        # 示意图位置：在图像右侧，2×2 网格布局
+        # 绘制四个半圆箭头示意图（垂直排列）
+        # 示意图位置：在图像右侧，从上到下垂直排列
         illustration_width = 220  # 示意图区域宽度（已弃用，保留以保持兼容性）
         
         # 尝试加载字体
@@ -191,60 +283,40 @@ def draw_coordinate_axes(img, position="right", rotate_180=False, env_id=None):
                 small_font = ImageFont.load_default()
         
         line_color = (255, 255, 255)  # 白色
-        semicircle_radius = 18  # 半圆半径
-        arrow_size = 6  # 箭头大小
-        grid_spacing_x = 35  # 水平格子间距（增加以分开左右两列）
-        grid_spacing_y = 20  # 垂直格子间距（保持原值）
+        semicircle_radius = 15  # 半圆半径
+        arrow_size = 3  # 箭头大小
+        vertical_spacing = 5  # 垂直间距（每个半圆之间的间距）
         line_width = 2  # 线宽
         
-        # 计算网格布局
-        # 网格总宽度：2个半圆 + 1个间距 = 2*18*2 + 35 = 107px
-        grid_width = semicircle_radius * 2 + grid_spacing_x
-        grid_height = semicircle_radius * 2 + grid_spacing_y
+        # 计算垂直布局
+        # 每个半圆需要的高度：半圆直径 + 标签高度 + 间距
+        item_height = semicircle_radius * 2 + 20  # 半圆直径 + 标签空间
+        total_height = 4 * item_height + 3 * vertical_spacing  # 4个半圆 + 3个间距
         
-        # 网格中心位置（位于右侧黑色区域的中心）
-        # width 为右侧黑色区域的宽度（240），将网格中心放在区域中心
-        grid_center_x = width // 2
-        grid_center_y = height // 2
+        # 布局中心位置（位于右侧黑色区域的中心）
+        # width 为右侧黑色区域的宽度（240），将布局中心放在区域中心
+        layout_center_x = width // 2
+        start_y = (height - total_height) // 2  # 从顶部开始的起始位置
         
-        # 计算四个格子的中心位置
-        # 左列中心 x
-        left_col_x = grid_center_x - grid_spacing_x // 2 - semicircle_radius
-        # 右列中心 x
-        right_col_x = grid_center_x + grid_spacing_x // 2 + semicircle_radius
-        # 上行（clockwise）中心 y
-        cw_row_y = grid_center_y - grid_spacing_y // 2 - semicircle_radius
-        # 下行（counterclockwise）中心 y
-        ccw_row_y = grid_center_y + grid_spacing_y // 2 + semicircle_radius
+        # 计算四个半圆的中心位置（从上到下）
+        # 1. Left Clockwise (最上)
+        lcw_center_x = layout_center_x
+        lcw_center_y = start_y + item_height // 2
+        # 2. Left Counterclockwise
+        lccw_center_x = layout_center_x
+        lccw_center_y = lcw_center_y + item_height + vertical_spacing
+        # 3. Right Clockwise
+        rcw_center_x = layout_center_x
+        rcw_center_y = lccw_center_y + item_height + vertical_spacing
+        # 4. Right Counterclockwise (最下)
+        rccw_center_x = layout_center_x
+        rccw_center_y = rcw_center_y + item_height + vertical_spacing
         
-        # 1. 绘制 left clockwise（左上格）：左半圆，右→左（顺时针），箭头在左端朝上
-        lcw_center_x = left_col_x
-        lcw_center_y = cw_row_y
-        # 左半圆：从 0°（右）到 180°（左），向左凸出
-        # 圆心在格子中心右侧，使半圆向左凸出
-        lcw_circle_center_x = lcw_center_x + semicircle_radius
-        lcw_circle_center_y = lcw_center_y
-        arc_points_lcw = []
-        for angle_deg in range(0, 181, 5):  # 从 0° 到 180°（顺时针）
-            angle_rad = math.radians(angle_deg)
-            x = lcw_circle_center_x + semicircle_radius * math.cos(angle_rad)
-            y = lcw_circle_center_y + semicircle_radius * math.sin(angle_rad)
-            arc_points_lcw.append((x, y))
-        # 绘制圆弧线段
-        for i in range(len(arc_points_lcw) - 1):
-            draw.line([arc_points_lcw[i], arc_points_lcw[i+1]], fill=line_color, width=line_width)
-        # 箭头在左端（180°位置），朝上
-        arrow_x_lcw = lcw_circle_center_x + semicircle_radius * math.cos(math.radians(180))
-        arrow_y_lcw = lcw_circle_center_y + semicircle_radius * math.sin(math.radians(180))
-        # 箭头朝上（在180°位置，切线方向向上）
-        draw.polygon(
-            [(arrow_x_lcw, arrow_y_lcw - arrow_size),  # 尖端向上
-             (arrow_x_lcw - arrow_size, arrow_y_lcw + arrow_size // 2),
-             (arrow_x_lcw + arrow_size, arrow_y_lcw + arrow_size // 2)],
-            fill=line_color
-        )
+        # 1. 绘制 left clockwise（最上）：左半圆，右→左（顺时针），箭头在左端朝上
+        draw_semicircle(draw, (lcw_center_x , lcw_center_y), semicircle_radius, line_color, line_width, half="upper", start_pos="left", end_pos="right", arrow_position="end", arrow_size=arrow_size)
+        
         # 添加标签 "L CW"
-        lcw_text = "L CW"
+        lcw_text = "Left Clockwise"
         lcw_bbox = draw.textbbox((0, 0), lcw_text, font=small_font)
         lcw_text_width = lcw_bbox[2] - lcw_bbox[0]
         lcw_text_height = lcw_bbox[3] - lcw_bbox[1]
@@ -257,74 +329,11 @@ def draw_coordinate_axes(img, position="right", rotate_180=False, env_id=None):
         )
         draw.text((lcw_text_x, lcw_text_y), lcw_text, fill=line_color, font=small_font)
         
-        # 2. 绘制 right clockwise（右上格）：右半圆，左→右（顺时针），箭头在右端朝上
-        rcw_center_x = right_col_x
-        rcw_center_y = cw_row_y
-        # 右半圆：从 180°（左）到 0°（右），向右凸出
-        # 圆心在格子中心左侧，使半圆向右凸出
-        rcw_circle_center_x = rcw_center_x - semicircle_radius
-        rcw_circle_center_y = rcw_center_y
-        arc_points_rcw = []
-        for angle_deg in range(180, -1, -5):  # 从 180° 到 0°（顺时针）
-            angle_rad = math.radians(angle_deg)
-            x = rcw_circle_center_x + semicircle_radius * math.cos(angle_rad)
-            y = rcw_circle_center_y + semicircle_radius * math.sin(angle_rad)
-            arc_points_rcw.append((x, y))
-        # 绘制圆弧线段
-        for i in range(len(arc_points_rcw) - 1):
-            draw.line([arc_points_rcw[i], arc_points_rcw[i+1]], fill=line_color, width=line_width)
-        # 箭头在右端（0°位置），朝上
-        arrow_x_rcw = rcw_circle_center_x + semicircle_radius * math.cos(math.radians(0))
-        arrow_y_rcw = rcw_circle_center_y + semicircle_radius * math.sin(math.radians(0))
-        # 箭头朝上（在0°位置，切线方向向上）
-        draw.polygon(
-            [(arrow_x_rcw, arrow_y_rcw - arrow_size),  # 尖端向上
-             (arrow_x_rcw - arrow_size, arrow_y_rcw + arrow_size // 2),
-             (arrow_x_rcw + arrow_size, arrow_y_rcw + arrow_size // 2)],
-            fill=line_color
-        )
-        # 添加标签 "R CW"
-        rcw_text = "R CW"
-        rcw_bbox = draw.textbbox((0, 0), rcw_text, font=small_font)
-        rcw_text_width = rcw_bbox[2] - rcw_bbox[0]
-        rcw_text_height = rcw_bbox[3] - rcw_bbox[1]
-        rcw_text_x = rcw_center_x - rcw_text_width // 2
-        rcw_text_y = rcw_center_y + semicircle_radius + 5
-        draw.rectangle(
-            [(rcw_text_x - 2, rcw_text_y - 2),
-             (rcw_text_x + rcw_text_width + 2, rcw_text_y + rcw_text_height + 2)],
-            fill=(0, 0, 0)
-        )
-        draw.text((rcw_text_x, rcw_text_y), rcw_text, fill=line_color, font=small_font)
-        
-        # 3. 绘制 left counterclockwise（左下格）：左半圆，左→右（逆时针），箭头在右端朝下
-        lccw_center_x = left_col_x
-        lccw_center_y = ccw_row_y
-        # 左半圆：从 180°（左）到 0°（右），向左凸出
-        # 圆心在格子中心右侧，使半圆向左凸出
-        lccw_circle_center_x = lccw_center_x + semicircle_radius
-        lccw_circle_center_y = lccw_center_y
-        arc_points_lccw = []
-        for angle_deg in range(180, -1, -5):  # 从 180° 到 0°（逆时针）
-            angle_rad = math.radians(angle_deg)
-            x = lccw_circle_center_x + semicircle_radius * math.cos(angle_rad)
-            y = lccw_circle_center_y + semicircle_radius * math.sin(angle_rad)
-            arc_points_lccw.append((x, y))
-        # 绘制圆弧线段
-        for i in range(len(arc_points_lccw) - 1):
-            draw.line([arc_points_lccw[i], arc_points_lccw[i+1]], fill=line_color, width=line_width)
-        # 箭头在右端（0°位置），朝下
-        arrow_x_lccw = lccw_circle_center_x + semicircle_radius * math.cos(math.radians(0))
-        arrow_y_lccw = lccw_circle_center_y + semicircle_radius * math.sin(math.radians(0))
-        # 箭头朝下（在0°位置，切线方向向下）
-        draw.polygon(
-            [(arrow_x_lccw, arrow_y_lccw + arrow_size),  # 尖端向下
-             (arrow_x_lccw - arrow_size, arrow_y_lccw - arrow_size // 2),
-             (arrow_x_lccw + arrow_size, arrow_y_lccw - arrow_size // 2)],
-            fill=line_color
-        )
+        # 2. 绘制 left counterclockwise（第二个）：左半圆，左→右（逆时针），箭头在右端朝下
+        draw_semicircle(draw, (lccw_center_x, lccw_center_y), semicircle_radius, line_color, line_width, half="lower", start_pos="left", end_pos="right", arrow_position="end", arrow_size=arrow_size)
+
         # 添加标签 "L CCW"
-        lccw_text = "L CCW"
+        lccw_text = "Left Counterclockwise"
         lccw_bbox = draw.textbbox((0, 0), lccw_text, font=small_font)
         lccw_text_width = lccw_bbox[2] - lccw_bbox[0]
         lccw_text_height = lccw_bbox[3] - lccw_bbox[1]
@@ -337,34 +346,28 @@ def draw_coordinate_axes(img, position="right", rotate_180=False, env_id=None):
         )
         draw.text((lccw_text_x, lccw_text_y), lccw_text, fill=line_color, font=small_font)
         
-        # 4. 绘制 right counterclockwise（右下格）：右半圆，右→左（逆时针），箭头在左端朝下
-        rccw_center_x = right_col_x
-        rccw_center_y = ccw_row_y
-        # 右半圆：从 0°（右）到 180°（左），向右凸出
-        # 圆心在格子中心左侧，使半圆向右凸出
-        rccw_circle_center_x = rccw_center_x - semicircle_radius
-        rccw_circle_center_y = rccw_center_y
-        arc_points_rccw = []
-        for angle_deg in range(0, 181, 5):  # 从 0° 到 180°（逆时针）
-            angle_rad = math.radians(angle_deg)
-            x = rccw_circle_center_x + semicircle_radius * math.cos(angle_rad)
-            y = rccw_circle_center_y + semicircle_radius * math.sin(angle_rad)
-            arc_points_rccw.append((x, y))
-        # 绘制圆弧线段
-        for i in range(len(arc_points_rccw) - 1):
-            draw.line([arc_points_rccw[i], arc_points_rccw[i+1]], fill=line_color, width=line_width)
-        # 箭头在左端（180°位置），朝下
-        arrow_x_rccw = rccw_circle_center_x + semicircle_radius * math.cos(math.radians(180))
-        arrow_y_rccw = rccw_circle_center_y + semicircle_radius * math.sin(math.radians(180))
-        # 箭头朝下（在180°位置，切线方向向下）
-        draw.polygon(
-            [(arrow_x_rccw, arrow_y_rccw + arrow_size),  # 尖端向下
-             (arrow_x_rccw - arrow_size, arrow_y_rccw - arrow_size // 2),
-             (arrow_x_rccw + arrow_size, arrow_y_rccw - arrow_size // 2)],
-            fill=line_color
+        # 3. 绘制 right clockwise（第三个）：右半圆，左→右（顺时针），箭头在右端朝上
+        draw_semicircle(draw, (rcw_center_x , rcw_center_y), semicircle_radius, line_color, line_width, half="lower", start_pos="right", end_pos="left", arrow_position="end", arrow_size=arrow_size)
+
+        # 添加标签 "R CW"
+        rcw_text = "Right Clockwise"
+        rcw_bbox = draw.textbbox((0, 0), rcw_text, font=small_font)
+        rcw_text_width = rcw_bbox[2] - rcw_bbox[0]
+        rcw_text_height = rcw_bbox[3] - rcw_bbox[1]
+        rcw_text_x = rcw_center_x - rcw_text_width // 2
+        rcw_text_y = rcw_center_y + semicircle_radius + 5
+        draw.rectangle(
+            [(rcw_text_x - 2, rcw_text_y - 2),
+             (rcw_text_x + rcw_text_width + 2, rcw_text_y + rcw_text_height + 2)],
+            fill=(0, 0, 0)
         )
+        draw.text((rcw_text_x, rcw_text_y), rcw_text, fill=line_color, font=small_font)
+        
+        # 4. 绘制 right counterclockwise（最下）：右半圆，右→左（逆时针），箭头在左端朝下
+        draw_semicircle(draw, (rccw_center_x , rccw_center_y), semicircle_radius, line_color, line_width, half="upper",start_pos="right", end_pos="left", arrow_position="end", arrow_size=arrow_size)
+
         # 添加标签 "R CCW"
-        rccw_text = "R CCW"
+        rccw_text = "Right Counterclockwise"
         rccw_bbox = draw.textbbox((0, 0), rccw_text, font=small_font)
         rccw_text_width = rccw_bbox[2] - rccw_bbox[0]
         rccw_text_height = rccw_bbox[3] - rccw_bbox[1]

@@ -8,7 +8,7 @@ GRADIO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$GRADIO_DIR"
 
 # Micromamba 环境路径
-MICROMAMBA_ENV="/data/hongzefu/maniskillenv1114"
+MICROMAMBA_ENV="/home/hongzefu/micromamba/envs/maniskillenv1228"
 
 # 日志目录（放在 gradio 目录中）
 LOG_DIR="$GRADIO_DIR/logs"

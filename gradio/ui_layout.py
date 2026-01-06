@@ -88,9 +88,7 @@ from gradio_callbacks import (
     init_app,
     confirm_demo_watched,
     play_demo_video,
-    select_env_id,
     switch_to_record_mode,
-    switch_to_test_mode,
     back_to_landing_page,  # 回退到模式选择页面的函数
     show_task_hint,  # 【新增导入】任务提示延迟加载函数：根据当前session的env_id加载任务提示内容
     show_loading_info  # 【新增导入】显示加载环境提示信息的函数
@@ -781,7 +779,6 @@ def create_ui_blocks():
             gr.Markdown("### Select Mode")
             gr.Markdown("Please choose how you want to proceed:")
             with gr.Row():
-                test_btn = gr.Button("Free Try Mode! 🤔", variant="secondary")
                 record_btn = gr.Button("Record Mode 📝", variant="primary")
 
         # --- Login Section ---
@@ -797,98 +794,6 @@ def create_ui_blocks():
                 )
                 login_btn = gr.Button("Login", variant="primary")
             login_msg = gr.Markdown("")
-
-        # --- Env ID Selection Section (for user_test only) ---
-        # 【环境ID选择界面 - 2x2分类网格布局】
-        # 此界面仅在测试模式（user_test）下显示，用于让用户选择要测试的环境ID
-        # 布局从原来的简单列表改为2x2分类网格，按任务类型分为四个类别：
-        # - Counting (计数): 需要计数操作的任务
-        # - Persistence (恒常): 需要持久性/记忆操作的任务
-        # - Reference (参考): 需要参考视频/演示的任务
-        # - Behavior (行为): 需要特定行为模式的任务
-        with gr.Group(visible=False) as env_selection_group:
-            gr.Markdown("### Select Environment")
-            gr.Markdown("Please select an environment ID to start the task")
-            
-            # 【按钮列表】存储所有环境按钮及其对应的环境ID，用于后续统一绑定点击事件
-            # 格式: [(button对象, env_id字符串), ...]
-            env_buttons_with_ids = []
-            
-            # 【创建环境按钮函数】
-            # 功能：创建环境选择按钮并添加到列表中，同时应用对应的CSS样式类
-            # 参数：
-            #   - env_id: 环境ID字符串（如"BinFill"）
-            #   - css_class: CSS样式类名（如"btn-counting"），用于设置按钮颜色
-            # 返回：创建的按钮对象
-            def create_env_btn(env_id, css_class=""):
-                # 创建按钮，使用secondary变体，大尺寸，并应用CSS类
-                btn = gr.Button(env_id, variant="secondary", size="lg", elem_classes=css_class)
-                # 将按钮和环境ID的元组添加到列表中，供后续事件绑定使用
-                env_buttons_with_ids.append((btn, env_id))
-                return btn
-
-            # 【第一行：Counting 和 Persistence 类别】
-            with gr.Row():
-                # 【左上：Counting (计数) 类别】
-                # 包含4个环境：BinFill, PickXtimes, SwingXtimes, StopCube
-                # 这些任务主要涉及计数操作
-                with gr.Column():
-                    gr.Markdown("#### 🔢 Counting")
-                    # 第一行：BinFill 和 PickXtimes
-                    with gr.Row():
-                         create_env_btn("BinFill", "btn-counting")      # 浅蓝色按钮
-                         create_env_btn("PickXtimes", "btn-counting")   # 浅蓝色按钮
-                    # 第二行：SwingXtimes 和 StopCube
-                    with gr.Row():
-                         create_env_btn("SwingXtimes", "btn-counting")  # 浅蓝色按钮
-                         create_env_btn("StopCube", "btn-counting")     # 浅蓝色按钮
-                
-                # 【右上：Persistence (恒常) 类别】
-                # 包含4个环境：VideoUnmask, ButtonUnmask, VideoUnmaskSwap, ButtonUnmaskSwap
-                # 这些任务主要涉及持久性/记忆操作
-                with gr.Column():
-                    gr.Markdown("#### 👁️ Persistence")
-                    # 第一行：VideoUnmask 和 ButtonUnmask
-                    with gr.Row():
-                         create_env_btn("VideoUnmask", "btn-persistence")      # 浅绿色按钮
-                         create_env_btn("ButtonUnmask", "btn-persistence")    # 浅绿色按钮
-                    # 第二行：VideoUnmaskSwap 和 ButtonUnmaskSwap
-                    with gr.Row():
-                         create_env_btn("VideoUnmaskSwap", "btn-persistence")  # 浅绿色按钮
-                         create_env_btn("ButtonUnmaskSwap", "btn-persistence") # 浅绿色按钮
-
-            # 【第二行：Reference 和 Behavior 类别】
-            with gr.Row():
-                # 【左下：Reference (参考) 类别】
-                # 包含4个环境：PickHighlight, VideoRepick, VideoPlaceButton, VideoPlaceOrder
-                # 这些任务主要涉及参考视频/演示
-                with gr.Column():
-                    gr.Markdown("#### 🖼️ Reference")
-                    # 第一行：PickHighlight 和 VideoRepick
-                    with gr.Row():
-                         create_env_btn("PickHighlight", "btn-reference")      # 浅黄色按钮
-                         create_env_btn("VideoRepick", "btn-reference")      # 浅黄色按钮
-                    # 第二行：VideoPlaceButton 和 VideoPlaceOrder
-                    with gr.Row():
-                         create_env_btn("VideoPlaceButton", "btn-reference") # 浅黄色按钮
-                         create_env_btn("VideoPlaceOrder", "btn-reference")  # 浅黄色按钮
-
-                # 【右下：Behavior (行为) 类别】
-                # 包含4个环境：MoveCube, InsertPeg, PatternLock, RouteStick
-                # 这些任务主要涉及特定的行为模式
-                with gr.Column():
-                    gr.Markdown("#### 🖐️ Behavior")
-                    # 第一行：MoveCube 和 InsertPeg
-                    with gr.Row():
-                         create_env_btn("MoveCube", "btn-behavior")    # 浅红色按钮
-                         create_env_btn("InsertPeg", "btn-behavior")  # 浅红色按钮
-                    # 第二行：PatternLock 和 RouteStick
-                    with gr.Row():
-                         create_env_btn("PatternLock", "btn-behavior") # 浅红色按钮
-                         create_env_btn("RouteStick", "btn-behavior")  # 浅红色按钮
-
-            # 环境选择消息显示区域（用于显示选择结果或错误信息）
-            env_selection_msg = gr.Markdown("")
 
         # --- Main Interface (Hidden initially) ---
         with gr.Group(visible=False) as main_interface:
@@ -925,7 +830,7 @@ def create_ui_blocks():
                              # 移除 Accordion，直接显示 Task Hint 按钮
                              # 点击按钮后切换显示/隐藏提示内容
                              # Task Hint 按钮
-                             show_hint_btn_demo = gr.Button("Task Hint 💡⬇️", size="sm")
+                             show_hint_btn_demo = gr.Button("Click to see Task Hint 💡⬇️", size="sm")
                              # 任务提示Markdown组件：初始值为空，点击按钮后切换显示/隐藏
                              note2_demo = gr.Markdown(
                                  value="",  # 初始值为空，延迟加载
@@ -966,7 +871,7 @@ def create_ui_blocks():
                             # 移除 Accordion，直接显示 Task Hint 按钮
                             # 点击按钮后切换显示/隐藏提示内容
                             # Task Hint 按钮
-                            show_hint_btn = gr.Button("Task Hint 💡⬇️", size="sm")
+                            show_hint_btn = gr.Button("Click to see Task Hint 💡⬇️", size="sm")
                             # 任务提示Markdown组件：初始值为空，点击按钮后切换显示/隐藏
                             note2 = gr.Markdown(
                                 value="",  # 初始值为空，延迟加载
@@ -1048,7 +953,6 @@ def create_ui_blocks():
             outputs=[
                 uid_state, 
                 login_group, 
-                env_selection_group,
                 main_interface, 
                 login_msg, 
                 img_display, 
@@ -1105,7 +1009,6 @@ def create_ui_blocks():
                 uid_state, 
                 landing_group, 
                 login_group, 
-                env_selection_group,
                 main_interface, 
                 login_msg, 
                 img_display, 
@@ -1131,122 +1034,6 @@ def create_ui_blocks():
                 loading_overlay  # 【关键】加载完成后返回空字符串，清空 overlay 组件内容，遮罩层自动隐藏
             ]
         )
-        
-        # ============================================
-        # 1.2 Landing Page - Test Mode 按钮事件绑定
-        # ============================================
-        # 功能说明：
-        # - 用户在模式选择页面点击 "Free Try Mode" 按钮时触发
-        # - 首先显示全屏加载遮罩层
-        # - 然后切换到测试模式（用户名后添加 _test 后缀）并执行登录和任务加载
-        # - 加载完成后，自动隐藏遮罩层
-        # 
-        # 事件链流程：
-        # 1. click 事件：调用 show_loading_info() 显示遮罩层
-        # 2. .then() 链：调用 switch_to_test_mode() 切换到测试模式并加载任务
-        # 3. switch_to_test_mode() 返回时，loading_overlay 被设置为空字符串，遮罩层消失
-        # ============================================
-        test_btn.click(
-            # 第一步：显示加载遮罩层
-            fn=show_loading_info,
-            outputs=[loading_overlay]  # 输出到 loading_overlay 组件，显示遮罩层
-        ).then(
-            # 第二步：切换到测试模式并加载任务
-            fn=switch_to_test_mode,
-            inputs=[username_state, uid_state],  # 输入：用户名状态和会话ID
-            outputs=[
-                uid_state, 
-                landing_group, 
-                login_group, 
-                env_selection_group,
-                main_interface, 
-                login_msg, 
-                img_display, 
-                log_output, 
-                options_radio, 
-                goal_box, 
-                coords_box, 
-                combined_display, 
-                video_display,
-                task_info_box,
-                progress_info_box,
-                login_btn,
-                next_task_btn,
-                exec_btn,
-                username_state,  # ADDED THIS: 更新前端用户名状态 / Update frontend username state
-                demo_video_group,
-                combined_view_group,
-                operation_zone_group,
-                confirm_demo_btn,
-                play_video_btn,
-                coords_group,
-                note2,
-                note2_demo,
-                loading_overlay  # 【关键】加载完成后返回空字符串，清空 overlay 组件内容，遮罩层自动隐藏
-            ]
-        )
-        
-        # ============================================
-        # 1.3 环境 ID 选择按钮事件绑定（针对 user_test 用户）
-        # ============================================
-        # 功能说明：
-        # - 在测试模式下，用户需要从环境选择界面选择一个环境 ID
-        # - 为所有环境选择按钮（如 PickXtimes、VideoPlaceOrder 等）绑定点击事件
-        # - 用户点击环境按钮时，首先显示全屏加载遮罩层
-        # - 然后加载对应的环境任务
-        # - 加载完成后，自动隐藏遮罩层
-        # 
-        # 事件链流程：
-        # 1. click 事件：调用 show_loading_info() 显示遮罩层
-        # 2. .then() 链：调用 select_env_id() 加载选定的环境任务
-        # 3. select_env_id() 返回时，loading_overlay 被设置为空字符串，遮罩层消失
-        # 
-        # 技术说明：
-        # - 使用 env_buttons_with_ids 列表，每个元素包含 (按钮对象, 环境ID) 元组
-        # - 使用 lambda 函数捕获当前循环的 env_id，确保每个按钮调用时传入正确的环境ID
-        # - 这样避免了依赖 ENV_IDS 的顺序，使代码更加健壮和清晰
-        # ============================================
-        for btn, env_id in env_buttons_with_ids:
-            # 为每个环境选择按钮绑定点击事件
-            # 使用 lambda 函数捕获当前循环的 env_id，确保每个按钮调用时传入正确的环境ID
-            btn.click(
-                # 第一步：显示加载遮罩层
-                fn=show_loading_info,
-                outputs=[loading_overlay]  # 输出到 loading_overlay 组件，显示遮罩层
-            ).then(
-                # 第二步：加载选定的环境任务
-                # 使用 lambda 函数捕获当前循环的 env_id，确保每个按钮调用时传入正确的环境ID
-                fn=lambda u, uid, eid=env_id: select_env_id(u, uid, eid),
-                inputs=[username_state, uid_state],  # 输入：用户名状态和会话ID
-                outputs=[
-                    uid_state,
-                    login_group,
-                    env_selection_group,
-                    main_interface,
-                    login_msg,
-                    img_display,
-                    log_output,
-                    options_radio,
-                    goal_box,
-                    coords_box,
-                    combined_display,
-                    video_display,
-                    task_info_box,
-                    progress_info_box,
-                    login_btn,
-                    next_task_btn,
-                    exec_btn,
-                    demo_video_group,
-                    combined_view_group,
-                    operation_zone_group,
-                    confirm_demo_btn,
-                    play_video_btn,
-                    coords_group,
-                    note2,
-                    note2_demo,
-                    loading_overlay  # 【关键】加载完成后返回空字符串，清空 overlay 组件内容，遮罩层自动隐藏
-                ]
-            )
         
         # ============================================
         # 1.5 Next Task 按钮事件绑定
@@ -1278,7 +1065,6 @@ def create_ui_blocks():
             outputs=[
                 uid_state, 
                 login_group,
-                env_selection_group,
                 main_interface, 
                 login_msg, 
                 img_display, 
@@ -1316,7 +1102,6 @@ def create_ui_blocks():
                 loading_group,          # 加载组
                 landing_group,          # 模式选择组（关键：显示模式选择页面）
                 login_group,           # 登录组
-                env_selection_group,    # 环境选择组
                 main_interface,        # 主界面
                 login_msg,             # 登录消息
                 img_display,           # 图片显示
@@ -1397,7 +1182,6 @@ def create_ui_blocks():
                 loading_group,
                 landing_group,
                 login_group,
-                env_selection_group,
                 main_interface, 
                 login_msg, 
                 img_display, 

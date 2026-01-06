@@ -105,9 +105,6 @@ class UserManager:
             end_time: 任务结束时间，ISO格式字符串（可选）
             timestamp: 向后兼容参数，如果提供且start_time/end_time为None，则同时设置为start_time和end_time
         """
-        # 如果 episode_idx 为 99，则不记录任何进度信息
-        if episode_idx == 99:
-            return
         
         record = {
             "username": username
