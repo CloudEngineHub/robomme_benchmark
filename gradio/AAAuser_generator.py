@@ -29,7 +29,7 @@ ENVS = [
 
 NUM_USERS = 20
 EPISODES_PER_ENV = 50
-TEST_EPISODE_IDX = 97
+TEST_EPISODE_IDX = 98
 
 
 def generate_json(seed: int = 0):

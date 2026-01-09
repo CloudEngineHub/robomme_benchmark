@@ -49,16 +49,16 @@ class UserManager:
         safe_username = username.replace("/", "_").replace("\\", "_")
         return os.path.join(self.progress_dir, f"{safe_username}.jsonl")
     
-    def has_episode97_success(self, username, env_id):
+    def has_episode98_success(self, username, env_id):
         """
-        检查指定用户和环境的episode97是否有成功记录。
+        检查指定用户和环境的episode98是否有成功记录。
         
         Args:
             username: 用户名
             env_id: 环境ID
         
         Returns:
-            bool: 如果存在episode97且status为"success"的记录则返回True，否则返回False
+            bool: 如果存在episode98且status为"success"的记录则返回True，否则返回False
         """
         if not username or not env_id:
             return False
@@ -75,20 +75,20 @@ class UserManager:
                             continue
                         try:
                             record = json.loads(line)
-                            # 检查是否是episode97且匹配env_id且status为success
+                            # 检查是否是episode98且匹配env_id且status为success
                             record_env_id = record.get("env_id")
                             record_episode_idx = record.get("episode_idx")
                             record_status = record.get("status", "").lower()
                             
                             if (record_env_id == env_id and 
-                                record_episode_idx == 97 and 
+                                record_episode_idx == 98 and 
                                 record_status == "success"):
                                 return True
                         except (json.JSONDecodeError, KeyError, ValueError):
                             # 跳过格式错误的记录
                             continue
         except Exception as e:
-            print(f"Error checking episode97 success for {username}/{env_id}: {e}")
+            print(f"Error checking episode98 success for {username}/{env_id}: {e}")
         
         return False
     

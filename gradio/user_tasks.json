@@ -2,67 +2,67 @@
   "user1": [
     {
       "env_id": "BinFill",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "PickXtimes",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "SwingXtimes",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "StopCube",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoUnmask",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "ButtonUnmask",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoUnmaskSwap",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "ButtonUnmaskSwap",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "PickHighlight",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoRepick",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoPlaceButton",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoPlaceOrder",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "MoveCube",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "InsertPeg",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "PatternLock",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "RouteStick",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "BinFill",
@@ -228,67 +228,67 @@
   "user2": [
     {
       "env_id": "BinFill",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "PickXtimes",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "SwingXtimes",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "StopCube",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoUnmask",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "ButtonUnmask",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoUnmaskSwap",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "ButtonUnmaskSwap",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "PickHighlight",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoRepick",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoPlaceButton",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoPlaceOrder",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "MoveCube",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "InsertPeg",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "PatternLock",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "RouteStick",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "BinFill",
@@ -454,67 +454,67 @@
   "user3": [
     {
       "env_id": "BinFill",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "PickXtimes",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "SwingXtimes",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "StopCube",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoUnmask",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "ButtonUnmask",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoUnmaskSwap",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "ButtonUnmaskSwap",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "PickHighlight",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoRepick",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoPlaceButton",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoPlaceOrder",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "MoveCube",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "InsertPeg",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "PatternLock",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "RouteStick",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "BinFill",
@@ -680,67 +680,67 @@
   "user4": [
     {
       "env_id": "BinFill",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "PickXtimes",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "SwingXtimes",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "StopCube",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoUnmask",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "ButtonUnmask",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoUnmaskSwap",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "ButtonUnmaskSwap",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "PickHighlight",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoRepick",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoPlaceButton",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoPlaceOrder",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "MoveCube",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "InsertPeg",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "PatternLock",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "RouteStick",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "BinFill",
@@ -906,67 +906,67 @@
   "user5": [
     {
       "env_id": "BinFill",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "PickXtimes",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "SwingXtimes",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "StopCube",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoUnmask",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "ButtonUnmask",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoUnmaskSwap",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "ButtonUnmaskSwap",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "PickHighlight",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoRepick",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoPlaceButton",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoPlaceOrder",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "MoveCube",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "InsertPeg",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "PatternLock",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "RouteStick",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "BinFill",
@@ -1132,67 +1132,67 @@
   "user6": [
     {
       "env_id": "BinFill",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "PickXtimes",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "SwingXtimes",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "StopCube",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoUnmask",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "ButtonUnmask",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoUnmaskSwap",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "ButtonUnmaskSwap",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "PickHighlight",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoRepick",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoPlaceButton",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoPlaceOrder",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "MoveCube",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "InsertPeg",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "PatternLock",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "RouteStick",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "BinFill",
@@ -1358,67 +1358,67 @@
   "user7": [
     {
       "env_id": "BinFill",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "PickXtimes",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "SwingXtimes",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "StopCube",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoUnmask",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "ButtonUnmask",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoUnmaskSwap",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "ButtonUnmaskSwap",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "PickHighlight",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoRepick",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoPlaceButton",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoPlaceOrder",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "MoveCube",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "InsertPeg",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "PatternLock",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "RouteStick",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "BinFill",
@@ -1584,67 +1584,67 @@
   "user8": [
     {
       "env_id": "BinFill",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "PickXtimes",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "SwingXtimes",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "StopCube",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoUnmask",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "ButtonUnmask",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoUnmaskSwap",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "ButtonUnmaskSwap",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "PickHighlight",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoRepick",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoPlaceButton",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoPlaceOrder",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "MoveCube",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "InsertPeg",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "PatternLock",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "RouteStick",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "BinFill",
@@ -1810,67 +1810,67 @@
   "user9": [
     {
       "env_id": "BinFill",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "PickXtimes",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "SwingXtimes",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "StopCube",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoUnmask",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "ButtonUnmask",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoUnmaskSwap",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "ButtonUnmaskSwap",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "PickHighlight",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoRepick",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoPlaceButton",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoPlaceOrder",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "MoveCube",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "InsertPeg",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "PatternLock",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "RouteStick",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "BinFill",
@@ -2036,67 +2036,67 @@
   "user10": [
     {
       "env_id": "BinFill",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "PickXtimes",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "SwingXtimes",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "StopCube",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoUnmask",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "ButtonUnmask",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoUnmaskSwap",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "ButtonUnmaskSwap",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "PickHighlight",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoRepick",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoPlaceButton",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoPlaceOrder",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "MoveCube",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "InsertPeg",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "PatternLock",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "RouteStick",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "BinFill",
@@ -2262,67 +2262,67 @@
   "user11": [
     {
       "env_id": "BinFill",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "PickXtimes",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "SwingXtimes",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "StopCube",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoUnmask",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "ButtonUnmask",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoUnmaskSwap",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "ButtonUnmaskSwap",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "PickHighlight",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoRepick",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoPlaceButton",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoPlaceOrder",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "MoveCube",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "InsertPeg",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "PatternLock",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "RouteStick",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "BinFill",
@@ -2488,67 +2488,67 @@
   "user12": [
     {
       "env_id": "BinFill",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "PickXtimes",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "SwingXtimes",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "StopCube",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoUnmask",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "ButtonUnmask",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoUnmaskSwap",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "ButtonUnmaskSwap",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "PickHighlight",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoRepick",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoPlaceButton",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoPlaceOrder",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "MoveCube",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "InsertPeg",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "PatternLock",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "RouteStick",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "BinFill",
@@ -2714,67 +2714,67 @@
   "user13": [
     {
       "env_id": "BinFill",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "PickXtimes",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "SwingXtimes",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "StopCube",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoUnmask",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "ButtonUnmask",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoUnmaskSwap",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "ButtonUnmaskSwap",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "PickHighlight",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoRepick",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoPlaceButton",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoPlaceOrder",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "MoveCube",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "InsertPeg",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "PatternLock",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "RouteStick",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "BinFill",
@@ -2940,67 +2940,67 @@
   "user14": [
     {
       "env_id": "BinFill",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "PickXtimes",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "SwingXtimes",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "StopCube",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoUnmask",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "ButtonUnmask",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoUnmaskSwap",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "ButtonUnmaskSwap",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "PickHighlight",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoRepick",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoPlaceButton",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoPlaceOrder",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "MoveCube",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "InsertPeg",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "PatternLock",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "RouteStick",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "BinFill",
@@ -3166,67 +3166,67 @@
   "user15": [
     {
       "env_id": "BinFill",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "PickXtimes",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "SwingXtimes",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "StopCube",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoUnmask",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "ButtonUnmask",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoUnmaskSwap",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "ButtonUnmaskSwap",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "PickHighlight",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoRepick",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoPlaceButton",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoPlaceOrder",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "MoveCube",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "InsertPeg",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "PatternLock",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "RouteStick",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "BinFill",
@@ -3392,67 +3392,67 @@
   "user16": [
     {
       "env_id": "BinFill",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "PickXtimes",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "SwingXtimes",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "StopCube",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoUnmask",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "ButtonUnmask",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoUnmaskSwap",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "ButtonUnmaskSwap",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "PickHighlight",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoRepick",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoPlaceButton",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoPlaceOrder",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "MoveCube",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "InsertPeg",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "PatternLock",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "RouteStick",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "BinFill",
@@ -3618,67 +3618,67 @@
   "user17": [
     {
       "env_id": "BinFill",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "PickXtimes",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "SwingXtimes",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "StopCube",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoUnmask",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "ButtonUnmask",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoUnmaskSwap",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "ButtonUnmaskSwap",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "PickHighlight",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoRepick",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoPlaceButton",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoPlaceOrder",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "MoveCube",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "InsertPeg",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "PatternLock",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "RouteStick",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "BinFill",
@@ -3844,67 +3844,67 @@
   "user18": [
     {
       "env_id": "BinFill",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "PickXtimes",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "SwingXtimes",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "StopCube",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoUnmask",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "ButtonUnmask",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoUnmaskSwap",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "ButtonUnmaskSwap",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "PickHighlight",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoRepick",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoPlaceButton",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoPlaceOrder",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "MoveCube",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "InsertPeg",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "PatternLock",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "RouteStick",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "BinFill",
@@ -4070,67 +4070,67 @@
   "user19": [
     {
       "env_id": "BinFill",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "PickXtimes",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "SwingXtimes",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "StopCube",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoUnmask",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "ButtonUnmask",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoUnmaskSwap",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "ButtonUnmaskSwap",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "PickHighlight",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoRepick",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoPlaceButton",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoPlaceOrder",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "MoveCube",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "InsertPeg",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "PatternLock",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "RouteStick",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "BinFill",
@@ -4296,67 +4296,67 @@
   "user20": [
     {
       "env_id": "BinFill",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "PickXtimes",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "SwingXtimes",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "StopCube",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoUnmask",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "ButtonUnmask",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoUnmaskSwap",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "ButtonUnmaskSwap",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "PickHighlight",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoRepick",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoPlaceButton",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "VideoPlaceOrder",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "MoveCube",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "InsertPeg",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "PatternLock",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "RouteStick",
-      "episode_idx": 97
+      "episode_idx": 98
     },
     {
       "env_id": "BinFill",

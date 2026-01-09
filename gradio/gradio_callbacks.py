@@ -323,16 +323,16 @@ def login_and_load_task(username, uid):
     ep_num = current_task["episode_idx"]
     
     
-    # 特殊处理episode97：如果当前任务是episode97且已有成功记录，自动跳过并推进到下一个任务
-    # 这确保用户在episode97成功后关闭重进时，不会再次加载episode97
-    if ep_num == 97:
-        has_success = user_manager.has_episode97_success(username, env_id)
+    # 特殊处理episode98：如果当前任务是episode98且已有成功记录，自动跳过并推进到下一个任务
+    # 这确保用户在episode98成功后关闭重进时，不会再次加载episode98
+    if ep_num == 98:
+        has_success = user_manager.has_episode98_success(username, env_id)
         if has_success:
             # 已有成功记录，但索引可能没有推进（用户关闭时没有点击Next Task）
             # 使用complete_current_task推进索引（会创建新的进度记录，但这是合理的，因为标记了任务完成）
             # 注意：这里会调用complete_current_task，但传入的env_id和episode_idx是当前任务的
             # 需要从任务列表中获取正确的信息
-            print(f"Episode97 for {username}/{env_id} already succeeded, skipping to next task")
+            print(f"Episode98 for {username}/{env_id} already succeeded, skipping to next task")
             
             # 从任务列表中获取当前任务的完整信息（包括difficulty等）
             tasks = user_manager.user_tasks.get(username, [])
@@ -350,7 +350,7 @@ def login_and_load_task(username, uid):
                     # #endregion
                     
                     # 推进任务索引（这会创建新的进度记录，标记任务已完成）
-                    # 使用"success"状态，因为episode97已经成功
+                    # 使用"success"状态，因为episode98已经成功
                     next_status = user_manager.complete_current_task(
                         username,
                         env_id=env_id,
@@ -502,8 +502,8 @@ def login_and_load_task(username, uid):
     # Success loading
     goal_text = capitalize_first_letter(session.language_goal) if session.language_goal else ""
     
-    # 检查是否为 episode 97 (trial mode)
-    if int(ep_num) == 97:
+    # 检查是否为 episode 98 (trial mode)
+    if int(ep_num) == 98:
         gr.Info("This is tutorial mode.")
         capitalized_goal = capitalize_first_letter(session.language_goal) if session.language_goal else ""
         goal_text = f"[[tutorial mode]]\n{capitalized_goal}"
@@ -819,7 +819,7 @@ def load_next_task_wrapper(username, uid):
     对于 user_test，next task 时跳转回 env_id 选择界面。
     For user_test, jump back to env_id selection interface when next task.
     
-    特殊处理episode97：如果episode97没有成功记录，保持在当前episode97，不推进索引。
+    特殊处理episode98：如果episode98没有成功记录，保持在当前episode98，不推进索引。
     """
     
     if username:
@@ -840,22 +840,22 @@ def load_next_task_wrapper(username, uid):
             env_id = current_task["env_id"]
             ep_num = current_task["episode_idx"]
             
-            # 特殊处理episode97：检查是否有成功记录
-            if ep_num == 97:
-                has_success = user_manager.has_episode97_success(username, env_id)
+            # 特殊处理episode98：检查是否有成功记录
+            if ep_num == 98:
+                has_success = user_manager.has_episode98_success(username, env_id)
                 if not has_success:
-                    # 没有成功记录，保持在当前episode97（不推进索引）
+                    # 没有成功记录，保持在当前episode98（不推进索引）
                     # 检查是否已有actions，如果有则创建新的attempt
                     if has_existing_actions(username, env_id, ep_num):
                         create_new_attempt(username, env_id, ep_num)
-                    # 继续加载当前episode97（login_and_load_task会使用status中的当前任务）
+                    # 继续加载当前episode98（login_and_load_task会使用status中的当前任务）
                 else:
                     # 有成功记录，正常推进到下一个任务
                     # 检查当前任务是否已有 actions，如果有则创建新的 attempt
                     if has_existing_actions(username, env_id, ep_num):
                         create_new_attempt(username, env_id, ep_num)
             else:
-                # 非episode97，正常处理
+                # 非episode98，正常处理
                 # 检查当前任务是否已有 actions，如果有则创建新的 attempt
                 if has_existing_actions(username, env_id, ep_num):
                     create_new_attempt(username, env_id, ep_num)
@@ -1495,22 +1495,22 @@ def execute_step(uid, username, option_idx, coords_str):
 
         # Update user progress (但不更新 progress_info_box，等用户按 next task/refresh 时再更新)
         if username:
-            # 判断是否为 episode_idx == 97
+            # 判断是否为 episode_idx == 98
             ep_val = getattr(session, 'episode_idx', None)
-            ep_is_97 = False
+            ep_is_98 = False
             if ep_val is not None:
                 if isinstance(ep_val, int):
-                    ep_is_97 = (ep_val == 97)
+                    ep_is_98 = (ep_val == 98)
                 else:
-                    ep_is_97 = (str(ep_val) == "97")
+                    ep_is_98 = (str(ep_val) == "98")
             
-            # episode97失败时不推进索引，成功时推进索引
-            if ep_is_97 and (final_log_status == "failed"):
+            # episode98失败时不推进索引，成功时推进索引
+            if ep_is_98 and (final_log_status == "failed"):
                 # 跳过 complete_current_task，不推进任务索引
                 gr.Info("---please press Next Task to redo it again---")
                 task_update = "Task Failed. Press Next Task to retry same episode."
             else:
-                # 正常推进任务索引并生成下一任务提示（包括episode97成功的情况）
+                # 正常推进任务索引并生成下一任务提示（包括episode98成功的情况）
                 seed = getattr(session, 'seed', None)
                 user_status = user_manager.complete_current_task(
                     username,

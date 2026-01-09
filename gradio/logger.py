@@ -660,8 +660,8 @@ def log_user_action(username, env_id, episode_idx, action_data, option_list=None
     文件路径: data/user_action_logs/{username}/{env_id}_{episode_idx}.h5
     文件格式: HDF5，包含 actions 组，每个 action 记录一次 execute，包含 execute 之前所有的 option_select 和 coordinate_clicks
     """
-    # 如果 episode_idx 为 97，只有在成功时才记录
-    if episode_idx == 97:
+    # 如果 episode_idx 为 98，只有在成功时才记录
+    if episode_idx == 98:
         # 检查是否成功：done=True 且 status 包含 "SUCCESS"
         is_success = False
         if action_data:
