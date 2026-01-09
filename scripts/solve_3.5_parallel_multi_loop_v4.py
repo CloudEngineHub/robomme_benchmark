@@ -51,25 +51,25 @@ from planner_fail_safe import (
 
 # 所有支持的环境模块名称列表
 DEFAULT_ENVS =[
-"PickXtimes",
-"StopCube",
-"SwingXtimes",
+# "PickXtimes",
+# "StopCube",
+# "SwingXtimes",
 "BinFill",
 
-"VideoUnmaskSwap",
-"VideoUnmask",
-"ButtonUnmaskSwap",
-"ButtonUnmask",
+# "VideoUnmaskSwap",
+# "VideoUnmask",
+# "ButtonUnmaskSwap",
+# "ButtonUnmask",
 
-"VideoRepick",
-"VideoPlaceButton",
-"VideoPlaceOrder",
-"PickHighlight",
+# "VideoRepick",
+# "VideoPlaceButton",
+# "VideoPlaceOrder",
+# "PickHighlight",
 
-"InsertPeg",
-'MoveCube',
-"PatternLock",
-"RouteStick"
+# "InsertPeg",
+# 'MoveCube',
+# "PatternLock",
+# "RouteStick"
 ]
 
 # 将环境名称映射为唯一的整数代码，用于生成随机种子
@@ -552,8 +552,8 @@ def main() -> None:
 
     for env_id in env_ids:
         # 为所有 episode 创建共享的临时文件夹
-        temp_folder =  Path(f"/data/hongzefu/dataset_generate/temp_{env_id}_episodes")
-        final_dataset_path =  Path(f"/data/hongzefu/dataset_generate/record_dataset_{env_id}.h5")
+        temp_folder =  Path(f"/home/hongzefu/dataset_generate/temp_{env_id}_episodes")
+        final_dataset_path =  Path(f"/home/hongzefu/dataset_generate/record_dataset_{env_id}.h5")
 
         print(f"\n{'='*80}")
         print(f"Environment: {env_id}")

@@ -219,7 +219,18 @@ class HistoryBenchRecordWrapper(gym.Wrapper):
 
         # 解析原始观测：RGB、分割 Mask 全部保留 torch->numpy 之后的数据，确保可直接写入 HDF5
         base_camera_frame = obs['sensor_data']['base_camera']['rgb'][0].cpu().numpy()
+        base_camera_depth = obs['sensor_data']['base_camera']['depth'][0].cpu().numpy()
         wrist_camera_frame = obs['sensor_data']['hand_camera']['rgb'][0].cpu().numpy()
+        wrist_camera_depth = obs['sensor_data']['hand_camera']['depth'][0].cpu().numpy()
+
+        base_camera_extrinsic_opencv=obs['sensor_param']['base_camera']['extrinsic_cv']
+        base_camera_intrinsic_opencv=obs['sensor_param']['base_camera']['intrinsic_cv']
+        base_camera_cam2world_opengl=obs['sensor_param']['base_camera']['cam2world_gl']
+        wrist_camera_extrinsic_opencv=obs['sensor_param']['hand_camera']['extrinsic_cv']
+        wrist_camera_intrinsic_opencv=obs['sensor_param']['hand_camera']['intrinsic_cv']
+        wrist_camera_cam2world_opengl=obs['sensor_param']['hand_camera']['cam2world_gl']
+        
+        
         segmentation=obs['sensor_data']['base_camera']['segmentation'].cpu().numpy()[0]
 
         # 获取当前子目标名称和在线规划子目标名称
@@ -376,6 +387,14 @@ class HistoryBenchRecordWrapper(gym.Wrapper):
                 'robot_endeffector_q': self.agent.robot.links[9].pose.q.cpu().numpy(),
                 'image': base_camera_frame,
                 'wrist_image': wrist_camera_frame,
+                'base_camera_depth': base_camera_depth,
+                'wrist_camera_depth': wrist_camera_depth,
+                'base_camera_extrinsic_opencv': base_camera_extrinsic_opencv,
+                'base_camera_intrinsic_opencv': base_camera_intrinsic_opencv,
+                'base_camera_cam2world_opengl': base_camera_cam2world_opengl,
+                'wrist_camera_extrinsic_opencv': wrist_camera_extrinsic_opencv,
+                'wrist_camera_intrinsic_opencv': wrist_camera_intrinsic_opencv,
+                'wrist_camera_cam2world_opengl': wrist_camera_cam2world_opengl,
                 'action': action,
                 'state': self.agent.robot.qpos.cpu().numpy() if hasattr(self.agent.robot.qpos, 'cpu') else self.agent.robot.qpos,
                 'velocity': end_effector_velocity,
@@ -502,6 +521,14 @@ class HistoryBenchRecordWrapper(gym.Wrapper):
                 ts_group.create_dataset("robot_endeffector_q", data=record_data['robot_endeffector_q'])
                 ts_group.create_dataset("image", data=record_data['image'])
                 ts_group.create_dataset("wrist_image", data=record_data['wrist_image'])
+                ts_group.create_dataset("base_camera_depth", data=record_data['base_camera_depth'])
+                ts_group.create_dataset("wrist_camera_depth", data=record_data['wrist_camera_depth'])
+                ts_group.create_dataset("base_camera_extrinsic_opencv", data=record_data['base_camera_extrinsic_opencv'])
+                ts_group.create_dataset("base_camera_intrinsic_opencv", data=record_data['base_camera_intrinsic_opencv'])
+                ts_group.create_dataset("base_camera_cam2world_opengl", data=record_data['base_camera_cam2world_opengl'])
+                ts_group.create_dataset("wrist_camera_extrinsic_opencv", data=record_data['wrist_camera_extrinsic_opencv'])
+                ts_group.create_dataset("wrist_camera_intrinsic_opencv", data=record_data['wrist_camera_intrinsic_opencv'])
+                ts_group.create_dataset("wrist_camera_cam2world_opengl", data=record_data['wrist_camera_cam2world_opengl'])
                 ts_group.create_dataset("segmentation", data=record_data['segmentation'])
                 ts_group.create_dataset("segmentation_result", data=record_data['segmentation_result'])
 
@@ -577,7 +604,7 @@ class HistoryBenchRecordWrapper(gym.Wrapper):
 
             # 保存成功视频（如果启用）。文件名包含语言目标/难度，方便查找
             if self.save_video and len(self.video_frames) > 0:
-                videos_dir = Path("/data/hongzefu/dataset_generate/videos")
+                videos_dir = self.output_root / "videos"
                 videos_dir.mkdir(parents=True, exist_ok=True)
                 combined_video_path = videos_dir / f"{video_prefix}_{filename_suffix}.mp4"
 
@@ -586,7 +613,7 @@ class HistoryBenchRecordWrapper(gym.Wrapper):
                         writer.append_data(combined_frame)
                 print(f"Saved combined video to {combined_video_path}")
             if self.save_video and len(self.no_object_video_frames) > 0:
-                videos_dir = Path("/data/hongzefu/dataset_generate/videos")
+                videos_dir = self.output_root / "videos"
                 videos_dir.mkdir(parents=True, exist_ok=True)
                 no_object_video_path = videos_dir / f"NO_OBJECT_{video_prefix}_{filename_suffix}.mp4"
 
@@ -601,7 +628,7 @@ class HistoryBenchRecordWrapper(gym.Wrapper):
 
             # 保存失败视频（如果启用），但不写入 HDF5
             if self.save_video and len(self.video_frames) > 0:
-                videos_dir = Path("/data/hongzefu/dataset_generate/videos")
+                videos_dir = self.output_root / "videos"
                 videos_dir.mkdir(parents=True, exist_ok=True)
                 # Add FAILED_ prefix to the filename
                 combined_video_path = videos_dir / f"FAILED_{video_prefix}_{filename_suffix}.mp4"
@@ -611,7 +638,7 @@ class HistoryBenchRecordWrapper(gym.Wrapper):
                         writer.append_data(combined_frame)
                 print(f"Saved failed episode video to {combined_video_path}")
             if self.save_video and len(self.no_object_video_frames) > 0:
-                videos_dir = Path("/data/hongzefu/dataset_generate/videos")
+                videos_dir = self.output_root / "videos"
                 videos_dir.mkdir(parents=True, exist_ok=True)
                 no_object_video_path = videos_dir / f"FAILED_NO_OBJECT_{video_prefix}_{filename_suffix}.mp4"
 

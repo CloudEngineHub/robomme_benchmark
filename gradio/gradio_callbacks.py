@@ -45,6 +45,14 @@ from process_session import ScrewPlanFailureError, ProcessSessionProxy
 from note_content import get_task_hint
 
 
+def capitalize_first_letter(text: str) -> str:
+    """确保字符串的第一个字母大写，其余字符保持不变"""
+    if not text:
+        return text
+    if len(text) == 1:
+        return text.upper()
+    return text[0].upper() + text[1:]
+
 
 def _ui_option_label(session, opt_label: str, opt_idx: int) -> str:
     """
@@ -492,12 +500,13 @@ def login_and_load_task(username, uid):
         )
         
     # Success loading
-    goal_text = f"{session.language_goal}"
+    goal_text = capitalize_first_letter(session.language_goal) if session.language_goal else ""
     
     # 检查是否为 episode 97 (trial mode)
     if int(ep_num) == 97:
         gr.Info("This is trial mode.")
-        goal_text = f"[[trial mode]]\n{session.language_goal}"
+        capitalized_goal = capitalize_first_letter(session.language_goal) if session.language_goal else ""
+        goal_text = f"[[trial mode]]\n{capitalized_goal}"
     
     options = session.available_options
     # 生成选项列表，如果选项需要坐标选择，在标签后添加提示
