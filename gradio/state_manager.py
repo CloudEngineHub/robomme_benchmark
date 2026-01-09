@@ -62,6 +62,10 @@ TASK_START_TIMES = {}  # {task_key: "2025-12-28T14:01:25.372278"}
 SESSION_LAST_ACTIVITY = {}  # {uid: timestamp} - timestamp是time.time()返回的浮点数
 SESSION_TIMEOUT_WARNED = {}  # {uid: bool} - 跟踪已警告的session，避免重复警告
 
+# --- 播放按钮状态跟踪 ---
+# 跟踪每个session的播放按钮是否已被点击（用于execute按钮条件控制）
+PLAY_BUTTON_CLICKED = {}  # {uid: bool} - 跟踪播放按钮是否已被点击
+
 # 线程锁，用于保护全局状态的访问
 _state_lock = threading.Lock()
 
@@ -186,6 +190,44 @@ def reset_ui_phase(uid):
     """重置UI阶段为初始阶段（watching_demo）"""
     with _state_lock:
         UI_PHASE_MAP[uid] = "watching_demo"
+
+
+def set_play_button_clicked(uid, clicked=True):
+    """
+    设置播放按钮是否已被点击
+    
+    Args:
+        uid: 会话ID
+        clicked: 是否已被点击（默认 True）
+    """
+    with _state_lock:
+        PLAY_BUTTON_CLICKED[uid] = clicked
+
+
+def get_play_button_clicked(uid):
+    """
+    获取播放按钮是否已被点击
+    
+    Args:
+        uid: 会话ID
+        
+    Returns:
+        bool: 如果已被点击返回 True，否则返回 False
+    """
+    with _state_lock:
+        return PLAY_BUTTON_CLICKED.get(uid, False)
+
+
+def reset_play_button_clicked(uid):
+    """
+    重置播放按钮点击状态
+    
+    Args:
+        uid: 会话ID
+    """
+    with _state_lock:
+        if uid in PLAY_BUTTON_CLICKED:
+            del PLAY_BUTTON_CLICKED[uid]
 
 
 def _get_task_key(username, env_id, episode_idx):
@@ -373,6 +415,10 @@ def cleanup_session(uid):
         # 7. 清理UI阶段
         if uid in UI_PHASE_MAP:
             del UI_PHASE_MAP[uid]
+        
+        # 清理播放按钮状态
+        if uid in PLAY_BUTTON_CLICKED:
+            del PLAY_BUTTON_CLICKED[uid]
             print(f"Session {uid}: UI phase cleaned up")
         
         # 8. 清理活动时间跟踪

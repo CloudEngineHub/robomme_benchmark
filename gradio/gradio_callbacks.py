@@ -29,6 +29,9 @@ from state_manager import (
     update_session_activity,
     get_session_activity,
     cleanup_session,
+    set_play_button_clicked,
+    get_play_button_clicked,
+    reset_play_button_clicked,
     GLOBAL_SESSIONS,
     SESSION_LAST_ACTIVITY,
     _state_lock,
@@ -37,9 +40,93 @@ from streaming_service import FrameQueueManager, cleanup_frame_queue
 from image_utils import draw_marker, save_video, concatenate_frames_horizontally
 from user_manager import user_manager, LeaseLost
 from logger import log_user_action, create_new_attempt, has_existing_actions
-from config import USE_SEGMENTED_VIEW, REFERENCE_VIEW_HEIGHT, should_show_demo_video, SESSION_TIMEOUT, EXECUTE_LIMIT_OFFSET
+from config import USE_SEGMENTED_VIEW, REFERENCE_VIEW_HEIGHT, DEMO_VIDEO_HEIGHT, should_show_demo_video, SESSION_TIMEOUT, EXECUTE_LIMIT_OFFSET
 from process_session import ScrewPlanFailureError, ProcessSessionProxy
 from note_content import get_task_hint
+
+
+
+def _ui_option_label(session, opt_label: str, opt_idx: int) -> str:
+    """
+    仅在 Gradio UI 层对选项显示文案做覆盖（不改底层 env/options 生成逻辑）。
+    目前只对 RouteStick 任务把 4 个长句 label 显示为短 label。
+    """
+    env_id = getattr(session, "env_id", None)
+    if env_id == "RouteStick":
+        routestick_map = {
+            0: "move left clockwise",
+            1: "move right clockwise",
+            2: "move left counterclockwise",
+            3: "move right counterclockwise",
+        }
+        return routestick_map.get(int(opt_idx), opt_label)
+    return opt_label
+
+
+def format_log_html(log_message):
+    """
+    将纯文本日志消息格式化为带颜色的 HTML 格式
+    
+    Args:
+        log_message: 纯文本日志消息（可以是多行）
+    
+    Returns:
+        str: 格式化的 HTML 字符串，成功消息显示绿色，错误消息显示红色
+    """
+    if not log_message or not log_message.strip():
+        return ""
+    
+    # 先检查整个消息是否包含成功或失败的关键词，如果包含，整个消息都使用相同颜色
+    message_upper = log_message.upper()
+    global_color = None
+    if any(keyword in message_upper for keyword in ["SUCCESS", "成功", "EPISODE SUCCESS"]):
+        global_color = "#28a745"  # 绿色
+    elif any(keyword in message_upper for keyword in ["FAILED", "失败", "ERROR", "EPISODE FAILED"]):
+        global_color = "#dc3545"  # 红色
+    
+    # 将消息按行分割
+    lines = log_message.split('\n')
+    formatted_lines = []
+    
+    for line in lines:
+        # 检查是否是空行（只包含空白字符）
+        if not line.strip():
+            # 保留空行，但使用最小高度的div
+            if global_color:
+                formatted_lines.append(f'<div style="color: {global_color}; margin: 0; padding: 0; line-height: 1.4; height: 0.7em;"></div>')
+            else:
+                formatted_lines.append('<div style="margin: 0; padding: 0; line-height: 1.4; height: 0.7em;"></div>')
+            continue
+        
+        # 保留原始行的空格（不strip），用于正确显示格式化边框
+        original_line = line
+        
+        # 如果整个消息有全局颜色，使用全局颜色；否则按行判断
+        if global_color:
+            color = global_color
+        else:
+            # 判断消息类型并设置颜色（使用strip后的行进行判断）
+            line_upper = original_line.strip().upper()
+            if any(keyword in line_upper for keyword in ["SUCCESS", "成功", "EPISODE SUCCESS"]):
+                color = "#28a745"  # 绿色
+            elif any(keyword in line_upper for keyword in ["FAILED", "失败", "ERROR", "EPISODE FAILED"]):
+                color = "#dc3545"  # 红色
+            else:
+                color = "inherit"  # 默认颜色
+        
+        # 转义 HTML 特殊字符（保留空格）
+        escaped_line = original_line.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        
+        # 创建带颜色的 div，设置 white-space: pre 保留空格，margin 和 padding 为 0 确保无间距
+        formatted_lines.append(f'<div style="color: {color}; margin: 0; padding: 0; line-height: 1.4; white-space: pre;">{escaped_line}</div>')
+    
+    # 包装在容器中，保持紧凑布局
+    # 使用 white-space: normal 让div正常换行，但每个div内部使用 white-space: pre 保留空格
+    # 注意：不设置 font-size，使用 CSS 中定义的字体大小（.compact-log 和 #log_output）
+    html_content = ''.join(formatted_lines)
+    result = f'<div style="font-family: monospace; line-height: 1.4;">{html_content}</div>'
+    
+    return result
 
 
 def show_task_hint(uid, current_hint=""):
@@ -128,6 +215,14 @@ def show_loading_info():
     return overlay_html
 
 
+def on_video_end(uid):
+    """
+    Called when the demonstration video finishes playing.
+    Updates the system log to prompt for action selection.
+    """
+    return format_log_html("please select the action below 👇🏻,\nsome actions also need to select keypoint")
+
+
 def login_and_load_task(username, uid):
     """
     Handle user login and load their current task.
@@ -151,10 +246,12 @@ def login_and_load_task(username, uid):
             gr.update(visible=True), # login_group
             gr.update(visible=False), # main_interface
             msg, # login_message
-            gr.update(value=None, interactive=False), None, # img, status
+            gr.update(value=None, interactive=False), format_log_html(""), # img, log_output (空字符串，但也要格式化)
             gr.update(choices=[], value=None), # options
             "", "No need for coordinates", # goal, coords
-            gr.update(value="<div id='combined_view_html'><p>等待登录...</p></div>"), None, # combined_html, demo_video
+            gr.update(value="<div id='combined_view_html'><p>等待登录...</p></div>"), 
+            gr.update(value=None, visible=False),  # video_display - 登录失败时隐藏
+            gr.update(value="", visible=False),  # no_video_display - 登录失败时隐藏
             "", "", # task_info, progress_info
             gr.update(interactive=True), # login_btn
             gr.update(interactive=False), # next_task_btn
@@ -162,15 +259,19 @@ def login_and_load_task(username, uid):
             gr.update(visible=False), # demo_video_group
             gr.update(visible=False), # combined_view_group
             gr.update(visible=False), # operation_zone_group
-            gr.update(visible=False),  # confirm_demo_btn
             gr.update(visible=False, interactive=True),  # play_video_btn
             gr.update(visible=False),  # coords_group
-            # 【修改】任务提示改为延迟加载：不再在登录失败时自动加载提示内容
-            # 初始值设为空字符串，用户需要点击"Show Hint"按钮才会显示提示
-            gr.update(value=""),  # note2 - 任务提示（延迟加载，初始为空）
-            gr.update(value=""),  # note2_demo - 演示任务提示（延迟加载，初始为空）
+            gr.update(value=""),  # task_hint_display - 任务提示显示（清空）
             ""  # loading_overlay - 【关键】清空加载遮罩层：返回空字符串，清空 loading_overlay 组件内容，使全屏遮罩层自动隐藏
         )
+    
+    # #region agent log
+    import json as json_module
+    try:
+        with open('/home/hongzefu/historybench-v5.6.11b5-debug/.cursor/debug.log', 'a', encoding='utf-8') as f:
+            f.write(json_module.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"E","location":"gradio_callbacks.py:259","message":"login_and_load_task after login","data":{"username":username,"status":status},"timestamp":int(__import__('time').time()*1000)})+"\n")
+    except: pass
+    # #endregion
     
     # Login success - Load current task
     if status["is_done_all"]:
@@ -190,31 +291,117 @@ def login_and_load_task(username, uid):
             gr.update(visible=False), # login_group
             gr.update(visible=True), # main_interface
             f"Welcome {username}. You have completed all tasks!", # login_message (hidden)
-            gr.update(value=None, interactive=False), "All tasks completed! Thank you.", 
+            gr.update(value=None, interactive=False), format_log_html("All tasks completed! Thank you."), 
             gr.update(choices=[], value=None),
             "All tasks completed.", "No need for coordinates", 
-            gr.update(value=combined_html), None,
+            gr.update(value=combined_html), 
+            gr.update(value=None, visible=False),  # video_display - 所有任务完成时隐藏
+            gr.update(value="", visible=False),  # no_video_display - 所有任务完成时隐藏
             "No active task", f"Progress: {total}/{total}",
             gr.update(interactive=True),
             gr.update(interactive=False),
             gr.update(interactive=False), # exec_btn
-            gr.update(visible=False), # demo_video_group
-            gr.update(visible=False), # combined_view_group
-            gr.update(visible=True),  # operation_zone_group
-            gr.update(visible=False),  # confirm_demo_btn
-            gr.update(visible=False, interactive=True),  # play_video_btn
+            gr.update(visible=True),  # demo_video_group (始终显示)
+            gr.update(visible=True),  # combined_view_group (始终显示)
+            gr.update(visible=True),  # operation_zone_group (始终显示)
+            gr.update(visible=True, interactive=False),  # play_video_btn (显示但禁用)
             gr.update(visible=False),  # coords_group
-            gr.update(value=""),  # note2
-            gr.update(value=""),  # note2_demo
+            gr.update(value=""),  # task_hint_display - 所有任务完成，无提示
             ""  # loading_overlay - 【关键】清空加载遮罩层：返回空字符串，清空 loading_overlay 组件内容，使全屏遮罩层自动隐藏
         )
-
+        
     current_task = status["current_task"]
     env_id = current_task["env_id"]
     ep_num = current_task["episode_idx"]
     
+    
+    # 特殊处理episode97：如果当前任务是episode97且已有成功记录，自动跳过并推进到下一个任务
+    # 这确保用户在episode97成功后关闭重进时，不会再次加载episode97
+    if ep_num == 97:
+        has_success = user_manager.has_episode97_success(username, env_id)
+        if has_success:
+            # 已有成功记录，但索引可能没有推进（用户关闭时没有点击Next Task）
+            # 使用complete_current_task推进索引（会创建新的进度记录，但这是合理的，因为标记了任务完成）
+            # 注意：这里会调用complete_current_task，但传入的env_id和episode_idx是当前任务的
+            # 需要从任务列表中获取正确的信息
+            print(f"Episode97 for {username}/{env_id} already succeeded, skipping to next task")
+            
+            # 从任务列表中获取当前任务的完整信息（包括difficulty等）
+            tasks = user_manager.user_tasks.get(username, [])
+            if tasks and status.get("current_index") is not None:
+                current_idx = status["current_index"]
+                if current_idx < len(tasks):
+                    current_task_info = tasks[current_idx]
+                    
+                    # #region agent log
+                    import json as json_module
+                    try:
+                        with open('/home/hongzefu/historybench-v5.6.11b5-debug/.cursor/debug.log', 'a', encoding='utf-8') as f:
+                            f.write(json_module.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"D","location":"gradio_callbacks.py:317","message":"current_task_info before complete_current_task","data":{"username":username,"current_idx":current_idx,"current_task_info":current_task_info},"timestamp":int(__import__('time').time()*1000)})+"\n")
+                    except: pass
+                    # #endregion
+                    
+                    # 推进任务索引（这会创建新的进度记录，标记任务已完成）
+                    # 使用"success"状态，因为episode97已经成功
+                    next_status = user_manager.complete_current_task(
+                        username,
+                        env_id=env_id,
+                        episode_idx=ep_num,
+                        status="success",  # 使用success状态
+                        difficulty=current_task_info.get("difficulty"),
+                        language_goal=None,  # 不需要language_goal，因为只是推进索引
+                        seed=None  # 不需要seed
+                    )
+                    
+                    # 重新获取任务状态
+                    if next_status:
+                        status = next_status
+                        if status.get("is_done_all"):
+                            # 如果所有任务完成，返回完成状态
+                            set_task_index(uid, status['total_tasks'] - 1, status['total_tasks'])
+                            task_info = get_task_index(uid)
+                            task_idx = task_info["task_index"]
+                            total = task_info["total_tasks"]
+                            import random
+                            random_id = random.randint(0, 1000000)
+                            combined_html = f'<div id="combined_view_html"><img src="/video_feed/{uid}?r={random_id}" style="max-width: 100%; height: {REFERENCE_VIEW_HEIGHT}; width: auto; margin: 0 auto; display: block; border-radius: 8px; object-fit: contain;" alt="Desk View | Robot View" /></div>'
+                            set_ui_phase(uid, "executing_task")
+                            return (
+                                uid,
+                                gr.update(visible=False),
+                                gr.update(visible=True),
+                                f"Welcome {username}. You have completed all tasks!",
+                                gr.update(value=None, interactive=False), format_log_html("All tasks completed! Thank you."), 
+                                gr.update(choices=[], value=None),
+                                "All tasks completed.", "No need for coordinates", 
+                                gr.update(value=combined_html), 
+                                gr.update(value=None, visible=False),
+                                gr.update(value="", visible=False),
+                                "No active task", f"Progress: {total}/{total}",
+                                gr.update(interactive=True),
+                                gr.update(interactive=False),
+                                gr.update(interactive=False),
+                                gr.update(visible=True),
+                                gr.update(visible=True),
+                                gr.update(visible=True),
+                                gr.update(visible=True, interactive=False),
+                                gr.update(visible=False),
+                                gr.update(value=""),
+                                ""
+                            )
+                        else:
+                            # 更新当前任务信息
+                            if status.get("current_task"):
+                                current_task = status["current_task"]
+                                env_id = current_task["env_id"]
+                                ep_num = current_task["episode_idx"]
+                                print(f"Skipped to next task: {env_id} Ep {ep_num}")
+                                
+    
     # Load the environment
     session = get_session(uid)
+
+
     # 【修复】如果session不存在（可能被free try mode销毁了），创建一个新的session
     # 场景：用户在free try mode下点击"Back to Mode Selection"时，session会被销毁
     # 当用户切换到Record Mode时，需要重新创建session才能正常加载环境
@@ -237,10 +424,19 @@ def login_and_load_task(username, uid):
     clear_coordinate_clicks(uid)
     clear_option_selects(uid)
     
+    # 重置播放按钮点击状态（新任务开始）
+    reset_play_button_clicked(uid)
+    
     # 重置该任务的 execute 计数（新任务开始）
     reset_execute_count(username, env_id, int(ep_num))
     
+    
     img, load_msg = session.load_episode(env_id, int(ep_num))
+    
+    
+    # 【修复】在load_episode之后，使用session.env_id来判断是否显示视频
+    # 这样可以确保使用的是实际加载的环境ID，而不是可能过时的局部变量
+    actual_env_id = getattr(session, 'env_id', None) or env_id  # 如果session.env_id不存在，回退到局部变量
     
     # 成功加载 episode 后，记录任务开始时间
     if img is not None:
@@ -248,47 +444,66 @@ def login_and_load_task(username, uid):
         set_task_start_time(username, env_id, int(ep_num), start_time)
     
     if img is None:
-         # 即使加载失败，也保存任务索引
-         set_task_index(uid, status['current_index'], status['total_tasks'])
-         task_info = get_task_index(uid)
-         task_idx = task_info["task_index"]
-         total = task_info["total_tasks"]
-         # 生成 HTML 内容，包含 MJPEG 流
-         import random
-         random_id = random.randint(0, 1000000)
-         combined_html = f'<div id="combined_view_html"><img src="/video_feed/{uid}?r={random_id}" style="max-width: 100%; height: {REFERENCE_VIEW_HEIGHT}; width: auto; margin: 0 auto; display: block; border-radius: 8px; object-fit: contain;" alt="Desk View | Robot View" /></div>'
-         # 加载失败，直接进入执行阶段
-         set_ui_phase(uid, "executing_task")
-         return (
+        # 即使加载失败，也保存任务索引
+        set_task_index(uid, status['current_index'], status['total_tasks'])
+        task_info = get_task_index(uid)
+        task_idx = task_info["task_index"]
+        total = task_info["total_tasks"]
+        # 生成 HTML 内容，包含 MJPEG 流
+        import random
+        random_id = random.randint(0, 1000000)
+        combined_html = f'<div id="combined_view_html"><img src="/video_feed/{uid}?r={random_id}" style="max-width: 100%; height: {REFERENCE_VIEW_HEIGHT}; width: auto; margin: 0 auto; display: block; border-radius: 8px; object-fit: contain;" alt="Desk View | Robot View" /></div>'
+        # 加载失败，直接进入执行阶段
+        set_ui_phase(uid, "executing_task")
+        
+        # 如果环境在 DEMO_VIDEO_ENV_IDS 中，无论如何都显示视频播放器（即使为空）
+        # 【修复】使用actual_env_id（从session.env_id获取）而不是局部变量env_id
+        should_show = should_show_demo_video(actual_env_id) if actual_env_id else False
+        
+        if should_show:
+            video_display_update = gr.update(value=None, visible=True)  # 显示视频播放器（即使为空）
+            no_video_display_update = gr.update(value="", visible=False)
+        else:
+            video_display_update = gr.update(value=None, visible=False)  # 环境不在列表中，隐藏视频
+            no_video_display_update = gr.update(visible=True, value=f"<div style='color: black; font-size: 20px; text-align: center; height: {DEMO_VIDEO_HEIGHT}; display: flex; align-items: center; justify-content: center;'>No video</div>")
+        
+        return (
             uid,
             gr.update(visible=False), # login_group
             gr.update(visible=True), # main_interface
             f"Error loading task for {username}",
-            gr.update(value=None, interactive=False), f"Error: {load_msg}",
+            gr.update(value=None, interactive=False), format_log_html(f"Error: {load_msg}"),
             gr.update(choices=[], value=None),
             "", "No need for coordinates", 
-            gr.update(value=combined_html), None,
-            f"Task: {env_id} (Ep {ep_num})", f"Progress: {task_idx + 1}/{total}",
+            gr.update(value=combined_html), 
+            video_display_update,  # video_display - 根据环境是否在列表中决定显示/隐藏
+            no_video_display_update,  # no_video_display
+            f"Task: {actual_env_id} (Ep {ep_num})", f"Progress: {task_idx + 1}/{total}",
             gr.update(interactive=True),
             gr.update(interactive=False),
             gr.update(interactive=False), # exec_btn
-            gr.update(visible=False), # demo_video_group
-            gr.update(visible=False), # combined_view_group
-            gr.update(visible=True),  # operation_zone_group
-            gr.update(visible=False),  # confirm_demo_btn
-            gr.update(visible=False, interactive=True),  # play_video_btn
+            gr.update(visible=True),  # demo_video_group (始终显示)
+            gr.update(visible=True),  # combined_view_group (始终显示)
+            gr.update(visible=True),  # operation_zone_group (始终显示)
+            gr.update(visible=True, interactive=False),  # play_video_btn (显示但禁用)
             gr.update(visible=False),  # coords_group
-            gr.update(value=""),  # note2
-            gr.update(value=""),  # note2_demo
+            gr.update(value=get_task_hint(env_id) if env_id else ""),  # task_hint_display - 任务提示（自动加载）
             ""  # loading_overlay - 【关键】清空加载遮罩层：返回空字符串，清空 loading_overlay 组件内容，使全屏遮罩层自动隐藏
         )
         
     # Success loading
     goal_text = f"{session.language_goal}"
+    
+    # 检查是否为 episode 97 (trial mode)
+    if int(ep_num) == 97:
+        gr.Info("This is trial mode.")
+        goal_text = f"[[trial mode]]\n{session.language_goal}"
+    
     options = session.available_options
     # 生成选项列表，如果选项需要坐标选择，在标签后添加提示
     radio_choices = []
     for opt_label, opt_idx in options:
+        opt_label = _ui_option_label(session, opt_label, opt_idx)
         # 检查该选项是否需要坐标
         if 0 <= opt_idx < len(session.raw_solve_options):
             opt = session.raw_solve_options[opt_idx]
@@ -306,12 +521,39 @@ def login_and_load_task(username, uid):
     
     demo_video_path = None
     has_demo_video = False
-    # 只有ENV_IDS为video的才显示demonstration videos
-    if session.demonstration_frames and should_show_demo_video(env_id):
-        try:
-            demo_video_path = save_video(session.demonstration_frames, "demo")
-            has_demo_video = True
-        except: pass
+    # 只用环境是否在 DEMO_VIDEO_ENV_IDS 中判断是否显示演示视频
+    # 【修复】使用actual_env_id（从session.env_id获取）而不是局部变量env_id
+    # 这样可以确保使用的是实际加载的环境ID，而不是可能过时的局部变量
+    should_show = should_show_demo_video(actual_env_id) if actual_env_id else False
+    
+    # Set initial log message based on whether video is shown
+    initial_log_msg = format_log_html("please select the action below 👇🏻,\nsome actions also need to select keypoint")
+    
+    if should_show:
+        has_demo_video = True  # 环境在列表中，标记为需要显示视频
+        initial_log_msg = format_log_html('press "Watch Video Input🎬" to watch a video\nNote: you can only watch the video once') # Show Watch Video prompt
+        # 尝试生成视频（即使没有 demonstration_frames 也尝试）
+        if session.demonstration_frames:
+            try:
+                demo_video_path = save_video(session.demonstration_frames, "demo")
+                
+                
+                # 验证视频文件是否真实存在且有效
+                if demo_video_path:
+                    file_exists = os.path.exists(demo_video_path)
+                    file_size = os.path.getsize(demo_video_path) if file_exists else 0
+                    
+                    
+                    if not (file_exists and file_size > 0):
+                        # 视频文件不存在或无效，但保持 has_demo_video = True
+                        demo_video_path = None
+            except Exception as e:
+                # 保存失败，但保持 has_demo_video = True（视频播放器将为空）
+                demo_video_path = None
+                pass
+        else:
+            # 如果没有 demonstration_frames，demo_video_path 保持为 None，但 has_demo_video = True
+            pass
 
 
     # 从TASK_INDEX_MAP直接读取Progress
@@ -330,8 +572,46 @@ def login_and_load_task(username, uid):
     
     # 根据是否有示范视频决定UI阶段
     if has_demo_video:
-        # 有示范视频：第一阶段 - 观看示范视频
-        reset_ui_phase(uid)  # 设置为 "watching_demo"
+        # 有示范视频：同时显示演示视频和执行界面
+        set_ui_phase(uid, "executing_task")  # 设置为执行阶段
+        
+        # 初始化Reference Views队列（有demo video时，也需要立即显示Reference Views）
+        if session.base_frames:
+            from state_manager import FRAME_QUEUES
+            
+            # 初始化队列：传入当前frames数量作为监控起始点
+            # 监控线程会从这些帧之后开始检测新帧，不会重复添加已存在的帧
+            current_base_count = len(session.base_frames) if session.base_frames else 0
+            
+            if uid not in FRAME_QUEUES:
+                FrameQueueManager.init_queue(uid, current_base_count)
+            
+            # 手动添加最后一帧到队列（重复多次），确保初始显示
+            # 这是可选的优化，因为 generate_mjpeg_stream 有 fallback 机制
+            last_base_frame = session.base_frames[-1] if session.base_frames else None
+            
+            if last_base_frame is not None:
+                env_id_for_concat = getattr(session, 'env_id', None)
+                last_frames = concatenate_frames_horizontally(
+                    [last_base_frame],
+                    env_id=env_id_for_concat
+                )
+                
+                queue_info = FRAME_QUEUES.get(uid)
+                if queue_info and last_frames:
+                    last_frame = last_frames[0]
+                    # 重复加入最后一帧10次，确保初始显示
+                    for _ in range(10):
+                        try:
+                            frame_copy = np.copy(last_frame) if isinstance(last_frame, np.ndarray) else last_frame
+                            queue_info["frame_queue"].put(frame_copy, block=False)
+                        except queue.Full:
+                            break
+        
+        
+        video_display_update = gr.update(value=demo_video_path, visible=True)
+        no_video_display_update = gr.update(value="", visible=False)
+        
         
         return (
             uid,
@@ -339,37 +619,32 @@ def login_and_load_task(username, uid):
             gr.update(visible=True),  # main_interface
             f"Logged in as {username}", 
             gr.update(value=img, interactive=False), 
-            f"Ready. Task {task_idx + 1}/{total}: {env_id}",
+            initial_log_msg,
             gr.update(choices=radio_choices, value=None),
             goal_text, 
             "No need for coordinates", 
             gr.update(value=combined_html), 
-            demo_video_path,
-            f"Current Task: {env_id} (Episode {ep_num})",
+            video_display_update,  # video_display - 有视频时显示
+            no_video_display_update,  # no_video_display - 有视频时隐藏并清空内容
+            f"Current Task: {actual_env_id}\n(Episode {ep_num})",
             f"Progress: {task_idx + 1}/{total}",
             gr.update(interactive=True),
             gr.update(interactive=False),
-            gr.update(interactive=False), # exec_btn (第一阶段禁用)
-            gr.update(visible=True),  # demo_video_group (第一阶段显示)
-            gr.update(visible=False), # combined_view_group (第一阶段隐藏，正确)
-            gr.update(visible=False), # operation_zone_group (第一阶段隐藏)
-            gr.update(visible=True, interactive=False),  # confirm_demo_btn (第一阶段显示，初始禁用)
-            gr.update(visible=True, interactive=True),  # play_video_btn (第一阶段显示)
+            gr.update(interactive=True), # exec_btn (直接启用，不需要等待确认)
+            gr.update(visible=True),  # demo_video_group (始终显示)
+            gr.update(visible=True),  # combined_view_group (始终显示)
+            gr.update(visible=True),  # operation_zone_group (始终显示)
+            gr.update(visible=True, interactive=True),  # play_video_btn (始终显示)
             gr.update(visible=False),  # coords_group (初始化时隐藏)
-            # 【修改】任务提示延迟加载功能（有示范视频的情况）：
-            # 之前：任务加载时自动调用 get_task_hint(env_id) 显示提示内容
-            # 现在：初始值设为空字符串，用户需要点击"Show Hint"按钮才会通过 show_task_hint() 函数加载并显示提示
-            # 这样可以减少不必要的计算，提升页面加载速度，同时让用户按需查看提示
-            gr.update(value=""),  # note2 - 任务提示（延迟加载，初始为空，点击按钮后显示）
-            gr.update(value=""),  # note2_demo - 演示任务提示（延迟加载，初始为空，点击按钮后显示）
+            gr.update(value=get_task_hint(actual_env_id)),  # task_hint_display - 任务提示（自动加载，页面加载完就显示）
             ""  # loading_overlay - 【关键】清空加载遮罩层：返回空字符串，清空 loading_overlay 组件内容，使全屏遮罩层自动隐藏
         )
     else:
-        # 没有示范视频：直接进入执行阶段
+        # 环境不在 DEMO_VIDEO_ENV_IDS 中：直接进入执行阶段
         set_ui_phase(uid, "executing_task")
 
         
-        # 初始化Reference Views队列（如果没有demo video，需要立即显示Reference Views）
+        # 初始化Reference Views队列（如果环境不在列表中，需要立即显示Reference Views）
         # 注意：即使手动添加了初始帧，generate_mjpeg_stream 也有 fallback 机制直接从 session 获取帧
         # 这确保了即使队列初始化时序有问题，用户也能看到当前状态
         if session.base_frames:
@@ -404,45 +679,55 @@ def login_and_load_task(username, uid):
                         except queue.Full:
                             break
         
+        # 环境不在 DEMO_VIDEO_ENV_IDS 中，隐藏视频并显示 "No video" 提示
+        
+        no_video_html = f"<div style='color: black; font-size: 20px; text-align: center; height: {DEMO_VIDEO_HEIGHT}; display: flex; align-items: center; justify-content: center;'>No video</div>"
+        video_display_update = gr.update(value=None, visible=False)
+        no_video_display_update = gr.update(visible=True, value=no_video_html)
+        
+        
         return (
             uid,
             gr.update(visible=False), # login_group
             gr.update(visible=True),  # main_interface
             f"Logged in as {username}", 
             gr.update(value=img, interactive=False), 
-            f"Ready. Task {task_idx + 1}/{total}: {env_id}",
+            initial_log_msg,
             gr.update(choices=radio_choices, value=None),
             goal_text, 
             "No need for coordinates", 
             gr.update(value=combined_html), 
-            None,  # demo_video_path
-            f"Current Task: {env_id} (Episode {ep_num})",
+            video_display_update,  # video_display - 无视频时隐藏，value=None确保hasDemoVideo()返回false
+            no_video_display_update,  # no_video_display - 无视频时显示黑色文字（占用和演示视频相同的高度）
+            f"Current Task: {actual_env_id}\n(Episode {ep_num})",
             f"Progress: {task_idx + 1}/{total}",
             gr.update(interactive=True),
             gr.update(interactive=False),
             gr.update(interactive=True), # exec_btn
-            gr.update(visible=False), # demo_video_group (无视频，隐藏)
-            gr.update(visible=True),  # combined_view_group (修复：应该显示)
-            gr.update(visible=True),  # operation_zone_group (直接显示)
-            gr.update(visible=False), # confirm_demo_btn (无视频，隐藏)
-            gr.update(visible=False, interactive=True),  # play_video_btn
+            gr.update(visible=True), # demo_video_group (无视频也显示)
+            gr.update(visible=True),  # combined_view_group (始终显示)
+            gr.update(visible=True),  # operation_zone_group (始终显示)
+            gr.update(visible=True, interactive=False),  # play_video_btn (无视频时禁用)
             gr.update(visible=False),  # coords_group (初始化时隐藏)
-            # 【修改】任务提示延迟加载功能（无示范视频的情况）：
-            # 之前：任务加载时自动调用 get_task_hint(env_id) 显示提示内容
-            # 现在：初始值设为空字符串，用户需要点击"Show Hint"按钮才会通过 show_task_hint() 函数加载并显示提示
-            # 这样可以减少不必要的计算，提升页面加载速度，同时让用户按需查看提示
-            gr.update(value=""),  # note2 - 任务提示（延迟加载，初始为空，点击按钮后显示）
-            gr.update(value=""),  # note2_demo - 演示任务提示（延迟加载，初始为空，点击按钮后显示）
+            gr.update(value=get_task_hint(actual_env_id)),  # task_hint_display - 任务提示（自动加载，页面加载完就显示）
             ""  # loading_overlay - 【关键】清空加载遮罩层：返回空字符串，清空 loading_overlay 组件内容，使全屏遮罩层自动隐藏
         )
 
 
-def play_demo_video(play_btn):
+def play_demo_video(play_btn, uid_state=None):
     """
-    播放示范视频并禁用按钮，同时启用Start Task按钮
+    播放示范视频并禁用按钮
+    
+    Args:
+        play_btn: 播放按钮组件
+        uid_state: 会话ID（可选，用于状态跟踪）
     """
-    # 返回禁用状态的播放按钮，和启用状态的确认按钮
-    return gr.update(interactive=False), gr.update(interactive=True)
+    # 如果提供了 uid，设置播放按钮已被点击的状态
+    if uid_state:
+        set_play_button_clicked(uid_state, clicked=True)
+    
+    # 返回禁用状态的播放按钮
+    return gr.update(interactive=False)
 
 
 def confirm_demo_watched(uid, username):
@@ -454,7 +739,7 @@ def confirm_demo_watched(uid, username):
         try:
             user_manager.assert_lease(username, uid)
         except LeaseLost as e:
-            raise gr.Error(f"You have been logged in elsewhere. This page is no longer valid. Please refresh the page to log in again.\n{str(e)}")
+            raise gr.Error(f"You have been logged in elsewhere. This page is no longer valid. Please refresh the page to log in again.\\n{str(e)}")
     
     # 更新session活动时间（确认观看演示操作）
     if uid:
@@ -504,23 +789,17 @@ def confirm_demo_watched(uid, username):
                     except queue.Full:
                         break
     
-    # 返回UI更新：隐藏示范视频，显示Combined View和操作区域
-    # 同时更新 exec_btn 为可交互状态
+    # 返回UI更新：两个组都显示（这个函数不再被使用，因为不再有第一阶段切换）
+    # 保留此函数以防将来需要，但返回值与新的布局一致
     env_id = session.env_id if session and hasattr(session, 'env_id') and session.env_id else ""
     return (
-        gr.update(visible=False),  # demo_video_group
-        gr.update(visible=True),   # combined_view_group (修复：应该显示)
-        gr.update(visible=True),   # operation_zone_group
-        gr.update(visible=False),  # confirm_demo_btn
-        gr.update(visible=False, interactive=False),  # play_video_btn (确认后隐藏)
+        gr.update(visible=True),   # demo_video_group (始终显示)
+        gr.update(visible=True),   # combined_view_group (始终显示)
+        gr.update(visible=True),   # operation_zone_group (始终显示)
+        gr.update(visible=True, interactive=False),  # play_video_btn (始终显示)
         gr.update(interactive=True),  # exec_btn - 启用执行按钮
-        gr.update(visible=False),   # coords_group (确认demo后，还未选择选项，隐藏)
-        # 【修改】任务提示延迟加载功能（确认观看演示视频后）：
-        # 之前：确认观看演示视频后自动调用 get_task_hint(env_id) 显示提示内容
-        # 现在：初始值设为空字符串，用户需要点击"Show Hint"按钮才会通过 show_task_hint() 函数加载并显示提示
-        # 这样可以减少不必要的计算，提升页面加载速度，同时让用户按需查看提示
-        gr.update(value=""),  # note2 - 任务提示（延迟加载，初始为空，用户必须点击按钮才显示）
-        gr.update(value="")  # note2_demo - 演示任务提示（延迟加载，初始为空，用户必须点击按钮才显示）
+        gr.update(visible=False),   # coords_group (还未选择选项，隐藏)
+        gr.update(value="")  # task_hint_display - 任务提示（此函数不再使用，但保留兼容性）
     )
 
 
@@ -530,6 +809,8 @@ def load_next_task_wrapper(username, uid):
     如果当前任务已有 actions，则创建新的 attempt。
     对于 user_test，next task 时跳转回 env_id 选择界面。
     For user_test, jump back to env_id selection interface when next task.
+    
+    特殊处理episode97：如果episode97没有成功记录，保持在当前episode97，不推进索引。
     """
     
     if username:
@@ -538,7 +819,7 @@ def load_next_task_wrapper(username, uid):
             user_manager.assert_lease(username, uid)
         except LeaseLost as e:
             # Raise error to be caught by Gradio and displayed
-            raise gr.Error(f"You have been logged in elsewhere. This page is no longer valid. Please refresh the page to log in again.\n{str(e)}")
+            raise gr.Error(f"You have been logged in elsewhere. This page is no longer valid. Please refresh the page to log in again.\\n{str(e)}")
         
         # 更新session活动时间（加载下一个任务操作）
         if uid:
@@ -550,9 +831,25 @@ def load_next_task_wrapper(username, uid):
             env_id = current_task["env_id"]
             ep_num = current_task["episode_idx"]
             
-            # 检查当前任务是否已有 actions，如果有则创建新的 attempt
-            if has_existing_actions(username, env_id, ep_num):
-                create_new_attempt(username, env_id, ep_num)
+            # 特殊处理episode97：检查是否有成功记录
+            if ep_num == 97:
+                has_success = user_manager.has_episode97_success(username, env_id)
+                if not has_success:
+                    # 没有成功记录，保持在当前episode97（不推进索引）
+                    # 检查是否已有actions，如果有则创建新的attempt
+                    if has_existing_actions(username, env_id, ep_num):
+                        create_new_attempt(username, env_id, ep_num)
+                    # 继续加载当前episode97（login_and_load_task会使用status中的当前任务）
+                else:
+                    # 有成功记录，正常推进到下一个任务
+                    # 检查当前任务是否已有 actions，如果有则创建新的 attempt
+                    if has_existing_actions(username, env_id, ep_num):
+                        create_new_attempt(username, env_id, ep_num)
+            else:
+                # 非episode97，正常处理
+                # 检查当前任务是否已有 actions，如果有则创建新的 attempt
+                if has_existing_actions(username, env_id, ep_num):
+                    create_new_attempt(username, env_id, ep_num)
     
     return login_and_load_task(username, uid)
 
@@ -566,7 +863,7 @@ def on_map_click(uid, username, option_value, evt: gr.SelectData):
         try:
             user_manager.assert_lease(username, uid)
         except LeaseLost as e:
-            raise gr.Error(f"You have been logged in elsewhere. This page is no longer valid. Please refresh the page to log in again.\n{str(e)}")
+            raise gr.Error(f"You have been logged in elsewhere. This page is no longer valid. Please refresh the page to log in again.\\n{str(e)}")
     
     # 更新session活动时间（点击图片操作）
     if uid:
@@ -645,7 +942,7 @@ def on_option_select(uid, username, option_value):
         try:
             user_manager.assert_lease(username, uid)
         except LeaseLost as e:
-            raise gr.Error(f"You have been logged in elsewhere. This page is no longer valid. Please refresh the page to log in again.\n{str(e)}")
+            raise gr.Error(f"You have been logged in elsewhere. This page is no longer valid. Please refresh the page to log in again.\\n{str(e)}")
     
     # 更新session活动时间（选择选项操作）
     if uid:
@@ -665,7 +962,7 @@ def on_option_select(uid, username, option_value):
         if session.available_options:
             for label, idx in session.available_options:
                 if idx == option_idx:
-                    option_label = label
+                    option_label = _ui_option_label(session, label, idx)
                     break
     
     # 将选项选择存储到临时列表，等待在action_execute时一起记录
@@ -684,110 +981,12 @@ def on_option_select(uid, username, option_value):
     return default_msg, gr.update(interactive=False), gr.update(visible=False)
 
 
-def switch_to_record_mode(username, uid):
-    """
-    Switch to record mode: proceed with login using original username.
-    切换到记录模式：使用原始用户名继续登录。
-    
-    功能说明：
-    - 用户在模式选择页面点击 "Record Mode" 按钮时调用此函数
-    - 使用原始用户名（不含 _test 后缀）调用 login_and_load_task() 进行登录和任务加载
-    - 返回值中包含 loading_overlay 的输出（空字符串），用于清空加载遮罩层
-    
-    返回值说明：
-    - 返回 login_and_load_task() 的结果，但将 landing_group 设置为隐藏
-    - 最后一个返回值是 loading_overlay（空字符串），用于清空遮罩层
-    """
-    if not username:
-        # 如果没有用户名，返回默认状态，包括 loading_overlay 的空字符串
-        return (None, gr.update(visible=True)) + (gr.update(visible=True),) + tuple([gr.update()] * 23) + ("",)  # 最后一个是 loading_overlay - 清空遮罩层
-
-    # Call login_and_load_task with original username
-    # 使用原始用户名调用 login_and_load_task
-    results = login_and_load_task(username, uid)
-    
-    # We need to return:
-    # uid, landing_group(hidden), + rest of results (starting from login_group)
-    # results[0] is uid
-    # results[1] is login_group
-    
-    return (results[0], gr.update(visible=False)) + results[1:]
-
-
-def back_to_landing_page(username, uid):
-    """
-    从执行界面返回到模式选择页面（Landing Page）。
-    允许用户在成功进入环境执行界面后，通过点击按钮回退到模式选择页面，重新选择测试模式或录制模式。
-    
-    Args:
-        username: 当前用户名（可能以 _test 结尾）
-        uid: 当前会话的唯一标识符
-    
-    Returns:
-        返回UI状态更新，用于显示模式选择页面（landing page）
-    """
-    if not username:
-        # 如果没有用户名，显示登录页面
-        return (
-            uid,                                    # uid_state: 会话唯一标识符
-            gr.update(visible=False),               # loading_group: 隐藏加载组
-            gr.update(visible=False),               # landing_group: 隐藏模式选择组
-            gr.update(visible=True),                # login_group: 显示登录组
-            gr.update(visible=False),               # main_interface: 隐藏主界面
-            "",                                     # login_msg: 登录消息（空）
-            gr.update(value=None, interactive=False), None,  # img_display: 图片显示（清空），log_output: 日志输出（无）
-            gr.update(choices=[], value=None),      # options_radio: 选项单选（清空）
-            "", "No need for coordinates",         # goal_box: 目标框（清空），coords_box: 坐标框（无需坐标）
-            gr.update(value="<div id='combined_view_html'><p>等待登录...</p></div>"), None,  # combined_display: 组合视图（等待登录），video_display: 视频显示（无）
-            "", "",                                 # task_info_box: 任务信息（清空），progress_info_box: 进度信息（清空）
-            gr.update(interactive=True),            # login_btn: 登录按钮（可交互）
-            gr.update(interactive=False),           # next_task_btn: 下一个任务按钮（不可交互）
-            gr.update(interactive=False),           # exec_btn: 执行按钮（不可交互）
-            "",                                     # username_state: 用户名状态（清空）
-            gr.update(visible=False),               # demo_video_group: 演示视频组（隐藏）
-            gr.update(visible=False),               # combined_view_group: 组合视图组（隐藏）
-            gr.update(visible=False),               # operation_zone_group: 操作区域组（隐藏）
-            gr.update(visible=False),               # confirm_demo_btn: 确认演示按钮（隐藏）
-            gr.update(visible=False, interactive=True),  # play_video_btn: 播放视频按钮（隐藏但可交互）
-            gr.update(visible=False),               # coords_group: 坐标组（隐藏）
-            gr.update(value=""),     # note2: 提示信息（清空）
-            gr.update(value="")      # note2_demo: 演示提示信息（清空）
-        )
-    
-    # 返回显示模式选择页面的状态（与 init_app 显示 landing_group 时相同）
-    return (
-        uid,                                    # uid_state: 会话唯一标识符（保持不变）
-        gr.update(visible=False),               # loading_group: 隐藏加载组
-        gr.update(visible=True),                # landing_group: 显示模式选择组（关键：显示模式选择页面）
-        gr.update(visible=False),               # login_group: 隐藏登录组
-        gr.update(visible=False),               # main_interface: 隐藏主界面
-        f"Welcome {username}",        # login_msg: 欢迎消息
-        gr.update(value=None, interactive=False), None,  # img_display: 图片显示（清空），log_output: 日志输出（无）
-        gr.update(choices=[], value=None),      # options_radio: 选项单选（清空）
-        "", "No need for coordinates",         # goal_box: 目标框（清空），coords_box: 坐标框（无需坐标）
-        gr.update(value="<div id='combined_view_html'><p>Select Mode...</p></div>"), None,  # combined_display: 组合视图（选择模式），video_display: 视频显示（无）
-        "", "",                                 # task_info_box: 任务信息（清空），progress_info_box: 进度信息（清空）
-        gr.update(interactive=True),             # login_btn: 登录按钮（可交互）
-        gr.update(interactive=False),           # next_task_btn: 下一个任务按钮（不可交互）
-        gr.update(interactive=False),           # exec_btn: 执行按钮（不可交互）
-        username,                      # username_state: 用户名状态
-        gr.update(visible=False),               # demo_video_group: 演示视频组（隐藏）
-        gr.update(visible=False),               # combined_view_group: 组合视图组（隐藏）
-        gr.update(visible=False),               # operation_zone_group: 操作区域组（隐藏）
-        gr.update(visible=False),               # confirm_demo_btn: 确认演示按钮（隐藏）
-        gr.update(visible=False, interactive=True),  # play_video_btn: 播放视频按钮（隐藏但可交互）
-        gr.update(visible=False),               # coords_group: 坐标组（隐藏）
-        gr.update(value=""),      # note2: 提示信息（清空）
-        gr.update(value="")       # note2_demo: 演示提示信息（清空）
-    )
-
-
 def init_app(request: gr.Request):
     """
     处理初始页面加载。
-    如果URL中包含 'user' 或 'username' 查询参数，显示选择模式页面 (Landing Page)。
+    如果URL中包含 'user' 或 'username' 查询参数，直接登录并进入主界面。
     Handle initial page load.
-    If URL contains 'user' or 'username' query parameters, show Select Mode page (Landing Page).
+    If URL contains 'user' or 'username' query parameters, automatically login and show main interface.
     
     支持的URL格式 / Supported URL formats：
     - http://host:port/?user=username
@@ -807,21 +1006,21 @@ def init_app(request: gr.Request):
     # outputs: 
     # 0. uid
     # 1. loading_group
-    # 2. landing_group (NEW)
-    # 3. login_group
+    # 2. login_group
     # ...
     
     default_outputs = (
         None, 
         gr.update(visible=False), # loading_group (hide it)
-        gr.update(visible=False), # landing_group (hide it)
         gr.update(visible=True), # login_group (show it)
         gr.update(visible=False), # main_interface
         "", 
-        gr.update(value=None, interactive=False), None, 
+        gr.update(value=None, interactive=False), format_log_html(""),  # img, log_output (空字符串，但也要格式化)
         gr.update(choices=[], value=None), 
         "", "No need for coordinates", 
-        gr.update(value="<div id='combined_view_html'><p>等待登录...</p></div>"), None, 
+        gr.update(value="<div id='combined_view_html'><p>等待登录...</p></div>"), 
+        gr.update(value=None, visible=False),  # video_display - 初始状态隐藏
+        gr.update(value="", visible=False),  # no_video_display - 初始状态隐藏
         "", "", 
         gr.update(interactive=True), 
         gr.update(interactive=False), 
@@ -830,45 +1029,66 @@ def init_app(request: gr.Request):
         gr.update(visible=False), # demo_video_group
         gr.update(visible=False), # combined_view_group
         gr.update(visible=False), # operation_zone_group
-        gr.update(visible=False), # confirm_demo_btn
         gr.update(visible=False, interactive=True),  # play_video_btn
         gr.update(visible=False),  # coords_group (初始化时隐藏)
-        gr.update(value=""),  # note2
-        gr.update(value="")  # note2_demo
+        gr.update(value="")  # task_hint_display (初始化时清空)
     )
     
     if username:
         # 检查用户是否存在
         # Check if user exists
         if username in user_manager.user_tasks:
-            # 显示 Landing Page
-            # Show Landing Page
-            print(f"URL Login: Detected '{username}', showing landing page.")
+            # 直接登录并加载任务，进入主界面
+            # Directly login and load task, show main interface
+            print(f"URL Auto-Login: Detected '{username}', automatically logging in and loading task.")
             
+            # 创建新的会话ID
+            uid = create_session()
+            
+            # 调用 login_and_load_task 进行登录和任务加载
+            login_results = login_and_load_task(username, uid)
+            
+            # login_and_load_task 返回的格式：
+            # (uid, login_group, main_interface, login_msg, img_display, log_output, 
+            #  options_radio, goal_box, coords_box, combined_display, video_display, no_video_display,
+            #  task_info_box, progress_info_box, login_btn, next_task_btn, exec_btn,
+            #  demo_video_group, combined_view_group, operation_zone_group, 
+            #  play_video_btn, coords_group, task_hint_display, loading_overlay)
+            
+            # init_app 需要的返回格式：
+            # (uid, loading_group, login_group, main_interface, login_msg, img_display, 
+            #  log_output, options_radio, goal_box, coords_box, combined_display, 
+            #  video_display, no_video_display, task_info_box, progress_info_box, login_btn, next_task_btn, 
+            #  exec_btn, username_state, demo_video_group, combined_view_group, 
+            #  operation_zone_group, play_video_btn, coords_group, task_hint_display)
+            
+            # 转换返回值格式：添加 loading_group 和 username_state，移除 loading_overlay
             return (
-                None,                       # uid
-                gr.update(visible=False),   # loading_group
-                gr.update(visible=True),    # landing_group (SHOW)
-                gr.update(visible=False),   # login_group
-                gr.update(visible=False),   # main_interface
-                f"Welcome {username}",      # login_msg
-                gr.update(value=None, interactive=False), None, # img, status
-                gr.update(choices=[], value=None), # options
-                "", "No need for coordinates", # goal, coords
-                gr.update(value="<div id='combined_view_html'><p>Select Mode...</p></div>"), None, # combined, video
-                "", "", # task, progress
-                gr.update(interactive=True), # login_btn
-                gr.update(interactive=False), # next_task_btn
-                gr.update(interactive=False), # exec_btn
-                username,                   # username_state (Set this!)
-                gr.update(visible=False),   # demo_video_group
-                gr.update(visible=False),   # combined_view_group
-                gr.update(visible=False),   # operation_zone_group
-                gr.update(visible=False),   # confirm_demo_btn
-                gr.update(visible=False, interactive=True), # play_video_btn
-                gr.update(visible=False),   # coords_group
-                gr.update(value=""), # note2
-                gr.update(value="")  # note2_demo
+                login_results[0],                    # uid
+                gr.update(visible=False),            # loading_group (隐藏加载界面)
+                login_results[1],                    # login_group
+                login_results[2],                   # main_interface
+                login_results[3],                   # login_msg
+                login_results[4],                  # img_display
+                login_results[5],                  # log_output
+                login_results[6],                  # options_radio
+                login_results[7],                  # goal_box
+                login_results[8],                  # coords_box
+                login_results[9],                  # combined_display
+                login_results[10],                 # video_display
+                login_results[11],                 # no_video_display
+                login_results[12],                # task_info_box
+                login_results[13],                 # progress_info_box
+                login_results[14],                 # login_btn
+                login_results[15],                 # next_task_btn
+                login_results[16],                 # exec_btn
+                username,                           # username_state
+                login_results[17],                 # demo_video_group
+                login_results[18],                 # combined_view_group
+                login_results[19],                 # operation_zone_group
+                login_results[20],                 # play_video_btn
+                login_results[21],                 # coords_group
+                login_results[22]                  # task_hint_display
             )
         else:
             # 用户名不存在，显示错误消息但仍显示登录界面
@@ -878,14 +1098,15 @@ def init_app(request: gr.Request):
             return (
                 None,
                 gr.update(visible=False),  # loading_group
-                gr.update(visible=False),  # landing_group
                 gr.update(visible=True),   # login_group (显示登录界面)
                 gr.update(visible=False),  # main_interface
                 error_msg,                 # login_msg (显示错误消息)
-                gr.update(value=None, interactive=False), None,
+                gr.update(value=None, interactive=False), format_log_html(""),  # img, log_output (空字符串，但也要格式化)
                 gr.update(choices=[], value=None),
                 "", "No need for coordinates",
-                gr.update(value="<div id='combined_view_html'><p>等待登录...</p></div>"), None,
+                gr.update(value="<div id='combined_view_html'><p>等待登录...</p></div>"), 
+                gr.update(value=None, visible=False),  # video_display - 用户名不存在时隐藏
+                gr.update(value="", visible=False),  # no_video_display - 用户名不存在时隐藏
                 "", "",
                 gr.update(interactive=True),
                 gr.update(interactive=False),
@@ -894,11 +1115,9 @@ def init_app(request: gr.Request):
                 gr.update(visible=False), # demo_video_group
                 gr.update(visible=False), # combined_view_group
                 gr.update(visible=False), # operation_zone_group
-                gr.update(visible=False), # confirm_demo_btn
                 gr.update(visible=False, interactive=True),  # play_video_btn
                 gr.update(visible=False),  # coords_group
-                gr.update(value=""),  # note2
-                gr.update(value="")  # note2_demo
+                gr.update(value="")  # task_hint_display (清空)
             )
     
     return default_outputs
@@ -927,7 +1146,22 @@ def execute_step(uid, username, option_idx, coords_str):
     
     session = get_session(uid)
     if not session:
-        return None, "Session Error", gr.update(), gr.update(), gr.update(interactive=False), gr.update(interactive=False), gr.update(visible=False)
+        return None, format_log_html("Session Error"), gr.update(), gr.update(), gr.update(interactive=False), gr.update(interactive=False), gr.update(visible=False)
+    
+    # 检查播放按钮是否已被点击（如果有演示视频）
+    # 注意：前端已经做了完整的验证，这里作为额外的安全检查
+    if session.env_id and should_show_demo_video(session.env_id):
+        # 检查是否有演示视频
+        if session.demonstration_frames:
+            play_button_clicked = get_play_button_clicked(uid)
+            if not play_button_clicked:
+                current_img = session.get_pil_image(use_segmented=USE_SEGMENTED_VIEW)
+                error_msg = "Please click 'Start Demonstration Video' button before executing."
+                # 记录日志
+                print(f"[{execute_timestamp}] User {username} (uid: {uid}) attempted to execute without clicking 'Start Demonstration Video' button. env_id: {session.env_id}, episode_idx: {session.episode_idx}")
+                # 使用 gr.Info 显示提示信息
+                gr.Info(error_msg)
+                return current_img, format_log_html(error_msg), gr.update(), gr.update(), gr.update(interactive=False), gr.update(interactive=True), gr.update(visible=False)
     
     # 检查 execute 次数限制（在执行前检查，如果达到限制则模拟失败状态）
     execute_limit_reached = False
@@ -1020,7 +1254,7 @@ def execute_step(uid, username, option_idx, coords_str):
                         break
     
     if option_idx is None:
-        return session.get_pil_image(use_segmented=USE_SEGMENTED_VIEW), "Error: No action selected", gr.update(), gr.update(), gr.update(interactive=False), gr.update(interactive=True), gr.update(visible=False)
+        return session.get_pil_image(use_segmented=USE_SEGMENTED_VIEW), format_log_html("Error: No action selected"), gr.update(), gr.update(), gr.update(interactive=False), gr.update(interactive=True), gr.update(visible=False)
 
     # 检查当前选项是否需要坐标
     needs_coords = False
@@ -1048,7 +1282,7 @@ def execute_step(uid, username, option_idx, coords_str):
         if not is_valid_coords:
             current_img = session.get_pil_image(use_segmented=USE_SEGMENTED_VIEW)
             error_msg = "please click the keypoint selection image before execute!"
-            return current_img, error_msg, gr.update(), gr.update(), gr.update(interactive=False), gr.update(interactive=True), gr.update(visible=True)
+            return current_img, format_log_html(error_msg), gr.update(), gr.update(), gr.update(interactive=False), gr.update(interactive=True), gr.update(visible=True)
 
     # Parse coords
     click_coords = None
@@ -1101,7 +1335,7 @@ def execute_step(uid, username, option_idx, coords_str):
         if session.available_options:
             for label, idx in session.available_options:
                 if idx == option_idx:
-                    option_label = label
+                    option_label = _ui_option_label(session, label, idx)
                     break
         
         # 模拟失败状态，使用和 oracle_logic.py 中任务失败一样的格式
@@ -1166,7 +1400,7 @@ def execute_step(uid, username, option_idx, coords_str):
             if session.available_options:
                 for label, idx in session.available_options:
                     if idx == option_idx:
-                        option_label = label
+                        option_label = _ui_option_label(session, label, idx)
                         break
             
             # 获取从上次action_execute到现在的所有option_select
@@ -1244,41 +1478,49 @@ def execute_step(uid, username, option_idx, coords_str):
             final_log_status = "success"
         
         # Episode完成时，格式化System Log的状态消息
-        # 使用固定模板，所有行长度一致（32个字符）
+        # 使用固定模板，所有行长度一致（32个字符），无空行
         if final_log_status == "success":
-            status = """********************************
-****   episode success      ****
-********************************
-  ---please press next task----   """
+            status = "********************************\n****   episode success      ****\n********************************\n  ---please press next task----   "
         else:
-            status = """********************************
-****   episode failed       ****
-********************************
-  ---please press next task----   """
+            status = "********************************\n****   episode failed       ****\n********************************\n  ---please press next task----   "
 
         # Update user progress (但不更新 progress_info_box，等用户按 next task/refresh 时再更新)
         if username:
-            # 获取 seed（直接使用 session.seed，如果不存在则为 None）
-            seed = getattr(session, 'seed', None)
-            
-            user_status = user_manager.complete_current_task(
-                username,
-                env_id=session.env_id,
-                episode_idx=session.episode_idx,
-                status=final_log_status,
-                difficulty=session.difficulty if hasattr(session, 'difficulty') and session.difficulty is not None else None,
-                language_goal=session.language_goal,
-                seed=seed
-            )
-            if user_status:
-                if user_status["is_done_all"]:
-                    task_update = "All tasks completed!"
-                    # progress_update 保持为 gr.update()，不改变
+            # 判断是否为 episode_idx == 97
+            ep_val = getattr(session, 'episode_idx', None)
+            ep_is_97 = False
+            if ep_val is not None:
+                if isinstance(ep_val, int):
+                    ep_is_97 = (ep_val == 97)
                 else:
-                    next_env = user_status["current_task"]["env_id"]
-                    next_ep = user_status["current_task"]["episode_idx"]
-                    task_update = f"Task Completed! Next: {next_env} (Ep {next_ep})"
-                    # progress_update 保持为 gr.update()，不改变
+                    ep_is_97 = (str(ep_val) == "97")
+            
+            # episode97失败时不推进索引，成功时推进索引
+            if ep_is_97 and (final_log_status == "failed"):
+                # 跳过 complete_current_task，不推进任务索引
+                gr.Info("Task Failed, Please try again!")
+                task_update = "Task Failed. Press Next Task to retry same episode."
+            else:
+                # 正常推进任务索引并生成下一任务提示（包括episode97成功的情况）
+                seed = getattr(session, 'seed', None)
+                user_status = user_manager.complete_current_task(
+                    username,
+                    env_id=session.env_id,
+                    episode_idx=session.episode_idx,
+                    status=final_log_status,
+                    difficulty=session.difficulty if hasattr(session, 'difficulty') and session.difficulty is not None else None,
+                    language_goal=session.language_goal,
+                    seed=seed
+                )
+                if user_status:
+                    if user_status["is_done_all"]:
+                        task_update = "All tasks completed!"
+                        # progress_update 保持为 gr.update()，不改变
+                    else:
+                        next_env = user_status["current_task"]["env_id"]
+                        next_ep = user_status["current_task"]["episode_idx"]
+                        task_update = f"Task Completed! Next: {next_env} (Ep {next_ep})"
+                        # progress_update 保持为 gr.update()，不改变
     
     # 根据视图模式重新获取图片
     img = session.get_pil_image(use_segmented=USE_SEGMENTED_VIEW)
@@ -1289,4 +1531,7 @@ def execute_step(uid, username, option_idx, coords_str):
     # 执行后隐藏Coords区域
     coords_group_update = gr.update(visible=False)
     
-    return img, status, task_update, progress_update, next_task_update, exec_btn_update, coords_group_update
+    # 格式化日志消息为 HTML 格式（支持颜色显示）
+    formatted_status = format_log_html(status)
+    
+    return img, formatted_status, task_update, progress_update, next_task_update, exec_btn_update, coords_group_update

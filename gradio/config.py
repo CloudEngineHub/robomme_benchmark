@@ -5,10 +5,23 @@
 RESTRICT_VIDEO_PLAYBACK = True  # Restrict controls; we will force autoplay via JS
 VIDEO_PLAYBACK_FPS = 30.0  # Frame rate for demonstration video playback
 USE_SEGMENTED_VIEW = False  # Set to True to use segmented view, False to use original image
-REFERENCE_VIEW_HEIGHT = "40vh"  # Height of the reference view image
+
+# Zone 高度配置
+# Reference Zone: 参考区域（包含任务信息、实时流、演示视频的整个顶部区域）
+REFERENCE_ZONE_HEIGHT = "50vh"  # Reference Zone 容器固定高度（整个参考区域的固定高度）
+REFERENCE_VIEW_HEIGHT = "30vh"      # 参考区域中实时流图像的高度（图像元素高度，应小于 REFERENCE_ZONE_HEIGHT）
+DEMO_VIDEO_HEIGHT = "30vh"          # 演示视频的固定高度（Watch video 部分的视频高度）
+
+# Operation Zone: 操作区域（用户交互和操作控制的底部区域）
+OPERATION_ZONE_HEIGHT = "45vh"  # Operation Zone 容器固定高度（整个操作区域的固定高度）
 
 # 全局字体大小配置（绝对值）
 FONT_SIZE = "20px"  # 统一字体大小，可在config.py中调整（如"14px", "16px", "18px", "20px"等）
+
+# Reference Zone 三列宽度比例 (Text Info : Combined View : Demo Video)
+TEXT_INFO_SCALE = 1  # 文本信息列的宽度比例（左侧）
+COMBINED_VIEW_SCALE = 1  # 执行实时流列的宽度比例（中间）
+DEMO_VIDEO_SCALE = 1  # 演示视频列的宽度比例（右侧）
 
 # Operation Zone 三列宽度比例 (Live Observation : Action : Control)
 LIVE_OBSERVATION_SCALE = 3  # Live Observation 列的宽度比例

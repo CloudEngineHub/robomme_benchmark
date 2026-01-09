@@ -44,7 +44,12 @@ def save_video(frames, suffix=""):
             # imageio期望RGB格式，frames已经是RGB
             processed_frames.append(f)
         
-        fd, path = tempfile.mkstemp(suffix=f"_{suffix}.mp4")
+        # 使用项目内的临时目录，避免系统/tmp清理或权限问题
+        temp_dir = os.path.join(os.getcwd(), "temp_demos")
+        os.makedirs(temp_dir, exist_ok=True)
+        
+        # 使用mkstemp创建唯一文件名，但在我们的temp_dir中
+        fd, path = tempfile.mkstemp(suffix=f"_{suffix}.mp4", dir=temp_dir)
         os.close(fd)
         
         # imageio.mimwrite会自动处理编码
@@ -106,41 +111,32 @@ def concatenate_frames_horizontally(frames1, frames2=None, env_id=None):
         right_border_width = 0
         if show_coordinate_axes:
             if env_id == "RouteStick":
-                left_border_width = 150  # RouteStick 任务的左侧边框宽度（用于坐标系）
-                right_border_width = 240  # RouteStick 任务的右侧边框宽度（用于旋转方向示意图）
+                left_border_width = 200  # RouteStick 任务的左侧边框宽度（用于四个半圆示意图）
+                right_border_width = 0  # RouteStick 任务不再显示右侧边框
             else:
                 left_border_width = 150  # 其他任务的左侧边框宽度
         
         if show_coordinate_axes:
-            # 添加左侧黑色边框用于绘制坐标系
+            # 添加左侧黑色边框
             left_border = np.zeros((actual_h, left_border_width, 3), dtype=np.uint8)
             
             # 拼接（包含左侧边框）
             concatenated_frame = np.concatenate([left_border, frame1], axis=1)
             
-            # 如果是 RouteStick 任务，添加右侧黑色边框
-            if env_id == "RouteStick" and right_border_width > 0:
-                right_border = np.zeros((actual_h, right_border_width, 3), dtype=np.uint8)
-                concatenated_frame = np.concatenate([concatenated_frame, right_border], axis=1)
-            
-            # 转换为PIL图像以便在黑色边框区域绘制坐标系
+            # 转换为PIL图像以便在黑色边框区域绘制
             concatenated_pil = Image.fromarray(concatenated_frame)
             
-            # 在左侧黑色边框绘制 base camera 坐标系（旋转180度）
+            # 在左侧黑色边框绘制内容
             left_border_pil = Image.new('RGB', (left_border_width, actual_h), (0, 0, 0))
-            left_border_pil = draw_coordinate_axes(left_border_pil, position="left", rotate_180=True, env_id=env_id)
+            if env_id == "RouteStick":
+                # RouteStick 任务：在左侧绘制四个半圆示意图（不绘制坐标系）
+                left_border_pil = draw_coordinate_axes(left_border_pil, position="left", rotate_180=False, env_id=env_id)
+            else:
+                # 其他任务：绘制坐标系（旋转180度）
+                left_border_pil = draw_coordinate_axes(left_border_pil, position="left", rotate_180=True, env_id=env_id)
             
-            # 将坐标系绘制到拼接后的图像上
+            # 将内容绘制到拼接后的图像上
             concatenated_pil.paste(left_border_pil, (0, 0))
-            
-            # 如果是 RouteStick 任务，在右侧黑色边框绘制旋转方向示意图
-            if env_id == "RouteStick" and right_border_width > 0:
-                right_border_pil = Image.new('RGB', (right_border_width, actual_h), (0, 0, 0))
-                right_border_pil = draw_coordinate_axes(right_border_pil, position="right", rotate_180=False, env_id=env_id)
-                
-                # 计算右侧边框在拼接图像中的位置
-                right_border_x = left_border_width + actual_w1
-                concatenated_pil.paste(right_border_pil, (right_border_x, 0))
             
             # 转换回numpy数组
             concatenated_frame = np.array(concatenated_pil)
@@ -267,10 +263,10 @@ def draw_coordinate_axes(img, position="right", rotate_180=False, env_id=None):
     # 获取图片尺寸
     width, height = img.size
     
-    # 如果是 RouteStick 任务且位置在右侧，绘制旋转方向示意图
-    if env_id == "RouteStick" and position == "right":
+    # 如果是 RouteStick 任务，绘制旋转方向示意图（左侧或右侧）
+    if env_id == "RouteStick" and (position == "right" or position == "left"):
         # 绘制四个半圆箭头示意图（垂直排列）
-        # 示意图位置：在图像右侧，从上到下垂直排列
+        # 示意图位置：在图像的左侧或右侧，从上到下垂直排列
         illustration_width = 220  # 示意图区域宽度（已弃用，保留以保持兼容性）
         
         # 尝试加载字体
@@ -293,8 +289,8 @@ def draw_coordinate_axes(img, position="right", rotate_180=False, env_id=None):
         item_height = semicircle_radius * 2 + 20  # 半圆直径 + 标签空间
         total_height = 4 * item_height + 3 * vertical_spacing  # 4个半圆 + 3个间距
         
-        # 布局中心位置（位于右侧黑色区域的中心）
-        # width 为右侧黑色区域的宽度（240），将布局中心放在区域中心
+        # 布局中心位置
+        # 左侧或右侧黑色区域的中心，将布局中心放在区域中心
         layout_center_x = width // 2
         start_y = (height - total_height) // 2  # 从顶部开始的起始位置
         
@@ -380,21 +376,14 @@ def draw_coordinate_axes(img, position="right", rotate_180=False, env_id=None):
         )
         draw.text((rccw_text_x, rccw_text_y), rccw_text, fill=line_color, font=small_font)
         
-        # 右侧区域只绘制旋转示意图，不绘制坐标系，直接返回
+        # RouteStick 任务只绘制旋转示意图，不绘制坐标系，直接返回
         return img
     
     # 坐标系位置（在黑色边框内）
     axis_size = 60  # 坐标系大小
     
-    # 如果是 RouteStick 任务且位置在左侧，坐标系位于左侧区域
-    # 与右侧旋转示意图对称，距离左边缘75像素
-    if env_id == "RouteStick" and position == "left":
-        # 坐标系中心位于左侧区域，距离左边缘75像素
-        center_x_pos = 75
-        origin_x = center_x_pos - axis_size // 2
-    else:
-        # 坐标轴中心位于边框宽度的中心
-        origin_x = width // 2 - axis_size // 2
+    # 坐标轴中心位于边框宽度的中心
+    origin_x = width // 2 - axis_size // 2
     origin_y = height // 2 - axis_size // 2
     
     # 尝试加载字体

@@ -1,5 +1,10 @@
 {
   "user1": [
+
+    {
+      "env_id": "VideoUnmaskSwap",
+      "episode_idx": 99
+    },
     {
       "env_id": "RouteStick",
       "episode_idx": 32
@@ -203,6 +208,14 @@
   ],
   "user2": [
     {
+      "env_id": "BinFill",
+      "episode_idx": 99
+    },
+    {
+      "env_id": "VideoUnmaskSwap",
+      "episode_idx": 99
+    },
+    {
       "env_id": "PickXtimes",
       "episode_idx": 28
     },
@@ -404,6 +417,14 @@
     }
   ],
   "user3": [
+    {
+      "env_id": "BinFill",
+      "episode_idx": 99
+    },
+    {
+      "env_id": "VideoUnmaskSwap",
+      "episode_idx": 99
+    },
     {
       "env_id": "MoveCube",
       "episode_idx": 46
@@ -607,6 +628,14 @@
   ],
   "user4": [
     {
+      "env_id": "BinFill",
+      "episode_idx": 99
+    },
+    {
+      "env_id": "VideoUnmaskSwap",
+      "episode_idx": 99
+    },
+    {
       "env_id": "ButtonUnmask",
       "episode_idx": 17
     },
@@ -808,6 +837,14 @@
     }
   ],
   "user5": [
+    {
+      "env_id": "BinFill",
+      "episode_idx": 99
+    },
+    {
+      "env_id": "VideoUnmaskSwap",
+      "episode_idx": 99
+    },
     {
       "env_id": "SwingXtimes",
       "episode_idx": 34
@@ -1011,6 +1048,14 @@
   ],
   "user6": [
     {
+      "env_id": "BinFill",
+      "episode_idx": 99
+    },
+    {
+      "env_id": "VideoUnmaskSwap",
+      "episode_idx": 99
+    },
+    {
       "env_id": "ButtonUnmaskSwap",
       "episode_idx": 5
     },
@@ -1212,6 +1257,14 @@
     }
   ],
   "user7": [
+    {
+      "env_id": "BinFill",
+      "episode_idx": 99
+    },
+    {
+      "env_id": "VideoUnmaskSwap",
+      "episode_idx": 99
+    },
     {
       "env_id": "VideoUnmask",
       "episode_idx": 8
@@ -1415,6 +1468,14 @@
   ],
   "user8": [
     {
+      "env_id": "BinFill",
+      "episode_idx": 99
+    },
+    {
+      "env_id": "VideoUnmaskSwap",
+      "episode_idx": 99
+    },
+    {
       "env_id": "PickXtimes",
       "episode_idx": 41
     },
@@ -1616,6 +1677,14 @@
     }
   ],
   "user9": [
+    {
+      "env_id": "BinFill",
+      "episode_idx": 99
+    },
+    {
+      "env_id": "VideoUnmaskSwap",
+      "episode_idx": 99
+    },
     {
       "env_id": "VideoPlaceOrder",
       "episode_idx": 47
@@ -1819,6 +1888,14 @@
   ],
   "user10": [
     {
+      "env_id": "BinFill",
+      "episode_idx": 99
+    },
+    {
+      "env_id": "VideoUnmaskSwap",
+      "episode_idx": 99
+    },
+    {
       "env_id": "VideoPlaceButton",
       "episode_idx": 36
     },
@@ -2020,6 +2097,14 @@
     }
   ],
   "user11": [
+    {
+      "env_id": "BinFill",
+      "episode_idx": 99
+    },
+    {
+      "env_id": "VideoUnmaskSwap",
+      "episode_idx": 99
+    },
     {
       "env_id": "MoveCube",
       "episode_idx": 24
@@ -2223,6 +2308,14 @@
   ],
   "user12": [
     {
+      "env_id": "BinFill",
+      "episode_idx": 99
+    },
+    {
+      "env_id": "VideoUnmaskSwap",
+      "episode_idx": 99
+    },
+    {
       "env_id": "StopCube",
       "episode_idx": 11
     },
@@ -2425,6 +2518,14 @@
   ],
   "user13": [
     {
+      "env_id": "BinFill",
+      "episode_idx": 99
+    },
+    {
+      "env_id": "VideoUnmaskSwap",
+      "episode_idx": 99
+    },
+    {
       "env_id": "PatternLock",
       "episode_idx": 41
     },
@@ -2626,6 +2727,14 @@
     }
   ],
   "user14": [
+    {
+      "env_id": "BinFill",
+      "episode_idx": 99
+    },
+    {
+      "env_id": "VideoUnmaskSwap",
+      "episode_idx": 99
+    },
     {
       "env_id": "VideoPlaceOrder",
       "episode_idx": 11
@@ -2830,6 +2939,14 @@
   "user15": [
     {
       "env_id": "BinFill",
+      "episode_idx": 99
+    },
+    {
+      "env_id": "VideoUnmaskSwap",
+      "episode_idx": 99
+    },
+    {
+      "env_id": "BinFill",
       "episode_idx": 24
     },
     {
@@ -3030,6 +3147,14 @@
     }
   ],
   "user16": [
+    {
+      "env_id": "BinFill",
+      "episode_idx": 99
+    },
+    {
+      "env_id": "VideoUnmaskSwap",
+      "episode_idx": 99
+    },
     {
       "env_id": "ButtonUnmaskSwap",
       "episode_idx": 2
