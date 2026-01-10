@@ -311,7 +311,7 @@ if __name__ == "__main__":
         # 使用第一个可用 IP，如果没有则使用 localhost
         base_ip = network_ips[0][1] if network_ips else "localhost"
         for username in sorted(available_users):
-            login_link = f"http://{base_ip}:{port}/?user={username}"
+            login_link = f"http://{base_ip}:{port}/?user={username}&__theme=light"
             print(f"  {username:20s} -> {login_link}")
         print("-" * 60)
         print(f"共 {len(available_users)} 个用户")

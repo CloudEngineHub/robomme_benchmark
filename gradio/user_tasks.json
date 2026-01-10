@@ -1,5 +1,5 @@
 {
-  "user1": [
+  "Hongyu_Zhou": [
     {
       "env_id": "BinFill",
       "episode_idx": 98
@@ -225,7 +225,7 @@
       "episode_idx": 16
     }
   ],
-  "user2": [
+  "Wanling_Cai": [
     {
       "env_id": "BinFill",
       "episode_idx": 98
@@ -451,7 +451,7 @@
       "episode_idx": 17
     }
   ],
-  "user3": [
+  "Xinyi_Wang": [
     {
       "env_id": "BinFill",
       "episode_idx": 98
@@ -677,7 +677,7 @@
       "episode_idx": 23
     }
   ],
-  "user4": [
+  "Yinpei_Dai": [
     {
       "env_id": "BinFill",
       "episode_idx": 98
@@ -903,7 +903,7 @@
       "episode_idx": 16
     }
   ],
-  "user5": [
+  "Hongze_Fu": [
     {
       "env_id": "BinFill",
       "episode_idx": 98
@@ -1129,7 +1129,7 @@
       "episode_idx": 18
     }
   ],
-  "user6": [
+  "Run_Peng": [
     {
       "env_id": "BinFill",
       "episode_idx": 98
@@ -1355,7 +1355,7 @@
       "episode_idx": 49
     }
   ],
-  "user7": [
+  "Haoran_Zhang": [
     {
       "env_id": "BinFill",
       "episode_idx": 98
@@ -1581,7 +1581,7 @@
       "episode_idx": 25
     }
   ],
-  "user8": [
+  "Yunqi_Zhao": [
     {
       "env_id": "BinFill",
       "episode_idx": 98
@@ -1807,7 +1807,7 @@
       "episode_idx": 17
     }
   ],
-  "user9": [
+  "Yue_Hu": [
     {
       "env_id": "BinFill",
       "episode_idx": 98
@@ -2033,7 +2033,7 @@
       "episode_idx": 3
     }
   ],
-  "user10": [
+  "Yiwei_Lyu": [
     {
       "env_id": "BinFill",
       "episode_idx": 98
@@ -2259,7 +2259,7 @@
       "episode_idx": 1
     }
   ],
-  "user11": [
+  "Josue_Torres-Fonseca": [
     {
       "env_id": "BinFill",
       "episode_idx": 98
@@ -2485,7 +2485,7 @@
       "episode_idx": 39
     }
   ],
-  "user12": [
+  "Jung-Chun_Liu": [
     {
       "env_id": "BinFill",
       "episode_idx": 98

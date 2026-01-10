@@ -542,7 +542,7 @@ def login_and_load_task(username, uid):
     
     # 检查是否为 episode 98 (trial mode)
     if int(ep_num) == 98:
-        gr.Info("This is tutorial mode.")
+        gr.Info("This is tutorial mode. You have to complete all the tutorials before you can start testing.")
         capitalized_goal = capitalize_first_letter(session.language_goal) if session.language_goal else ""
         goal_text = f"[[tutorial mode]]\n{capitalized_goal}"
     

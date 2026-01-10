@@ -2249,7 +2249,7 @@ def create_ui_blocks():
                 with gr.Column(scale=COMBINED_VIEW_SCALE):
                     with gr.Group(visible=True) as combined_view_group:
                         # 标题行
-                        gr.Markdown("### Execution LiveStream 🦾")
+                        gr.Markdown("### Execution LiveStream 🦾(might be delayed)")
                         
                         # 内容行 - 单列布局
                         with gr.Column(scale=1):

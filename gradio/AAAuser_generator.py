@@ -27,6 +27,21 @@ ENVS = [
     "RouteStick",
 ]
 
+REAL_USERS = [
+    "Hongyu_Zhou",
+    "Wanling_Cai",
+    "Xinyi_Wang",
+    "Yinpei_Dai",
+    "Hongze_Fu",
+    "Run_Peng",
+    "Haoran_Zhang",
+    "Yunqi_Zhao",
+    "Yue_Hu",
+    "Yiwei_Lyu",
+    "Josue_Torres-Fonseca",
+    "Jung-Chun_Liu"
+]
+
 NUM_USERS = 20
 EPISODES_PER_ENV = 50
 TEST_EPISODE_IDX = 98
@@ -43,14 +58,22 @@ def generate_json(seed: int = 0):
             for ep in range(EPISODES_PER_ENV)
         ]
 
+    # Generate user keys
+    user_keys = []
+    for i in range(NUM_USERS):
+        if i < len(REAL_USERS):
+            user_keys.append(REAL_USERS[i])
+        else:
+            user_keys.append(f"user{i+1}")
+
     # 2️⃣ 初始化用户任务列表
-    users = {f"user{i}": [] for i in range(1, NUM_USERS + 1)}
+    users = {key: [] for key in user_keys}
     
     # 3️⃣ 阶段1：保证每个用户都有全部环境至少一次
     # 为每个用户从每个环境随机选择1个任务
     used_tasks = {env: set() for env in ENVS}  # 记录已使用的episode_idx
     
-    for user_id in range(1, NUM_USERS + 1):
+    for user_key in user_keys:
         for env in ENVS:
             # 从该环境的可用任务中随机选择一个
             available = [
@@ -59,7 +82,7 @@ def generate_json(seed: int = 0):
             ]
             if available:
                 selected_task = rng.choice(available)
-                users[f"user{user_id}"].append(selected_task)
+                users[user_key].append(selected_task)
                 used_tasks[env].add(selected_task["episode_idx"])
 
     # 4️⃣ 阶段2：均匀分配剩余任务
@@ -80,14 +103,14 @@ def generate_json(seed: int = 0):
     for i in range(NUM_USERS):
         start = i * remaining_per_user
         end = (i + 1) * remaining_per_user
-        users[f"user{i+1}"].extend(remaining_tasks[start:end])
+        users[user_keys[i]].extend(remaining_tasks[start:end])
     
     # 如果有余数，分配给前几个用户（每个用户1个）
     remainder = len(remaining_tasks) % NUM_USERS
     if remainder > 0:
         start_idx = remaining_per_user * NUM_USERS
         for i in range(remainder):
-            users[f"user{i+1}"].append(remaining_tasks[start_idx + i])
+            users[user_keys[i]].append(remaining_tasks[start_idx + i])
 
     # 5️⃣ test（保持你原格式）
     test_template = [
@@ -97,9 +120,9 @@ def generate_json(seed: int = 0):
     ]
 
     output = {}
-    for i in range(1, NUM_USERS + 1):
+    for user_key in user_keys:
         # 把test任务放在训练任务前面
-        output[f"user{i}"] = test_template + users[f"user{i}"]
+        output[user_key] = test_template + users[user_key]
         #output[f"user{i}_test"] = test_template 不输出test
 
     return output
