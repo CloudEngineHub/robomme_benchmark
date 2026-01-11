@@ -1,5 +1,10 @@
 import os
 
+# 设置 VNC 显示环境变量（必须在导入 sapien 之前设置）
+os.environ['DISPLAY'] = ':1'
+# 设置 OpenGL 相关环境变量以支持 VNC
+os.environ['LIBGL_ALWAYS_SOFTWARE'] = '1'  # 使用软件渲染（VNC 通常不支持硬件加速）
+os.environ['GALLIUM_DRIVER'] = 'llvmpipe'  # 使用 llvmpipe 驱动
 
 import sys
 import numpy as np
@@ -39,7 +44,7 @@ def main():
     """
 
     num_episodes = 1
-    env_id_list=["VideoPlaceOrder"]
+    env_id_list=["BinFill"]
     for env_id in env_id_list:
         dataset_path = Path(f"/home/hongzefu/dataset_generate/record_dataset_{env_id}.h5")
         for episode in range(num_episodes):
@@ -72,7 +77,7 @@ def main():
                 planner = FailAwarePandaStickMotionPlanningSolver(
                         env,
                         debug=False,
-                        vis=True,
+                        vis=False,
                         base_pose=env.unwrapped.agent.robot.pose,
                         visualize_target_grasp_pose=False,
                         print_env_info=False,
@@ -82,9 +87,9 @@ def main():
                 planner = FailAwarePandaArmMotionPlanningSolver(
                         env,
                         debug=False,
-                        vis=True,
+                        vis=False,
                         base_pose=env.unwrapped.agent.robot.pose,
-                        visualize_target_grasp_pose=False,
+                        visualize_target_grasp_pose=True,
                         print_env_info=False,
                     )
                 

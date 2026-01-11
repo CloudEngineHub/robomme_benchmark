@@ -381,10 +381,18 @@ class HistoryBenchRecordWrapper(gym.Wrapper):
             #print(f"End-effector linear velocity: {self.agent.robot.links[9].get_linear_velocity().tolist()[0]}, angular velocity: {self.agent.robot.links[9].get_angular_velocity().tolist()[0]}")
             end_effector_velocity = self.agent.robot.links[9].get_linear_velocity().tolist()[0] + self.agent.robot.links[9].get_angular_velocity().tolist()[0]
 
+            # 处理keypoint信息：读取env中的待记录keypoint（如果存在则记录一次后清除）
+            current_keypoint = None
+            env_unwrapped = getattr(self.env, 'unwrapped', self.env)
+            if hasattr(env_unwrapped, '_pending_keypoint') and env_unwrapped._pending_keypoint is not None:
+                # 获取待记录的keypoint并立即清除，确保每个keypoint只记录一次
+                current_keypoint = env_unwrapped._pending_keypoint
+                env_unwrapped._pending_keypoint = None
+
             record_data = {
                 'record_timestep': record_timestep,
-                'robot_endeffector_p': self.agent.robot.links[9].pose.p.cpu().numpy(),
-                'robot_endeffector_q': self.agent.robot.links[9].pose.q.cpu().numpy(),
+                'robot_endeffector_p': self.agent.tcp.pose.p.cpu().numpy(),
+                'robot_endeffector_q': self.agent.tcp.pose.q.cpu().numpy(),
                 'image': base_camera_frame,
                 'wrist_image': wrist_camera_frame,
                 'base_camera_depth': base_camera_depth,
@@ -404,7 +412,8 @@ class HistoryBenchRecordWrapper(gym.Wrapper):
                 'segmentation':segmentation,
                 'segmentation_result':segmentation_result,
                 'grounded_subgoal': self.current_subgoal_segment_filled,
-                'grounded_subgoal_online': self.current_subgoal_segment_online_filled
+                'grounded_subgoal_online': self.current_subgoal_segment_online_filled,
+                'keypoint': current_keypoint if current_keypoint else None
             }
 
             self.buffer.append(record_data)
@@ -571,6 +580,26 @@ class HistoryBenchRecordWrapper(gym.Wrapper):
                 ts_group.create_dataset("grounded_subgoal_online", data=task_name_encoded)
 
                 ts_group.create_dataset("demonstration", data=record_data['demonstration'])
+
+                # 写入keypoint信息（如果存在）
+                keypoint = record_data.get('keypoint', None)
+                if keypoint:
+                    ts_group.create_dataset("keypoint_p", data=keypoint['keypoint_p'])
+                    ts_group.create_dataset("keypoint_q", data=keypoint['keypoint_q'])
+                    
+                    solve_function_name = keypoint.get('solve_function', 'unknown')
+                    if isinstance(solve_function_name, str):
+                        solve_function_name_encoded = solve_function_name.encode('utf-8')
+                    else:
+                        solve_function_name_encoded = solve_function_name
+                    ts_group.create_dataset("keypoint_solve_function", data=solve_function_name_encoded)
+                    
+                    keypoint_type = keypoint.get('keypoint_type', 'unknown')
+                    if isinstance(keypoint_type, str):
+                        keypoint_type_encoded = keypoint_type.encode('utf-8')
+                    else:
+                        keypoint_type_encoded = keypoint_type
+                    ts_group.create_dataset("keypoint_type", data=keypoint_type_encoded)
 
             # 写入 setup 信息（种子、难度、任务列表）
             setup_group = episode_group.create_group(f"setup")

@@ -807,6 +807,52 @@ def solve_pickup_fail(env, planner, obj=None,z_offset=None,xy_offset=None,obj_ty
     return None
 
 
+def _record_keypoint(env, keypoint_p, keypoint_q, solve_function, keypoint_type):
+    """
+    记录keypoint信息到env属性中，用于后续写入hdf5文件。
+    
+    Args:
+        env: 环境对象
+        keypoint_p: 位置坐标（3D数组），可以是list、numpy数组或torch tensor
+        keypoint_q: 四元数（4D数组），可以是list、numpy数组或torch tensor
+        solve_function: solve函数名称字符串（如'solve_pickup'）
+        keypoint_type: keypoint类型字符串（如'reach_pose', 'grasp_pose'）
+    """
+    env = getattr(env, "unwrapped", env)
+    
+    # 转换keypoint_p为numpy数组
+    if isinstance(keypoint_p, torch.Tensor):
+        keypoint_p_np = keypoint_p.detach().cpu().numpy()
+        if keypoint_p_np.ndim > 1:
+            keypoint_p_np = keypoint_p_np.flatten()
+        keypoint_p_np = keypoint_p_np[:3]  # 确保是3D
+    elif isinstance(keypoint_p, (list, tuple)):
+        keypoint_p_np = np.array(keypoint_p, dtype=np.float32)[:3]
+    else:
+        keypoint_p_np = np.asarray(keypoint_p, dtype=np.float32).flatten()[:3]
+    
+    # 转换keypoint_q为numpy数组
+    if isinstance(keypoint_q, torch.Tensor):
+        keypoint_q_np = keypoint_q.detach().cpu().numpy()
+        if keypoint_q_np.ndim > 1:
+            keypoint_q_np = keypoint_q_np.flatten()
+        keypoint_q_np = keypoint_q_np[:4]  # 确保是4D
+    elif isinstance(keypoint_q, (list, tuple)):
+        keypoint_q_np = np.array(keypoint_q, dtype=np.float32)[:4]
+    else:
+        keypoint_q_np = np.asarray(keypoint_q, dtype=np.float32).flatten()[:4]
+    
+    # 记录keypoint信息到待记录变量（只保存一个，step中记录后会被清除）
+    keypoint_info = {
+        'keypoint_p': keypoint_p_np.astype(np.float32),
+        'keypoint_q': keypoint_q_np.astype(np.float32),
+        'solve_function': solve_function,
+        'keypoint_type': keypoint_type
+    }
+    
+    env._pending_keypoint = keypoint_info
+
+
 def solve_pickup(env, planner, obj=None,fail_grasp=False,mode=None):
     # 10% chance to perform a deliberate failed hover before the normal pickup.
     planner.open_gripper()
@@ -840,11 +886,15 @@ def solve_pickup(env, planner, obj=None,fail_grasp=False,mode=None):
     reach_pose_q = grasp_pose.q.tolist() if hasattr(grasp_pose.q, 'tolist') else list(grasp_pose.q)
     reach_pose_p[2]=0.15
     planner.move_to_pose_with_screw(sapien.Pose(p=reach_pose_p,q=reach_pose_q))
+    _record_keypoint(env, reach_pose_p, reach_pose_q, 'solve_pickup', 'reach_pose')
     planner.open_gripper()
     # -------------------------------------------------------------------------- #
     # Grasp
     # -------------------------------------------------------------------------- #
     planner.move_to_pose_with_screw(grasp_pose)
+    grasp_pose_p = grasp_pose.p.tolist() if hasattr(grasp_pose.p, 'tolist') else list(grasp_pose.p)
+    grasp_pose_q = grasp_pose.q.tolist() if hasattr(grasp_pose.q, 'tolist') else list(grasp_pose.q)
+    _record_keypoint(env, grasp_pose_p, grasp_pose_q, 'solve_pickup', 'grasp_pose')
     planner.close_gripper()
 
     # -------------------------------------------------------------------------- #
@@ -854,6 +904,7 @@ def solve_pickup(env, planner, obj=None,fail_grasp=False,mode=None):
     goal_pose_P[2]=0.15
     goal_pose = sapien.Pose(goal_pose_P, grasp_pose.q)
     res = planner.move_to_pose_with_screw(goal_pose)
+    _record_keypoint(env, goal_pose_P, grasp_pose.q, 'solve_pickup', 'goal_pose')
 
     planner.close()
     return res
@@ -1317,6 +1368,7 @@ def solve_putonto_whenhold_binspecial(env, planner,target=None):
     goal_pose_P[2]=0.2
     goal_pose = sapien.Pose(goal_pose_P, grasp_pose_q)
     res = planner.move_to_pose_with_screw(goal_pose)
+    _record_keypoint(env, goal_pose_P, grasp_pose_q, 'solve_putonto_whenhold_binspecial', 'goal_pose')
     planner.open_gripper()
 
     goal_pose_P=target.pose.p.tolist()[0]
@@ -1376,8 +1428,14 @@ def solve_button(env, planner,obj,steps_press=None,interval=20,without_hold=Fals
     steps=env.elapsed_steps.item()
     print("press button at step",steps)
     planner.move_to_pose_with_screw(sapien.Pose(p=position,q=rotate))
+    # Convert rotate to list/numpy for recording
+    rotate_list = rotate.tolist() if hasattr(rotate, 'tolist') else rotate
+
+    _record_keypoint(env, position, rotate_list, 'solve_button', 'button_pose')
 
     planner.move_to_pose_with_screw(sapien.Pose(p=ready_position, q=rotate))
+
+    _record_keypoint(env, ready_position, rotate, 'solve_button', 'ready_pose')
 
 def solve_button_ready(env, planner,obj):
     FINGER_LENGTH = 0.025
