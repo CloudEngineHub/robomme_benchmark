@@ -33,7 +33,7 @@ def main():
     """
 
     num_episodes = 1
-    gui_render=True
+    gui_render=False
     max_steps=3000
     
 
@@ -46,13 +46,13 @@ def main():
         # "InsertPeg",
         # "MoveCube",
         #"PatternLock",
-        "PickHighlight",
+        #"PickHighlight",
         # "PickXtimes",
         # "RouteStick",
         # "StopCube",
         # "SwingXtimes",
-        # "VideoPlaceButton",
-        # "VideoPlaceOrder",
+        #"VideoPlaceButton",
+        "VideoPlaceOrder",
         # "VideoUnmask",
         # "VideoUnmaskSwap",
     ]
@@ -65,9 +65,9 @@ def main():
         render_mode="rgb_array"
 
     for env_id in env_id_list:
-        dataset_path= f"/data/hongzefu/data_1206/record_dataset_{env_id}.h5"
-        dataset = h5py.File(dataset_path, "r")
-        metadata_path =  f"/data/hongzefu/data_1206/record_dataset_{env_id}_metadata.json"
+        # dataset_path= f"/data/hongzefu/data_1206/record_dataset_{env_id}.h5"
+        # dataset = h5py.File(dataset_path, "r")
+        metadata_path =  f"/data/hongzefu/historybench-v5.6.19.1-gradio-changeStopcube3/dataset_json/record_dataset_{env_id}_metadata.json"
 
         resolver = EpisodeConfigResolver(
             env_id=env_id,
@@ -79,6 +79,7 @@ def main():
         )
 
         for episode in range(num_episodes):
+            episode=98
             env, episode_dataset, seed, difficulty = resolver.make_env_for_episode(episode)
            
             env.reset()
