@@ -214,9 +214,13 @@ def get_tutorial_video_path(env_id):
     if not env_id:
         return None
     
+    # 获取当前文件所在目录，然后构建videos目录的路径
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    videos_dir = os.path.join(current_dir, "videos")
+    
     # 直接使用 env_id 添加 .mp4 后缀（视频文件名是大写的，如 BinFill.mp4）
     video_filename = env_id + ".mp4"
-    video_path = os.path.join("/home/hongzefu/historybench-v5.6.16-gradio-final-video/gradio/videos", video_filename)
+    video_path = os.path.join(videos_dir, video_filename)
     
     # 检查文件是否存在
     if os.path.exists(video_path):

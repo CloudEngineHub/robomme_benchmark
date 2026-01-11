@@ -39,7 +39,7 @@ def main():
     """
 
     num_episodes = 1
-    env_id_list=["BinFill"]
+    env_id_list=["VideoPlaceOrder"]
     for env_id in env_id_list:
         dataset_path = Path(f"/home/hongzefu/dataset_generate/record_dataset_{env_id}.h5")
         for episode in range(num_episodes):
@@ -52,7 +52,7 @@ def main():
                 control_mode="pd_joint_pos",
                 render_mode="rgb_array",  
                 reward_mode="dense",
-                HistoryBench_seed=33000,
+                HistoryBench_seed=619800,
                 max_episode_steps=200,
                 HistoryBench_difficulty="hard",
             )

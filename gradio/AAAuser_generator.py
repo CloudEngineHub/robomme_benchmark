@@ -39,7 +39,10 @@ REAL_USERS = [
     "Yue_Hu",
     "Yiwei_Lyu",
     "Josue_Torres-Fonseca",
-    "Jung-Chun_Liu"
+    "Jung-Chun_Liu",
+    "Jacob_Sansom",
+    "Long-Jing_Hsu"
+
 ]
 
 NUM_USERS = 20

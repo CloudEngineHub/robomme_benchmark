@@ -164,6 +164,7 @@ from streaming_service import create_video_feed_route
 from ui_layout import create_ui_blocks, CSS, SYNC_JS
 from state_manager import create_session, start_timeout_monitor
 from user_manager import user_manager
+from config import USER_PORT_MAP
 
 import os
 import multiprocessing
@@ -358,16 +359,53 @@ if __name__ == "__main__":
     network_ips = get_all_network_ips()
     base_ip = network_ips[0][1] if network_ips else "localhost"
     
-    # 为每个用户分配端口
-    num_users = len(available_users)
-    try:
-        ports = find_free_ports(start_port=7860, count=num_users)
-    except RuntimeError as e:
-        print(f"\n❌ 错误: {e}")
-        sys.exit(1)
+    # 为每个用户分配端口（使用固定映射，未映射的用户使用动态分配）
+    user_port_map = {}
+    unmapped_users = []
     
-    # 创建用户名到端口的映射
-    user_port_map = {username: ports[i] for i, username in enumerate(sorted(available_users))}
+    # 首先分配固定端口映射的用户
+    for username in sorted(available_users):
+        if username in USER_PORT_MAP:
+            user_port_map[username] = USER_PORT_MAP[username]
+        else:
+            unmapped_users.append(username)
+    
+    # 为未映射的用户动态分配端口（从固定映射的最大端口号+1开始，并排除已分配的端口）
+    if unmapped_users:
+        # 计算固定映射中使用的最大端口号
+        max_fixed_port = max(USER_PORT_MAP.values()) if USER_PORT_MAP else 7859
+        dynamic_start_port = max_fixed_port + 1
+        
+        # 获取所有已分配的端口（避免冲突）
+        allocated_ports = set(user_port_map.values())
+        
+        try:
+            # 动态分配端口，跳过已被占用的端口
+            dynamic_ports = []
+            current_port = dynamic_start_port
+            max_attempts = 1000
+            
+            while len(dynamic_ports) < len(unmapped_users) and current_port < dynamic_start_port + max_attempts:
+                # 检查端口是否已被分配或正在使用
+                if current_port not in allocated_ports:
+                    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                        try:
+                            s.bind(('localhost', current_port))
+                            dynamic_ports.append(current_port)
+                            allocated_ports.add(current_port)  # 标记为已分配
+                        except OSError:
+                            # 端口已被占用，跳过
+                            pass
+                current_port += 1
+            
+            if len(dynamic_ports) < len(unmapped_users):
+                raise RuntimeError(f"无法找到 {len(unmapped_users)} 个可用端口（从 {dynamic_start_port} 开始）")
+            
+            for i, username in enumerate(sorted(unmapped_users)):
+                user_port_map[username] = dynamic_ports[i]
+        except RuntimeError as e:
+            print(f"\n❌ 错误: 无法为未映射用户分配端口: {e}")
+            sys.exit(1)
     
     # 存储所有子进程
     processes = []
