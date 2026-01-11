@@ -132,9 +132,9 @@ def get_language_goal(self,historybench_env):
             num_repeats = self.num_repeats
             if num_repeats>1:
                 word = num2words.get(num_repeats, str(num_repeats))
-                language_goal=f'watch the video carefully, then repeatedly pick up and put down the same block that was previously picked up for {word} times, finally press the button to stop'
+                language_goal=f'watch the video carefully, then repeatedly pick up and put down the same block that was previously picked up for {word} times, finally put it down and press the button to stop'
             else:
-                language_goal=f'watch the video carefully, then pick up the same block that was previously picked up again, finally press the button to stop'
+                language_goal=f'watch the video carefully, then pick up the same block that was previously picked up again, finally put it down and press the button to stop'
 
 
         elif historybench_env=="StopCube":
