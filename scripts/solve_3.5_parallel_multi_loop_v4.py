@@ -56,20 +56,20 @@ DEFAULT_ENVS =[
 # "SwingXtimes",
 "BinFill",
 
-# "VideoUnmaskSwap",
+#"VideoUnmaskSwap",
 # "VideoUnmask",
 # "ButtonUnmaskSwap",
 # "ButtonUnmask",
 
 # "VideoRepick",
 # "VideoPlaceButton",
-# "VideoPlaceOrder",
+"VideoPlaceOrder",
 # "PickHighlight",
 
 # "InsertPeg",
 # 'MoveCube',
 # "PatternLock",
-# "RouteStick"
+"RouteStick"
 ]
 
 # 将环境名称映射为唯一的整数代码，用于生成随机种子

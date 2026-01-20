@@ -540,8 +540,8 @@ class DemonstrationWrapper(gym.Wrapper):
                     position='top_right',
                 )
                 self.video_frames.append(combined)
-                if self.no_object_flag:
-                    self.no_object_video_frames.append(combined)
+                # if self.no_object_flag:
+                #     self.no_object_video_frames.append(combined)
 
 
 
@@ -594,20 +594,20 @@ class DemonstrationWrapper(gym.Wrapper):
                 for frame in self.video_frames:
                     writer.append_data(frame)
             print(f"Saved demonstration video to {video_path}")
-        if self.save_video and len(self.no_object_video_frames)>0:
-            videos_dir = Path("/data/hongzefu/dataset_generate/replay_videos")
-            videos_dir.mkdir(parents=True, exist_ok=True)
-
-            language_goal = task_goal.get_language_goal(self.env,self.unwrapped.spec.id)
-            sanitized_goal = language_goal.replace(" ", "_").replace("/", "_") if language_goal else "no_goal"
-            seed = getattr(self.env.unwrapped, "HistoryBench_seed", None)
-            seed_tag = f"_seed{seed}" if seed is not None else ""
-
-            video_path = videos_dir / f"DEMO_NO_OBJECT_{self.unwrapped.spec.id}{seed_tag}_{sanitized_goal}.mp4"
-            with imageio.get_writer(video_path.as_posix(), fps=30, codec="libx264", quality=8) as writer:
-                for frame in self.no_object_video_frames:
-                    writer.append_data(frame)
-            print(f"Saved demonstration no-object video to {video_path}")
+        # if self.save_video and len(self.no_object_video_frames)>0:
+        #     videos_dir = Path("/data/hongzefu/dataset_generate/replay_videos")
+        #     videos_dir.mkdir(parents=True, exist_ok=True)
+        #
+        #     language_goal = task_goal.get_language_goal(self.env,self.unwrapped.spec.id)
+        #     sanitized_goal = language_goal.replace(" ", "_").replace("/", "_") if language_goal else "no_goal"
+        #     seed = getattr(self.env.unwrapped, "HistoryBench_seed", None)
+        #     seed_tag = f"_seed{seed}" if seed is not None else ""
+        #
+        #     video_path = videos_dir / f"DEMO_NO_OBJECT_{self.unwrapped.spec.id}{seed_tag}_{sanitized_goal}.mp4"
+        #     with imageio.get_writer(video_path.as_posix(), fps=30, codec="libx264", quality=8) as writer:
+        #         for frame in self.no_object_video_frames:
+        #             writer.append_data(frame)
+        #     print(f"Saved demonstration no-object video to {video_path}")
 
         self.video_frames.clear()
         self.no_object_video_frames.clear()

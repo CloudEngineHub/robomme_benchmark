@@ -240,7 +240,7 @@ def main():
     # API服务器地址，默认本地8000端口
     parser.add_argument('--api_url', type=str, default='http://141.212.48.176:8002', help='API URL')
     # 每个episode的最大执行步数，默认25步
-    parser.add_argument('--max_steps', type=int, default=10, help='Max steps per episode')
+    parser.add_argument('--max_steps', type=int, default=25, help='Max steps per episode')
     args = parser.parse_args()
     
     # 提取参数值
@@ -295,8 +295,8 @@ def main():
             # 重置环境，获取初始观测和信息
             obs, info = env.reset()
             
-            if resolved_difficulty != "easy":
-                continue
+            # if resolved_difficulty != "easy":
+            #     continue
             
             # ========== 初始化运动规划器 ==========
             # 根据任务类型选择不同的运动规划器
@@ -306,7 +306,7 @@ def main():
                 planner = FailAwarePandaStickMotionPlanningSolver(
                     env,  # 环境对象
                     debug=False,  # 是否开启调试模式
-                    vis=True,  # 是否可视化规划过程
+                    vis=False,  # 是否可视化规划过程
                     base_pose=env.unwrapped.agent.robot.pose,  # 机器人基座位姿
                     visualize_target_grasp_pose=False,  # 是否可视化目标抓取位姿（棍子任务不需要）
                     print_env_info=False,  # 是否打印环境信息
@@ -317,7 +317,7 @@ def main():
                 planner = FailAwarePandaArmMotionPlanningSolver(
                     env,
                     debug=False,
-                    vis=True,
+                    vis=False,
                     base_pose=env.unwrapped.agent.robot.pose,
                     visualize_target_grasp_pose=True,  # 可视化目标抓取位姿（有助于调试）
                     print_env_info=False,

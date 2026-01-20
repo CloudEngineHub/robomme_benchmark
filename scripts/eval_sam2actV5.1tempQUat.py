@@ -220,7 +220,7 @@ def main():
     主函数：使用SAM2ACT Agent API运行仿真评估
     
     该函数是脚本的入口点，主要执行以下步骤：
-    1. 解析命令行参数（API地址、最大步数等）1
+    1. 解析命令行参数（API地址、最大步数等）
     2. 遍历指定的环境任务列表
     3. 读取每个任务的metadata文件，获取所有episode配置
     4. 对每个episode：
@@ -229,7 +229,7 @@ def main():
        c. 执行评估循环（调用API获取动作并执行）
        d. 评估任务完成情况
     5. 输出评估结果
-    1
+    
     工作流程：
     - 每个episode最多执行max_steps步
     - 每一步：获取观测 -> 调用API获取动作 -> 执行动作 -> 检查是否成功
@@ -240,7 +240,7 @@ def main():
     # API服务器地址，默认本地8000端口
     parser.add_argument('--api_url', type=str, default='http://141.212.48.176:8002', help='API URL')
     # 每个episode的最大执行步数，默认25步
-    parser.add_argument('--max_steps', type=int, default=10, help='Max steps per episode')
+    parser.add_argument('--max_steps', type=int, default=20, help='Max steps per episode')
     args = parser.parse_args()
     
     # 提取参数值
@@ -251,7 +251,7 @@ def main():
     # 要评估的环境任务列表（可以包含多个任务，如["BinFill", "PatternLock"]）
     env_id_list = ["BinFill"]
     # 数据集根目录路径，包含metadata文件和episode数据
-    dataset_root = Path("/data/hongzefu/historybench-v5.7.4-sam2act-generate128/dataset_json")
+    dataset_root = Path("/data/hongzefu/historybench-v5.7.5-sam2act5/dataset_json")
     
     # ========== 遍历所有环境任务 ==========
     for env_id in env_id_list:
@@ -276,6 +276,7 @@ def main():
             render_mode="rgb_array",  # 渲染模式："rgb_array"表示无头渲染（不创建窗口）
             gui_render=False,  # 是否启用GUI渲染（False表示不显示图形界面）
             max_steps_without_demonstration=200,  # 没有演示时的最大步数（用于安全限制）
+            save_video=True,  # 是否保存视频
         )
         
         # ========== 遍历所有episode ==========
@@ -293,6 +294,8 @@ def main():
             env, episode_dataset, resolved_seed, resolved_difficulty = resolver.make_env_for_episode(episode)
             # 重置环境，获取初始观测和信息
             obs, info = env.reset()
+            
+
             
             # ========== 初始化运动规划器 ==========
             # 根据任务类型选择不同的运动规划器
@@ -381,37 +384,13 @@ def main():
                     quat_xyzw = pose_list[3:7] # [qx, qy, qz, qw]
                     
                     # SAPIEN 需要 [w, x, y, z]
-                    quat_wxyz = [
-                        quat_xyzw[3], # w
-                        quat_xyzw[0], # x
-                        quat_xyzw[1], # y
-                        quat_xyzw[2]  # z
-                    ]
+                    quat_wxyz = quat_xyzw
+
                     
                     pose = sapien.Pose(p=pos, q=quat_wxyz)
                     print(f"pose: {pos}, quat(wxyz): {quat_wxyz} gripper_action: {gripper_action}")
                     
-                    # # ========== 处理夹爪动作 ==========
-                    # # 如果夹爪动作值大于0.5，表示需要打开夹爪
-                    # if gripper_action > 0.5:
-                    #     planner.open_gripper()  # 打开夹爪
-                    # else:
-                    #     # 延迟闭合：先移动到目标位姿，然后再闭合夹爪
-                    #     # 这样可以避免在移动过程中夹爪闭合导致碰撞
-                    #     pass
-                
-                    # ========== 处理键盘输入控制夹爪 ==========
-                    # 阻塞式等待用户输入
-                    user_input = input("输入 '1' 打开夹爪，输入 '2' 闭合夹爪，按回车继续: ").strip().lower()
-                    if user_input == '1':
-                        planner.open_gripper()  # 打开夹爪
-                        print("夹爪已打开")
-                    elif user_input == '2':
-                        planner.close_gripper()  # 闭合夹爪
-                        print("夹爪已闭合")
-                    else:
-                        print(f"未识别的输入: {user_input}，跳过夹爪操作")
-                    
+                 
 
                         
                     # ========== 执行运动规划并移动到目标位姿 ==========
@@ -420,9 +399,11 @@ def main():
                         # 螺旋运动是一种平滑的轨迹规划方法，适合机械臂运动
                         planner.move_to_pose_with_RRTStar(pose)
                         
-                        # # 如果动作指示需要闭合夹爪，在移动完成后闭合
-                        # if gripper_action <= 0.5:
-                        #     planner.close_gripper()
+                        # 如果动作指示需要闭合夹爪，在移动完成后闭合
+                        if gripper_action <= 0.5:
+                            planner.close_gripper()
+                        else:
+                            planner.open_gripper()
                             
                     except ScrewPlanFailure as exc:
                         # 捕获螺旋运动规划失败异常

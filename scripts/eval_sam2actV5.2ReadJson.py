@@ -95,11 +95,13 @@ def read_pred_actions(pred_actions_path):
         episode_idx = action_record.get('episode_idx')
         keypoint_pair_idx = action_record.get('keypoint_pair_idx')
         pred_action = action_record.get('pred_action')
+        gt_action = action_record.get('gt_action')  # 读取gt_action
         
         if task_name is not None and episode_idx is not None and pred_action is not None:
             grouped[(task_name, episode_idx)].append({
                 'keypoint_pair_idx': keypoint_pair_idx,
                 'pred_action': pred_action,
+                'gt_action': gt_action,  # 保存gt_action
                 'record': action_record  # 保留完整记录以便后续使用
             })
     
@@ -223,7 +225,8 @@ def main():
         # 遍历该episode的所有预测动作
         for step, action_data in enumerate(action_list):
             keypoint_pair_idx = action_data['keypoint_pair_idx']
-            pred_action = action_data['pred_action']
+            pred_action = action_data['gt_action']
+            pred_action = action_data['pred_action']#选择预测动作
             
             print(f"Step {step}/{len(action_list)} (keypoint_pair_idx: {keypoint_pair_idx})")
             
