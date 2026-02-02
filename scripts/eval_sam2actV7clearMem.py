@@ -238,7 +238,7 @@ def main():
     # ========== 命令行参数解析 ==========
     parser = argparse.ArgumentParser(description='Run evaluation using SAM2ACT Agent API')
     # API服务器地址，默认本地8000端口
-    parser.add_argument('--api_url', type=str, default='http://141.212.48.176:8002', help='API URL')
+    parser.add_argument('--api_url', type=str, default='http://141.212.48.176:8001', help='API URL')
     # 每个episode的最大执行步数，默认25步
     parser.add_argument('--max_steps', type=int, default=40, help='Max steps per episode')
     args = parser.parse_args()
@@ -250,25 +250,25 @@ def main():
     # ========== 配置参数 ==========
     # 要评估的环境任务列表（可以包含多个任务，如["BinFill", "PatternLock"]）
     env_id_list =[
-    "PickXtimes",
-    "StopCube",
-    "SwingXtimes",
-"BinFill",
+#     "PickXtimes",
+#     "StopCube",
+   #  "SwingXtimes",
+   #  "BinFill",
 
-    "VideoUnmaskSwap",
-"VideoUnmask",
-    "ButtonUnmaskSwap",
-    "ButtonUnmask",
+#     "VideoUnmaskSwap",
+# "VideoUnmask",
+#     "ButtonUnmaskSwap",
+#     "ButtonUnmask",
 
-    "VideoRepick",
-    "VideoPlaceButton",
-"VideoPlaceOrder",
-    "PickHighlight",
+#     "VideoRepick",
+#     "VideoPlaceButton",
+# "VideoPlaceOrder",
+#     "PickHighlight",
 
-     "InsertPeg",
-     'MoveCube',
-    "PatternLock",
-   "RouteStick"
+#      "InsertPeg",
+#      'MoveCube',
+     "PatternLock",
+#    "RouteStick"
     ]
 
     #env_id_list = ["BinFill"]
@@ -309,7 +309,7 @@ def main():
             difficulty = episode_record.get('difficulty')  # 难度等级（可选）
 
             #only run episode 0-10
-            if episode > 50:
+            if episode > 30:
                 continue    
             
             print(f"--- Running simulation for episode:{episode}, env: {env_id}, seed: {seed}, difficulty: {difficulty} ---")

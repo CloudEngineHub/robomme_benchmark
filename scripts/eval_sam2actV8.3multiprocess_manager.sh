@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# eval_sam2actV7clearMem_manager.sh - 评估脚本管理器
-# 用于管理 eval_sam2actV7clearMem.py 的运行、监控、停止
+# eval_sam2actV8.3multiprocess_manager.sh - 评估脚本管理器
+# 用于管理 eval_sam2actV8.3multiprocess.py 的运行、监控、停止
 # 功能：
 # 1. 使用nohup确保SSH断开后仍能运行
 # 2. 使用Python -u参数实现无缓冲输出
@@ -10,12 +10,12 @@
 
 # 脚本目录
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SCRIPT_NAME="eval_sam2actV7clearMem.py"
+SCRIPT_NAME="eval_sam2actV8.3multiprocess.py"
 SCRIPT_PATH="${SCRIPT_DIR}/${SCRIPT_NAME}"
 
 # 日志文件路径
 LOG_DIR="${SCRIPT_DIR}/logs"
-PID_FILE="${LOG_DIR}/eval_sam2actV7clearMem.pid"
+PID_FILE="${LOG_DIR}/eval_sam2actV8.3multiprocess.pid"
 
 # 创建日志目录
 mkdir -p "${LOG_DIR}"
@@ -55,7 +55,7 @@ check_status() {
         echo "PID: ${PID}"
         
         # 查找最新的日志文件
-        LATEST_LOG=$(ls -t "${LOG_DIR}"/eval_sam2actV7clearMem_*.log 2>/dev/null | head -1)
+        LATEST_LOG=$(ls -t "${LOG_DIR}"/eval_sam2actV8.3multiprocess_*.log 2>/dev/null | head -1)
         if [ -n "${LATEST_LOG}" ]; then
             echo "日志文件: ${LATEST_LOG}"
             echo "日志大小: $(du -h "${LATEST_LOG}" | cut -f1)"
@@ -73,53 +73,104 @@ check_status() {
     fi
 }
 
-# 停止进程
+# 递归杀死某 PID 及其所有子进程（先杀子后杀父，确保 ProcessPoolExecutor 等子进程全部退出）
+kill_process_tree() {
+    local pid=$1
+    local sig=${2:-15}
+    [ -z "$pid" ] && return
+    # 先杀所有直接子进程
+    local children
+    children=$(ps -o pid= --ppid "$pid" 2>/dev/null)
+    if [ -n "$children" ]; then
+        for c in $children; do
+            [ -n "$c" ] && kill_process_tree "$c" "$sig"
+        done
+        sleep 0.5
+    fi
+    kill -$sig "$pid" 2>/dev/null
+}
+
+# 检查某 PID 或其任意子进程是否还存在
+any_process_exists() {
+    local pid=$1
+    [ -z "$pid" ] && return 1
+    ps -p "$pid" > /dev/null 2>&1 && return 0
+    ps -o pid= --ppid "$pid" 2>/dev/null | grep -q . && return 0
+    return 1
+}
+
+# 停止进程（含所有子进程，确保 multiprocess 全部结束）
 stop_process() {
     if [ ! -f "${PID_FILE}" ]; then
         echo "未找到PID文件，可能没有进程在运行"
+        # 兜底：按进程名清理可能残留的 worker
+        stop_by_script_name
         return 0
     fi
     
     PID=$(cat "${PID_FILE}")
     
     if ! ps -p "${PID}" > /dev/null 2>&1; then
-        echo "进程 ${PID} 已不存在"
+        echo "主进程 ${PID} 已不存在，检查是否还有子进程残留..."
+        stop_by_script_name
         rm -f "${PID_FILE}"
         return 0
     fi
     
-    echo "正在停止进程 ${PID}..."
+    echo "正在停止进程 ${PID} 及其所有子进程..."
     
-    # 发送SIGTERM信号（优雅退出）
-    kill "${PID}" 2>/dev/null
+    # 先对整棵进程树发 SIGTERM（先子后父）
+    kill_process_tree "${PID}" 15
     
-    # 等待进程结束
-    for i in {1..10}; do
-        if ! ps -p "${PID}" > /dev/null 2>&1; then
-            echo "进程已停止"
+    # 等待整棵树退出
+    for i in {1..15}; do
+        if ! any_process_exists "${PID}"; then
+            echo "进程及子进程已全部停止"
             rm -f "${PID_FILE}"
             return 0
         fi
         sleep 1
     done
     
-    # 如果进程仍在运行，强制杀死
-    if ps -p "${PID}" > /dev/null 2>&1; then
-        echo "进程未响应，强制终止..."
-        kill -9 "${PID}" 2>/dev/null
-        sleep 1
+    # 若仍有残留，整棵树发 SIGKILL
+    if any_process_exists "${PID}"; then
+        echo "进程未完全退出，强制终止整棵进程树..."
+        kill_process_tree "${PID}" 9
+        sleep 2
     fi
     
-    # 清理PID文件
+    # 再次按脚本名清理，确保没有遗漏的 worker（如被 init 收养的孤儿进程）
+    stop_by_script_name
+    
     rm -f "${PID_FILE}"
     echo "进程已停止"
+}
+
+# 按命令行匹配脚本名清理残留进程（仅用于 stop 时的兜底）
+stop_by_script_name() {
+    local pattern="python.*${SCRIPT_NAME}"
+    local pids
+    pids=$(pgrep -f "${pattern}" 2>/dev/null)
+    if [ -n "$pids" ]; then
+        echo "清理按名称匹配的残留进程: ${pids}"
+        for p in $pids; do
+            kill_process_tree "$p" 15 2>/dev/null
+        done
+        sleep 2
+        pids=$(pgrep -f "${pattern}" 2>/dev/null)
+        if [ -n "$pids" ]; then
+            for p in $pids; do
+                kill -9 $p 2>/dev/null
+            done
+        fi
+    fi
 }
 
 # 启动进程
 start_process() {
     # 检查脚本是否存在
     if [ ! -f "${SCRIPT_PATH}" ]; then
-        echo "错误: eval_sam2actV7clearMem.py 文件不存在: ${SCRIPT_PATH}"
+        echo "错误: eval_sam2actV8.3multiprocess.py 文件不存在: ${SCRIPT_PATH}"
         exit 1
     fi
     
@@ -137,11 +188,11 @@ start_process() {
     fi
     
     # 生成日志文件名
-    LOG_FILE="${LOG_DIR}/eval_sam2actV7clearMem_$(date +%Y%m%d_%H%M%S).log"
+    LOG_FILE="${LOG_DIR}/eval_sam2actV8.3multiprocess_$(date +%Y%m%d_%H%M%S).log"
     
     # 激活conda环境并运行脚本
     echo "=========================================="
-    echo "开始运行 eval_sam2actV7clearMem.py"
+    echo "开始运行 eval_sam2actV8.3multiprocess.py"
     echo "脚本路径: ${SCRIPT_PATH}"
     echo "日志文件: ${LOG_FILE}"
     echo "Micromamba环境: ${CONDA_ENV}"
@@ -279,15 +330,15 @@ monitor_log() {
     fi
     
     # 查找最新的日志文件
-    LATEST_LOG=$(ls -t "${LOG_DIR}"/eval_sam2actV7clearMem_*.log 2>/dev/null | head -1)
+    LATEST_LOG=$(ls -t "${LOG_DIR}"/eval_sam2actV8.3multiprocess_*.log 2>/dev/null | head -1)
     
     if [ -z "${LATEST_LOG}" ]; then
-        echo "错误: 未找到 eval_sam2actV7clearMem 的日志文件"
+        echo "错误: 未找到 eval_sam2actV8.3multiprocess 的日志文件"
         exit 1
     fi
     
     echo "=========================================="
-    echo "监控 eval_sam2actV7clearMem.py 日志"
+    echo "监控 eval_sam2actV8.3multiprocess.py 日志"
     echo "进程PID: ${PID}"
     echo "日志文件: ${LATEST_LOG}"
     echo "按Ctrl+C退出监控（进程会继续运行）"
@@ -313,7 +364,7 @@ case "${1}" in
         check_status
         ;;
     restart)
-        echo "重启 eval_sam2actV7clearMem.py..."
+        echo "重启 eval_sam2actV8.3multiprocess.py..."
         stop_process
         sleep 2
         start_process "$@"
