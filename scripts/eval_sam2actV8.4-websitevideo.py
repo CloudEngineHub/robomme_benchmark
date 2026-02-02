@@ -60,6 +60,27 @@ from planner_fail_safe import (
 # 输出根目录：脚本所在目录的父目录
 OUTPUT_ROOT = Path(__file__).resolve().parents[1]
 
+# Task Suite -> 任务名（文件夹全小写）
+# Suite 1: Counting; Suite 2: Persistence; Suite 3: Reference; Suite 4: Behavior
+ENV_ID_TO_SUITE_TASK = {
+    "PickXtimes": ("counting", "pickxtimes"),
+    "BinFill": ("counting", "binfill"),
+    "SwingXtimes": ("counting", "swingxtimes"),
+    "StopCube": ("counting", "stopcube"),
+    "VideoUnmask": ("permanence", "videounmask"),
+    "ButtonUnmask": ("permanence", "buttonunmask"),
+    "VideoUnmaskSwap": ("permanence", "videounmaskswap"),
+    "ButtonUnmaskSwap": ("permanence", "buttonunmaskswap"),
+    "PickHighlight": ("reference", "pickhighlight"),
+    "VideoRepick": ("reference", "videorepick"),
+    "VideoPlaceButton": ("reference", "videoplacebutton"),
+    "VideoPlaceOrder": ("reference", "videoplaceorder"),
+    "MoveCube": ("imitation", "movecube"),
+    "InsertPeg": ("imitation", "insertpeg"),
+    "PatternLock": ("imitation", "drawpattern"),
+    "RouteStick": ("imitation", "routestick"),
+}
+
 
 class CustomDemonstrationWrapper(DemonstrationWrapper):
     def __init__(self, env, max_steps_without_demonstration, gui_render, save_video=False, env_id="unknown"):
@@ -76,17 +97,12 @@ class CustomDemonstrationWrapper(DemonstrationWrapper):
         return obs, info
 
     def close(self):
-        # 自定义视频保存逻辑：ep{episode_id}_{difficulty}_{language_goal}_{success/fail/timeout}
+        # 自定义视频保存逻辑：真实路径 video/sim/<suite>/<task>/ep{N}_sam2act.mp4（所有 suite 均在此路径下）
         if self.save_video and len(self.video_frames) > 0:
-            videos_dir = Path("/data/hongzefu/dataset_generate/replay_videos")
+            suite, task = ENV_ID_TO_SUITE_TASK.get(self.env_id, ("unknown", self.env_id.lower()))
+            videos_dir = Path("/data/hongzefu/dataset_generate") / "video" / "sim" / suite / task
             videos_dir.mkdir(parents=True, exist_ok=True)
-
-            # Sanitize language goal
-            sanitized_goal = self.episode_language_goal.replace(" ", "_").replace("/", "_") if self.episode_language_goal else "no_goal"
-
-            # 新的文件名格式：env_id 放最前面
-            difficulty_str = self.episode_difficulty if self.episode_difficulty else "unknown"
-            video_path = videos_dir / f"{self.env_id}_ep{self.episode_id}_{difficulty_str}_{self.episode_status}_{sanitized_goal}.mp4"
+            video_path = videos_dir / f"ep{self.episode_id + 1}_sam2act.mp4"
 
             try:
                 with imageio.get_writer(video_path.as_posix(), fps=30, codec="libx264", quality=8) as writer:
@@ -280,10 +296,31 @@ def read_metadata(metadata_path):
         return episode_records
 
 
-def evaluate_single_episode(episode_record, env_id, api_url_queue, max_steps, metadata_path, gpu_id=0):
+def _append_result_to_jsonl(jsonl_path, env_id, episode_0based, status, taskgoal, seed):
+    """单条结果实时追加到 jsonl 并 flush。episode_0based 为 0-based，写入时转为 1-based。"""
+    if jsonl_path is None:
+        return
+    path = Path(jsonl_path)
+    line = {
+        "envid": env_id,
+        "episode": (episode_0based + 1) if episode_0based is not None else None,
+        "status": status,
+        "taskgoal": taskgoal or "",
+        "seed": seed,
+    }
+    try:
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(line, ensure_ascii=False) + "\n")
+            f.flush()
+    except Exception as e:
+        print(f"[{env_id}] Failed to append jsonl: {e}")
+
+
+def evaluate_single_episode(episode_record, env_id, api_url_queue, max_steps, metadata_path, gpu_id=0, jsonl_path=None):
     """
     评估单个Episode。
     gpu_id: 本进程使用的 GPU 编号（0 或 1），用于交替使用 GPU 0/1。
+    jsonl_path: 结果 jsonl 路径，每完成一条即追加并 flush（实时写入）。
     """
     # 在进程内尽早限制可见 GPU，实现 GPU 0/1 交替运行
     os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu_id)
@@ -294,7 +331,8 @@ def evaluate_single_episode(episode_record, env_id, api_url_queue, max_steps, me
 
         # 从episode记录中提取信息
         episode = episode_record['episode']  # episode编号
-        seed = episode_record.get('seed')  # 随机种子（可选）
+        record_seed = episode_record.get('seed')  # 随机种子（用于 jsonl 记录，勿覆盖）
+        seed = record_seed
         difficulty = episode_record.get('difficulty')  # 难度等级（可选）
 
         print(f"[{env_id}] --- Running simulation for episode:{episode}, seed: {seed}, difficulty: {difficulty} with API: {api_url} [GPU {gpu_id}] ---")
@@ -463,8 +501,8 @@ def evaluate_single_episode(episode_record, env_id, api_url_queue, max_steps, me
             'actions': env.actions,
             'states': env.states,
             'velocity': env.velocity,
-            'subgoal': env.subgoal,
-            'subgoal_grounded': env.subgoal_grounded,
+            'subgoal_history': env.subgoal,
+            'subgoal_grounded_history': env.subgoal_grounded,
             'language goal': language_goal_demo,
         }
         
@@ -567,13 +605,17 @@ def evaluate_single_episode(episode_record, env_id, api_url_queue, max_steps, me
         
         env.close()
         print(f"[{env_id}] --- Finished Running simulation for episode:{episode} ---")
-        return {"env_id": env_id, "episode": episode, "status": "completed"}
-        
+        taskgoal = getattr(env, "episode_language_goal", None) or lang_goal
+        _append_result_to_jsonl(jsonl_path, env_id, episode, env.episode_status, taskgoal, record_seed)
+        return {"env_id": env_id, "episode": episode, "status": env.episode_status, "taskgoal": taskgoal, "seed": record_seed}
+
     except Exception as e:
         print(f"[{env_id}] Error in evaluate_single_episode {episode_record.get('episode')}: {e}")
         import traceback
         traceback.print_exc()
-        return {"env_id": env_id, "episode": episode_record.get('episode'), "status": "failed", "error": str(e)}
+        ep = episode_record.get('episode')
+        _append_result_to_jsonl(jsonl_path, env_id, ep, "failed", "", episode_record.get('seed'))
+        return {"env_id": env_id, "episode": ep, "status": "failed", "taskgoal": "", "seed": episode_record.get('seed'), "error": str(e)}
         
     finally:
         # 归还API URL
@@ -581,9 +623,36 @@ def evaluate_single_episode(episode_record, env_id, api_url_queue, max_steps, me
             api_url_queue.put(api_url)
 
 
-def process_env_parallel(env_id, api_url_queue, max_steps, dataset_root, max_episodes_per_env):
+def generate_fail_video_list(jsonl_path):
     """
-    并行处理单个环境的所有episodes
+    从 eval_results.jsonl 生成仅包含非 success 的 video 路径列表，均标为 false (fail)。
+    返回格式: {"video/sim/<suite>/<task>/ep<N>_sam2act.mp4": false, ...}
+    """
+    out = {}
+    path = Path(jsonl_path)
+    if not path.exists():
+        print(f"eval_results not found: {path}")
+        return out
+    with open(path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            rec = json.loads(line)
+            if rec.get("status") == "success":
+                continue
+            envid = rec.get("envid", "")
+            episode = rec.get("episode")
+            if envid and episode is not None:
+                suite, task = ENV_ID_TO_SUITE_TASK.get(envid, ("unknown", envid.lower()))
+                key = f"video/sim/{suite}/{task}/ep{episode}_sam2act.mp4"
+                out[key] = False
+    return out
+
+
+def process_env_parallel(env_id, api_url_queue, max_steps, dataset_root, max_episodes_per_env, jsonl_path):
+    """
+    并行处理单个环境的所有episodes；每完成一个 episode 即向全局 jsonl 追加一行。
     """
     print(f"[{env_id}] Starting parallel evaluation...")
     
@@ -612,7 +681,7 @@ def process_env_parallel(env_id, api_url_queue, max_steps, dataset_root, max_epi
             gpu_id = idx % 2  # GPU 0 与 GPU 1 交替
             future = executor.submit(
                 evaluate_single_episode,
-                record, env_id, api_url_queue, max_steps, metadata_path, gpu_id,
+                record, env_id, api_url_queue, max_steps, metadata_path, gpu_id, str(jsonl_path),
             )
             futures.append(future)
             
@@ -620,9 +689,10 @@ def process_env_parallel(env_id, api_url_queue, max_steps, dataset_root, max_epi
             try:
                 res = future.result()
                 results.append(res)
+                # jsonl 已由 worker 内 _append_result_to_jsonl 实时写入，此处仅收集 result
             except Exception as e:
                 print(f"[{env_id}] Exception in worker: {e}")
-                
+
     return {"env_id": env_id, "status": "completed", "episodes_processed": len(results)}
 
 
@@ -636,8 +706,22 @@ def main():
     parser.add_argument('--num_ports', type=int, default=8, help='Number of API ports available')
     parser.add_argument('--max_steps', type=int, default=40, help='Max steps per episode')
     parser.add_argument('--max_episodes_per_env', type=int, default=10, help='Max number of episodes to run per environment')
+    parser.add_argument('--gen_fail_list', action='store_true', help='Only read eval_results.jsonl and print fail video list (default: run full evaluation: generate video + save jsonl)')
+    parser.add_argument('--eval_jsonl', type=str, default='/data/hongzefu/dataset_generate/eval_results.jsonl', help='Path to eval_results.jsonl (used when writing results or with --gen_fail_list)')
     args = parser.parse_args()
     
+    if args.gen_fail_list:
+        # 仅从已有 eval_results.jsonl 生成失败视频列表，不跑评估、不生成视频
+        jsonl_path = Path(args.eval_jsonl)
+        d = generate_fail_video_list(jsonl_path)
+        fail_list_path = jsonl_path.parent / "fail_list.json"
+        with open(fail_list_path, "w", encoding="utf-8") as f:
+            json.dump(d, f, ensure_ascii=False, indent=2)
+        print(f"Fail list saved to {fail_list_path} ({len(d)} failed videos)")
+        print(json.dumps(d, indent=4, ensure_ascii=False))
+        return
+
+    # 以下为完整评估：会生成视频并追加写入 jsonl
     base_url = args.base_url
     if base_url.endswith('/'):
         base_url = base_url[:-1]
@@ -681,13 +765,22 @@ def main():
     ]
     
  
-    dataset_root = Path("/data/hongzefu/historybench-v5.7.6-sam2act7-full-dataset2-annotate/dataset_json")
-    
+    dataset_root = Path("/data/hongzefu/historybench-final-sam2act-dataGen-eval/dataset_json")
+    jsonl_path = Path(args.eval_jsonl)
+    jsonl_path.parent.mkdir(parents=True, exist_ok=True)
+    jsonl_path.write_text("")  # 每次运行覆盖，全局一个 jsonl
+
     # 顺序处理每个环境
     for env_id in env_id_list:
         print(f"\n[Main] Processing environment: {env_id}")
-        process_env_parallel(env_id, api_url_queue, max_steps, dataset_root, max_episodes_per_env)
+        process_env_parallel(env_id, api_url_queue, max_steps, dataset_root, max_episodes_per_env, jsonl_path)
         
+    # 评估结束后自动生成失败列表并写入单个 JSON dict
+    fail_list = generate_fail_video_list(jsonl_path)
+    fail_list_path = jsonl_path.parent / "fail_list.json"
+    with open(fail_list_path, "w", encoding="utf-8") as f:
+        json.dump(fail_list, f, ensure_ascii=False, indent=2)
+    print(f"\n[Main] Fail list saved to {fail_list_path} ({len(fail_list)} failed videos)")
     print("\n[Main] All evaluations completed!")
 
 

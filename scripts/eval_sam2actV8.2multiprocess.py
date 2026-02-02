@@ -433,8 +433,8 @@ def evaluate_environment(env_id, api_url, max_steps, dataset_root):
                 'actions': env.actions,
                 'states': env.states,
                 'velocity': env.velocity,
-                'subgoal': env.subgoal,
-                'subgoal_grounded': env.subgoal_grounded,
+                'subgoal_history': env.subgoal,
+                'subgoal_grounded_history': env.subgoal_grounded,
                 'language goal': language_goal_demo,
             }
             

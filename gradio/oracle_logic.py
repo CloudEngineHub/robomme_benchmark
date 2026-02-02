@@ -211,7 +211,7 @@ class OracleSession:
         )
 
         try:
-            self.env, episode_dataset, seed, difficulty = resolver.make_env_for_episode(episode_idx)
+            self.env, seed, difficulty = resolver.make_env_for_episode(episode_idx)
             self.env.reset()
             self.env_id = env_id
             self.episode_idx = episode_idx

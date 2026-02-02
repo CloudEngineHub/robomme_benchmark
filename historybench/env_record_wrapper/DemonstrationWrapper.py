@@ -39,145 +39,6 @@ from ..HistoryBench_env.util import task_goal
 from ..HistoryBench_env.util import reset_panda
 
 
-def load_episode_metadata(metadata_path: Union[str, Path, None]) -> Dict[Tuple[str, int], Dict[str, object]]:
-    """
-    从 JSON 文件读取每集的元数据（metadata）；如果缺失或无效则返回空字典。
-    用于恢复特定 episode 的配置（如 seed、难度等）。
-    """
-
-    metadata_index: Dict[Tuple[str, int], Dict[str, object]] = {}
-    if not metadata_path:
-        return metadata_index
-
-    path = Path(metadata_path)
-    if not path.exists():
-        print(f"Metadata file not found, skipping: {path}")
-        return metadata_index
-
-    try:
-        with path.open("r", encoding="utf-8") as handle:
-            payload = json.load(handle)
-    except Exception as exc:  # pragma: no cover - informational logging only
-        print(f"Failed to read metadata {path}: {exc}")
-        return metadata_index
-
-    default_task = str(payload.get("env_id") or "").strip()
-    for record in payload.get("records", []):
-        task_name = str(record.get("task") or default_task or "").strip()
-        episode = record.get("episode")
-        if not task_name or episode is None:
-            continue
-        try:
-            episode_idx = int(episode)
-        except (TypeError, ValueError):
-            continue
-        metadata_index[(task_name, episode_idx)] = record
-
-    if metadata_index:
-        print(f"Loaded {len(metadata_index)} metadata records from {path}")
-    else:
-        print(f"No valid metadata entries found in {path}")
-    return metadata_index
-
-
-def get_episode_metadata(
-    metadata_index: Dict[Tuple[str, int], Dict[str, object]],
-    task: str,
-    episode: int,
-) -> Optional[Dict[str, object]]:
-    """查找特定 (task, episode) 配对的元数据条目。"""
-
-    if not metadata_index:
-        return None
-    return metadata_index.get((task, episode))
-
-
-class EpisodeConfigResolver:
-    """
-    Episode 配置解析器。
-    
-    辅助类，用于解析每个 episode 的种子（seed）和难度（difficulty），并构建包装好的环境。
-    数据来源可以是已有的 HDF5 数据集，也可以是元数据文件。
-    """
-
-    def __init__(
-        self,
-        env_id: str,
-        dataset: Optional[h5py.File],
-        metadata_path: Union[str, Path, None],
-        render_mode: str,
-        gui_render: bool,
-        max_steps_without_demonstration: int,
-        save_video: bool = False,
-    ):
-        self.env_id = env_id
-        self.render_mode = render_mode
-        self.gui_render = gui_render
-        self.max_steps_without_demonstration = max_steps_without_demonstration
-        self.save_video = save_video
-        self.metadata_index = load_episode_metadata(metadata_path)
-
-        self.env_dataset = None
-        if dataset is not None:
-            env_group = f"env_{env_id}"
-            if env_group not in dataset:
-                raise KeyError(f"Dataset missing group '{env_group}'")
-            self.env_dataset = dataset[env_group]
-
-    def resolve_episode(self, episode: int):
-        """根据 dataset 或 metadata 解析 episode 的配置。"""
-        episode_dataset = None
-        seed = None
-        difficulty_hint = None
-
-        if self.env_dataset is not None:
-            episode_key = f"episode_{episode}"
-            if episode_key not in self.env_dataset:
-                raise KeyError(f"No data for episode {episode} in env_{self.env_id}")
-
-            episode_dataset = self.env_dataset[episode_key]
-            seed = int(episode_dataset["setup"]["seed"][()])
-
-        metadata = get_episode_metadata(self.metadata_index, self.env_id, episode)
-        if metadata:
-            metadata_seed = metadata.get("seed")
-            if metadata_seed is not None:
-                try:
-                    seed = int(metadata_seed)
-                except (TypeError, ValueError):
-                    print(f"[{self.env_id}] Invalid metadata seed for episode {episode}: {metadata_seed}")
-            difficulty_hint = metadata.get("difficulty")
-
-        return seed, difficulty_hint, episode_dataset
-
-    def make_env_for_episode(self, episode: int):
-        """为特定 episode 创建并配置环境。"""
-        seed, difficulty_hint, episode_dataset = self.resolve_episode(episode)
-        env_kwargs = dict(
-            obs_mode="rgb+depth+segmentation",
-            control_mode="pd_joint_pos",
-            render_mode=self.render_mode,
-            reward_mode="dense",
-            max_episode_steps=99999,
-        )
-        if seed is not None:
-            env_kwargs["HistoryBench_seed"] = seed
-        if difficulty_hint:
-            env_kwargs["HistoryBench_difficulty"] = difficulty_hint
-        seed_desc = seed if seed is not None else "default"
-        difficulty_str = f", difficulty={difficulty_hint}" if difficulty_hint else ""
-        print(f"[{self.env_id}] Episode {episode}: seed={seed_desc}{difficulty_str}")
-
-        env = gym.make(self.env_id, **env_kwargs)
-        env = DemonstrationWrapper(
-            env,
-            max_steps_without_demonstration=self.max_steps_without_demonstration,
-            gui_render=self.gui_render,
-            save_video=self.save_video,
-        )
-        return env, episode_dataset, seed, difficulty_hint
-
-
 class DemonstrationWrapper(gym.Wrapper):
     """
     Demonstration 包装器。
@@ -261,11 +122,29 @@ class DemonstrationWrapper(gym.Wrapper):
         )
 
         obs, _, _, _, info = self.step(action)
-
+        obs, info = self._augment_obs_and_info(obs, info)
         return obs, info
 
+    def _augment_obs_and_info(self, obs, info):
+        """Augment obs and info with demonstration data (frames, actions, states, subgoal, etc.)."""
+        language_goal = task_goal.get_language_goal(self.env, self.unwrapped.spec.id)
+        new_obs = {
+            **obs,
+            'frames': list(self.frames),
+            'wrist_frames': list(self.wrist_frames),
+            'actions': list(self.actions),
+            'states': list(self.states),
+            'velocity': list(self.velocity),
+            'language_goal': language_goal,
+        }
+        new_info = {
+            **info,
+            'subgoal_history': list(self.subgoal),
+            'subgoal_grounded_history': list(self.subgoal_grounded),
+        }
+        return new_obs, new_info
 
-    def _add_red_border(self, frame, border_width=10):
+    def _add_red_border(self, frame, border_width=5):
         frame_with_border = frame.copy()
         frame_with_border[:border_width, :] = [255, 0, 0]
         frame_with_border[-border_width:, :] = [255, 0, 0]
@@ -474,13 +353,11 @@ class DemonstrationWrapper(gym.Wrapper):
             self.subgoal.append(subgoal_text)
             self.subgoal_grounded.append(grounded_subgoal)
 
-            # 与 RecordWrapper 保持一致的视频帧组合（base | wrist | segmentation | filtered | base+dot）
+            # 视频帧：直接使用 base | wrist 左右拼接；demonstration 时加红框 thickness=10
             if self.save_video:
                 is_demonstration = getattr(self, 'current_task_demonstration', False)
                 base_frame_video = copy.deepcopy(image)
                 wrist_frame_video = copy.deepcopy(wrist_image)
-                segmentation_for_video = copy.deepcopy(segmentation) if segmentation is not None else np.zeros(base_frame_video.shape[:2], dtype=np.int32)
-                segmentation_result_for_video = copy.deepcopy(segmentation_result) if segmentation_result is not None else np.zeros(base_frame_video.shape[:2], dtype=np.int32)
 
                 if base_frame_video.shape[:2] != wrist_frame_video.shape[:2]:
                     wrist_frame_video = cv2.resize(
@@ -489,56 +366,9 @@ class DemonstrationWrapper(gym.Wrapper):
                         interpolation=cv2.INTER_LINEAR,
                     )
 
-                seg_2d = segmentation_for_video.squeeze() if segmentation_for_video.ndim > 2 else segmentation_for_video
-                seg_result_2d = segmentation_result_for_video.squeeze() if segmentation_result_for_video.ndim > 2 else segmentation_result_for_video
-
-                segmentation_vis = np.zeros((*seg_2d.shape, 3), dtype=np.uint8)
-                segmentation_result_vis = np.zeros((*seg_result_2d.shape, 3), dtype=np.uint8)
-
-                for seg_id in np.unique(seg_2d):
-                    if seg_id > 0:
-                        mask = seg_2d == seg_id
-                        segmentation_vis[mask] = self.color_map.get(seg_id, [255, 255, 255])
-
-                for seg_id in np.unique(seg_result_2d):
-                    if seg_id > 0:
-                        mask = seg_result_2d == seg_id
-                        segmentation_result_vis[mask] = self.color_map.get(seg_id, [255, 255, 255])
-
-                if segmentation_vis.shape[:2] != base_frame_video.shape[:2]:
-                    segmentation_vis = cv2.resize(
-                        segmentation_vis,
-                        (base_frame_video.shape[1], base_frame_video.shape[0]),
-                        interpolation=cv2.INTER_NEAREST,
-                    )
-
-                if segmentation_result_vis.shape[:2] != base_frame_video.shape[:2]:
-                    segmentation_result_vis = cv2.resize(
-                        segmentation_result_vis,
-                        (base_frame_video.shape[1], base_frame_video.shape[0]),
-                        interpolation=cv2.INTER_NEAREST,
-                    )
-
-                target_frame = copy.deepcopy(base_frame_video)
-                if self.segmentation_points:
-                    for center_y, center_x in self.segmentation_points:
-                        cv2.circle(target_frame, (center_x, center_y), 5, (255, 0, 0), -1)
-
-                combined = np.hstack([
-                    base_frame_video,
-                    wrist_frame_video,
-                    segmentation_vis,
-                    segmentation_result_vis,
-                    target_frame,
-                ])
-
+                combined = np.hstack([base_frame_video, wrist_frame_video])
                 if is_demonstration:
-                    combined = self._add_red_border(combined)
-                combined = self._add_text_to_frame(
-                    combined,
-                    [language_goal, subgoal_text, grounded_subgoal],
-                    position='top_right',
-                )
+                    combined = self._add_red_border(combined, border_width=5)
                 self.video_frames.append(combined)
                 # if self.no_object_flag:
                 #     self.no_object_video_frames.append(combined)
@@ -573,6 +403,7 @@ class DemonstrationWrapper(gym.Wrapper):
             finally:
                 self._doing_extra_step = False
 
+        obs, info = self._augment_obs_and_info(obs, info)
         return obs, reward, terminated, truncated, info
 
     def close(self):
@@ -701,7 +532,7 @@ class DemonstrationWrapper(gym.Wrapper):
             'actions': self.actions,
             'states': self.states,
             'velocity':self.velocity,
-            'subgoal':self.subgoal,
-            'subgoal_grounded': self.subgoal_grounded,  # 所有步骤《》占位符填充为坐标后的文本序列
+            'subgoal_history':self.subgoal,
+            'subgoal_grounded_history': self.subgoal_grounded,  # 所有步骤《》占位符填充为坐标后的文本序列
             'language goal':language_goal,
         }

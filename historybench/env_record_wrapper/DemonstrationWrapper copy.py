@@ -265,7 +265,7 @@ class DemonstrationWrapper(gym.Wrapper):
         return obs, info
 
 
-    def _add_red_border(self, frame, border_width=10):
+    def _add_red_border(self, frame, border_width=5):
         frame_with_border = frame.copy()
         frame_with_border[:border_width, :] = [255, 0, 0]
         frame_with_border[-border_width:, :] = [255, 0, 0]
@@ -474,13 +474,11 @@ class DemonstrationWrapper(gym.Wrapper):
             self.subgoal.append(subgoal_text)
             self.subgoal_grounded.append(grounded_subgoal)
 
-            # 与 RecordWrapper 保持一致的视频帧组合（base | wrist | segmentation | filtered | base+dot）
+            # 视频帧：直接使用 base | wrist 左右拼接；demonstration 时加红框 thickness=10
             if self.save_video:
                 is_demonstration = getattr(self, 'current_task_demonstration', False)
                 base_frame_video = copy.deepcopy(image)
                 wrist_frame_video = copy.deepcopy(wrist_image)
-                segmentation_for_video = copy.deepcopy(segmentation) if segmentation is not None else np.zeros(base_frame_video.shape[:2], dtype=np.int32)
-                segmentation_result_for_video = copy.deepcopy(segmentation_result) if segmentation_result is not None else np.zeros(base_frame_video.shape[:2], dtype=np.int32)
 
                 if base_frame_video.shape[:2] != wrist_frame_video.shape[:2]:
                     wrist_frame_video = cv2.resize(
@@ -489,56 +487,9 @@ class DemonstrationWrapper(gym.Wrapper):
                         interpolation=cv2.INTER_LINEAR,
                     )
 
-                seg_2d = segmentation_for_video.squeeze() if segmentation_for_video.ndim > 2 else segmentation_for_video
-                seg_result_2d = segmentation_result_for_video.squeeze() if segmentation_result_for_video.ndim > 2 else segmentation_result_for_video
-
-                segmentation_vis = np.zeros((*seg_2d.shape, 3), dtype=np.uint8)
-                segmentation_result_vis = np.zeros((*seg_result_2d.shape, 3), dtype=np.uint8)
-
-                for seg_id in np.unique(seg_2d):
-                    if seg_id > 0:
-                        mask = seg_2d == seg_id
-                        segmentation_vis[mask] = self.color_map.get(seg_id, [255, 255, 255])
-
-                for seg_id in np.unique(seg_result_2d):
-                    if seg_id > 0:
-                        mask = seg_result_2d == seg_id
-                        segmentation_result_vis[mask] = self.color_map.get(seg_id, [255, 255, 255])
-
-                if segmentation_vis.shape[:2] != base_frame_video.shape[:2]:
-                    segmentation_vis = cv2.resize(
-                        segmentation_vis,
-                        (base_frame_video.shape[1], base_frame_video.shape[0]),
-                        interpolation=cv2.INTER_NEAREST,
-                    )
-
-                if segmentation_result_vis.shape[:2] != base_frame_video.shape[:2]:
-                    segmentation_result_vis = cv2.resize(
-                        segmentation_result_vis,
-                        (base_frame_video.shape[1], base_frame_video.shape[0]),
-                        interpolation=cv2.INTER_NEAREST,
-                    )
-
-                target_frame = copy.deepcopy(base_frame_video)
-                if self.segmentation_points:
-                    for center_y, center_x in self.segmentation_points:
-                        cv2.circle(target_frame, (center_x, center_y), 5, (255, 0, 0), -1)
-
-                combined = np.hstack([
-                    base_frame_video,
-                    wrist_frame_video,
-                    segmentation_vis,
-                    segmentation_result_vis,
-                    target_frame,
-                ])
-
+                combined = np.hstack([base_frame_video, wrist_frame_video])
                 if is_demonstration:
-                    combined = self._add_red_border(combined)
-                combined = self._add_text_to_frame(
-                    combined,
-                    [language_goal, subgoal_text, grounded_subgoal],
-                    position='top_right',
-                )
+                    combined = self._add_red_border(combined, border_width=5)
                 self.video_frames.append(combined)
                 # if self.no_object_flag:
                 #     self.no_object_video_frames.append(combined)

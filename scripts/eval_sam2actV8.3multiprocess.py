@@ -463,8 +463,8 @@ def evaluate_single_episode(episode_record, env_id, api_url_queue, max_steps, me
             'actions': env.actions,
             'states': env.states,
             'velocity': env.velocity,
-            'subgoal': env.subgoal,
-            'subgoal_grounded': env.subgoal_grounded,
+            'subgoal_history': env.subgoal,
+            'subgoal_grounded_history': env.subgoal_grounded,
             'language goal': language_goal_demo,
         }
         

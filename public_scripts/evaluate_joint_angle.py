@@ -25,6 +25,7 @@ import imageio
 import h5py
 
 import re
+from PIL import Image
 
 
 def main():
@@ -39,8 +40,8 @@ def main():
 
 
     env_id_list = [
-        # "VideoRepick",
-        "BinFill",
+        "VideoRepick",
+        #"BinFill",
         # "ButtonUnmask",
         # "ButtonUnmaskSwap",
 
@@ -73,7 +74,6 @@ def main():
 
         resolver = EpisodeConfigResolver(
             env_id=env_id,
-            dataset=None,
             metadata_path=metadata_path,
             render_mode=render_mode,
             gui_render=gui_render,
@@ -82,20 +82,29 @@ def main():
 
         for episode in range(num_episodes):
             episode=98
-            env, episode_dataset, seed, difficulty = resolver.make_env_for_episode(episode)
+            env, seed, difficulty = resolver.make_env_for_episode(episode)
            
-            env.reset()
+            obs, info = env.reset()
 
-            # Demonstration data is now automatically generated in reset()
-            demonstration_data = env.demonstration_data
-            frames = demonstration_data.get('frames', []) if demonstration_data else []
-            wrist_frames = demonstration_data.get('wrist_frames', []) if demonstration_data else []
-            actions= demonstration_data.get('actions', []) if demonstration_data else []
-            states = demonstration_data.get('states', []) if demonstration_data else []
-            velocity = demonstration_data.get('velocity', []) if demonstration_data else []
-            subgoal = demonstration_data.get('subgoal_history', []) if demonstration_data else []
-            subgoal_grounded = demonstration_data.get('subgoal_grounded_history', []) if demonstration_data else []
-            language_goal = demonstration_data.get('language goal') if demonstration_data else None
+            # 从 obs 读取
+            frames = obs.get('frames', []) if obs else []
+            wrist_frames = obs.get('wrist_frames', []) if obs else []
+            actions = obs.get('actions', []) if obs else []
+            states = obs.get('states', []) if obs else []
+            velocity = obs.get('velocity', []) if obs else []
+            language_goal = obs.get('language_goal') if obs else None
+
+            # 从 info 读取
+            subgoal = info.get('subgoal_history', []) if info else []
+            subgoal_grounded = info.get('subgoal_grounded_history', []) if info else []
+
+
+            #保存最后一张frame和wrist_frame 左右拼接成一张图片
+            image = np.concatenate([frames[-1], wrist_frames[-1]], axis=1)
+            image = Image.fromarray(image)
+            image.save(f"last_frame_{env_id}_{episode}.png")
+
+
 
 
             while True:
@@ -103,17 +112,20 @@ def main():
             
                 action = None
 
-                action=np.array([0.0, 0.0, 0.0, 0.0, 0.0,0.0,0.0,-1.0])
+                action=np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0])
 
                 obs, reward, terminated, truncated, info = env.step(action)
-                
 
-                image=env.frames[-1]
-                wrist_image=env.wrist_frames[-1]
-                last_action=env.actions[-1]
-                state=env.states[-1]
-                velocity=env.velocity[-1]
-                subgoal_grounded=env.subgoal_grounded[-1]
+                # 从 obs 读取
+                image = obs.get('frames', [])[-1] if obs.get('frames') else None
+                wrist_image = obs.get('wrist_frames', [])[-1] if obs.get('wrist_frames') else None
+                last_action = obs.get('actions', [])[-1] if obs.get('actions') else None
+                state = obs.get('states', [])[-1] if obs.get('states') else None
+                velocity = obs.get('velocity', [])[-1] if obs.get('velocity') else None
+                language_goal = obs.get('language_goal') if obs else None
+                # 从 info 读取
+                subgoal = info.get('subgoal_history', []) if info else []
+                subgoal_grounded = info.get('subgoal_grounded_history', []) if info else []
 
 
                 if info["success"] == torch.tensor([True]):
