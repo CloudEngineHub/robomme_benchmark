@@ -2,7 +2,7 @@
 DemonstrationWrapper：在 HistoryBench 环境外再包一层，用于自动生成演示轨迹并记录帧/动作/状态/子目标等。
 
 - reset 后调用 get_demonstration_trajectory()，用 Motion Planner 执行带 demonstration 标记的任务并记录轨迹。
-- step 中根据 action_space 做 ee_pose→关节映射、分割与子目标占位符填充、轨迹记录、truncate 与成功判断。
+- step 接收关节空间动作，做分割与子目标占位符填充、轨迹记录、truncate 与成功判断。ee_pose→关节 由外层 EndeffectorDemonstrationWrapper 负责。
 - 不包含视频保存功能；obs/info 通过 _augment_obs_and_info 注入演示数据。
 """
 import copy
@@ -50,19 +50,13 @@ class DemonstrationWrapper(gym.Wrapper):
     1. 在环境 reset 后自动生成演示轨迹（Trajectory），使用 Motion Planner。
     2. 记录演示过程中的帧、动作、状态、子目标等数据，供下游任务使用。
     """
-    def __init__(self, env, max_steps_without_demonstration, gui_render, action_space=None, **kwargs):
-        # **kwargs 兼容旧调用（如 save_video=...），已不再使用
+    def __init__(self, env, max_steps_without_demonstration, gui_render, **kwargs):
+        # **kwargs 兼容旧调用（如 save_video=..., action_space=...），已不再使用
         # 无演示步数上限：超过此步数未执行演示任务则 truncate episode
         self.max_steps_without_demonstration = max_steps_without_demonstration
         self.gui_render = gui_render
-        # 末端执行器位姿模式下的运动规划器（懒初始化）
-        self._ee_pose_planner = None
-        # 上一时刻的关节动作（ee_pose 模式下仅在 IK 成功时更新）
-        self._last_joint_action = None
 
-        # 先初始化父类，确保 self.env 存在（父类会设置 self._action_space = None，故用独立属性存 ee_pose 模式）
         super().__init__(env)
-        self._action_space_mode = action_space
         self.unwrapped.use_demonstrationwrapper = True
 
         # 演示轨迹缓冲区：每步记录的观测与动作
@@ -108,9 +102,6 @@ class DemonstrationWrapper(gym.Wrapper):
 
     def reset(self, **kwargs):
         """重置环境并生成演示轨迹，再执行一步初始动作后返回增强后的 obs 与 info。"""
-        if getattr(self, "_action_space_mode", None) == "ee_pose":
-            self._last_joint_action = None
-        
         # Reset latching state
         self.last_subgoal_segment = None
         self.latched_replacements = None
@@ -132,26 +123,26 @@ class DemonstrationWrapper(gym.Wrapper):
             action = reset_panda.get_reset_panda_param("action", gripper=gripper)
 
         # 执行一步初始动作，使观测与记录与演示阶段对齐
-        obs, _, _, _, info = self.step(action, override_jointAngle=True)
+        obs, _, _, _, info = self.step(action)
         obs, info = self._augment_obs_and_info(obs, info)
         return obs, info
 
     def _augment_obs_and_info(self, obs, info):
-        """将演示轨迹数据（帧、动作、状态、速度、子目标历史等）合并进 obs 和 info 后返回。"""
+        """将演示轨迹数据（帧、动作、状态、速度、子目标历史等）合并进 obs 和 info 后返回。只取各 list 的最后一个，仍以 list 形式给出。"""
         language_goal = task_goal.get_language_goal(self.env, self.unwrapped.spec.id)
         new_obs = {
             **obs,
-            'frames': list(self.frames),
-            'wrist_frames': list(self.wrist_frames),
-            'actions': list(self.actions),
-            'states': list(self.states),
-            'velocity': list(self.velocity),
+            'frames': [self.frames[-1]],
+            'wrist_frames': [self.wrist_frames[-1]],
+            'actions': [self.actions[-1]],
+            'states': [self.states[-1]],
+            'velocity': [self.velocity[-1]],
             'language_goal': language_goal,
         }
         new_info = {
             **info,
-            'subgoal_history': list(self.subgoal),
-            'subgoal_grounded_history': list(self.subgoal_grounded),
+            'subgoal': [self.subgoal[-1]],
+            'subgoal_grounded': [self.subgoal_grounded[-1]],
         }
         return new_obs, new_info
 
@@ -425,48 +416,9 @@ class DemonstrationWrapper(gym.Wrapper):
             failed_match = placeholder_count > 0 and self.latched_replacements is None
             return (current_subgoal_segment, failed_match)
 
-    def step(self, action, override_jointAngle=False):
-        """执行一步：可选 ee_pose→关节映射、分割与子目标占位符填充、轨迹记录、truncate 与成功判断。"""
-        use_joint_direct = override_jointAngle or getattr(self, '_override_joint_angle', False)
-
-        # ---------- 动作空间：ee_pose 时将末端位姿+夹爪转为关节动作并执行 ----------
-        # get_demonstration_trajectory 期间 motion planner 直接调用 step 时传入的是关节空间动作，不做 ee_pose→关节 转换
-        if getattr(self, "_action_space_mode", None) == "ee_pose" and not use_joint_direct:
-            action = np.asarray(action, dtype=np.float64).flatten()
-            if action.size >= 8:
-                ee_p = action[:3]
-                ee_q = action[3:7]
-                gripper = float(action[7])
-                if self._ee_pose_planner is None:
-                    self._ee_pose_planner = PandaArmMotionPlanningSolver(
-                        self.env,
-                        debug=False,
-                        vis=False,
-                        base_pose=self.env.unwrapped.agent.robot.pose,
-                        visualize_target_grasp_pose=False,
-                        print_env_info=False,
-                    )
-                planner = self._ee_pose_planner
-                goal_world = np.concatenate([ee_p, ee_q])
-                goal_base = planner.planner.transform_goal_to_wrt_base(goal_world)
-                current_qpos = planner.robot.get_qpos().cpu().numpy()[0]
-                ik_status, ik_solutions = planner.planner.IK(goal_base, current_qpos)
-                if ik_status != "Success" or len(ik_solutions) == 0:
-                    raise RuntimeError(
-                        f"ee_pose step: IK failed (status={ik_status}, num_solutions={len(ik_solutions)}), "
-                        f"goal_base={goal_base.tolist()}, current_qpos={current_qpos.tolist()}"
-                    )
-                qpos = np.asarray(ik_solutions[0][:7], dtype=np.float64)
-                if getattr(planner, "control_mode", "pd_joint_pos") == "pd_joint_pos_vel":
-                    qvel = np.zeros_like(qpos)
-                    joint_action = np.hstack([qpos, qvel, gripper])
-                else:
-                    joint_action = np.hstack([qpos, gripper])
-                self._last_joint_action = joint_action
-                obs, reward, terminated, truncated, info = super().step(joint_action)
-
-        else:
-            obs, reward, terminated, truncated, info = super().step(action)
+    def step(self, action):
+        """执行一步：分割与子目标占位符填充、轨迹记录、truncate 与成功判断。接收关节空间动作。"""
+        obs, reward, terminated, truncated, info = super().step(action)
 
         # ---------- 子目标分割与占位符填充：内部从 obs 解析分割并计算中心、填充占位符 ----------
         filled_text, failed_match = self._compute_segmentation_and_fill_subgoal(obs)
@@ -524,8 +476,7 @@ class DemonstrationWrapper(gym.Wrapper):
                 print("Episode failed, data will be discarded")
 
         # ---------- 终止时多执行一步，使最后一帧也被记录（动作与上一步相同） ----------
-        # 演示记录期间由 motion planner 控制步进，不在此处多执行一步
-        if terminated.any() and not self._doing_extra_step and not use_joint_direct:
+        if terminated.any() and not self._doing_extra_step:
             self._doing_extra_step = True
             try:
                 self.step(action)
@@ -579,7 +530,6 @@ class DemonstrationWrapper(gym.Wrapper):
         self.non_demonstration_task_length = len(tasks) - len(demonstration_tasks)
         print(f"Non-demonstration task length: {self.non_demonstration_task_length}")
 
-        self._override_joint_angle = True
         # 依次执行每个演示任务：设 demonstration_record_traj=True，调用任务的 solve(planner)
         for idx, task_entry in enumerate(demonstration_tasks):
             self.unwrapped.demonstration_record_traj = True
@@ -596,14 +546,13 @@ class DemonstrationWrapper(gym.Wrapper):
 
         language_goal = task_goal.get_language_goal(self.env, self.env.unwrapped.spec.id)
         self.unwrapped.demonstration_record_traj = False  # 演示结束，后续 step 正常做 subgoal 判断
-        self._override_joint_angle = False
         return {
             'frames': self.frames,
             'wrist_frames': self.wrist_frames,
             'actions': self.actions,
             'states': self.states,
             'velocity': self.velocity,
-            'subgoal_history': self.subgoal,
-            'subgoal_grounded_history': self.subgoal_grounded,
+            'subgoal': self.subgoal,
+            'subgoal_grounded': self.subgoal_grounded,
             'language goal': language_goal,
         }

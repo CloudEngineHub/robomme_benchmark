@@ -105,6 +105,45 @@ class EpisodeDatasetResolver:
         )
         self._non_demo_record_steps: List[int] = []
         self._scan_cursor = 0
+        self._non_demo_keypoint_record_steps: List[int] = []
+        self._keypoint_scan_cursor = 0
+
+    def get_keypoint(self, step: int) -> Optional[np.ndarray]:
+        """
+        Return 8-d keypoint action [keypoint_p(3), keypoint_q(4), gripper(1)] for the step-th
+        non-demonstration timestep that has keypoint data (keypoint_p, keypoint_q).
+        Returns None when step is out of range or no more keypoints.
+        """
+        while step >= len(self._non_demo_keypoint_record_steps) and self._keypoint_scan_cursor < len(self._timestep_indexes):
+            record_step = self._timestep_indexes[self._keypoint_scan_cursor]
+            key = f"record_timestep_{record_step}"
+            timestep_group = self._episode_group[key]
+            is_demo = False
+            if "demonstration" in timestep_group:
+                is_demo = _as_bool(timestep_group["demonstration"][()])
+            has_keypoint = "keypoint_p" in timestep_group and "keypoint_q" in timestep_group
+            self._keypoint_scan_cursor += 1
+            if not is_demo and has_keypoint:
+                self._non_demo_keypoint_record_steps.append(record_step)
+        if step >= len(self._non_demo_keypoint_record_steps):
+            return None
+        record_step = self._non_demo_keypoint_record_steps[step]
+        key = f"record_timestep_{record_step}"
+        if key not in self._episode_group:
+            return None
+        timestep_group = self._episode_group[key]
+        p = timestep_group["keypoint_p"][()] if "keypoint_p" in timestep_group else None
+        q = timestep_group["keypoint_q"][()] if "keypoint_q" in timestep_group else None
+        if p is None or q is None:
+            return None
+        raw_action = timestep_group["action"][()] if "action" in timestep_group else None
+        action_8d = _action_to_8d(raw_action)
+        gripper = float(action_8d[-1]) if action_8d is not None and len(action_8d) > 0 else -1.0
+        return np.concatenate([
+            np.asarray(p, dtype=np.float64).flatten()[:3],
+            np.asarray(q, dtype=np.float64).flatten()[:4],
+            [gripper],
+        ]).astype(np.float64)
 
     def get_action(self, step: int) -> Optional[np.ndarray]:
         """

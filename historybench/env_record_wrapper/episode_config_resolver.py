@@ -105,7 +105,7 @@ class EpisodeConfigResolver:
         return seed, difficulty_hint
 
     def make_env_for_episode(self, episode: int):
-        """为特定 episode 创建并配置环境。当 action_space=keypoint 时自动包一层 MultiStepDemonstrationWrapper。"""
+        """为特定 episode 创建并配置环境。action_space=ee_pose 时包 EndeffectorDemonstrationWrapper，keypoint 时包 MultiStepDemonstrationWrapper。"""
         from .DemonstrationWrapper import DemonstrationWrapper
 
         seed, difficulty_hint = self.resolve_episode(episode)
@@ -129,8 +129,11 @@ class EpisodeConfigResolver:
             env,
             max_steps_without_demonstration=self.max_steps_without_demonstration,
             gui_render=self.gui_render,
-            action_space=self.action_space,
         )
+        if self.action_space == "ee_pose":
+            from .EndeffectorDemonstrationWrapper import EndeffectorDemonstrationWrapper
+
+            env = EndeffectorDemonstrationWrapper(env)
         if self.action_space == "keypoint":
             from .MultiStepDemonstrationWrapper import MultiStepDemonstrationWrapper
 

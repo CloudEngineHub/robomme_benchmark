@@ -95,8 +95,8 @@ def main():
             language_goal = obs.get('language_goal') if obs else None
 
             # 从 info 读取
-            subgoal = info.get('subgoal_history', []) if info else []
-            subgoal_grounded = info.get('subgoal_grounded_history', []) if info else []
+            subgoal = info.get('subgoal', []) if info else []
+            subgoal_grounded = info.get('subgoal_grounded', []) if info else []
 
 
             #保存最后一张frame和wrist_frame 左右拼接成一张图片
@@ -125,8 +125,8 @@ def main():
                 language_goal = obs.get('language_goal') if obs else None
 
                 # 从 info 读取
-                subgoal = info.get('subgoal_history', []) if info else []
-                subgoal_grounded = info.get('subgoal_grounded_history', []) if info else []
+                subgoal = info.get('subgoal', []) if info else []
+                subgoal_grounded = info.get('subgoal_grounded', []) if info else []
 
 
                 if info["success"] == torch.tensor([True]):

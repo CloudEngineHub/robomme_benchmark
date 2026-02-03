@@ -1,9 +1,8 @@
 import os
-
-
 import sys
 import json
 import h5py
+import imageio
 import numpy as np
 import sapien
 from pathlib import Path
@@ -13,8 +12,6 @@ _root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, _root)
 sys.path.insert(0, os.path.join(_root, "scripts"))
 import gymnasium as gym
-from gymnasium.utils.save_video import save_video
-
 from historybench.env_record_wrapper import (
     HistoryBenchRecordWrapper,
     EpisodeConfigResolver,
@@ -192,6 +189,9 @@ def main():
         # 遍历所有 episode
         for episode_record in episode_records:
 
+            if episode_record['episode'] != 0:
+                continue
+
 
             episode = episode_record['episode']
             seed = episode_record.get('seed')
@@ -220,6 +220,12 @@ def main():
             for i, task in enumerate(env.unwrapped.task_list):
                 task_name = task.get("name", "Unknown")
                 print(f"  Task {i+1}: {task_name}")
+
+            video_dir = dataset_root / "videos"
+            video_dir.mkdir(parents=True, exist_ok=True)
+            out_video_path = video_dir / f"replay_kp_{env_id}_ep{episode}.mp4"
+            fps = 20
+            writer = imageio.get_writer(str(out_video_path), fps=fps, codec="libx264", quality=8)
             
             # 执行所有 keypoint
             for idx, kp in enumerate(episode_keypoints):
@@ -243,16 +249,6 @@ def main():
 
                 try:
                     obs, reward, terminated, truncated, info = env.step(action)
-                    # 从 obs 读取
-                    image = obs.get('frames', [])[-1] if obs.get('frames') else None
-                    wrist_image = obs.get('wrist_frames', [])[-1] if obs.get('wrist_frames') else None
-                    last_action = obs.get('actions', [])[-1] if obs.get('actions') else None
-                    state = obs.get('states', [])[-1] if obs.get('states') else None
-                    velocity = obs.get('velocity', [])[-1] if obs.get('velocity') else None
-                    language_goal = obs.get('language_goal') if obs else None
-                    # 从 info 读取
-                    subgoal = info.get('subgoal_history', []) if info else []
-                    subgoal_grounded = info.get('subgoal_grounded_history', []) if info else []
 
                     # 从 obs 读取
                     frames = obs.get('frames', []) if obs else []
@@ -262,8 +258,19 @@ def main():
                     velocity = obs.get('velocity', []) if obs else []
                     language_goal = obs.get('language_goal') if obs else None
                     # 从 info 读取
-                    subgoal = info.get('subgoal_history', []) if info else []
-                    subgoal_grounded = info.get('subgoal_grounded_history', []) if info else []
+                    subgoal = info.get('subgoal', []) if info else []
+                    subgoal_grounded = info.get('subgoal_grounded', []) if info else []
+
+                    for frame in frames:
+                        writer.append_data(np.asarray(frame))
+
+                    kp_video_path = video_dir / f"replay_kp_{env_id}_ep{episode}_kp{idx}.mp4"
+                    with imageio.get_writer(str(kp_video_path), fps=fps, codec="libx264", quality=8) as writer_kp:
+                        for frame in frames:
+                            writer_kp.append_data(np.asarray(frame))
+                    print(f"Saved keypoint video: {kp_video_path}")
+
+                    print(subgoal_grounded)
 
                     if gui_render:
                         env.render()
@@ -283,15 +290,11 @@ def main():
                     print(f"    RRT plan failure for keypoint timestep {timestep}: {exc}")
                     break
 
-            
-
-
-            # 保存回放视频（frames + subgoal_grounded）
-            video_dir = dataset_root / "videos"
-            video_dir.mkdir(parents=True, exist_ok=True)
-            out_video_path = video_dir / f"replay_kp_{env_id}_ep{episode}.mp4"
-            env.save_video(str(out_video_path))
+            writer.close()
             print(f"Saved video: {out_video_path}")
+
+            env.save_video(str(out_video_path))
+            print(f"Saved video (env): {out_video_path}")
 
             # 执行完成后进行评估
             evaluation = env.unwrapped.evaluate(solve_complete_eval=True)

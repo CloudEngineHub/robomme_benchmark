@@ -91,8 +91,8 @@ def main():
             language_goal = obs.get("language_goal") if obs else None
 
             # ---------- 从 info 读取子目标等 ----------
-            subgoal = info.get("subgoal_history", []) if info else []
-            subgoal_grounded = info.get("subgoal_grounded_history", []) if info else []
+            subgoal = info.get("subgoal", []) if info else []
+            subgoal_grounded = info.get("subgoal_grounded", []) if info else []
 
 
             # ---------- 按 step 回放：action = [eep, eeq, gripper]，wrapper 内做 IK ----------
@@ -107,11 +107,12 @@ def main():
                 image = obs.get("frames", [])[-1] if obs.get("frames") else None
                 wrist_image = obs.get("wrist_frames", [])[-1] if obs.get("wrist_frames") else None
                 last_action = obs.get("actions", [])[-1] if obs.get("actions") else None
-                state = obs.get("states", [])[-1] if obs.get("states") else None
+                state = obs.get("states", [])[-1] if obs.get("states") else None·
                 velocity = obs.get("velocity", [])[-1] if obs.get("velocity") else None
                 language_goal = obs.get("language_goal") if obs else None
-                subgoal = info.get("subgoal_history", []) if info else []
-                subgoal_grounded = info.get("subgoal_grounded_history", []) if info else []
+                subgoal = info.get("subgoal", []) if info else []
+                print(subgoal)
+                subgoal_grounded = info.get("subgoal_grounded", []) if info else []
 
                 step += 1
                 if gui_render:

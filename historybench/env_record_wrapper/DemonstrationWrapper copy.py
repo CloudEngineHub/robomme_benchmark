@@ -155,8 +155,8 @@ class DemonstrationWrapper(gym.Wrapper):
         }
         new_info = {
             **info,
-            'subgoal_history': list(self.subgoal),
-            'subgoal_grounded_history': list(self.subgoal_grounded),
+            'subgoal': list(self.subgoal),
+            'subgoal_grounded': list(self.subgoal_grounded),
         }
         return new_obs, new_info
 
@@ -610,7 +610,7 @@ class DemonstrationWrapper(gym.Wrapper):
             'actions': self.actions,
             'states': self.states,
             'velocity': self.velocity,
-            'subgoal_history': self.subgoal,
-            'subgoal_grounded_history': self.subgoal_grounded,
+            'subgoal': self.subgoal,
+            'subgoal_grounded': self.subgoal_grounded,
             'language goal': language_goal,
         }

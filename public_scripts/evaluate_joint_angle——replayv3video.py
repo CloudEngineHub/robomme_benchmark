@@ -16,6 +16,7 @@ import numpy as np
 import gymnasium as gym
 import torch
 from PIL import Image
+import matplotlib.pyplot as plt
 
 from historybench.HistoryBench_env import *
 from historybench.HistoryBench_env.util import *
@@ -37,7 +38,7 @@ def main():
     从 DATASET_ROOT 读取数据集，回放所有 episode；
     每个 episode 仅回放非 demonstration 的动作（跳过 demonstration 步）。
     """
-    gui_render = False
+    gui_render = True
     max_steps = 3000
 
     render_mode = "human" if gui_render else "rgb_array"
@@ -46,7 +47,6 @@ def main():
 
     for env_id in env_id_list:
         metadata_path = f"{DATASET_ROOT}/record_dataset_{env_id}_metadata.json"
-
         config_resolver = EpisodeConfigResolver(
             env_id=env_id,
             metadata_path=metadata_path,
@@ -79,25 +79,37 @@ def main():
             language_goal = obs.get('language_goal') if obs else None
 
             # 从 info 读取
-            subgoal = info.get('subgoal_history', []) if info else []
-            subgoal_grounded = info.get('subgoal_grounded_history', []) if info else []
+            subgoal = info.get('subgoal', []) if info else []
+            subgoal_grounded = info.get('subgoal_grounded', []) if info else []
 
 
             step = 0
+            # fig = plt.figure()
+            # plt.ion()
             while True:
                 action = dataset_resolver.get_action(step)
                 obs, reward, terminated, truncated, info = env.step(action)
 
                 # 从 obs 读取
-                image = obs.get('frames', [])[-1] if obs.get('frames') else None
-                wrist_image = obs.get('wrist_frames', [])[-1] if obs.get('wrist_frames') else None
-                last_action = obs.get('actions', [])[-1] if obs.get('actions') else None
-                state = obs.get('states', [])[-1] if obs.get('states') else None
-                velocity = obs.get('velocity', [])[-1] if obs.get('velocity') else None
+                image = obs.get('frames', []) if obs.get('frames') else None
+                wrist_image = obs.get('wrist_frames', []) if obs.get('wrist_frames') else None
+                last_action = obs.get('actions', []) if obs.get('actions') else None
+                state = obs.get('states', []) if obs.get('states') else None
+                velocity = obs.get('velocity', []) if obs.get('velocity') else None
                 language_goal = obs.get('language_goal') if obs else None
                 # 从 info 读取
-                subgoal = info.get('subgoal_history', []) if info else []
-                subgoal_grounded = info.get('subgoal_grounded_history', []) if info else []
+                subgoal = info.get('subgoal', []) if info else []
+                print(subgoal)
+                subgoal_grounded = info.get('subgoal_grounded', []) if info else []
+
+                # # plot image: one figure, update in place, show 0.1s (avoids X11 BadWindow)
+                # plt.figure(fig.number)
+                # plt.clf()
+                # plt.imshow(image[0])
+                # plt.pause(0.1)
+  
+
+
 
                 step += 1
                 if gui_render:
@@ -115,7 +127,6 @@ def main():
                     break
 
 
-            
             out_video_path = os.path.join(DATASET_ROOT, "videos", f"replay_{env_id}_ep{episode}.mp4")
             env.save_video(out_video_path)
             print(f"Saved video: {out_video_path}")
