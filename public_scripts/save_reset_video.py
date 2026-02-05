@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
-# Shared utilities for saving reset-phase (demonstration) videos with captions.
+# 用于保存 reset 阶段（演示阶段）带字幕视频的公共工具。
 
 import os
-from typing import List, Any, Optional
+from typing import Dict, List, Any
 
 import numpy as np
 import cv2
@@ -16,7 +16,7 @@ def add_text_to_frame(
     text: Any,
     text_area_height: int = TEXT_AREA_HEIGHT,
 ) -> np.ndarray:
-    """Overlay caption on top of frame (black bar + text), same style as DemonstrationWrapper.save_video."""
+    """在帧顶部叠加字幕（黑底+白字），样式与 DemonstrationWrapper.save_video 一致。"""
     frame = np.asarray(frame).copy()
     if frame.ndim == 2:
         frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2RGB)
@@ -57,61 +57,50 @@ def add_text_to_frame(
 
 
 def save_listStep_video(
-    obs_list: List[Optional[dict]],
-    reward_list: List[Any],
-    terminated_list: List[Any],
-    truncated_list: List[Any],
-    info_list: List[Optional[dict]],
+    obs_batch: Dict[str, List[Any]],
+    reward_batch: Any,
+    terminated_batch: Any,
+    truncated_batch: Any,
+    info_batch: Dict[str, List[Any]],
     save_path: str,
     fps: int = 20,
 ) -> bool:
     """
-    Save the reset-phase (demonstration) video with captions from subgoal_grounded.
+    保存 reset 阶段（演示阶段）视频，并使用 subgoal_grounded 作为字幕。
 
-    Extracts frames from each obs in obs_list (key 'frames') and captions from
-    each info in info_list (key 'subgoal_grounded'), then writes a captioned
-    video to save_path.
+    从 obs_batch["frames"] 提取图像帧，
+    从 info_batch["subgoal_grounded"] 提取字幕，
+    并写入 save_path 指定的视频文件。
 
     Args:
-        obs_list: List of observation dicts from env.reset().
-        reward_list: List of rewards (unused, for consistent signature).
-        terminated_list: List of terminated flags (unused).
-        truncated_list: List of truncated flags (unused).
-        info_list: List of info dicts from env.reset().
-        save_path: Output video file path (e.g. .mp4).
-        fps: Frames per second for the output video.
+        obs_batch: 列式观测字典（dict-of-list）。
+        reward_batch: 一维 reward 张量（未使用，仅保持函数签名一致）。
+        terminated_batch: 一维 terminated 张量（未使用）。
+        truncated_batch: 一维 truncated 张量（未使用）。
+        info_batch: 列式 info 字典（dict-of-list）。
+        save_path: 输出视频路径（如 .mp4）。
+        fps: 输出视频帧率。
 
     Returns:
-        True if a video was written (at least one frame), False otherwise.
+        至少写入一帧时返回 True，否则返回 False。
     """
-    def _extract_frames(obs_root: dict) -> list:
-        frames_local = obs_root.get("frames", [])
-        if frames_local:
-            return list(frames_local)
-        ms_obs = obs_root.get("maniskill_obs", {})
-        sensor_data = ms_obs.get("sensor_data", {}) if isinstance(ms_obs, dict) else {}
-        base_cam = sensor_data.get("base_camera", {}) if isinstance(sensor_data, dict) else {}
-        rgb = base_cam.get("rgb") if isinstance(base_cam, dict) else None
-        if rgb is None:
-            return []
-        try:
-            if hasattr(rgb, "cpu"):
-                rgb = rgb.cpu().numpy()
-            rgb = np.asarray(rgb)
-            if rgb.ndim >= 4:
-                return [rgb[0]]
-        except Exception:
-            return []
-        return []
-
     frames = []
-    for o in obs_list:
-        obs_root = o or {}
-        frames.extend(_extract_frames(obs_root))
+    for item in (obs_batch or {}).get("frames", []) or []:
+        if item is None:
+            continue
+        if isinstance(item, (list, tuple)):
+            frames.extend([x for x in item if x is not None])
+        else:
+            frames.append(item)
+
     subgoal_grounded = []
-    for i in info_list:
-        if i:
-            subgoal_grounded.extend(i.get("subgoal_grounded", []))
+    for item in (info_batch or {}).get("subgoal_grounded", []) or []:
+        if item is None:
+            continue
+        if isinstance(item, (list, tuple)):
+            subgoal_grounded.extend([x for x in item if x is not None])
+        else:
+            subgoal_grounded.append(item)
 
     n_reset = min(len(frames), len(subgoal_grounded))
     if n_reset == 0:

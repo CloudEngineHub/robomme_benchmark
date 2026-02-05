@@ -1,10 +1,10 @@
 """
-MultiStepDemonstrationWrapper: wraps DemonstrationWrapper and exposes a keypoint-step API.
+MultiStepDemonstrationWrapper：封装 DemonstrationWrapper，对外提供 keypoint step 接口。
 
-Each step(action) accepts action = keypoint_p (3) + keypoint_q (4) + gripper_action (1) = 8 dims.
-Uses planner_denseStep to run move_to_pose_with_RRTStar and close_gripper/open_gripper,
-returning 5 lists (obs_list, reward_list, terminated_list, truncated_list, info_list).
-Callers must have scripts/ on sys.path for planner_fail_safe import.
+每次 step(action) 接收 action = keypoint_p(3) + keypoint_q(4) + gripper_action(1)，共 8 维。
+内部通过 planner_denseStep 调用 move_to_pose_with_RRTStar 与 close_gripper/open_gripper，
+返回统一批次（obs/info 为字典列式列表，reward/terminated/truncated 为一维张量）。
+调用方需保证 scripts/ 在 sys.path 中，以便导入 planner_fail_safe。
 """
 import numpy as np
 import sapien
@@ -14,13 +14,14 @@ from . import planner_denseStep
 
 
 class RRTPlanFailure(RuntimeError):
-    """Raised when move_to_pose_with_RRTStar returns -1 (planning failed)."""
+    """当 move_to_pose_with_RRTStar 返回 -1（规划失败）时抛出。"""
 
 
 class MultiStepDemonstrationWrapper(gym.Wrapper):
     """
-    Wraps DemonstrationWrapper; step(action) interprets action as (keypoint_p, keypoint_q, gripper_action)
-    and runs the planner via planner_denseStep, returning 5 lists (obs, reward, terminated, truncated, info).
+    封装 DemonstrationWrapper。step(action) 会把 action 解释为
+    (keypoint_p, keypoint_q, gripper_action)，并通过 planner_denseStep 执行规划，
+    返回统一批次。
     """
 
     def __init__(self, env, gui_render=True, vis=True, **kwargs):
@@ -31,6 +32,22 @@ class MultiStepDemonstrationWrapper(gym.Wrapper):
         self.action_space = gym.spaces.Box(
             low=-np.inf, high=np.inf, shape=(8,), dtype=np.float32
         )
+
+    @staticmethod
+    def _batch_to_steps(batch):
+        obs_batch, reward_batch, terminated_batch, truncated_batch, info_batch = batch
+        n = int(reward_batch.numel())
+        steps = []
+        obs_keys = list(obs_batch.keys())
+        info_keys = list(info_batch.keys())
+        for idx in range(n):
+            obs = {k: obs_batch[k][idx] for k in obs_keys}
+            info = {k: info_batch[k][idx] for k in info_keys}
+            reward = reward_batch[idx]
+            terminated = terminated_batch[idx]
+            truncated = truncated_batch[idx]
+            steps.append((obs, reward, terminated, truncated, info))
+        return steps
 
     def _get_planner(self):
         if self._planner is not None:
@@ -72,7 +89,7 @@ class MultiStepDemonstrationWrapper(gym.Wrapper):
         return p
 
     def _no_op_step(self):
-        """One step with current qpos + gripper to get obs without moving."""
+        """使用当前 qpos + gripper 执行一步，不移动机械臂，仅获取观测。"""
         robot = self.env.unwrapped.agent.robot
         qpos = robot.get_qpos().cpu().numpy().flatten()
         arm = qpos[:7]
@@ -81,7 +98,7 @@ class MultiStepDemonstrationWrapper(gym.Wrapper):
         return self.env.step(action)
 
     def step(self, action):
-        """Keypoint step: runs RRT* move + optional gripper via planner_denseStep, returns 5 lists."""
+        """执行关键点 step：RRT* 移动 + 可选夹爪动作，返回统一批次。"""
         action = np.asarray(action, dtype=np.float64).flatten()
         if action.size < 8:
             raise ValueError(f"action must have at least 8 elements, got {action.size}")
@@ -95,44 +112,32 @@ class MultiStepDemonstrationWrapper(gym.Wrapper):
         current_p = self._current_tcp_p()
         dist = np.linalg.norm(current_p - keypoint_p)
 
+        collected_steps = []
         if dist < 0.001:
-            obs, reward, terminated, truncated, info = self._no_op_step()
-            obs_list = [obs]
-            reward_list = [reward]
-            terminated_list = [terminated]
-            truncated_list = [truncated]
-            info_list = [info]
+            collected_steps.append(self._no_op_step())
         else:
-            result = planner_denseStep.move_to_pose_with_RRTStar(planner, pose)
-            if result == -1:
+            move_steps = planner_denseStep._collect_dense_steps(
+                planner, lambda: planner.move_to_pose_with_RRTStar(pose)
+            )
+            if move_steps == -1:
                 raise RRTPlanFailure("move_to_pose_with_RRTStar failed (returned -1)")
-            obs_list, reward_list, terminated_list, truncated_list, info_list = result
+            collected_steps.extend(move_steps)
 
-        # Gripper actions only when planner supports them (e.g. FailAwarePandaStickMotionPlanningSolver has no close_gripper/open_gripper).
+        # 仅当规划器支持夹爪接口时才执行夹爪动作（如 stick 规划器无开合夹爪接口）。
         if gripper_action == -1:
             if hasattr(planner, "close_gripper"):
                 result = planner_denseStep.close_gripper(planner)
                 if result != -1:
-                    go_obs, go_r, go_t, go_tr, go_i = result
-                    obs_list.extend(go_obs)
-                    reward_list.extend(go_r)
-                    terminated_list.extend(go_t)
-                    truncated_list.extend(go_tr)
-                    info_list.extend(go_i)
-            # else: planner has no close_gripper (e.g. stick solver), skip gripper step
+                    collected_steps.extend(self._batch_to_steps(result))
+            # 否则（如 stick 规划器）跳过夹爪关闭步骤。
         elif gripper_action == 1:
             if hasattr(planner, "open_gripper"):
                 result = planner_denseStep.open_gripper(planner)
                 if result != -1:
-                    go_obs, go_r, go_t, go_tr, go_i = result
-                    obs_list.extend(go_obs)
-                    reward_list.extend(go_r)
-                    terminated_list.extend(go_t)
-                    truncated_list.extend(go_tr)
-                    info_list.extend(go_i)
-            # else: planner has no open_gripper (e.g. stick solver), skip gripper step
+                    collected_steps.extend(self._batch_to_steps(result))
+            # 否则（如 stick 规划器）跳过夹爪打开步骤。
 
-        return obs_list, reward_list, terminated_list, truncated_list, info_list
+        return planner_denseStep.to_step_batch(collected_steps)
 
     def reset(self, **kwargs):
         self._planner = None

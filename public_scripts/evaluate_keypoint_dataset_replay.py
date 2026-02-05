@@ -4,7 +4,7 @@ import json
 import numpy as np
 from pathlib import Path
 
-# Add parent directory and scripts to Python path
+# 将上级目录与 scripts 目录加入 Python 路径
 _root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, _root)
 sys.path.insert(0, os.path.join(_root, "scripts"))
@@ -22,15 +22,34 @@ OUTPUT_ROOT = Path(__file__).resolve().parents[1]
 DATASET_ROOT = Path("/data/hongzefu/dataset_generate")
 
 
+def _flatten_column(batch_dict, key):
+    out = []
+    for item in (batch_dict or {}).get(key, []) or []:
+        if item is None:
+            continue
+        if isinstance(item, (list, tuple)):
+            out.extend([x for x in item if x is not None])
+        else:
+            out.append(item)
+    return out
+
+
+def _last_info(info_batch, n):
+    if n <= 0:
+        return {}
+    idx = n - 1
+    return {k: v[idx] for k, v in (info_batch or {}).items() if len(v) > idx and v[idx] is not None}
+
+
 def read_metadata(metadata_path):
     """
-    从 metadata JSON 文件读取所有 episode 配置
+    从 metadata JSON 文件读取所有 episode 配置。
 
-    Args:
-        metadata_path: metadata JSON 文件路径
+    参数:
+        metadata_path: metadata JSON 文件路径。
 
-    Returns:
-        list: 包含所有 episode 记录的列表，每个记录包含 task、episode、seed、difficulty
+    返回:
+        list: episode 记录列表，每条记录包含 task、episode、seed、difficulty。
     """
     if not Path(metadata_path).exists():
         print(f"Metadata file not found: {metadata_path}")
@@ -44,8 +63,9 @@ def read_metadata(metadata_path):
 
 def main():
     """
-    Main function to run the simulation using keypoints from dataset.
-    Uses EpisodeDatasetResolver.get_keypoint(step) per episode; mirrors evaluate_endeffector-replayv2 structure.
+    主函数：使用数据集中的 keypoint 执行回放。
+    每个 episode 通过 EpisodeDatasetResolver.get_keypoint(step) 逐步取动作，
+    整体流程与 evaluate_endeffector_dataset_replay 的结构保持一致。
     """
 
     env_id_list = [
@@ -89,7 +109,7 @@ def main():
                 episode=episode,
                 dataset_path=h5_path,
             )
-            obs_list, reward_list, terminated_list, truncated_list, info_list = env.reset()
+            obs_batch, reward_batch, terminated_batch, truncated_batch, info_batch = env.reset()
 
               # ---------- 从每个 obs 读取 frame 等，构建列表 ----------
             frames = []
@@ -97,30 +117,25 @@ def main():
             actions = []
             states = []
             velocity = []
-            for o in obs_list:
-                obs_root = o or {}
-                _ms_obs = obs_root.get("maniskill_obs", {})
-                frames.extend(obs_root.get("frames", []))
-                wrist_frames.extend(obs_root.get("wrist_frames", []))
-                actions.extend(obs_root.get("actions", []))
-                states.extend(obs_root.get("states", []))
-                velocity.extend(obs_root.get("velocity", []))
-            first_obs = obs_list[0] if obs_list else {}
-            language_goal = (first_obs or {}).get("language_goal")
+            frames.extend(_flatten_column(obs_batch, "frames"))
+            wrist_frames.extend(_flatten_column(obs_batch, "wrist_frames"))
+            actions.extend(_flatten_column(obs_batch, "actions"))
+            states.extend(_flatten_column(obs_batch, "states"))
+            velocity.extend(_flatten_column(obs_batch, "velocity"))
+            language_goal_list = (obs_batch or {}).get("language_goal", [])
+            language_goal = language_goal_list[0] if language_goal_list else None
 
             # ---------- 从每个 info 读取子目标等 ----------
             subgoal = []
             subgoal_grounded = []
-            for i in info_list:
-                if i:
-                    subgoal.extend(i.get("subgoal", []))
-                    subgoal_grounded.extend(i.get("subgoal_grounded", []))
+            subgoal.extend(_flatten_column(info_batch, "subgoal"))
+            subgoal_grounded.extend(_flatten_column(info_batch, "subgoal_grounded"))
 
             # 用 reset 后的 frames 和 subgoal_grounded 直接保存为带字幕视频
             out_video_dir = DATASET_ROOT / "videos"
             os.makedirs(out_video_dir, exist_ok=True)
             reset_captioned_path = os.path.join(out_video_dir, f"replay_ee_{env_id}_ep{episode}_reset_captioned.mp4")
-            save_listStep_video(obs_list, reward_list, terminated_list, truncated_list, info_list, reset_captioned_path)
+            save_listStep_video(obs_batch, reward_batch, terminated_batch, truncated_batch, info_batch, reset_captioned_path)
 
 
 
@@ -140,7 +155,7 @@ def main():
                 print(f"  Executing keypoint {step+1}: keypoint_p: {action[:3]}")
                 action = action.astype(np.float32)
 
-                obs_list, reward_list, terminated_list, truncated_list, info_list = env.step(action)
+                obs_batch, reward_batch, terminated_batch, truncated_batch, info_batch = env.step(action)
 
                 # 从每个 obs 读取 frame 等，构建列表
                 frames = []
@@ -148,33 +163,29 @@ def main():
                 actions = []
                 states = []
                 velocity = []
-                for o in obs_list:
-                    obs_root = o or {}
-                    _ms_obs = obs_root.get("maniskill_obs", {})
-                    frames.extend(obs_root.get('frames', []))
-                    wrist_frames.extend(obs_root.get('wrist_frames', []))
-                    actions.extend(obs_root.get('actions', []))
-                    states.extend(obs_root.get('states', []))
-                    velocity.extend(obs_root.get('velocity', []))
-                first_obs = obs_list[0] if obs_list else {}
-                language_goal = (first_obs or {}).get('language_goal')
+                frames.extend(_flatten_column(obs_batch, "frames"))
+                wrist_frames.extend(_flatten_column(obs_batch, "wrist_frames"))
+                actions.extend(_flatten_column(obs_batch, "actions"))
+                states.extend(_flatten_column(obs_batch, "states"))
+                velocity.extend(_flatten_column(obs_batch, "velocity"))
+                language_goal_list = (obs_batch or {}).get("language_goal", [])
+                language_goal = language_goal_list[0] if language_goal_list else None
 
                 # 从每个 info 读取
                 subgoal = []
                 subgoal_grounded = []
-                for i in info_list:
-                    if i:
-                        subgoal.extend(i.get('subgoal', []))
-                        subgoal_grounded.extend(i.get('subgoal_grounded', []))
+                subgoal.extend(_flatten_column(info_batch, "subgoal"))
+                subgoal_grounded.extend(_flatten_column(info_batch, "subgoal_grounded"))
 
                 # 用最后一步的 terminated/truncated/info 做循环判断
-                terminated = terminated_list[-1] if terminated_list else False
-                truncated = truncated_list[-1] if truncated_list else False
-                info = info_list[-1] if info_list else {}
+                n = int(reward_batch.numel()) if hasattr(reward_batch, "numel") else 0
+                terminated = bool(terminated_batch[-1].item()) if n > 0 else False
+                truncated = bool(truncated_batch[-1].item()) if n > 0 else False
+                info = _last_info(info_batch, n)
 
-                # Save captioned video for this step (每个 step 保存一个带字幕的视频)
+                # 保存当前步骤的带字幕视频
                 kp_captioned_path = video_dir / f"replay_kp_{env_id}_ep{episode}_kp{step}_captioned.mp4"
-                save_listStep_video(obs_list, reward_list, terminated_list, truncated_list, info_list, str(kp_captioned_path), fps=fps)
+                save_listStep_video(obs_batch, reward_batch, terminated_batch, truncated_batch, info_batch, str(kp_captioned_path), fps=fps)
 
 
 
@@ -185,7 +196,7 @@ def main():
                 if truncated:
                     print(f"[{env_id}] episode {episode} 步数超限。")
                     break
-                if terminated.any():
+                if terminated:
                     if info.get("success") == torch.tensor([True]) or (
                         isinstance(info.get("success"), torch.Tensor) and info.get("success").item()
                     ):

@@ -18,7 +18,7 @@ from . import planner_denseStep
 # 本模块：Oracle 规划器演示包装器
 # 在 Gym 环境中接入 HistoryBench 的 Oracle 规划逻辑，支持按步收集观测。
 # 以下 Oracle 逻辑内联自 history_bench_sim.oracle_logic，与 planner_denseStep
-# 配合，将规划器内部多次 env.step 聚合成 5 个列表（obs/reward/terminated/truncated/info）返回。
+# 配合，将规划器内部多次 env.step 聚合成统一批次返回。
 # -----------------------------------------------------------------------------
 
 
@@ -54,18 +54,17 @@ def _find_best_semantic_match(user_query, options):
 def step_after(env, planner, env_id, seg_raw, command_dict):
     """
     根据 command_dict（含 action 与可选 point）执行一次 Oracle 动作，
-    返回 5 个列表：obs_list, reward_list, terminated_list, truncated_list, info_list，
-    对应规划器执行过程中每一帧的 env.step 结果。
+    返回统一 dense batch（obs/info 字典值为 list，reward/terminated/truncated 为 1D tensor）。
     """
     selected_target = {"obj": None, "name": None, "seg_id": None, "click_point": None, "centroid_point": None}
     solve_options = _build_solve_options(env, planner, selected_target, env_id)
     target_action = command_dict.get("action")
     target_param = command_dict.get("point")
-    # 无 action 则直接返回空列表
+    # 无 action 则直接返回空批次
     if "action" not in command_dict:
-        return [], [], [], [], []
+        return planner_denseStep.empty_step_batch()
     if target_action is None:
-        return [], [], [], [], []
+        return planner_denseStep.empty_step_batch()
     found_idx = -1
     # 在解题选项中按 label 或序号查找动作索引
     for i, opt in enumerate(solve_options):
@@ -78,7 +77,7 @@ def step_after(env, planner, env_id, seg_raw, command_dict):
         found_idx, score = _find_best_semantic_match(target_action, solve_options)
     if found_idx == -1:
         print(f"错误：当前选项中未找到动作 '{target_action}'。")
-        return [], [], [], [], []
+        return planner_denseStep.empty_step_batch()
     # 若提供了点击坐标且存在分割图，则解析最近物体并填充 selected_target
     if target_param is not None and seg_raw is not None:
         cx, cy = target_param
@@ -140,14 +139,12 @@ def step_after(env, planner, env_id, seg_raw, command_dict):
 
     if result == -1:
         print("警告：solve() 执行失败（返回 -1）")
-        return [], [], [], [], []
-
-    obs_list, reward_list, terminated_list, truncated_list, info_list = result
+        return planner_denseStep.empty_step_batch()
 
     env.unwrapped.evaluate()
     evaluation = env.unwrapped.evaluate(solve_complete_eval=True)
     print(f"评估结果：{evaluation}")
-    return obs_list, reward_list, terminated_list, truncated_list, info_list
+    return result
 
 
 
@@ -155,8 +152,7 @@ def step_after(env, planner, env_id, seg_raw, command_dict):
 class OraclePlannerDemonstrationWrapper(gym.Wrapper):
     """
     将带 Oracle 规划逻辑的 HistoryBench 环境包装成 Gym Wrapper，用于演示/评估；
-    step 的输入为 command_dict（含 action 与可选 point），输出为 5 个列表，
-    即每步的 obs_list、reward_list、terminated_list、truncated_list、info_list。
+    step 的输入为 command_dict（含 action 与可选 point），输出为统一 dense batch。
     """
     def __init__(self, env, env_id, gui_render=True):
         super().__init__(env)
@@ -204,7 +200,7 @@ class OraclePlannerDemonstrationWrapper(gym.Wrapper):
     def step(self, action):
         """
         执行一步：action 为 command_dict，需包含 "action"，可选 "point"。
-        返回 5 个列表，对应规划器执行过程中每一帧的观测、奖励、是否终止、是否截断、信息。
+        返回统一 dense batch，对应规划器执行过程中每一帧的数据。
         """
         command_dict = action
 
@@ -221,8 +217,8 @@ class OraclePlannerDemonstrationWrapper(gym.Wrapper):
             for opt in raw_options
         ]
 
-        # 调用 step_after 执行动作并得到 5 个列表
-        obs_list, reward_list, terminated_list, truncated_list, info_list = step_after(
+        # 调用 step_after 执行动作并得到统一批次
+        obs_batch, reward_batch, terminated_batch, truncated_batch, info_batch = step_after(
             self.env, self.planner, self.env_id, self.seg_raw, command_dict
         )
-        return obs_list, reward_list, terminated_list, truncated_list, info_list
+        return obs_batch, reward_batch, terminated_batch, truncated_batch, info_batch

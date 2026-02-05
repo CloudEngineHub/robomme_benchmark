@@ -1,6 +1,7 @@
 """
-EndeffectorDemonstrationWrapper: outer wrapper that accepts ee_pose actions (8-d)
-and converts them to joint actions via IK before forwarding to the inner env.
+EndeffectorDemonstrationWrapper：外层包装器，接收 8 维 ee_pose 动作，
+通过 IK 转换为关节动作后再转发给内层环境。
+返回值会直接透传内层环境的统一批次结果。
 """
 import numpy as np
 import gymnasium as gym
@@ -10,8 +11,10 @@ from mani_skill.examples.motionplanning.panda.motionplanner import PandaArmMotio
 
 class EndeffectorDemonstrationWrapper(gym.Wrapper):
     """
-    Wraps an env that expects joint actions. step(action) accepts action = [ee_p(3), ee_q(4), gripper(1)].
-    Runs IK to get joint_action, then calls inner env.step(joint_action).
+    封装一个期望关节动作的环境。step(action) 接收
+    action = [ee_p(3), ee_q(4), gripper(1)]。
+    内部先做 IK 得到 joint_action，再调用内层 env.step(joint_action)，并返回：
+    (obs_batch, reward_batch, terminated_batch, truncated_batch, info_batch)。
     """
 
     def __init__(self, env):

@@ -30,6 +30,25 @@ from save_reset_video import save_listStep_video
 DATASET_ROOT = "/data/hongzefu/dataset_generate"
 
 
+def _flatten_column(batch_dict, key):
+    out = []
+    for item in (batch_dict or {}).get(key, []) or []:
+        if item is None:
+            continue
+        if isinstance(item, (list, tuple)):
+            out.extend([x for x in item if x is not None])
+        else:
+            out.append(item)
+    return out
+
+
+def _last_info(info_batch, n):
+    if n <= 0:
+        return {}
+    idx = n - 1
+    return {k: v[idx] for k, v in (info_batch or {}).items() if len(v) > idx and v[idx] is not None}
+
+
 def main():
     """
     从 DATASET_ROOT 读取数据集，回放所有 episode；
@@ -66,52 +85,43 @@ def main():
             )
 
             # ---------- 重置环境（含 demonstration 阶段），并保存 reset 带字幕视频 ----------
-            obs_list, reward_list, terminated_list, truncated_list, info_list = env.reset()
+            obs_batch, reward_batch, terminated_batch, truncated_batch, info_batch = env.reset()
 
-            # 从 obs_list / info_list 抽取并合并成新列表
-            frames = []
-            wrist_frames = []
-            actions = []
-            states = []
-            velocity = []
-            for o in obs_list:
-                obs_root = o or {}
-                _ms_obs = obs_root.get("maniskill_obs", {})
-                frames.extend(obs_root.get("frames", []))
-                wrist_frames.extend(obs_root.get("wrist_frames", []))
-                actions.extend(obs_root.get("actions", []))
-                states.extend(obs_root.get("states", []))
-                velocity.extend(obs_root.get("velocity", []))
-            first_obs = obs_list[0] if obs_list else {}
-            language_goal = (first_obs or {}).get("language_goal")
-            subgoal = []
-            subgoal_grounded = []
-            for i in info_list:
-                if i:
-                    subgoal.extend(i.get("subgoal", []))
-                    subgoal_grounded.extend(i.get("subgoal_grounded", []))
+            # 从 obs_batch / info_batch 抽取并合并成列表
+            frames = _flatten_column(obs_batch, "frames")
+            wrist_frames = _flatten_column(obs_batch, "wrist_frames")
+            actions = _flatten_column(obs_batch, "actions")
+            states = _flatten_column(obs_batch, "states")
+            velocity = _flatten_column(obs_batch, "velocity")
+            language_goal_list = (obs_batch or {}).get("language_goal", [])
+            language_goal = language_goal_list[0] if language_goal_list else None
+            subgoal = _flatten_column(info_batch, "subgoal")
+            subgoal_grounded = _flatten_column(info_batch, "subgoal_grounded")
 
             # 用 reset 后的 frames 和 subgoal_grounded 直接保存为带字幕视频
             reset_captioned_path = os.path.join(out_video_dir, f"replay_{env_id}_ep{episode}_reset_captioned.mp4")
-            save_listStep_video(obs_list, reward_list, terminated_list, truncated_list, info_list, reset_captioned_path)
+            save_listStep_video(obs_batch, reward_batch, terminated_batch, truncated_batch, info_batch, reset_captioned_path)
 
             # ---------- 按 step 回放：从数据集取关节角动作执行 ----------
             step = 0
             while True:
                 action = dataset_resolver.get_action(step)
-                obs, reward, terminated, truncated, info = env.step(action)
+                obs_batch, reward_batch, terminated_batch, truncated_batch, info_batch = env.step(action)
 
-                # 从 obs / info 读取（供调试或后续逻辑）
-                obs_root = obs or {}
-                _ms_obs = obs_root.get("maniskill_obs", {})
-                image = obs_root.get('frames', []) if obs_root.get('frames') else None
-                wrist_image = obs_root.get('wrist_frames', []) if obs_root.get('wrist_frames') else None
-                last_action = obs_root.get('actions', []) if obs_root.get('actions') else None
-                state = obs_root.get('states', []) if obs_root.get('states') else None
-                velocity = obs_root.get('velocity', []) if obs_root.get('velocity') else None
-                language_goal = obs_root.get('language_goal')
-                subgoal = info.get('subgoal', []) if info else []
-                subgoal_grounded = info.get('subgoal_grounded', []) if info else []
+                # 从 batch 读取（供调试或后续逻辑）
+                image = _flatten_column(obs_batch, "frames")
+                wrist_image = _flatten_column(obs_batch, "wrist_frames")
+                last_action = _flatten_column(obs_batch, "actions")
+                state = _flatten_column(obs_batch, "states")
+                velocity = _flatten_column(obs_batch, "velocity")
+                language_goal_list = (obs_batch or {}).get("language_goal", [])
+                language_goal = language_goal_list[-1] if language_goal_list else None
+                subgoal = _flatten_column(info_batch, "subgoal")
+                subgoal_grounded = _flatten_column(info_batch, "subgoal_grounded")
+                n = int(reward_batch.numel()) if hasattr(reward_batch, "numel") else 0
+                info = _last_info(info_batch, n)
+                terminated = bool(terminated_batch[-1].item()) if n > 0 else False
+                truncated = bool(truncated_batch[-1].item()) if n > 0 else False
 
                 step += 1
                 if gui_render:
@@ -119,7 +129,7 @@ def main():
                 if truncated:
                     print(f"[{env_id}] episode {episode} 步数超限，步 {step}。")
                     break
-                if terminated.any():
+                if terminated:
                     if info.get("success") == torch.tensor([True]) or (
                         isinstance(info.get("success"), torch.Tensor) and info.get("success").item()
                     ):
