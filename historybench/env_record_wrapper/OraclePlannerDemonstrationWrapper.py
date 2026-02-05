@@ -2,7 +2,6 @@ import gymnasium as gym
 import numpy as np
 import torch
 import cv2
-import colorsys
 from rapidfuzz import process, fuzz
 
 from historybench.HistoryBench_env.util.vqa_options import get_vqa_options
@@ -14,85 +13,26 @@ from mani_skill.examples.motionplanning.panda.motionplanner_stick import (
 )
 from . import planner_denseStep
 
-def _generate_color_map(n=10000, s_min=0.70, s_max=0.95, v_min=0.78, v_max=0.95):
-    phi = 0.6180339887498948
-    color_map = {}
-    for i in range(1, n + 1):
-        h = (i * phi) % 1.0
-        s = s_min + (s_max - s_min) * ((i % 7) / 6)
-        v = v_min + (v_max - v_min) * (((i * 3) % 5) / 4)
-        r, g, b = colorsys.hsv_to_rgb(h, s, v)
-        color_map[i] = [int(round(r * 255)), int(round(g * 255)), int(round(b * 255))]
-    return color_map
-
-def _sync_table_color(env, color_map):
-    seg_id_map = getattr(env.unwrapped, "segmentation_id_map", None)
-    if not isinstance(seg_id_map, dict):
-        return
-    for obj_id, obj in seg_id_map.items():
-        if getattr(obj, "name", None) == "table-workspace":
-            color_map[obj_id] = [0, 0, 0]
-
 
 # -----------------------------------------------------------------------------
-# Oracle logic (inlined from history_bench_sim.oracle_logic)
+# 本模块：Oracle 规划器演示包装器
+# 在 Gym 环境中接入 HistoryBench 的 Oracle 规划逻辑，支持按步收集观测。
+# 以下 Oracle 逻辑内联自 history_bench_sim.oracle_logic，与 planner_denseStep
+# 配合，将规划器内部多次 env.step 聚合成 5 个列表（obs/reward/terminated/truncated/info）返回。
 # -----------------------------------------------------------------------------
-
-def _prepare_frame(frame):
-    """Preprocess frame to uint8."""
-    frame = np.asarray(frame)
-    if frame.dtype != np.uint8:
-        max_val = float(np.max(frame)) if frame.size else 0.0
-        if max_val <= 1.0:
-            frame = (frame * 255.0).clip(0, 255).astype(np.uint8)
-        else:
-            frame = frame.clip(0, 255).astype(np.uint8)
-    if frame.ndim == 2:
-        frame = np.stack([frame] * 3, axis=-1)
-    return frame
-
-
-def _prepare_segmentation_visual(segmentation, color_map, target_hw):
-    """Convert segmentation to visual image."""
-    if segmentation is None:
-        return None, None
-    seg = segmentation
-    if hasattr(seg, "cpu"):
-        seg = seg.cpu().numpy()
-    seg = np.asarray(seg)
-    if seg.ndim > 2:
-        seg = seg[0]
-    seg_2d = seg.squeeze().astype(np.int64)
-    h, w = seg_2d.shape[:2]
-    seg_rgb = np.zeros((h, w, 3), dtype=np.uint8)
-    unique_ids = np.unique(seg_2d)
-    for seg_id in unique_ids:
-        if seg_id <= 0:
-            continue
-        color = color_map.get(int(seg_id))
-        if color is None:
-            continue
-        seg_rgb[seg_2d == seg_id] = color
-    seg_bgr = cv2.cvtColor(seg_rgb, cv2.COLOR_RGB2BGR)
-    target_h, target_w = target_hw
-    if seg_bgr.shape[:2] != (target_h, target_w):
-        seg_bgr = cv2.resize(seg_bgr, (target_w, target_h), interpolation=cv2.INTER_NEAREST)
-    return seg_bgr, seg_2d
-
-
-def _fetch_segmentation(env):
-    """Get segmentation from env."""
-    obs = env.unwrapped.get_obs(unflattened=True)
-    return obs["sensor_data"]["base_camera"]["segmentation"]
 
 
 def _build_solve_options(env, planner, selected_target, env_id):
-    """Build available action options."""
+    """根据当前环境、规划器、已选目标和 env_id 构建可用的解题选项列表（来自 VQA 选项）。"""
     return get_vqa_options(env, planner, selected_target, env_id)
 
 
 def _find_best_semantic_match(user_query, options):
-    """Find best option by character edit distance (rapidfuzz)."""
+    """
+    用 rapidfuzz 的字符编辑距离在 options 的 label 中找与 user_query 最匹配的一项；
+    用于精确 action 名未命中时的语义回退。
+    返回 (best_idx, best_score)，无匹配或异常时 best_idx=-1、score=0.0。
+    """
     if not options:
         return -1, 0.0
     labels = [opt.get("label", "") for opt in options]
@@ -105,80 +45,41 @@ def _find_best_semantic_match(user_query, options):
         else:
             return -1, 0.0
     except Exception as exc:
-        print(f"  [NLP] Edit Distance match failed ({exc}); defaulting to option 1.")
+        print(f"  [NLP] 编辑距离匹配失败 ({exc})，回退到选项 1。")
         return 0, 0.0
-    print(f"  [NLP] Closest Match (Edit Distance): '{query_text}' -> '{labels[best_idx]}' (Score: {best_score:.4f})")
+    print(f"  [NLP] 最近语义匹配（编辑距离）：'{query_text}' -> '{labels[best_idx]}' (得分: {best_score:.4f})")
     return best_idx, best_score
 
 
-def step_before(env, planner, env_id, color_map, use_segmentation=False):
-    """Called before executing action; returns current state and available options."""
-    base_frames = getattr(env, "frames", [])
-    if not base_frames:
-        base_frames = getattr(env.unwrapped, "frames", []) or []
-    wrist_frames = getattr(env, "wrist_frames", [])
-    if not wrist_frames:
-        wrist_frames = getattr(env.unwrapped, "wrist_frames", []) or []
-    seg_data = _fetch_segmentation(env)
-    seg_hw = (255, 255)
-    if base_frames and len(base_frames) > 0:
-        seg_hw = base_frames[-1].shape[:2]
-    elif seg_data is not None:
-        try:
-            temp = seg_data
-            if hasattr(temp, "cpu"):
-                temp = temp.cpu().numpy()
-            temp = np.asarray(temp)
-            if temp.ndim > 2:
-                temp = temp[0]
-            seg_hw = temp.shape[:2]
-        except Exception:
-            pass
-    seg_vis = None
-    seg_raw = None
-    if use_segmentation:
-        seg_vis, seg_raw = _prepare_segmentation_visual(seg_data, color_map, seg_hw)
-    else:
-        _, seg_raw = (_prepare_segmentation_visual(seg_data, color_map, seg_hw)
-                      if seg_data is not None else (None, None))
-        if base_frames:
-            vis_frame = _prepare_frame(base_frames[-1])
-            vis_frame = cv2.cvtColor(vis_frame, cv2.COLOR_RGB2BGR)
-            if vis_frame.shape[:2] != seg_hw:
-                vis_frame = cv2.resize(vis_frame, (seg_hw[1], seg_hw[0]), interpolation=cv2.INTER_LINEAR)
-            seg_vis = vis_frame
-    if seg_vis is None:
-        seg_vis = np.zeros((seg_hw[0], seg_hw[1], 3), dtype=np.uint8)
-    dummy_target = {"obj": None, "name": None, "seg_id": None, "click_point": None, "centroid_point": None}
-    raw_options = _build_solve_options(env, planner, dummy_target, env_id)
-    available_options = [
-        {"action": opt.get("label", "Unknown"), "need_parameter": bool(opt.get("available"))}
-        for opt in raw_options
-    ]
-    return seg_vis, seg_raw, base_frames, wrist_frames, available_options
-
-
-def step_after(env, planner, env_id, seg_vis, seg_raw, base_frames, wrist_frames, command_dict):
-    """Execute action from command_dict and return evaluation + 5 lists (obs, reward, terminated, truncated, info)."""
+def step_after(env, planner, env_id, seg_raw, command_dict):
+    """
+    根据 command_dict（含 action 与可选 point）执行一次 Oracle 动作，
+    返回 5 个列表：obs_list, reward_list, terminated_list, truncated_list, info_list，
+    对应规划器执行过程中每一帧的 env.step 结果。
+    """
     selected_target = {"obj": None, "name": None, "seg_id": None, "click_point": None, "centroid_point": None}
     solve_options = _build_solve_options(env, planner, selected_target, env_id)
     target_action = command_dict.get("action")
     target_param = command_dict.get("point")
+    # 无 action 则直接返回空列表
     if "action" not in command_dict:
-        return None, [], [], [], [], []
+        return [], [], [], [], []
     if target_action is None:
-        return None, [], [], [], [], []
+        return [], [], [], [], []
     found_idx = -1
+    # 在解题选项中按 label 或序号查找动作索引
     for i, opt in enumerate(solve_options):
         if opt.get("label") == target_action or str(i + 1) == str(target_action):
             found_idx = i
             break
+    # 未命中且为字符串且非数字时，尝试语义匹配
     if found_idx == -1 and isinstance(target_action, str) and not target_action.isdigit():
-        print(f"Attempting semantic match for: '{target_action}'")
+        print(f"正在对 '{target_action}' 尝试语义匹配…")
         found_idx, score = _find_best_semantic_match(target_action, solve_options)
     if found_idx == -1:
-        print(f"Error: Action '{target_action}' not found in current options.")
-        return None, [], [], [], [], []
+        print(f"错误：当前选项中未找到动作 '{target_action}'。")
+        return [], [], [], [], []
+    # 若提供了点击坐标且存在分割图，则解析最近物体并填充 selected_target
     if target_param is not None and seg_raw is not None:
         cx, cy = target_param
         h, w = seg_raw.shape[:2]
@@ -188,6 +89,7 @@ def step_after(env, planner, env_id, seg_vis, seg_raw, base_frames, wrist_frames
         candidates = []
 
         def _collect(item):
+            """递归收集 available 中的可操作对象。"""
             if isinstance(item, (list, tuple)):
                 for x in item:
                     _collect(x)
@@ -203,6 +105,7 @@ def step_after(env, planner, env_id, seg_vis, seg_raw, base_frames, wrist_frames
             _collect(avail)
             best_cand = None
             min_dist = float("inf")
+            # 在分割图中找与点击点距离最近的物体
             for actor in candidates:
                 target_ids = [sid for sid, obj in seg_id_map.items() if obj is actor]
                 for tid in target_ids:
@@ -227,109 +130,56 @@ def step_after(env, planner, env_id, seg_vis, seg_raw, base_frames, wrist_frames
                 selected_target["click_point"] = (int(cx), int(cy))
         else:
             selected_target["click_point"] = (int(cx), int(cy))
-    print(f"Executing Option: {found_idx + 1} - {solve_options[found_idx].get('label')}")
-    
-    # Wrap solve() with dense collection to capture all intermediate env.step() results
+    print(f"执行选项：{found_idx + 1} - {solve_options[found_idx].get('label')}")
+
+    # 用 dense 收集包装 solve()，收集中间所有 env.step 的结果
     result = planner_denseStep._run_with_dense_collection(
         planner,
         lambda: solve_options[found_idx].get("solve")()
     )
-    
+
     if result == -1:
-        print("Warning: solve() execution failed (returned -1)")
-        return None, [], [], [], [], []
-    
+        print("警告：solve() 执行失败（返回 -1）")
+        return [], [], [], [], []
+
     obs_list, reward_list, terminated_list, truncated_list, info_list = result
-    
+
     env.unwrapped.evaluate()
     evaluation = env.unwrapped.evaluate(solve_complete_eval=True)
-    print(f"Evaluation: {evaluation}")
-    return evaluation, obs_list, reward_list, terminated_list, truncated_list, info_list
+    print(f"评估结果：{evaluation}")
+    return obs_list, reward_list, terminated_list, truncated_list, info_list
 
 
-def _tensor_to_bool(value):
-    """Convert tensor or other types to boolean."""
-    if value is None:
-        return False
-    if isinstance(value, torch.Tensor):
-        return bool(value.detach().cpu().bool().item())
-    if isinstance(value, np.ndarray):
-        return bool(np.any(value))
-    return bool(value)
+
 
 class OraclePlannerDemonstrationWrapper(gym.Wrapper):
     """
-    Gym Environment Wrapper for Oracle Planner Logic.
-    Wraps the environment to provide oracle planner capabilities.
+    将带 Oracle 规划逻辑的 HistoryBench 环境包装成 Gym Wrapper，用于演示/评估；
+    step 的输入为 command_dict（含 action 与可选 point），输出为 5 个列表，
+    即每步的 obs_list、reward_list、terminated_list、truncated_list、info_list。
     """
     def __init__(self, env, env_id, gui_render=True):
         super().__init__(env)
         self.env_id = env_id
         self.gui_render = gui_render
-        
+
         self.planner = None
-        self.color_map = None
         self.language_goal = None
-        
-        # State variables
+
+        # 状态：分割图、帧缓存、当前可用选项
         self.seg_vis = None
         self.seg_raw = None
         self.base_frames = []
         self.wrist_frames = []
         self.available_options = []
-        
-        # Metadata
-        self.action_space = gym.spaces.Dict({}) 
+
+        # 动作/观测空间（此处为空 Dict，由外部约定）
+        self.action_space = gym.spaces.Dict({})
         self.observation_space = gym.spaces.Dict({})
 
-    # def reset(self, seed=None, options=None):
-    #     obs, info = super().reset(seed=seed, options=options)
-        
-    #     # Initialization logic
-    #     try:
-    #         self.language_goal = self.env.unwrapped.demonstration_data.get('language goal')
-    #     except AttributeError:
-    #          # Fallback if demonstration_data is missing, possibly read from metadata if available
-    #          # or simply default to None/Empty
-    #         self.language_goal = None
-    #         print(f"Warning: {self.env_id} object has no attribute 'demonstration_data'. 'language_goal' set to None.")
-
-    #     # Generate semantic segmentation color map
-    #     self.color_map = _generate_color_map()
-    #     _sync_table_color(self.env, self.color_map)
-
-    #     # Initialize Planner
-    #     if self.env_id in ("PatternLock", "RouteStick"):
-    #         self.planner = PandaStickMotionPlanningSolver(
-    #             self.env,
-    #             debug=False,
-    #             vis=self.gui_render,
-    #             base_pose=self.env.unwrapped.agent.robot.pose,
-    #             visualize_target_grasp_pose=False,
-    #             print_env_info=False,
-    #             joint_vel_limits=0.3,
-    #         )
-    #     else:
-    #         self.planner = PandaArmMotionPlanningSolver(
-    #             self.env,
-    #             debug=False,
-    #             vis=self.gui_render,
-    #             base_pose=self.env.unwrapped.agent.robot.pose,
-    #             visualize_target_grasp_pose=False,
-    #             print_env_info=False,
-    #         )
-
-    #     # Initial step_before
-    #     self.seg_vis, self.seg_raw, self.base_frames, self.wrist_frames, self.available_options = \
-    #         step_before(self.env, self.planner, self.env_id, self.color_map)
-            
-    #     info["available_options"] = self.available_options
-    #     info["seg_vis"] = self.seg_vis
-    #     info["seg_raw"] = self.seg_raw
-    #     return self._get_obs(obs), info
 
     def reset(self, **kwargs):
-                # Initialize Planner
+        # 按 env_id 选择棍状或机械臂规划器并初始化
         if self.env_id in ("PatternLock", "RouteStick"):
             self.planner = PandaStickMotionPlanningSolver(
                 self.env,
@@ -349,51 +199,30 @@ class OraclePlannerDemonstrationWrapper(gym.Wrapper):
                 visualize_target_grasp_pose=False,
                 print_env_info=False,
             )
-        self.color_map = _generate_color_map()
-        _sync_table_color(self.env, self.color_map)
         return self.env.reset(**kwargs)
 
     def step(self, action):
         """
-        Args:
-            action: command_dict containing "action" and "point"
-        
-        Returns:
-            obs_list, reward_list, terminated_list, truncated_list, info_list
-            (5 lists, one entry per internal env.step during planner execution)
+        执行一步：action 为 command_dict，需包含 "action"，可选 "point"。
+        返回 5 个列表，对应规划器执行过程中每一帧的观测、奖励、是否终止、是否截断、信息。
         """
         command_dict = action
 
-        # Get current state and options (step_before) before executing action
-        self.seg_vis, self.seg_raw, self.base_frames, self.wrist_frames, self.available_options = \
-            step_before(self.env, self.planner, self.env_id, self.color_map)
+        # 直接获取当前观测与分割图（不单独 step_before）
+        obs = self.env.unwrapped.get_obs(unflattened=True)
+        seg = obs["sensor_data"]["base_camera"]["segmentation"]
+        seg = seg.cpu().numpy() if hasattr(seg, "cpu") else np.asarray(seg)
+        self.seg_raw = (seg[0] if seg.ndim > 2 else seg).squeeze().astype(np.int64)
 
-        # Execute action (step_after) - returns evaluation + 5 lists
-        evaluation, obs_list, reward_list, terminated_list, truncated_list, info_list = step_after(
-            self.env, 
-            self.planner, 
-            self.env_id, 
-            self.seg_vis, 
-            self.seg_raw, 
-            self.base_frames, 
-            self.wrist_frames, 
-            command_dict
+        dummy_target = {"obj": None, "name": None, "seg_id": None, "click_point": None, "centroid_point": None}
+        raw_options = _build_solve_options(self.env, self.planner, dummy_target, self.env_id)
+        self.available_options = [
+            {"action": opt.get("label", "未知"), "need_parameter": bool(opt.get("available"))}
+            for opt in raw_options
+        ]
+
+        # 调用 step_after 执行动作并得到 5 个列表
+        obs_list, reward_list, terminated_list, truncated_list, info_list = step_after(
+            self.env, self.planner, self.env_id, self.seg_raw, command_dict
         )
-        
-        # Enrich the last info with available_options, seg_vis, seg_raw, and evaluation
-        if info_list:
-            info_list[-1]["available_options"] = self.available_options
-            info_list[-1]["seg_vis"] = self.seg_vis
-            info_list[-1]["seg_raw"] = self.seg_raw
-            if evaluation:
-                info_list[-1].update(evaluation)
-
         return obs_list, reward_list, terminated_list, truncated_list, info_list
-
-    def _get_obs(self, base_obs=None):
-        if base_obs is None or not isinstance(base_obs, dict):
-            base_obs = {}
-        base_obs["language_goal"] = self.language_goal
-        base_obs["frames"] = self.base_frames
-        base_obs["wrist_frames"] = self.wrist_frames
-        return base_obs

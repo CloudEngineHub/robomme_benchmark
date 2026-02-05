@@ -21,73 +21,9 @@ import re
 
 from historybench.env_record_wrapper import EpisodeConfigResolver, EpisodeDatasetResolver
 from pathlib import Path
+from save_reset_video import save_listStep_video
 
 
-# =============================================================================
-# 辅助函数
-# =============================================================================
-
-def _tensor_to_bool(value):
-    """将 tensor 或其他类型转换为布尔值"""
-    if value is None:
-        return False
-    if isinstance(value, torch.Tensor):
-        return bool(value.detach().cpu().bool().item())
-    if isinstance(value, np.ndarray):
-        return bool(np.any(value))
-    return bool(value)
-
-
-
-
-def _frame_to_uint8_rgb(f):
-    """Convert a single frame (tensor or ndarray) to uint8 RGB."""
-    if hasattr(f, "cpu") and callable(getattr(f, "cpu", None)):
-        arr = f.cpu().numpy()
-    else:
-        arr = np.asarray(f)
-    arr = np.asarray(arr).astype(np.uint8)
-    if arr.ndim == 2:
-        arr = np.stack([arr] * 3, axis=-1)
-    return arr
-
-
-def save_frames_to_video(frames, output_path, fps=12):
-    """Save a list of frames (numpy or tensor) to an MP4 file. Frames assumed RGB."""
-    if not frames:
-        return
-    try:
-        import imageio
-        processed = [_frame_to_uint8_rgb(f) for f in frames]
-        imageio.mimwrite(output_path, processed, fps=fps, quality=8, macro_block_size=None, codec="libx264")  # type: ignore[arg-type]
-    except Exception as e:
-        try:
-            import cv2
-            arr0 = _frame_to_uint8_rgb(frames[0])
-            h, w = arr0.shape[:2]
-            fourcc = cv2.VideoWriter_fourcc(*"mp4v")  # type: ignore[attr-defined]
-            out = cv2.VideoWriter(output_path, fourcc, float(fps), (w, h))
-            if out.isOpened():
-                for f in frames:
-                    a = _frame_to_uint8_rgb(f)
-                    out.write(cv2.cvtColor(a, cv2.COLOR_RGB2BGR))
-                out.release()
-        except Exception as e2:
-            print(f"Failed to save video to {output_path}: {e}, {e2}")
-
-
-def get_num_episodes(dataset_root, env_id):
-    metadata_path = dataset_root / f"record_dataset_{env_id}_metadata.json"
-    if not metadata_path.exists():
-        print(f"[{env_id}] Metadata {metadata_path} not found.")
-        return 0
-    try:
-        with open(metadata_path, "r", encoding="utf-8") as f:
-            payload = json.load(f)
-            return payload.get("record_count", 0)
-    except Exception as e:
-        print(f"Error reading metadata: {e}")
-        return 0
 
 def main():
     # Dataset Root
@@ -116,9 +52,8 @@ def main():
     ]
 
     for env_id in env_id_list:
-        num_episodes = get_num_episodes(dataset_root, env_id)
 
-        # Initialize Resolver per Env
+    # Initialize Resolver per Env
         metadata_path = dataset_root / f"record_dataset_{env_id}_metadata.json"
         resolver = EpisodeConfigResolver(
             env_id=env_id,
@@ -171,6 +106,15 @@ def main():
             
             success = "fail"
 
+            video_dir = dataset_root / "videos"
+            video_dir.mkdir(parents=True, exist_ok=True)
+            out_video_path = video_dir / f"replay_op_{env_id}_ep{episode}.mp4"
+
+            reset_captioned_path = video_dir / f"replay_op_{env_id}_ep{episode}_reset_captioned.mp4"
+            if save_listStep_video(
+                obs_list, reward_list, terminated_list, truncated_list, info_list, str(reset_captioned_path)
+            ):
+                print(f"Saved reset captioned video: {reset_captioned_path}")
             os.makedirs(save_dir, exist_ok=True)
 
             step_idx = 0
@@ -184,14 +128,12 @@ def main():
 
 
 
-                # 每次获得的 frames 单独保存为视频
-                if frames:
-                    video_path = os.path.join(save_dir, f"frames_step_{step_idx}.mp4")
-                    save_frames_to_video(frames, video_path)
-                if wrist_frames:
-                    wrist_path = os.path.join(save_dir, f"wrist_frames_step_{step_idx}.mp4")
-                    save_frames_to_video(wrist_frames, wrist_path)
-
+                # 每次获得的 obs_list 保存为带字幕视频 (save_listStep_video, 与 keypoint 一致)
+                step_pre_captioned_path = video_dir / f"replay_op_{env_id}_ep{episode}_step{step_idx}_pre_captioned.mp4"
+                if save_listStep_video(
+                    obs_list, reward_list, terminated_list, truncated_list, info_list, str(step_pre_captioned_path),
+                ):
+                    print(f"Saved step captioned video: {step_pre_captioned_path}")
 
                 subgoal_text = dataset_resolver.get_grounded_subgoal(step_idx)
                 if subgoal_text is None:
@@ -238,9 +180,12 @@ def main():
                         subgoal.extend(i.get('subgoal', []))
                         subgoal_grounded.extend(i.get('subgoal_grounded', []))
 
-
-                
-
+                # Save captioned video for this step (same as keypoint replay)
+                step_captioned_path = video_dir / f"replay_op_{env_id}_ep{episode}_step{step_idx}_captioned.mp4"
+                if save_listStep_video(
+                    obs_list, reward_list, terminated_list, truncated_list, info_list, str(step_captioned_path),
+                ):
+                    print(f"Saved step captioned video: {step_captioned_path}")
 
                 # 用最后一步的 terminated/truncated/info 做循环判断
                 terminated = terminated_list[-1] if terminated_list else False
@@ -250,7 +195,7 @@ def main():
 
                 # 步数达到上限
                 if truncated:
-                    print(f"[{env_id}] episode {episode} 步数超限，步 {step}。")
+                    print(f"[{env_id}] episode {episode} 步数超限，步 {step_idx}。")
                     break
                 # 任务结束（成功或失败）
                 if terminated.any():
@@ -266,8 +211,7 @@ def main():
             
 
             # 保存回放视频（frames + subgoal_grounded）
-            out_video_path = os.path.join(dataset_root, "videos", f"replay_ee_{env_id}_ep{episode}.mp4")
-            env.save_video(out_video_path)
+            env.save_video(str(out_video_path))
             print(f"Saved video: {out_video_path}")
 
 
