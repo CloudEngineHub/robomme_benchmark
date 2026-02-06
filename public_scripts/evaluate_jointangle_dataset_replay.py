@@ -58,7 +58,27 @@ def main():
     gui_render = True
     max_steps = 3000
     render_mode = "human" if gui_render else "rgb_array"
-    env_id_list = ["SwingXtimes"]
+    env_id_list = [
+"PickXtimes",
+"StopCube",
+"SwingXtimes",
+"BinFill",
+
+"VideoUnmaskSwap",
+"VideoUnmask",
+"ButtonUnmaskSwap",
+"ButtonUnmask",
+
+"VideoRepick",
+"VideoPlaceButton",
+"VideoPlaceOrder",
+"PickHighlight",
+
+"InsertPeg",
+'MoveCube',
+"PatternLock",
+"RouteStick"
+    ]
 
     for env_id in env_id_list:
         # ---------- 按 env_id 创建配置解析器与数据集路径 ----------
@@ -73,7 +93,7 @@ def main():
         h5_path = f"{DATASET_ROOT}/record_dataset_{env_id}.h5"
         out_video_dir = os.path.join(DATASET_ROOT, "videos")
 
-        for episode in range(10):
+        for episode in range(2):
             # ---------- 为当前 episode 创建环境与数据集解析器 ----------
             env, seed, difficulty = config_resolver.make_env_for_episode(episode)
             env.save_failed_match_env_id = env_id
@@ -102,8 +122,11 @@ def main():
             reset_captioned_path = os.path.join(out_video_dir, f"replay_{env_id}_ep{episode}_reset_captioned.mp4")
             save_listStep_video(obs_batch, reward_batch, terminated_batch, truncated_batch, info_batch, reset_captioned_path)
 
-            # ---------- 按 step 回放：从数据集取关节角动作执行 ----------
+            # ---------- 按 step 回放：从数据集取关节角动作执行；每步收集帧与字幕（拷贝）用于保存视频 ----------
             step = 0
+            episode_success = False
+            replay_frames = []
+            replay_subgoal_grounded = []
             while True:
                 action = dataset_resolver.get_action(step)
                 obs_batch, reward_batch, terminated_batch, truncated_batch, info_batch = env.step(action)
@@ -118,6 +141,12 @@ def main():
                 language_goal = language_goal_list[-1] if language_goal_list else None
                 subgoal = _flatten_column(info_batch, "subgoal")
                 subgoal_grounded = _flatten_column(info_batch, "subgoal_grounded")
+                # 每步拷贝当前帧与字幕，避免与 env 内部 buffer 共享导致视频每帧相同
+                if image:
+                    replay_frames.append(np.asarray(image[-1]).copy())
+                if subgoal_grounded:
+                    replay_subgoal_grounded.append(subgoal_grounded[-1])
+                    
                 n = int(reward_batch.numel()) if hasattr(reward_batch, "numel") else 0
                 info = _last_info(info_batch, n)
                 terminated = bool(terminated_batch[-1].item()) if n > 0 else False
@@ -134,14 +163,19 @@ def main():
                         isinstance(info.get("success"), torch.Tensor) and info.get("success").item()
                     ):
                         print(f"[{env_id}] episode {episode} 成功。")
+                        episode_success = True
                     elif info.get("fail", False):
                         print(f"[{env_id}] episode {episode} 失败。")
                     break
 
-            # ---------- 保存本 episode 回放视频并关闭资源 ----------
+            # ---------- 保存本 episode 回放视频（用本循环内收集的帧与字幕，不调用 env.save_video）并关闭资源 ----------
             os.makedirs(out_video_dir, exist_ok=True)
-            out_video_path = os.path.join(out_video_dir, f"replay_{env_id}_ep{episode}.mp4")
-            env.save_video(out_video_path)
+            success_prefix = "success" if episode_success else "fail"
+            out_video_path = os.path.join(out_video_dir, f"{success_prefix}_replay_{env_id}_ep{episode}.mp4")
+            if replay_frames and replay_subgoal_grounded:
+                obs_video = {"image": replay_frames}
+                info_video = {"subgoal_grounded": replay_subgoal_grounded}
+                save_listStep_video(obs_video, reward_batch, terminated_batch, truncated_batch, info_video, out_video_path)
             print(f"Saved video: {out_video_path}")
             dataset_resolver.close()
             env.close()

@@ -205,6 +205,8 @@ class EpisodeDatasetResolver:
         if step < len(self._non_demo_record_steps):
             record_step = self._non_demo_record_steps[step]
             action, _ = self.get_action_from_absolute_timestep(record_step)
+            if action is not None and self.env_id in ("PatternLock", "RouteStick"):
+                action = action[:7]
             return action
         return None
 

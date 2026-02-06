@@ -112,13 +112,36 @@ def main():
             obs_batch, reward_batch, terminated_batch, truncated_batch, info_batch = env.reset()
 
               # ---------- 从每个 obs 读取 frame 等，构建列表 ----------
-            frames = []
-            wrist_frames = []
+            maniskill_obs = (obs_batch or {}).get("maniskill_obs", [])
+            image = []
+            wrist_image = []
+            base_camera_depth = []
+            base_camera_segmentation = []
+            wrist_camera_depth = []
+            base_camera_extrinsic_opencv = []
+            base_camera_intrinsic_opencv = []
+            base_camera_cam2world_opengl = []
+            wrist_camera_extrinsic_opencv = []
+            wrist_camera_intrinsic_opencv = []
+            wrist_camera_cam2world_opengl = []
+            robot_endeffector_p = []
+            robot_endeffector_q = []
             actions = []
             states = []
             velocity = []
-            frames.extend(_flatten_column(obs_batch, "frames"))
-            wrist_frames.extend(_flatten_column(obs_batch, "wrist_frames"))
+            image.extend(_flatten_column(obs_batch, "image"))
+            wrist_image.extend(_flatten_column(obs_batch, "wrist_image"))
+            base_camera_depth.extend(_flatten_column(obs_batch, "base_camera_depth"))
+            base_camera_segmentation.extend(_flatten_column(obs_batch, "base_camera_segmentation"))
+            wrist_camera_depth.extend(_flatten_column(obs_batch, "wrist_camera_depth"))
+            base_camera_extrinsic_opencv.extend(_flatten_column(obs_batch, "base_camera_extrinsic_opencv"))
+            base_camera_intrinsic_opencv.extend(_flatten_column(obs_batch, "base_camera_intrinsic_opencv"))
+            base_camera_cam2world_opengl.extend(_flatten_column(obs_batch, "base_camera_cam2world_opengl"))
+            wrist_camera_extrinsic_opencv.extend(_flatten_column(obs_batch, "wrist_camera_extrinsic_opencv"))
+            wrist_camera_intrinsic_opencv.extend(_flatten_column(obs_batch, "wrist_camera_intrinsic_opencv"))
+            wrist_camera_cam2world_opengl.extend(_flatten_column(obs_batch, "wrist_camera_cam2world_opengl"))
+            robot_endeffector_p.extend(_flatten_column(obs_batch, "robot_endeffector_p"))
+            robot_endeffector_q.extend(_flatten_column(obs_batch, "robot_endeffector_q"))
             actions.extend(_flatten_column(obs_batch, "actions"))
             states.extend(_flatten_column(obs_batch, "states"))
             velocity.extend(_flatten_column(obs_batch, "velocity"))
@@ -130,8 +153,12 @@ def main():
             subgoal_grounded = []
             subgoal.extend(_flatten_column(info_batch, "subgoal"))
             subgoal_grounded.extend(_flatten_column(info_batch, "subgoal_grounded"))
+            n = int(reward_batch.numel()) if hasattr(reward_batch, "numel") else 0
+            info = _last_info(info_batch, n)
+            terminated = bool(terminated_batch[-1].item()) if n > 0 else False
+            truncated = bool(truncated_batch[-1].item()) if n > 0 else False
 
-            # 用 reset 后的 frames 和 subgoal_grounded 直接保存为带字幕视频
+            # 用 reset 后的 image 和 subgoal_grounded 直接保存为带字幕视频
             out_video_dir = DATASET_ROOT / "videos"
             os.makedirs(out_video_dir, exist_ok=True)
             reset_captioned_path = os.path.join(out_video_dir, f"replay_ee_{env_id}_ep{episode}_reset_captioned.mp4")
@@ -145,6 +172,9 @@ def main():
             video_dir.mkdir(parents=True, exist_ok=True)
             out_video_path = video_dir / f"replay_kp_{env_id}_ep{episode}.mp4"
             fps = 20
+            episode_success = False
+            replay_frames = []
+            replay_subgoal_grounded = []
 
             step = 0
             while True:
@@ -158,24 +188,51 @@ def main():
                 obs_batch, reward_batch, terminated_batch, truncated_batch, info_batch = env.step(action)
 
                 # 从每个 obs 读取 frame 等，构建列表
-                frames = []
-                wrist_frames = []
+                maniskill_obs = (obs_batch or {}).get("maniskill_obs", [])
+                image = []
+                wrist_image = []
+                base_camera_depth = []
+                base_camera_segmentation = []
+                wrist_camera_depth = []
+                base_camera_extrinsic_opencv = []
+                base_camera_intrinsic_opencv = []
+                base_camera_cam2world_opengl = []
+                wrist_camera_extrinsic_opencv = []
+                wrist_camera_intrinsic_opencv = []
+                wrist_camera_cam2world_opengl = []
+                robot_endeffector_p = []
+                robot_endeffector_q = []
                 actions = []
                 states = []
                 velocity = []
-                frames.extend(_flatten_column(obs_batch, "frames"))
-                wrist_frames.extend(_flatten_column(obs_batch, "wrist_frames"))
+                image.extend(_flatten_column(obs_batch, "image"))
+                wrist_image.extend(_flatten_column(obs_batch, "wrist_image"))
+                base_camera_depth.extend(_flatten_column(obs_batch, "base_camera_depth"))
+                base_camera_segmentation.extend(_flatten_column(obs_batch, "base_camera_segmentation"))
+                wrist_camera_depth.extend(_flatten_column(obs_batch, "wrist_camera_depth"))
+                base_camera_extrinsic_opencv.extend(_flatten_column(obs_batch, "base_camera_extrinsic_opencv"))
+                base_camera_intrinsic_opencv.extend(_flatten_column(obs_batch, "base_camera_intrinsic_opencv"))
+                base_camera_cam2world_opengl.extend(_flatten_column(obs_batch, "base_camera_cam2world_opengl"))
+                wrist_camera_extrinsic_opencv.extend(_flatten_column(obs_batch, "wrist_camera_extrinsic_opencv"))
+                wrist_camera_intrinsic_opencv.extend(_flatten_column(obs_batch, "wrist_camera_intrinsic_opencv"))
+                wrist_camera_cam2world_opengl.extend(_flatten_column(obs_batch, "wrist_camera_cam2world_opengl"))
+                robot_endeffector_p.extend(_flatten_column(obs_batch, "robot_endeffector_p"))
+                robot_endeffector_q.extend(_flatten_column(obs_batch, "robot_endeffector_q"))
                 actions.extend(_flatten_column(obs_batch, "actions"))
                 states.extend(_flatten_column(obs_batch, "states"))
                 velocity.extend(_flatten_column(obs_batch, "velocity"))
                 language_goal_list = (obs_batch or {}).get("language_goal", [])
-                language_goal = language_goal_list[0] if language_goal_list else None
+                language_goal = language_goal_list[-1] if language_goal_list else None
 
                 # 从每个 info 读取
                 subgoal = []
                 subgoal_grounded = []
                 subgoal.extend(_flatten_column(info_batch, "subgoal"))
                 subgoal_grounded.extend(_flatten_column(info_batch, "subgoal_grounded"))
+                if image:
+                    replay_frames.append(np.asarray(image[-1]).copy())
+                if subgoal_grounded:
+                    replay_subgoal_grounded.append(subgoal_grounded[-1])
 
                 # 用最后一步的 terminated/truncated/info 做循环判断
                 n = int(reward_batch.numel()) if hasattr(reward_batch, "numel") else 0
@@ -201,11 +258,15 @@ def main():
                         isinstance(info.get("success"), torch.Tensor) and info.get("success").item()
                     ):
                         print(f"[{env_id}] episode {episode} 成功。")
+                        episode_success = True
                     elif info.get("fail", False):
                         print(f"[{env_id}] episode {episode} 失败。")
                     break
 
-            env.save_video(str(out_video_path))
+            if replay_frames and replay_subgoal_grounded:
+                obs_video = {"image": replay_frames}
+                info_video = {"subgoal_grounded": replay_subgoal_grounded}
+                save_listStep_video(obs_video, reward_batch, terminated_batch, truncated_batch, info_video, str(out_video_path), fps=fps)
             print(f"Saved video: {out_video_path}")
 
             dataset_resolver.close()

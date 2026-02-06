@@ -704,7 +704,7 @@ class HistoryBenchRecordWrapper(gym.Wrapper):
                 try:
                     videos_dir = self.output_root / "videos"
                     videos_dir.mkdir(parents=True, exist_ok=True)
-                    no_object_video_path = videos_dir / f"NO_OBJECT_{video_prefix}_{filename_suffix}.mp4"
+                    no_object_video_path = videos_dir / f"success_NO_OBJECT_{video_prefix}_{filename_suffix}.mp4"
 
                     with imageio.get_writer(no_object_video_path.as_posix(), fps=30, codec="libx264", quality=8) as writer:
                         for combined_frame in self.no_object_video_frames:

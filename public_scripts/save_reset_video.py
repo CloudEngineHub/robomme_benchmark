@@ -7,8 +7,21 @@ from typing import Dict, List, Any
 import numpy as np
 import cv2
 import imageio
+import torch
 
 TEXT_AREA_HEIGHT = 60
+
+
+def _frame_to_numpy(frame: Any) -> np.ndarray:
+    """Convert frame-like input to CPU numpy array for OpenCV/imageio writing."""
+    if isinstance(frame, torch.Tensor):
+        frame = frame.detach()
+        if frame.is_cuda:
+            frame = frame.cpu()
+        frame = frame.numpy()
+    else:
+        frame = np.asarray(frame)
+    return frame
 
 
 def add_text_to_frame(
@@ -17,7 +30,7 @@ def add_text_to_frame(
     text_area_height: int = TEXT_AREA_HEIGHT,
 ) -> np.ndarray:
     """在帧顶部叠加字幕（黑底+白字），样式与 DemonstrationWrapper.save_video 一致。"""
-    frame = np.asarray(frame).copy()
+    frame = _frame_to_numpy(frame).copy()
     if frame.ndim == 2:
         frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2RGB)
     if text is None:
@@ -68,7 +81,7 @@ def save_listStep_video(
     """
     保存 reset 阶段（演示阶段）视频，并使用 subgoal_grounded 作为字幕。
 
-    从 obs_batch["frames"] 提取图像帧，
+    从 obs_batch["image"] 提取图像帧，
     从 info_batch["subgoal_grounded"] 提取字幕，
     并写入 save_path 指定的视频文件。
 
@@ -84,14 +97,14 @@ def save_listStep_video(
     Returns:
         至少写入一帧时返回 True，否则返回 False。
     """
-    frames = []
-    for item in (obs_batch or {}).get("frames", []) or []:
+    image = []
+    for item in (obs_batch or {}).get("image", []) or []:
         if item is None:
             continue
         if isinstance(item, (list, tuple)):
-            frames.extend([x for x in item if x is not None])
+            image.extend([x for x in item if x is not None])
         else:
-            frames.append(item)
+            image.append(item)
 
     subgoal_grounded = []
     for item in (info_batch or {}).get("subgoal_grounded", []) or []:
@@ -102,7 +115,7 @@ def save_listStep_video(
         else:
             subgoal_grounded.append(item)
 
-    n_reset = min(len(frames), len(subgoal_grounded))
+    n_reset = min(len(image), len(subgoal_grounded))
     if n_reset == 0:
         return False
 
@@ -111,7 +124,7 @@ def save_listStep_video(
         os.makedirs(out_dir, exist_ok=True)
     with imageio.get_writer(save_path, fps=fps, codec="libx264", quality=8) as writer:
         for i in range(n_reset):
-            frame = np.asarray(frames[i])
+            frame = _frame_to_numpy(image[i])
             caption = subgoal_grounded[i] if i < len(subgoal_grounded) else ""
             combined = add_text_to_frame(frame, caption)
             writer.append_data(combined)

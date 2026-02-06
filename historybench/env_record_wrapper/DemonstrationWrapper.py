@@ -215,37 +215,9 @@ class DemonstrationWrapper(gym.Wrapper):
 
         return np.vstack((text_area, frame))
 
-    def save_video(self, output_path: Union[str, Path], fps: int = 20):
-        """
-        将 self.frames 与 self.subgoal_grounded 一一对应保存为视频；
-        每帧上方为黑色区域，写入当前 subgoal_grounded 文本（自动换行）。
-        """
-        n = min(len(self.frames), len(self.subgoal_grounded))
-        if n == 0:
-            return
-        output_path = Path(output_path)
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-
-        target_h, target_w = None, None
-        scale = 2  # 分辨率放大两倍，长宽比固定
-        with imageio.get_writer(str(output_path), fps=fps, codec="libx264", quality=8) as writer:
-            for i in range(n):
-                frame = np.asarray(self.frames[i]).copy()
-                text = self.subgoal_grounded[i] if i < len(self.subgoal_grounded) else ""
-                combined = self._add_text_to_frame(frame, text)
-                if combined.ndim == 2:
-                    combined = cv2.cvtColor(combined, cv2.COLOR_GRAY2RGB)
-                if target_h is None:
-                    target_h, target_w = combined.shape[:2]
-                if combined.shape[0] != target_h or combined.shape[1] != target_w:
-                    combined = cv2.resize(combined, (int(target_w), int(target_h)), interpolation=cv2.INTER_LINEAR)
-                out_w, out_h = int(target_w) * scale, int(target_h) * scale
-                combined = cv2.resize(combined, (out_w, out_h), interpolation=cv2.INTER_LINEAR)
-                writer.append_data(combined)
-
     def save_frame_as_image(self, output_path: Union[str, Path], frame: np.ndarray, text=None):
         """
-        将单帧与文本叠加（与 save_video 中单帧逻辑一致）并保存为图片。
+        将单帧与文本叠加并保存为图片。
         """
         output_path = Path(output_path)
         output_path.parent.mkdir(parents=True, exist_ok=True)
