@@ -148,7 +148,7 @@ def main():
                 print(f"WARNING: Reset video not saved (no frames or no subgoal_grounded): {reset_captioned_path}")
 
 
-            # ---------- 按 step 回放：action = [eep, eeq, gripper]（或 PatternLock/RouteStick 为 7 维），wrapper 内做 IK ----------
+            # ---------- 按 step 回放：action 统一为 [eep, eeq, gripper] 8 维，wrapper 内做 IK 与 stick 维度兼容 ----------
             episode_success = False
             step = 0
             replay_frames = []

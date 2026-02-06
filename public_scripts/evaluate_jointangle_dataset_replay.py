@@ -59,23 +59,23 @@ def main():
     max_steps = 3000
     render_mode = "human" if gui_render else "rgb_array"
     env_id_list = [
-"PickXtimes",
-"StopCube",
-"SwingXtimes",
-"BinFill",
+# "PickXtimes",
+# "StopCube",
+# "SwingXtimes",
+# "BinFill",
 
-"VideoUnmaskSwap",
-"VideoUnmask",
-"ButtonUnmaskSwap",
-"ButtonUnmask",
+# "VideoUnmaskSwap",
+# "VideoUnmask",
+# "ButtonUnmaskSwap",
+# "ButtonUnmask",
 
-"VideoRepick",
-"VideoPlaceButton",
-"VideoPlaceOrder",
-"PickHighlight",
+# "VideoRepick",
+# "VideoPlaceButton",
+# "VideoPlaceOrder",
+# "PickHighlight",
 
-"InsertPeg",
-'MoveCube',
+# "InsertPeg",
+# 'MoveCube',
 "PatternLock",
 "RouteStick"
     ]
@@ -145,6 +145,8 @@ def main():
             replay_subgoal_grounded = []
             while True:
                 action = dataset_resolver.get_action(step)
+                if action is None:
+                    break
                 obs_batch, reward_batch, terminated_batch, truncated_batch, info_batch = env.step(action)
 
                 # 从 batch 读取（供调试或后续逻辑）

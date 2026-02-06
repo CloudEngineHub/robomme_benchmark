@@ -1,8 +1,8 @@
 """
 EndeffectorDemonstrationWrapper：外层包装器，接收 ee_pose 动作并经 IK 转成关节动作。
 
-- 常规环境：action = [ee_p(3), ee_q(4), gripper(1)]，共 8 维
-- PatternLock/RouteStick：action = [ee_p(3), ee_q(4)]，共 7 维（无 gripper）
+- 统一外部接口：优先使用 action = [ee_p(3), ee_q(4), gripper(1)]，共 8 维
+- PatternLock/RouteStick：内部忽略 gripper，并下传 7 维 joint action
 """
 import numpy as np
 import gymnasium as gym
@@ -13,13 +13,13 @@ from mani_skill.examples.motionplanning.panda.motionplanner import PandaArmMotio
 class EndeffectorDemonstrationWrapper(gym.Wrapper):
     """
     封装一个期望关节动作的环境。step(action) 接收 ee pose：
-    - 常规环境：action = [ee_p(3), ee_q(4), gripper(1)]（8 维）
-    - PatternLock/RouteStick：action = [ee_p(3), ee_q(4)]（7 维）
+    - 统一外部输入：action = [ee_p(3), ee_q(4), gripper(1)]（8 维）
+    - PatternLock/RouteStick 兼容 len>=7 输入，并在内部忽略 gripper
     内部先做 IK 得到 joint_action，再调用内层 env.step(joint_action)，并返回：
     (obs_batch, reward_batch, terminated_batch, truncated_batch, info_batch)。
     """
 
-    # 与 EpisodeDatasetResolver 保持一致：这两个环境只使用 7 维 ee_pose（无 gripper）。
+    # resolver 已统一 8 维输出；stick 环境内部忽略 gripper 并下传 7 维 joint action。
     _EE_POSE_7D_ENV_IDS = ("PatternLock", "RouteStick")
 
     def __init__(self, env):

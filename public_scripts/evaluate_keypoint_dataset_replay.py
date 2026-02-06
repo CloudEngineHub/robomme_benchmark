@@ -65,6 +65,7 @@ def main():
     """
     主函数：使用数据集中的 keypoint 执行回放。
     每个 episode 通过 EpisodeDatasetResolver.get_keypoint(step) 逐步取动作，
+    get_keypoint 对所有环境均返回 8 维 [keypoint_p, keypoint_q, gripper]。
     整体流程与 evaluate_endeffector_dataset_replay 的结构保持一致。
     """
 
@@ -82,11 +83,11 @@ def main():
 # "VideoRepick",
 # "VideoPlaceButton",
 # "VideoPlaceOrder",
-"PickHighlight",
+#"PickHighlight",
 
 # "InsertPeg",
 # 'MoveCube',
-# "PatternLock",
+ "PatternLock",
 # "RouteStick"
     ]
 

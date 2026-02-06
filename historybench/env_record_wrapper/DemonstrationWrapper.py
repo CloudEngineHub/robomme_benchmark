@@ -415,9 +415,29 @@ class DemonstrationWrapper(gym.Wrapper):
             failed_match = placeholder_count > 0 and self.latched_replacements is None
             return (current_subgoal_segment, failed_match)
 
+    _STICK_ENV_IDS = ("PatternLock", "RouteStick")
+
+    def _normalize_action_for_env_step(self, action) -> np.ndarray:
+        """
+        Normalize external action to the dimensionality required by the wrapped env.step.
+        - PatternLock/RouteStick: accept len>=7 and pass first 7 dims.
+        - Other envs: accept len>=8 and pass first 8 dims.
+        """
+        env_spec = getattr(self.unwrapped, "spec", None)
+        env_id = getattr(env_spec, "id", "<unknown_env>")
+        action_arr = np.asarray(action, dtype=np.float64).flatten()
+        if env_id in self._STICK_ENV_IDS:
+            if action_arr.size < 7:
+                raise ValueError(f"[{env_id}] action must have at least 7 elements, got {action_arr.size}")
+            return action_arr[:7]
+        if action_arr.size < 8:
+            raise ValueError(f"[{env_id}] action must have at least 8 elements, got {action_arr.size}")
+        return action_arr[:8]
+
     def step(self, action):
         """执行一步并返回统一批次（N=1）。"""
-        obs, reward, terminated, truncated, info = super().step(action)
+        normalized_action = self._normalize_action_for_env_step(action)
+        obs, reward, terminated, truncated, info = super().step(normalized_action)
 
         # ---------- 子目标分割与占位符填充：内部从 obs 解析分割并计算中心、填充占位符 ----------
         filled_text, failed_match = self._compute_segmentation_and_fill_subgoal(obs)
@@ -443,11 +463,11 @@ class DemonstrationWrapper(gym.Wrapper):
         if terminated.any() and not self._doing_extra_step:
             self._doing_extra_step = True
             try:
-                self.step(action)
+                self.step(normalized_action)
             finally:
                 self._doing_extra_step = False
 
-        obs, info = self._augment_obs_and_info(obs, info, action)
+        obs, info = self._augment_obs_and_info(obs, info, normalized_action)
         return planner_denseStep.to_step_batch([(obs, reward, terminated, truncated, info)])
 
     def close(self):

@@ -3,6 +3,7 @@ MultiStepDemonstrationWrapper：封装 DemonstrationWrapper，对外提供 keypo
 
 每次 step(action) 接收 action = keypoint_p(3) + keypoint_q(4) + gripper_action(1)，共 8 维。
 内部通过 planner_denseStep 调用 move_to_pose_with_RRTStar 与 close_gripper/open_gripper，
+其中 PatternLock/RouteStick 会强制跳过 close_gripper/open_gripper。
 返回统一批次（obs/info 为字典列式列表，reward/terminated/truncated 为一维张量）。
 调用方需保证 scripts/ 在 sys.path 中，以便导入 planner_fail_safe。
 """
@@ -108,6 +109,7 @@ class MultiStepDemonstrationWrapper(gym.Wrapper):
 
         pose = sapien.Pose(p=keypoint_p, q=keypoint_q)
         planner = self._get_planner()
+        is_stick_env = self.env.unwrapped.spec.id in ("PatternLock", "RouteStick")
 
         current_p = self._current_tcp_p()
         dist = np.linalg.norm(current_p - keypoint_p)
@@ -123,19 +125,18 @@ class MultiStepDemonstrationWrapper(gym.Wrapper):
                 raise RRTPlanFailure("move_to_pose_with_RRTStar failed (returned -1)")
             collected_steps.extend(move_steps)
 
-        # 仅当规划器支持夹爪接口时才执行夹爪动作（如 stick 规划器无开合夹爪接口）。
-        if gripper_action == -1:
-            if hasattr(planner, "close_gripper"):
-                result = planner_denseStep.close_gripper(planner)
-                if result != -1:
-                    collected_steps.extend(self._batch_to_steps(result))
-            # 否则（如 stick 规划器）跳过夹爪关闭步骤。
-        elif gripper_action == 1:
-            if hasattr(planner, "open_gripper"):
-                result = planner_denseStep.open_gripper(planner)
-                if result != -1:
-                    collected_steps.extend(self._batch_to_steps(result))
-            # 否则（如 stick 规划器）跳过夹爪打开步骤。
+        # PatternLock/RouteStick 强制跳过夹爪动作（即使规划器对象存在同名方法）。
+        if not is_stick_env:
+            if gripper_action == -1:
+                if hasattr(planner, "close_gripper"):
+                    result = planner_denseStep.close_gripper(planner)
+                    if result != -1:
+                        collected_steps.extend(self._batch_to_steps(result))
+            elif gripper_action == 1:
+                if hasattr(planner, "open_gripper"):
+                    result = planner_denseStep.open_gripper(planner)
+                    if result != -1:
+                        collected_steps.extend(self._batch_to_steps(result))
 
         return planner_denseStep.to_step_batch(collected_steps)
 

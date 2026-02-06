@@ -155,8 +155,9 @@ class EpisodeDatasetResolver:
 
     def get_keypoint(self, step: int) -> Optional[np.ndarray]:
         """
-        Return 8-d keypoint action [keypoint_p(3), keypoint_q(4), gripper(1)] for the step-th
-        non-demonstration timestep that has keypoint data (keypoint_p, keypoint_q).
+        Return 8-d keypoint action [keypoint_p(3), keypoint_q(4), gripper(1)]
+        for the step-th non-demonstration timestep that has keypoint data
+        (keypoint_p, keypoint_q), for all envs.
         Returns None when step is out of range or no more keypoints.
         """
         while step >= len(self._non_demo_keypoint_record_steps) and self._keypoint_scan_cursor < len(self._timestep_indexes):
@@ -192,7 +193,8 @@ class EpisodeDatasetResolver:
 
     def get_action(self, step: int) -> Optional[np.ndarray]:
         """
-        Return the action for the step-th non-demo timestep (0 = first non-demo).
+        Return 8-d joint action for the step-th non-demo timestep (0 = first non-demo),
+        for all envs.
         Builds non-demo index lazily: only scans forward as needed, no full iterate.
         Returns None when step is out of range (no more steps).
         """
@@ -205,8 +207,6 @@ class EpisodeDatasetResolver:
         if step < len(self._non_demo_record_steps):
             record_step = self._non_demo_record_steps[step]
             action, _ = self.get_action_from_absolute_timestep(record_step)
-            if action is not None and self.env_id in ("PatternLock", "RouteStick"):
-                action = action[:7]
             return action
         return None
 
@@ -231,13 +231,10 @@ class EpisodeDatasetResolver:
             return self.get_ee_pose_from_absolute_timestep(record_step)
         return None, None
 
-    # 仅 [ee_p, ee_q] 7 维、不包含 gripper 的 env（与 ManiSkill action 空间一致）
-    _EE_POSE_7D_ENV_IDS = ("PatternLock", "RouteStick")
-
     def get_ee_pose_gripper(self, step: int) -> Optional[np.ndarray]:
         """
-        Return ee action for the step-th non-demo timestep.
-        For most envs: [ee_p, ee_q, gripper] 8d; for PatternLock/RouteStick: [ee_p, ee_q] 7d.
+        Return 8-d ee action [ee_p(3), ee_q(4), gripper(1)] for the step-th
+        non-demo timestep, for all envs.
         Same step resolution as get_ee_pose. Returns None if pose is missing.
         """
         while step >= len(self._non_demo_record_steps) and self._scan_cursor < len(self._timestep_indexes):
@@ -261,14 +258,12 @@ class EpisodeDatasetResolver:
         q = timestep_group["robot_endeffector_q"][()] if "robot_endeffector_q" in timestep_group else None
         if p is None or q is None:
             return None
-        p_flat = np.asarray(p, dtype=np.float64).flatten()
-        q_flat = np.asarray(q, dtype=np.float64).flatten()
-        if self.env_id in self._EE_POSE_7D_ENV_IDS:
-            return np.concatenate([p_flat, q_flat])  # 7 维 [ee_p, ee_q]
+        p_flat = np.asarray(p, dtype=np.float64).flatten()[:3]
+        q_flat = np.asarray(q, dtype=np.float64).flatten()[:4]
         raw_action = timestep_group["action"][()] if "action" in timestep_group else None
         action_8d = _action_to_8d(raw_action)
         gripper = float(action_8d[-1]) if action_8d is not None and len(action_8d) > 0 else -1.0
-        return np.concatenate([p_flat, q_flat, [gripper]])  # 8 维
+        return np.concatenate([p_flat, q_flat, [gripper]]).astype(np.float64)
 
     def get_grounded_subgoal(self, step_idx: int) -> Optional[str]:
         """
