@@ -142,6 +142,18 @@ class DemonstrationWrapper(gym.Wrapper):
             'states': [self.states[-1]] if self.states else [],
             'velocity': [self.velocity[-1]] if self.velocity else [],
             'language_goal': language_goal,
+            # 占位为空，供 evaluate 等脚本统一 _flatten_column 读取
+            'base_camera_depth': [],#obs['sensor_data']['base_camera']['depth']
+            'base_camera_segmentation': [],#obs['sensor_data']['base_camera']['segmentation']
+          wrist_camera_depth = obs['sensor_data']['hand_camera']['depth']
+        base_camera_extrinsic_opencv=obs['sensor_param']['base_camera']['extrinsic_cv']
+        base_camera_intrinsic_opencv=obs['sensor_param']['base_camera']['intrinsic_cv']
+        base_camera_cam2world_opengl=obs['sensor_param']['base_camera']['cam2world_gl']
+        wrist_camera_extrinsic_opencv=obs['sensor_param']['hand_camera']['extrinsic_cv']
+        wrist_camera_intrinsic_opencv=obs['sensor_param']['hand_camera']['intrinsic_cv']
+        wrist_camera_cam2world_opengl=obs['sensor_param']['hand_camera']['cam2world_gl']
+            'robot_endeffector_p': self.agent.tcp.pose.p
+            'robot_endeffector_q': self.agent.tcp.pose.q
         }
         new_info = {
             **info,
