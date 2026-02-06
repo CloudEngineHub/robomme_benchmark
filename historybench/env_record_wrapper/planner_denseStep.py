@@ -9,6 +9,7 @@
 - terminated_batch/truncated_batch: torch.bool，形状为 [N]。
 """
 
+import numpy as np
 import torch
 
 
@@ -19,6 +20,35 @@ def _to_scalar(value):
             return 0
         return value.reshape(-1)[0].item()
     return value
+
+
+def _snapshot_value(value):
+    """对可能复用底层内存的值做快照，避免后续步骤覆盖前序帧。"""
+    if isinstance(value, torch.Tensor):
+        return value.detach().clone()
+    if isinstance(value, np.ndarray):
+        return value.copy()
+    if isinstance(value, dict):
+        return {k: _snapshot_value(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_snapshot_value(v) for v in value]
+    if isinstance(value, tuple):
+        return tuple(_snapshot_value(v) for v in value)
+    return value
+
+
+def _snapshot_step(out):
+    """对单步输出做深拷贝快照。"""
+    if not (isinstance(out, tuple) and len(out) == 5):
+        return out
+    obs, reward, terminated, truncated, info = out
+    return (
+        _snapshot_value(obs),
+        _snapshot_value(reward),
+        _snapshot_value(terminated),
+        _snapshot_value(truncated),
+        _snapshot_value(info),
+    )
 
 
 def _is_columnar_dict(batch_dict, n):
@@ -58,11 +88,19 @@ def _output_to_steps(out):
                 obs_keys = list(obs_part.keys())
                 info_keys = list(info_part.keys())
                 for idx in range(n):
-                    obs = {k: obs_part[k][idx] for k in obs_keys}
-                    info = {k: info_part[k][idx] for k in info_keys}
-                    steps.append((obs, reward_part[idx], terminated_part[idx], truncated_part[idx], info))
+                    obs = {k: _snapshot_value(obs_part[k][idx]) for k in obs_keys}
+                    info = {k: _snapshot_value(info_part[k][idx]) for k in info_keys}
+                    steps.append(
+                        (
+                            obs,
+                            _snapshot_value(reward_part[idx]),
+                            _snapshot_value(terminated_part[idx]),
+                            _snapshot_value(truncated_part[idx]),
+                            info,
+                        )
+                    )
                 return steps
-    return [out]
+    return [_snapshot_step(out)]
 
 
 def _dicts_to_columnar_dict(dict_steps):

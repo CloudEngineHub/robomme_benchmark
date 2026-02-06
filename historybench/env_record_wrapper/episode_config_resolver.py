@@ -137,7 +137,7 @@ class EpisodeConfigResolver:
         if self.action_space == "keypoint":
             from .MultiStepDemonstrationWrapper import MultiStepDemonstrationWrapper
 
-            env = MultiStepDemonstrationWrapper(env, gui_render=self.gui_render, vis=True)
+            env = MultiStepDemonstrationWrapper(env, gui_render=self.gui_render, vis=self.gui_render)
         
         if self.action_space == "oracle_planner":
             from .OraclePlannerDemonstrationWrapper import OraclePlannerDemonstrationWrapper

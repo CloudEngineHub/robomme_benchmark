@@ -55,7 +55,7 @@ def main():
     每个 episode 仅回放非 demonstration 的动作（跳过 demonstration 步）。
     """
     # ---------- 全局配置 ----------
-    gui_render = True
+    gui_render = False
     max_steps = 3000
     render_mode = "human" if gui_render else "rgb_array"
     env_id_list = [
@@ -108,8 +108,20 @@ def main():
             obs_batch, reward_batch, terminated_batch, truncated_batch, info_batch = env.reset()
 
             # 从 obs_batch / info_batch 抽取并合并成列表
-            frames = _flatten_column(obs_batch, "frames")
-            wrist_frames = _flatten_column(obs_batch, "wrist_frames")
+            maniskill_obs = (obs_batch or {}).get("maniskill_obs", [])
+            base_camera = _flatten_column(obs_batch, "base_camera")
+            wrist_camera = _flatten_column(obs_batch, "wrist_camera")
+            base_camera_depth = _flatten_column(obs_batch, "base_camera_depth")
+            base_camera_segmentation = _flatten_column(obs_batch, "base_camera_segmentation")
+            wrist_camera_depth = _flatten_column(obs_batch, "wrist_camera_depth")
+            base_camera_extrinsic_opencv = _flatten_column(obs_batch, "base_camera_extrinsic_opencv")
+            base_camera_intrinsic_opencv = _flatten_column(obs_batch, "base_camera_intrinsic_opencv")
+            base_camera_cam2world_opengl = _flatten_column(obs_batch, "base_camera_cam2world_opengl")
+            wrist_camera_extrinsic_opencv = _flatten_column(obs_batch, "wrist_camera_extrinsic_opencv")
+            wrist_camera_intrinsic_opencv = _flatten_column(obs_batch, "wrist_camera_intrinsic_opencv")
+            wrist_camera_cam2world_opengl = _flatten_column(obs_batch, "wrist_camera_cam2world_opengl")
+            robot_endeffector_p = _flatten_column(obs_batch, "robot_endeffector_p")
+            robot_endeffector_q = _flatten_column(obs_batch, "robot_endeffector_q")
             actions = _flatten_column(obs_batch, "actions")
             states = _flatten_column(obs_batch, "states")
             velocity = _flatten_column(obs_batch, "velocity")
@@ -118,9 +130,13 @@ def main():
             subgoal = _flatten_column(info_batch, "subgoal")
             subgoal_grounded = _flatten_column(info_batch, "subgoal_grounded")
 
-            # 用 reset 后的 frames 和 subgoal_grounded 直接保存为带字幕视频
+            # save_listStep_video 需要 obs["image"] 和 info["subgoal_grounded"]；环境返回的是 base_camera，需转成 image
             reset_captioned_path = os.path.join(out_video_dir, f"replay_{env_id}_ep{episode}_reset_captioned.mp4")
-            save_listStep_video(obs_batch, reward_batch, terminated_batch, truncated_batch, info_batch, reset_captioned_path)
+            reset_obs_for_video = {"image": base_camera} if base_camera else {}
+            if save_listStep_video(reset_obs_for_video, reward_batch, terminated_batch, truncated_batch, info_batch, reset_captioned_path):
+                print(f"Saved reset captioned video: {reset_captioned_path}")
+            else:
+                print(f"WARNING: Reset video not saved (no frames or no subgoal_grounded): {reset_captioned_path}")
 
             # ---------- 按 step 回放：从数据集取关节角动作执行；每步收集帧与字幕（拷贝）用于保存视频 ----------
             step = 0
@@ -132,8 +148,20 @@ def main():
                 obs_batch, reward_batch, terminated_batch, truncated_batch, info_batch = env.step(action)
 
                 # 从 batch 读取（供调试或后续逻辑）
-                image = _flatten_column(obs_batch, "frames")
-                wrist_image = _flatten_column(obs_batch, "wrist_frames")
+                maniskill_obs = (obs_batch or {}).get("maniskill_obs", [])
+                base_camera = _flatten_column(obs_batch, "base_camera")
+                wrist_camera = _flatten_column(obs_batch, "wrist_camera")
+                base_camera_depth = _flatten_column(obs_batch, "base_camera_depth")
+                base_camera_segmentation = _flatten_column(obs_batch, "base_camera_segmentation")
+                wrist_camera_depth = _flatten_column(obs_batch, "wrist_camera_depth")
+                base_camera_extrinsic_opencv = _flatten_column(obs_batch, "base_camera_extrinsic_opencv")
+                base_camera_intrinsic_opencv = _flatten_column(obs_batch, "base_camera_intrinsic_opencv")
+                base_camera_cam2world_opengl = _flatten_column(obs_batch, "base_camera_cam2world_opengl")
+                wrist_camera_extrinsic_opencv = _flatten_column(obs_batch, "wrist_camera_extrinsic_opencv")
+                wrist_camera_intrinsic_opencv = _flatten_column(obs_batch, "wrist_camera_intrinsic_opencv")
+                wrist_camera_cam2world_opengl = _flatten_column(obs_batch, "wrist_camera_cam2world_opengl")
+                robot_endeffector_p = _flatten_column(obs_batch, "robot_endeffector_p")
+                robot_endeffector_q = _flatten_column(obs_batch, "robot_endeffector_q")
                 last_action = _flatten_column(obs_batch, "actions")
                 state = _flatten_column(obs_batch, "states")
                 velocity = _flatten_column(obs_batch, "velocity")
@@ -142,8 +170,11 @@ def main():
                 subgoal = _flatten_column(info_batch, "subgoal")
                 subgoal_grounded = _flatten_column(info_batch, "subgoal_grounded")
                 # 每步拷贝当前帧与字幕，避免与 env 内部 buffer 共享导致视频每帧相同
-                if image:
-                    replay_frames.append(np.asarray(image[-1]).copy())
+                if base_camera:
+                    frame = base_camera[-1]
+                    if hasattr(frame, "cpu"):
+                        frame = frame.cpu()
+                    replay_frames.append(np.asarray(frame).copy())
                 if subgoal_grounded:
                     replay_subgoal_grounded.append(subgoal_grounded[-1])
                     
@@ -176,7 +207,9 @@ def main():
                 obs_video = {"image": replay_frames}
                 info_video = {"subgoal_grounded": replay_subgoal_grounded}
                 save_listStep_video(obs_video, reward_batch, terminated_batch, truncated_batch, info_video, out_video_path)
-            print(f"Saved video: {out_video_path}")
+                print(f"Saved video: {out_video_path}")
+            else:
+                print(f"Skipped video (no frames or no subtitles): {out_video_path}")
             dataset_resolver.close()
             env.close()
 
