@@ -1,6 +1,7 @@
 import os
 import sys
 import json
+import argparse
 import numpy as np
 from pathlib import Path
 
@@ -20,6 +21,61 @@ import torch
 
 OUTPUT_ROOT = Path(__file__).resolve().parents[1]
 DATASET_ROOT = Path("/data/hongzefu/dataset_generate")
+DEFAULT_ENV_IDS = [
+    # "PickXtimes",
+    # "StopCube",
+    # "SwingXtimes",
+    # "BinFill",
+    # "VideoUnmaskSwap",
+    # "VideoUnmask",
+    # "ButtonUnmaskSwap",
+    "ButtonUnmask",
+    # "VideoRepick",
+    # "VideoPlaceButton",
+    # "VideoPlaceOrder",
+    # "PickHighlight",
+    # "InsertPeg",
+    # "MoveCube",
+    # "PatternLock",
+    # "RouteStick",
+]
+
+
+def _parse_args():
+    parser = argparse.ArgumentParser(
+        description="Replay keypoint dataset trajectories."
+    )
+    parser.add_argument(
+        "--env-id",
+        dest="env_ids",
+        action="append",
+        default=None,
+        help=(
+            "Specify env id(s) to run. Can be passed multiple times or as comma-separated values. "
+            "Default: run all 16 envs."
+        ),
+    )
+    return parser.parse_args()
+
+
+def _resolve_env_ids(env_args):
+    if not env_args:
+        return list(DEFAULT_ENV_IDS)
+
+    selected = []
+    for raw in env_args:
+        for env_id in raw.split(","):
+            env_id = env_id.strip()
+            if not env_id:
+                continue
+            if env_id not in DEFAULT_ENV_IDS:
+                raise ValueError(
+                    f"Unknown env_id '{env_id}'. Available: {', '.join(DEFAULT_ENV_IDS)}"
+                )
+            if env_id not in selected:
+                selected.append(env_id)
+
+    return selected if selected else list(DEFAULT_ENV_IDS)
 
 
 def _flatten_column(batch_dict, key):
@@ -69,29 +125,11 @@ def main():
     整体流程与 evaluate_endeffector_dataset_replay 的结构保持一致。
     """
 
-    env_id_list = [
-"PickXtimes",
-"StopCube",
-"SwingXtimes",
-"BinFill",
+    args = _parse_args()
+    env_id_list = _resolve_env_ids(args.env_ids)
+    print(f"Running envs: {env_id_list}")
 
-"VideoUnmaskSwap",
-"VideoUnmask",
-"ButtonUnmaskSwap",
-"ButtonUnmask",
-
-"VideoRepick",
-"VideoPlaceButton",
-"VideoPlaceOrder",
-"PickHighlight",
-
-"InsertPeg",
-'MoveCube',
- "PatternLock",
-"RouteStick"
-    ]
-
-    gui_render = False
+    gui_render = True
     render_mode = "human" if gui_render else "rgb_array"
     max_steps_without_demonstration = 2000
 
@@ -112,9 +150,13 @@ def main():
             max_steps_without_demonstration=max_steps_without_demonstration,
             action_space="keypoint",
         )
+        video_dir = DATASET_ROOT / "videos" / "keypoint"
+        video_dir.mkdir(parents=True, exist_ok=True)
 
         for episode_record in episode_records:
             episode = episode_record["episode"]
+            if episode != 4:
+                continue
 
             seed = episode_record.get("seed")
             difficulty = episode_record.get("difficulty")
@@ -158,18 +200,14 @@ def main():
             truncated = bool(truncated_batch[-1].item()) if n > 0 else False
 
             # save_listStep_video 需要 obs["image"] 和 info["subgoal_grounded"]；环境返回的是 base_camera，需转成 image
-            out_video_dir = DATASET_ROOT / "videos"
-            os.makedirs(out_video_dir, exist_ok=True)
             fps = 20
-            reset_captioned_path = os.path.join(out_video_dir, f"replay_kp_{env_id}_ep{episode}_reset_captioned.mp4")
+            reset_captioned_path = os.path.join(video_dir, f"replay_kp_{env_id}_ep{episode}_reset_captioned.mp4")
             reset_obs_for_video = {"image": base_camera} if base_camera else {}
             # if save_listStep_video(reset_obs_for_video, reward_batch, terminated_batch, truncated_batch, info_batch, reset_captioned_path, fps=fps):
             #     print(f"Saved reset captioned video: {reset_captioned_path}")
             # else:
             #     print(f"WARNING: Reset video not saved (no frames or no subgoal_grounded): {reset_captioned_path}")
 
-            video_dir = DATASET_ROOT / "videos"
-            video_dir.mkdir(parents=True, exist_ok=True)
             episode_success = False
             replay_frames = []
             replay_subgoal_grounded = []

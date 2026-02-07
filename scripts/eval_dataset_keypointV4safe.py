@@ -146,9 +146,9 @@ def main():
 # "VideoUnmaskSwap",
 # "VideoUnmask",
 # "ButtonUnmaskSwap",
-# "ButtonUnmask",
+ "ButtonUnmask",
 
-"VideoRepick",
+#"VideoRepick",
 #  "VideoPlaceButton",
 # "VideoPlaceOrder",
 # "PickHighlight",
@@ -179,10 +179,9 @@ def main():
         
         print(f"Found {len(episode_records)} episodes and {len(all_keypoints)} keypoints for {env_id}")
         
-        # 初始化 EpisodeConfigResolver
+        # 初始化 EpisodeConfigResolver（仅用 metadata_path 解析 seed/difficulty，不传 dataset）
         resolver = EpisodeConfigResolver(
             env_id=env_id,
-            dataset=None,
             metadata_path=metadata_path,
             render_mode="human",
             gui_render=True,
@@ -192,8 +191,8 @@ def main():
         # 遍历所有 episode
         for episode_record in episode_records:
 
-            # if episode_record['episode'] != 0:
-            #     continue
+            if episode_record['episode'] != 4:
+                continue
 
             episode = episode_record['episode']
             seed = episode_record.get('seed')
@@ -201,8 +200,8 @@ def main():
             
             print(f"--- Running simulation for episode:{episode}, env: {env_id}, seed: {seed}, difficulty: {difficulty} ---")
             
-            # 使用 EpisodeConfigResolver 创建环境
-            env, episode_dataset, resolved_seed, resolved_difficulty = resolver.make_env_for_episode(episode)
+            # 使用 EpisodeConfigResolver 创建环境（返回 env, seed, difficulty_hint）
+            env, resolved_seed, resolved_difficulty = resolver.make_env_for_episode(episode)
             env.reset()
         
             
@@ -215,7 +214,7 @@ def main():
                     base_pose=env.unwrapped.agent.robot.pose,
                     visualize_target_grasp_pose=False,
                     print_env_info=False,
-                    joint_vel_limits=0.3,
+                    
                 )
             else:
                 planner = FailAwarePandaArmMotionPlanningSolver(
@@ -279,7 +278,9 @@ def main():
                     if dist < 0.001:  # 阈值可调整，例如 5mm
                         print(f"Target too close (dist={dist:.6f}), skipping planner motion.")
                     else:
-                        planner.move_to_pose_with_RRTStar(pose)
+                        #planner.move_to_pose_with_RRTStar(pose)
+                        planner.move_to_pose_with_screw(pose)
+                      
                     #import pdb; pdb.set_trace()
                     # try:
                     #     planner.move_to_pose_with_screw(pose)

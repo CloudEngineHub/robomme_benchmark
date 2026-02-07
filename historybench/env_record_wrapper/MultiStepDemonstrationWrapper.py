@@ -115,15 +115,15 @@ class MultiStepDemonstrationWrapper(gym.Wrapper):
         dist = np.linalg.norm(current_p - keypoint_p)
 
         collected_steps = []
-        if dist < 0.001:
-            collected_steps.append(self._no_op_step())
-        else:
-            move_steps = planner_denseStep._collect_dense_steps(
-                planner, lambda: planner.move_to_pose_with_RRTStar(pose)
-            )
-            if move_steps == -1:
-                raise RRTPlanFailure("move_to_pose_with_RRTStar failed (returned -1)")
-            collected_steps.extend(move_steps)
+        # if dist < 0.001:
+        #     collected_steps.append(self._no_op_step())
+        # else:
+        move_steps = planner_denseStep._collect_dense_steps(
+            planner, lambda: planner.move_to_pose_with_screw(pose)
+        )
+        if move_steps == -1:
+            raise RRTPlanFailure("move_to_pose_with_screw failed (returned -1)")
+        collected_steps.extend(move_steps)
 
         # PatternLock/RouteStick 强制跳过夹爪动作（即使规划器对象存在同名方法）。
         if not is_stick_env:

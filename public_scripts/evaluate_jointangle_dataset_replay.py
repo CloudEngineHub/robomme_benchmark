@@ -2,6 +2,7 @@
 
 import os
 import sys
+import argparse
 from pathlib import Path
 from typing import List, Optional
 
@@ -28,6 +29,61 @@ from save_reset_video import save_listStep_video
 
 # 数据集根目录（包含 record_dataset_*_metadata.json 与 record_dataset_*.h5）
 DATASET_ROOT = "/data/hongzefu/dataset_generate"
+DEFAULT_ENV_IDS = [
+    "PickXtimes",
+    "StopCube",
+    "SwingXtimes",
+    "BinFill",
+    "VideoUnmaskSwap",
+    "VideoUnmask",
+    "ButtonUnmaskSwap",
+    "ButtonUnmask",
+    "VideoRepick",
+    "VideoPlaceButton",
+    "VideoPlaceOrder",
+    "PickHighlight",
+    "InsertPeg",
+    "MoveCube",
+    "PatternLock",
+    "RouteStick",
+]
+
+
+def _parse_args():
+    parser = argparse.ArgumentParser(
+        description="Replay joint-angle dataset trajectories."
+    )
+    parser.add_argument(
+        "--env-id",
+        dest="env_ids",
+        action="append",
+        default=None,
+        help=(
+            "Specify env id(s) to run. Can be passed multiple times or as comma-separated values. "
+            "Default: run all 16 envs."
+        ),
+    )
+    return parser.parse_args()
+
+
+def _resolve_env_ids(env_args):
+    if not env_args:
+        return list(DEFAULT_ENV_IDS)
+
+    selected = []
+    for raw in env_args:
+        for env_id in raw.split(","):
+            env_id = env_id.strip()
+            if not env_id:
+                continue
+            if env_id not in DEFAULT_ENV_IDS:
+                raise ValueError(
+                    f"Unknown env_id '{env_id}'. Available: {', '.join(DEFAULT_ENV_IDS)}"
+                )
+            if env_id not in selected:
+                selected.append(env_id)
+
+    return selected if selected else list(DEFAULT_ENV_IDS)
 
 
 def _flatten_column(batch_dict, key):
@@ -58,27 +114,9 @@ def main():
     gui_render = False
     max_steps = 3000
     render_mode = "human" if gui_render else "rgb_array"
-    env_id_list = [
-"PickXtimes",
-"StopCube",
-"SwingXtimes",
-"BinFill",
-
-"VideoUnmaskSwap",
-"VideoUnmask",
-"ButtonUnmaskSwap",
-"ButtonUnmask",
-
-"VideoRepick",
-"VideoPlaceButton",
-"VideoPlaceOrder",
-"PickHighlight",
-
-"InsertPeg",
-'MoveCube',
-"PatternLock",
-"RouteStick"
-    ]
+    args = _parse_args()
+    env_id_list = _resolve_env_ids(args.env_ids)
+    print(f"Running envs: {env_id_list}")
 
     for env_id in env_id_list:
         # ---------- 按 env_id 创建配置解析器与数据集路径 ----------
@@ -91,7 +129,8 @@ def main():
             max_steps_without_demonstration=max_steps,
         )
         h5_path = f"{DATASET_ROOT}/record_dataset_{env_id}.h5"
-        out_video_dir = os.path.join(DATASET_ROOT, "videos")
+        out_video_dir = os.path.join(DATASET_ROOT, "videos", "jointangle")
+        os.makedirs(out_video_dir, exist_ok=True)
 
         for episode in range(50):
             # ---------- 为当前 episode 创建环境与数据集解析器 ----------
@@ -202,7 +241,6 @@ def main():
                     break
 
             # ---------- 保存本 episode 回放视频（用本循环内收集的帧与字幕，不调用 env.save_video）并关闭资源 ----------
-            os.makedirs(out_video_dir, exist_ok=True)
             success_prefix = "success" if episode_success else "fail"
             out_video_path = os.path.join(out_video_dir, f"{success_prefix}_replay_{env_id}_ep{episode}.mp4")
             if replay_frames and replay_subgoal_grounded:
