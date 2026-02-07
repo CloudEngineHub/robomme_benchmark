@@ -53,25 +53,25 @@ from planner_fail_safe import (
 
 # 所有支持的环境模块名称列表
 DEFAULT_ENVS =[
-# "PickXtimes",
-# "StopCube",
-# "SwingXtimes",
-# "BinFill",
+"PickXtimes",
+"StopCube",
+"SwingXtimes",
+"BinFill",
 
-# "VideoUnmaskSwap",
-# "VideoUnmask",
-# "ButtonUnmaskSwap",
+"VideoUnmaskSwap",
+"VideoUnmask",
+"ButtonUnmaskSwap",
 "ButtonUnmask",
 
-# "VideoRepick",
-# "VideoPlaceButton",
-# "VideoPlaceOrder",
-# "PickHighlight",
+"VideoRepick",
+"VideoPlaceButton",
+"VideoPlaceOrder",
+"PickHighlight",
 
-# "InsertPeg",
-# 'MoveCube',
-# "PatternLock",
-# "RouteStick"
+"InsertPeg",
+'MoveCube',
+"PatternLock",
+"RouteStick"
     ]
 
 # 将环境名称映射为唯一的整数代码，用于生成随机种子
@@ -533,7 +533,7 @@ def parse_args() -> argparse.Namespace:
         "--episodes",
         "-n",
         type=int,
-        default=10,
+        default=50,
         help="每个环境生成的 episode 数量 (默认: 100)",
     )
 
@@ -567,7 +567,7 @@ def parse_args() -> argparse.Namespace:
         "--max-workers",
         "-w",
         type=int,
-        default=34,
+        default=35,
         help="运行多个环境时的并行 worker 数量。",
     )
     return parser.parse_args()

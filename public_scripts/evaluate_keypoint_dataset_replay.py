@@ -22,22 +22,22 @@ import torch
 OUTPUT_ROOT = Path(__file__).resolve().parents[1]
 DATASET_ROOT = Path("/data/hongzefu/dataset_generate")
 DEFAULT_ENV_IDS = [
-    # "PickXtimes",
-    # "StopCube",
-    # "SwingXtimes",
-    # "BinFill",
-    # "VideoUnmaskSwap",
-    # "VideoUnmask",
-    # "ButtonUnmaskSwap",
+    "PickXtimes",
+    "StopCube",
+    "SwingXtimes",
+    "BinFill",
+    "VideoUnmaskSwap",
+    "VideoUnmask",
+    "ButtonUnmaskSwap",
     "ButtonUnmask",
-    # "VideoRepick",
-    # "VideoPlaceButton",
-    # "VideoPlaceOrder",
-    # "PickHighlight",
-    # "InsertPeg",
-    # "MoveCube",
-    # "PatternLock",
-    # "RouteStick",
+    "VideoRepick",
+    "VideoPlaceButton",
+    "VideoPlaceOrder",
+    "PickHighlight",
+    "InsertPeg",
+    "MoveCube",
+    "PatternLock",
+    "RouteStick",
 ]
 
 

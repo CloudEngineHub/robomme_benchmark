@@ -931,11 +931,34 @@ def solve_pickup_fail(env, planner, obj=None,z_offset=None,xy_offset=None,obj_ty
         ready_pose_p[2] = 0.2
     ready_pose = sapien.Pose(p=ready_pose_p, q=fail_pose_q)
     planner.move_to_pose_with_screw(ready_pose)
+    _record_keypoint(
+        env,
+        "solve_pickup_fail",
+        "open",
+        keypoint_p=ready_pose_p,
+        keypoint_q=fail_pose_q,
+    )
+
     fail_pose = sapien.Pose(p=fail_pose_p, q=fail_pose_q)
     planner.move_to_pose_with_screw(fail_pose)
     planner.close_gripper()
+    _record_keypoint(
+        env,
+        "solve_pickup_fail",
+        "close",
+        keypoint_p=fail_pose_p,
+        keypoint_q=fail_pose_q,
+    )
+
     planner.move_to_pose_with_screw(ready_pose)
     planner.open_gripper()
+    _record_keypoint(
+        env,
+        "solve_pickup_fail",
+        "open",
+        keypoint_p=ready_pose_p,
+        keypoint_q=fail_pose_q,
+    )
 
     env.use_fail_planner=True
 
