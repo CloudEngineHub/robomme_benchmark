@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # 用法:
-# 1) 启动顺序回放(先 endeffector, 再 jointangle):
+# 1) 启动顺序回放(先 endeffector, 再 endeffector_fk):
 #    ./run_parallel_replay_16_two.sh start [run_name] [extra_python_args...]
 # 2) 查看状态:
 #    ./run_parallel_replay_16_two.sh status [run_name]
@@ -45,7 +45,7 @@ Usage:
   run_parallel_replay_16_two.sh list
 
 start behavior:
-  fixed order: endeffector -> jointangle
+  fixed order: endeffector -> endeffector_fk
   each mode runs 16 envs in parallel
   next mode starts immediately after previous mode fully finishes
 
@@ -60,11 +60,10 @@ resolve_script() {
   local mode="$1"
   case "$mode" in
     endeffector) echo "${SCRIPT_DIR}/evaluate_endeffector_dataset_replay.py" ;;
-    jointangle) echo "${SCRIPT_DIR}/evaluate_jointangle_dataset_replay.py" ;;
-    keypoint) echo "${SCRIPT_DIR}/evaluate_keypoint_dataset_replay.py" ;;
+    endeffector_fk) echo "${SCRIPT_DIR}/evaluate_endeffector_FK.py" ;;
     *)
       echo "Unknown mode: ${mode}" >&2
-      echo "Valid: endeffector | jointangle | keypoint" >&2
+      echo "Valid: endeffector | endeffector_fk" >&2
       exit 1
       ;;
   esac
@@ -100,18 +99,18 @@ cmd_start() {
   fi
 
   if [[ -z "${run_name}" ]]; then
-    run_name="seq_endeffector_jointangle_$(date +%Y%m%d_%H%M%S)"
+    run_name="seq_endeffector_endeffector_fk_$(date +%Y%m%d_%H%M%S)"
   fi
 
   local run_dir="${RUN_ROOT}/${run_name}"
   mkdir -p "${run_dir}"
 
-  echo "modes=endeffector,jointangle" > "${run_dir}/meta.txt"
+  echo "modes=endeffector,endeffector_fk" > "${run_dir}/meta.txt"
   echo "python_bin=${PYTHON_BIN}" >> "${run_dir}/meta.txt"
   echo "started_at=$(date -Iseconds)" >> "${run_dir}/meta.txt"
   echo "run_name=${run_name}" >> "${run_dir}/meta.txt"
 
-  local modes=(endeffector jointangle)
+  local modes=(endeffector endeffector_fk)
   local mode
   for mode in "${modes[@]}"; do
     local py_script
@@ -169,7 +168,7 @@ cmd_start() {
   echo "finished_at=$(date -Iseconds)" >> "${run_dir}/meta.txt"
   echo "status=success" >> "${run_dir}/meta.txt"
   echo
-  echo "All modes finished successfully in order: endeffector -> jointangle"
+  echo "All modes finished successfully in order: endeffector -> endeffector_fk"
   echo "Run directory: ${run_dir}"
 }
 
@@ -184,7 +183,7 @@ cmd_monitor() {
 
   local log_files=()
   local mode
-  for mode in endeffector jointangle; do
+  for mode in endeffector endeffector_fk; do
     local log_dir="${run_dir}/${mode}/logs"
     [[ -d "${log_dir}" ]] || continue
     local f
@@ -199,7 +198,7 @@ cmd_monitor() {
     exit 1
   fi
 
-  echo "Monitoring logs under: ${run_dir}/{endeffector,jointangle}/logs"
+  echo "Monitoring logs under: ${run_dir}/{endeffector,endeffector_fk}/logs"
   tail -n 60 -F "${log_files[@]}"
 }
 
@@ -212,7 +211,7 @@ cmd_status() {
     exit 1
   fi
 
-  local modes=(endeffector jointangle)
+  local modes=(endeffector endeffector_fk)
   local mode
   for mode in "${modes[@]}"; do
     local pid_dir="${run_dir}/${mode}/pids"
@@ -248,7 +247,7 @@ cmd_stop() {
     exit 1
   fi
 
-  local modes=(endeffector jointangle)
+  local modes=(endeffector endeffector_fk)
   local mode
   for mode in "${modes[@]}"; do
     local pid_dir="${run_dir}/${mode}/pids"
