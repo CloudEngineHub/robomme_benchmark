@@ -76,6 +76,12 @@ class DemonstrationWrapper(gym.Wrapper):
         self.episode_success = False
 
         self._failed_match_save_count = 0
+        # demonstration 阶段 screw 规划失败重试：总尝试次数（含首次）
+        self._demo_screw_max_attempts = 1
+        # screw 失败后的 RRT* 规划重试：总尝试次数（含首次）
+        self._demo_rrt_max_attempts = 3
+        # 当前 demonstration task 是否出现规划失败（用于 task 级继续执行）
+        self._current_demo_task_screw_failed = False
 
         # 与 RecordWrapper 一致：按物体 ID 生成区分度高的颜色表，用于分割可视化
         def generate_color_map(n=100, s_min=0.70, s_max=0.95, v_min=0.78, v_max=0.95):
@@ -496,9 +502,22 @@ class DemonstrationWrapper(gym.Wrapper):
            （包括 move_to_pose_with_screw、follow_path、直接 env.step 等所有路径）。
         4. 返回统一批次（obs/info 字典值为 list，reward/terminated/truncated 为一维张量）。
         """
+        # 懒加载 FailAware 规划器；若导入失败，回退到原 planner 实现
+        try:
+            from planner_fail_safe import (
+                FailAwarePandaArmMotionPlanningSolver,
+                FailAwarePandaStickMotionPlanningSolver,
+                ScrewPlanFailure,
+            )
+        except Exception as exc:
+            print(f"[DemonstrationWrapper] Warning: failed to import planner_fail_safe, fallback to base planners: {exc}")
+            FailAwarePandaArmMotionPlanningSolver = PandaArmMotionPlanningSolver
+            FailAwarePandaStickMotionPlanningSolver = PandaStickMotionPlanningSolver
+            ScrewPlanFailure = RuntimeError
+
         # 按环境选择运动规划器：PatternLock/RouteStick 用 stick 规划器，其余用机械臂规划器
         if self.unwrapped.spec.id == "PatternLock" or self.unwrapped.spec.id == "RouteStick":
-            planner = PandaStickMotionPlanningSolver(
+            planner = FailAwarePandaStickMotionPlanningSolver(
                 self,
                 debug=False,
                 vis=False,
@@ -508,7 +527,7 @@ class DemonstrationWrapper(gym.Wrapper):
                 joint_vel_limits=0.3,
             )
         else:
-            planner = PandaArmMotionPlanningSolver(
+            planner = FailAwarePandaArmMotionPlanningSolver(
                 self,
                 debug=False,
                 vis=False,
@@ -516,6 +535,61 @@ class DemonstrationWrapper(gym.Wrapper):
                 visualize_target_grasp_pose=False,
                 print_env_info=False,
             )
+
+        # 在 planner 实例层包装 screw 调用：screw 失败后自动切到 RRT* 重试
+        original_move_to_pose_with_screw = planner.move_to_pose_with_screw
+        original_move_to_pose_with_rrt = planner.move_to_pose_with_RRTStar
+
+        def _move_to_pose_with_screw_then_rrt_retry(*args, **kwargs):
+            for attempt in range(1, self._demo_screw_max_attempts + 1):
+                try:
+                    result = original_move_to_pose_with_screw(*args, **kwargs)
+                except ScrewPlanFailure as exc:
+                    print(
+                        f"[DemonstrationWrapper] screw planning failed "
+                        f"(attempt {attempt}/{self._demo_screw_max_attempts}): {exc}"
+                    )
+                    continue
+
+                # 兼容非 FailAware 回退场景：原 planner 可能直接返回 -1
+                if isinstance(result, int) and result == -1:
+                    print(
+                        f"[DemonstrationWrapper] screw planning returned -1 "
+                        f"(attempt {attempt}/{self._demo_screw_max_attempts})"
+                    )
+                    continue
+
+                return result
+
+            print(
+                "[DemonstrationWrapper] screw planning exhausted; "
+                f"fallback to RRT* (max {self._demo_rrt_max_attempts} attempts)"
+            )
+
+            for attempt in range(1, self._demo_rrt_max_attempts + 1):
+                try:
+                    result = original_move_to_pose_with_rrt(*args, **kwargs)
+                except Exception as exc:
+                    print(
+                        f"[DemonstrationWrapper] RRT* planning failed "
+                        f"(attempt {attempt}/{self._demo_rrt_max_attempts}): {exc}"
+                    )
+                    continue
+
+                if isinstance(result, int) and result == -1:
+                    print(
+                        f"[DemonstrationWrapper] RRT* planning returned -1 "
+                        f"(attempt {attempt}/{self._demo_rrt_max_attempts})"
+                    )
+                    continue
+
+                return result
+
+            self._current_demo_task_screw_failed = True
+            print("[DemonstrationWrapper] screw->RRT* planning exhausted; return -1")
+            return -1
+
+        planner.move_to_pose_with_screw = _move_to_pose_with_screw_then_rrt_retry
         tasks = getattr(self, 'task_list', [])
         self.task_list_length = len(tasks)
         print(f"Task list length: {self.task_list_length}")
@@ -531,6 +605,7 @@ class DemonstrationWrapper(gym.Wrapper):
         # 以收集所有 env.step 调用（包括 follow_path、直接 env.step 等底层路径）
         for idx, task_entry in enumerate(demonstration_tasks):
             self.unwrapped.demonstration_record_traj = True
+            self._current_demo_task_screw_failed = False
             task_name = task_entry.get("name", f"Task {idx}")
             print(f"Executing task {idx+1}/{len(demonstration_tasks)}: {task_name}")
 
@@ -539,12 +614,33 @@ class DemonstrationWrapper(gym.Wrapper):
                 raise ValueError(f"Task '{task_name}' must supply a callable 'solve'.")
 
             self.evaluate(solve_complete_eval=True)
+
+            def _solve_task_without_hard_fail():
+                # 避免 solve 返回 -1 导致 _collect_dense_steps 丢弃本 task 已收集的 step
+                try:
+                    solve_result = solve_callable(self, planner)
+                except ScrewPlanFailure as exc:
+                    self._current_demo_task_screw_failed = True
+                    print(f"[DemonstrationWrapper] task '{task_name}' screw failure: {exc}")
+                    return None
+                if isinstance(solve_result, int) and solve_result == -1:
+                    self._current_demo_task_screw_failed = True
+                    print(f"[DemonstrationWrapper] task '{task_name}' returned -1 after screw->RRT* retries")
+                    return None
+                return solve_result
+
             task_steps = planner_denseStep._collect_dense_steps(
                 planner,
-                lambda: solve_callable(self, planner)
+                _solve_task_without_hard_fail,
             )
-            if task_steps != -1:
+            if task_steps == -1:
+                # 理论上不应命中（_solve_task_without_hard_fail 已吞掉 -1）
+                print(f"[DemonstrationWrapper] task '{task_name}' returned -1 from collector; continuing")
+            else:
                 all_collected_steps.extend(task_steps)
+
+            if self._current_demo_task_screw_failed:
+                print(f"[DemonstrationWrapper] task '{task_name}' marked failed after screw->RRT* retries; continuing")
             self.evaluate(solve_complete_eval=True)
 
         self.unwrapped.demonstration_record_traj = False  # 演示结束，后续 step 正常做 subgoal 判断
