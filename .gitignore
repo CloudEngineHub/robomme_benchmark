@@ -15,6 +15,10 @@ __pycache__/
 # Logs
 logs/
 *.log
+historybench/HistoryBench_env/task_name_logs/
+
+# Replay run outputs
+public_scripts/replay_runs/
 
 # Video files
 *.mp4
