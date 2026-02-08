@@ -28,9 +28,9 @@ from historybench.env_record_wrapper import (
 from save_reset_video import save_listStep_video
 
 # 数据集根目录（包含 record_dataset_*_metadata.json 与 record_dataset_*.h5）
-DATASET_ROOT = "/data/hongzefu/dataset_generate"
+DATASET_ROOT = "/data/hongzefu/data_1206"
 DEFAULT_ENV_IDS = [
-    # "PickXtimes",
+    "PickXtimes",
     # "StopCube",
     # "SwingXtimes",
     # "BinFill",
@@ -40,7 +40,7 @@ DEFAULT_ENV_IDS = [
     # "ButtonUnmask",
     # "VideoRepick",
     # "VideoPlaceButton",
-    "VideoPlaceOrder",
+    # "VideoPlaceOrder",
     # "PickHighlight",
     # "InsertPeg",
     # "MoveCube",
@@ -129,12 +129,11 @@ def main():
             max_steps_without_demonstration=max_steps,
         )
         h5_path = f"{DATASET_ROOT}/record_dataset_{env_id}.h5"
-        out_video_dir = os.path.join(DATASET_ROOT, "videos", "jointangle")
+        out_video_dir = os.path.join("/data/hongzefu/dataset_generate", "videos", "jointangle")
         os.makedirs(out_video_dir, exist_ok=True)
 
         for episode in range(50):
-            if episode != 3:
-                continue
+
 
             
             # ---------- 为当前 episode 创建环境与数据集解析器 ----------

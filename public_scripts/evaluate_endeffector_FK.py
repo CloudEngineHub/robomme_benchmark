@@ -31,7 +31,7 @@ from historybench.env_record_wrapper import (
 )
 
 # 数据集根目录：需包含 record_dataset_{env_id}_metadata.json 与 record_dataset_{env_id}.h5
-DATASET_ROOT = "/data/hongzefu/dataset_generate"
+DATASET_ROOT = "/data/hongzefu/data_1206"
 DEFAULT_ENV_IDS = [
     "PickXtimes",
     "StopCube",
@@ -200,7 +200,7 @@ def main():
             action_space="ee_pose",
         )
         h5_path = f"{DATASET_ROOT}/record_dataset_{env_id}.h5"
-        out_video_dir = os.path.join(DATASET_ROOT, "videos", "ee-fk")
+        out_video_dir = os.path.join("/data/hongzefu/dataset_generate", "videos", "ee-fk")
         os.makedirs(out_video_dir, exist_ok=True)
 
         for episode in range(50):
@@ -248,8 +248,11 @@ def main():
             truncated = bool(truncated_batch[-1].item()) if n > 0 else False
 
             reset_captioned_path = os.path.join(out_video_dir, f"replay_ee_fk_{env_id}_ep{episode}_reset_captioned.mp4")
-            # save_listStep_video 需要 obs["image"] 和 info["subgoal_grounded"]；环境返回的是 base_camera，需转成 image
-            reset_obs_for_video = {"image": base_camera} if base_camera else {}
+            # save_listStep_video 支持 base/wrist 左右拼接
+            reset_obs_for_video = {
+                "base_camera": base_camera,
+                "wrist_camera": wrist_camera,
+            } if (base_camera or wrist_camera) else {}
             # if save_listStep_video(reset_obs_for_video, reward_batch, terminated_batch, truncated_batch, info_batch, reset_captioned_path):
             #     print(f"Saved reset captioned video: {reset_captioned_path}")
             # else:
@@ -259,7 +262,8 @@ def main():
             # ---------- 按 step 回放：读取 joint action，经 FK 转 ee_pose(8维) 后执行 ----------
             episode_success = False
             step = 0
-            replay_frames = []
+            replay_base_frames = []
+            replay_wrist_frames = []
             replay_subgoal_grounded = []
             while True:
                 joint_action = dataset_resolver.get_action(step)
@@ -301,7 +305,12 @@ def main():
                     frame = base_camera[-1]
                     if hasattr(frame, "cpu"):
                         frame = frame.cpu()
-                    replay_frames.append(np.asarray(frame).copy())
+                    replay_base_frames.append(np.asarray(frame).copy())
+                if wrist_camera:
+                    frame = wrist_camera[-1]
+                    if hasattr(frame, "cpu"):
+                        frame = frame.cpu()
+                    replay_wrist_frames.append(np.asarray(frame).copy())
                 if subgoal_grounded:
                     replay_subgoal_grounded.append(subgoal_grounded[-1])
                 n = int(reward_batch.numel()) if hasattr(reward_batch, "numel") else 0
@@ -330,8 +339,11 @@ def main():
             # ---------- 保存本 episode 回放视频（用本循环内收集的帧与字幕）并关闭资源 ----------
             success_prefix = "success" if episode_success else "fail"
             out_video_path = os.path.join(out_video_dir, f"{success_prefix}_replay_ee_fk_{env_id}_ep{episode}.mp4")
-            if replay_frames and replay_subgoal_grounded:
-                obs_video = {"image": replay_frames}
+            if (replay_base_frames or replay_wrist_frames) and replay_subgoal_grounded:
+                obs_video = {
+                    "base_camera": replay_base_frames,
+                    "wrist_camera": replay_wrist_frames,
+                }
                 info_video = {"subgoal_grounded": replay_subgoal_grounded}
                 save_listStep_video(obs_video, reward_batch, terminated_batch, truncated_batch, info_video, out_video_path)
                 print(f"Saved video: {out_video_path}")

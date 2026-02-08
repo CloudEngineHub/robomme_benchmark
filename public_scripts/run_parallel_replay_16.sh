@@ -3,8 +3,9 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RUN_ROOT="${SCRIPT_DIR}/replay_runs"
-DEFAULT_PYTHON_BIN="/data/hongzefu/maniskillenv1120/bin/python"
+DEFAULT_PYTHON_BIN="/data/hongzefu/maniskillenv1114/bin/python"
 PYTHON_BIN="${PYTHON_BIN:-$DEFAULT_PYTHON_BIN}"
+TARGET_SCRIPT="${SCRIPT_DIR}/evaluate_endeffector_FK.py"
 
 ENV_IDS=(
   PickXtimes
@@ -28,38 +29,21 @@ ENV_IDS=(
 usage() {
   cat <<'EOF'
 Usage:
-  PYTHON_BIN=/path/to/python run_parallel_replay_16.sh start <mode> [run_name] [extra_python_args...]
-  run_parallel_replay_16.sh start <mode> [run_name] [extra_python_args...]
+  PYTHON_BIN=/path/to/python run_parallel_replay_16.sh start [run_name] [extra_python_args...]
+  run_parallel_replay_16.sh start [run_name] [extra_python_args...]
   run_parallel_replay_16.sh monitor [run_name]
   run_parallel_replay_16.sh status [run_name]
   run_parallel_replay_16.sh stop [run_name]
   run_parallel_replay_16.sh list
 
-mode:
-  endeffector | jointangle | keypoint
-
 Examples:
-  ./run_parallel_replay_16.sh start keypoint
-  PYTHON_BIN=/data/hongzefu/maniskillenv1120/bin/python ./run_parallel_replay_16.sh start keypoint
-  ./run_parallel_replay_16.sh start endeffector my_run
+  ./run_parallel_replay_16.sh start
+  PYTHON_BIN=/data/hongzefu/maniskillenv1114/bin/python ./run_parallel_replay_16.sh start
+  ./run_parallel_replay_16.sh start my_run
   ./run_parallel_replay_16.sh monitor my_run
   ./run_parallel_replay_16.sh status my_run
   ./run_parallel_replay_16.sh stop my_run
 EOF
-}
-
-resolve_script() {
-  local mode="$1"
-  case "$mode" in
-    endeffector) echo "${SCRIPT_DIR}/evaluate_endeffector_dataset_replay.py" ;;
-    jointangle) echo "${SCRIPT_DIR}/evaluate_jointangle_dataset_replay.py" ;;
-    keypoint) echo "${SCRIPT_DIR}/evaluate_keypoint_dataset_replay.py" ;;
-    *)
-      echo "Unknown mode: ${mode}" >&2
-      echo "Valid: endeffector | jointangle | keypoint" >&2
-      exit 1
-      ;;
-  esac
 }
 
 latest_run() {
@@ -79,13 +63,6 @@ resolve_run_dir() {
 }
 
 cmd_start() {
-  local mode="${1:-}"
-  if [[ -z "${mode}" ]]; then
-    usage
-    exit 1
-  fi
-  shift || true
-
   local run_name="${1:-}"
   if [[ -n "${run_name}" && "${run_name}" == --* ]]; then
     run_name=""
@@ -93,10 +70,8 @@ cmd_start() {
     shift || true
   fi
 
-  local py_script
-  py_script="$(resolve_script "${mode}")"
-  if [[ ! -f "${py_script}" ]]; then
-    echo "Script not found: ${py_script}" >&2
+  if [[ ! -f "${TARGET_SCRIPT}" ]]; then
+    echo "Script not found: ${TARGET_SCRIPT}" >&2
     exit 1
   fi
   if [[ ! -x "${PYTHON_BIN}" ]]; then
@@ -105,7 +80,7 @@ cmd_start() {
   fi
 
   if [[ -z "${run_name}" ]]; then
-    run_name="${mode}_$(date +%Y%m%d_%H%M%S)"
+    run_name="endeffector_fk_$(date +%Y%m%d_%H%M%S)"
   fi
 
   local run_dir="${RUN_ROOT}/${run_name}"
@@ -114,8 +89,8 @@ cmd_start() {
 
   mkdir -p "${log_dir}" "${pid_dir}"
 
-  echo "mode=${mode}" > "${run_dir}/meta.txt"
-  echo "script=${py_script}" >> "${run_dir}/meta.txt"
+  echo "mode=endeffector_fk" > "${run_dir}/meta.txt"
+  echo "script=${TARGET_SCRIPT}" >> "${run_dir}/meta.txt"
   echo "python_bin=${PYTHON_BIN}" >> "${run_dir}/meta.txt"
   echo "started_at=$(date -Iseconds)" >> "${run_dir}/meta.txt"
   echo "run_name=${run_name}" >> "${run_dir}/meta.txt"
@@ -127,7 +102,7 @@ cmd_start() {
     local pid_file="${pid_dir}/${env_id}.pid"
 
     # -u + PYTHONUNBUFFERED=1 保证日志尽可能实时刷新。
-    nohup env PYTHONUNBUFFERED=1 "${PYTHON_BIN}" -u "${py_script}" --env-id "${env_id}" "$@" \
+    nohup env PYTHONUNBUFFERED=1 "${PYTHON_BIN}" -u "${TARGET_SCRIPT}" --env-id "${env_id}" "$@" \
       > "${log_file}" 2>&1 < /dev/null &
     echo "$!" > "${pid_file}"
     echo "  started ${env_id} pid=$(cat "${pid_file}") log=${log_file}"
