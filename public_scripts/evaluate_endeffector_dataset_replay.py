@@ -26,7 +26,7 @@ from historybench.HistoryBench_env import *
 from historybench.HistoryBench_env.util import *
 # 用于根据元数据创建环境、从 h5 读取 episode 动作/位姿
 from historybench.env_record_wrapper import (
-    EpisodeConfigResolver,
+    BenchmarkEnvBuilder,
     EpisodeDatasetResolver,
 )
 
@@ -117,21 +117,17 @@ def main():
     # ---------- 全局配置 ----------
     gui_render = False
     max_steps = 3000
-    render_mode = "human" if gui_render else "rgb_array"
     args = _parse_args()
     env_id_list = _resolve_env_ids(args.env_ids)
     print(f"Running envs: {env_id_list}")
 
     for env_id in env_id_list:
         # ---------- 按 env_id 创建配置解析器与数据集路径 ----------
-        metadata_path = f"{DATASET_ROOT}/record_dataset_{env_id}_metadata.json"
-        config_resolver = EpisodeConfigResolver(
+        config_resolver = BenchmarkEnvBuilder(
             env_id=env_id,
-            metadata_path=metadata_path,
-            render_mode=render_mode,
-            gui_render=gui_render,
-            max_steps_without_demonstration=max_steps,
+            dataset="train",
             action_space="ee_pose",
+            gui_render=gui_render,
         )
         h5_path = f"{DATASET_ROOT}/record_dataset_{env_id}.h5"
         out_video_dir = os.path.join(DATASET_ROOT, "videos", "endeffector")

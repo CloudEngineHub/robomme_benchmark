@@ -11,7 +11,7 @@ sys.path.insert(0, _root)
 sys.path.insert(0, os.path.join(_root, "scripts"))
 import gymnasium as gym
 from historybench.env_record_wrapper import (
-    EpisodeConfigResolver,
+    BenchmarkEnvBuilder,
     EpisodeDatasetResolver,
 )
 from historybench.HistoryBench_env import *
@@ -130,8 +130,6 @@ def main():
     print(f"Running envs: {env_id_list}")
 
     gui_render = True
-    render_mode = "human" if gui_render else "rgb_array"
-    max_steps_without_demonstration = 2000
 
     for env_id in env_id_list:
         metadata_path = DATASET_ROOT / f"record_dataset_{env_id}_metadata.json"
@@ -142,13 +140,11 @@ def main():
             print(f"No episode records found for {env_id}; skipping")
             continue
 
-        config_resolver = EpisodeConfigResolver(
+        config_resolver = BenchmarkEnvBuilder(
             env_id=env_id,
-            metadata_path=str(metadata_path),
-            render_mode=render_mode,
-            gui_render=gui_render,
-            max_steps_without_demonstration=max_steps_without_demonstration,
+            dataset="train",
             action_space="keypoint",
+            gui_render=gui_render,
         )
         video_dir = DATASET_ROOT / "videos" / "keypoint"
         video_dir.mkdir(parents=True, exist_ok=True)

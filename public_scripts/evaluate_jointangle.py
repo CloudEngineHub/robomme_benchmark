@@ -20,11 +20,9 @@ from historybench.HistoryBench_env import *
 from historybench.HistoryBench_env.util import *
 # 用于根据元数据创建环境
 from historybench.env_record_wrapper import (
-    EpisodeConfigResolver,
+    BenchmarkEnvBuilder,
 )
 
-# 数据集根目录：需包含 record_dataset_{env_id}_metadata.json
-DATASET_ROOT = os.path.join(_PARENT, "dataset_json")
 DEFAULT_ENV_IDS = [
     "PickXtimes",
     "StopCube",
@@ -84,21 +82,18 @@ def main():
     - 保留 obs/info 展开逻辑，用于调试和后续处理。
     """
     # ---------- 全局配置 ----------
-    gui_render = False
+    gui_render = True
     max_steps = 3000
-    render_mode = "human" if gui_render else "rgb_array"
     env_id_list = list(DEFAULT_ENV_IDS)
     print(f"Running envs: {env_id_list}")
 
     for env_id in env_id_list:
         # ---------- 按 env_id 创建配置解析器 ----------
-        metadata_path = f"{DATASET_ROOT}/record_dataset_{env_id}_metadata.json"
-        config_resolver = EpisodeConfigResolver(
+        config_resolver = BenchmarkEnvBuilder(
             env_id=env_id,
-            metadata_path=metadata_path,
-            render_mode=render_mode,
+            dataset="train",
+            action_space="joint_angle",
             gui_render=gui_render,
-            max_steps_without_demonstration=max_steps,
         )
 
         for episode in range(50):

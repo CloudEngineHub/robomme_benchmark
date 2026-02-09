@@ -4,7 +4,7 @@ from .DemonstrationWrapper import *
 from .EndeffectorDemonstrationWrapper import EndeffectorDemonstrationWrapper
 from .MultiStepDemonstrationWrapper import MultiStepDemonstrationWrapper, RRTPlanFailure
 from .episode_config_resolver import (
-    EpisodeConfigResolver,
+    BenchmarkEnvBuilder,
     load_episode_metadata,
     get_episode_metadata,
 )

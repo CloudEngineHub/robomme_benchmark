@@ -2,10 +2,15 @@
 Episode 配置解析：从元数据解析 episode 的 seed、difficulty，并构建包装好的环境。
 """
 import json
+import os
 from pathlib import Path
 from typing import Dict, Optional, Tuple, Union
 
 import gymnasium as gym
+
+DATASET_ROOT = Path(__file__).resolve().parents[2] / "dataset_json"
+_ALLOWED_DATASETS = {"train"}
+_ALLOWED_ACTION_SPACES = {"joint_angle", "ee_pose", "keypoint", "oracle_planner"}
 
 
 def load_episode_metadata(metadata_path: Union[str, Path, None]) -> Dict[Tuple[str, int], Dict[str, object]]:
@@ -61,31 +66,42 @@ def get_episode_metadata(
     return metadata_index.get((task, episode))
 
 
-class EpisodeConfigResolver:
+class BenchmarkEnvBuilder:
     """
-    Episode 配置解析器。
+    Episode 环境构建器。
 
-    辅助类，用于解析每个 episode 的种子（seed）和难度（difficulty），并构建包装好的环境。
-    数据来源为元数据文件。
+    根据 dataset 与 env_id 自动解析 metadata，并按 action_space 构建包装好的环境。
     """
 
     def __init__(
         self,
         env_id: str,
-        metadata_path: Union[str, Path, None],
-        render_mode: str,
+        dataset: str,
+        action_space: str,
         gui_render: bool,
-        max_steps_without_demonstration: int,
-        save_video: bool = False,
-        action_space: Optional[str] = None,
     ):
+        if dataset not in _ALLOWED_DATASETS:
+            raise ValueError(f"Unsupported dataset '{dataset}'. Allowed datasets: {sorted(_ALLOWED_DATASETS)}")
+        if action_space not in _ALLOWED_ACTION_SPACES:
+            raise ValueError(
+                f"Unsupported action_space '{action_space}'. "
+                f"Allowed action spaces: {sorted(_ALLOWED_ACTION_SPACES)}"
+            )
+
         self.env_id = env_id
-        self.render_mode = render_mode
-        self.gui_render = gui_render
-        self.max_steps_without_demonstration = max_steps_without_demonstration
-        self.save_video = save_video
+        self.dataset = dataset
         self.action_space = action_space
+        self.gui_render = gui_render
+        self.render_mode = "human" if gui_render else "rgb_array"
+        self.max_steps_without_demonstration = 10000
+
+        metadata_path = self._resolve_metadata_path()
         self.metadata_index = load_episode_metadata(metadata_path)
+
+    def _resolve_metadata_path(self) -> str:
+        if self.dataset == "train":
+            return os.path.join(str(DATASET_ROOT), f"record_dataset_{self.env_id}_metadata.json")
+        raise ValueError(f"Unsupported dataset '{self.dataset}'.")
 
     def resolve_episode(self, episode: int):
         """根据 metadata 解析 episode 的配置。"""
@@ -130,17 +146,18 @@ class EpisodeConfigResolver:
             max_steps_without_demonstration=self.max_steps_without_demonstration,
             gui_render=self.gui_render,
         )
-        if self.action_space == "ee_pose":
+        if self.action_space == "joint_angle":
+            pass
+        elif self.action_space == "ee_pose":
             from .EndeffectorDemonstrationWrapper import EndeffectorDemonstrationWrapper
 
             env = EndeffectorDemonstrationWrapper(env)
-        if self.action_space == "keypoint":
+        elif self.action_space == "keypoint":
             from .MultiStepDemonstrationWrapper import MultiStepDemonstrationWrapper
 
             env = MultiStepDemonstrationWrapper(env, gui_render=self.gui_render, vis=self.gui_render)
-        
-        if self.action_space == "oracle_planner":
+        elif self.action_space == "oracle_planner":
             from .OraclePlannerDemonstrationWrapper import OraclePlannerDemonstrationWrapper
             env = OraclePlannerDemonstrationWrapper(env, env_id=self.env_id, gui_render=self.gui_render)
-            
+
         return env, seed, difficulty_hint

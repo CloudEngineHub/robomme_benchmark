@@ -19,7 +19,7 @@ import torch
 import gc
 import re
 
-from historybench.env_record_wrapper import EpisodeConfigResolver, EpisodeDatasetResolver
+from historybench.env_record_wrapper import BenchmarkEnvBuilder, EpisodeDatasetResolver
 from pathlib import Path
 from save_reset_video import save_listStep_video
 
@@ -75,14 +75,11 @@ def main():
     for env_id in env_id_list:
 
     # 为每个环境初始化配置解析器
-        metadata_path = dataset_root / f"record_dataset_{env_id}_metadata.json"
-        resolver = EpisodeConfigResolver(
+        resolver = BenchmarkEnvBuilder(
             env_id=env_id,
-            metadata_path=metadata_path,
-            render_mode="human" if GUI_RENDER else "rgb_array",
+            dataset="train",
+            action_space="oracle_planner",
             gui_render=GUI_RENDER,
-            max_steps_without_demonstration=1000,
-            action_space="oracle_planner"
         )
 
         # 如需全量回放可改为：for episode in range(num_episodes):
@@ -94,7 +91,7 @@ def main():
             model_name = "env_only"
             save_dir = '/data/hongzefu/dataset_generate/videos'
             
-            # 使用 EpisodeConfigResolver
+            # 使用 BenchmarkEnvBuilder
             env, seed, difficulty = resolver.make_env_for_episode(episode)
             
             h5_path = dataset_root / f"record_dataset_{env_id}.h5"
