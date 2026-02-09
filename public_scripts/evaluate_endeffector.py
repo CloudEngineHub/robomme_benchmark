@@ -64,12 +64,14 @@ def _last_info(info_batch, n):
 
 
 def _get_dummy_action(robot_endeffector_p, robot_endeffector_q, actions):
-    """用当前 robot_endeffector_p、robot_endeffector_q、actions 的最后一个元素拼成 8 维 dummy action (3 pose + 4 quat + 1 gripper)。"""
-    p = np.ravel(np.array(robot_endeffector_p[-1], dtype=np.float32)) if robot_endeffector_p else np.zeros(3, dtype=np.float32)
-    q = np.ravel(np.array(robot_endeffector_q[-1], dtype=np.float32)) if robot_endeffector_q else np.array([1.0, 0.0, 0.0, 0.0], dtype=np.float32)
-    last_action = np.ravel(np.array(actions[-1], dtype=np.float32)) if actions else np.array([-1.0], dtype=np.float32)
-    gripper = float(last_action[-1]) if last_action.size > 0 else -1.0
-    return np.concatenate([p, q, np.array([gripper], dtype=np.float32)])
+    # """用当前 robot_endeffector_p、robot_endeffector_q、actions 的最后一个元素拼成 8 维 dummy action (3 pose + 4 quat + 1 gripper)。"""
+    # p = np.ravel(np.array(robot_endeffector_p[-1], dtype=np.float32)) if robot_endeffector_p else np.zeros(3, dtype=np.float32)
+    # q = np.ravel(np.array(robot_endeffector_q[-1], dtype=np.float32)) if robot_endeffector_q else np.array([1.0, 0.0, 0.0, 0.0], dtype=np.float32)
+    # last_action = np.ravel(np.array(actions[-1], dtype=np.float32)) if actions else np.array([-1.0], dtype=np.float32)
+    # gripper = float(last_action[-1]) if last_action.size > 0 else -1.0
+    # return np.concatenate([p, q, np.array([gripper], dtype=np.float32)])
+    return np.array([-6.0499899e-02, -2.8136521e-08,  5.2110010e-01, -7.3355800e-08,
+  1.0000000e+00, -2.0861623e-07, -1.8728323e-09,  1.0000000e+00], dtype=np.float32)
 
 
 def main():
@@ -79,7 +81,7 @@ def main():
     - 保留 obs/info 展开逻辑，用于调试和后续处理。
     """
     # ---------- 全局配置 ----------
-    gui_render = True
+    gui_render = False
     max_steps = 3000
     render_mode = "human" if gui_render else "rgb_array"
     env_id_list = list(DEFAULT_ENV_IDS)
@@ -140,6 +142,7 @@ def main():
                 dummy_action = _get_dummy_action(robot_endeffector_p, robot_endeffector_q, actions)
 
                 obs_batch, reward_batch, terminated_batch, truncated_batch, info_batch = env.step(dummy_action)
+                print("dummy_action: ", dummy_action)
                 
                 # 从 batch 读取（供调试或后续逻辑）
                 maniskill_obs = (obs_batch or {}).get("maniskill_obs", [])

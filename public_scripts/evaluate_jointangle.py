@@ -65,14 +65,16 @@ def _last_info(info_batch, n):
 
 
 def _get_dummy_action_joint(states, actions):
-    """用当前 states（qpos）、actions 的最后一个元素拼成 8 维 dummy action（7 joint + 1 gripper）。"""
-    qpos = np.ravel(np.array(states[-1], dtype=np.float32)) if states else np.zeros(7, dtype=np.float32)
-    if qpos.size < 7:
-        qpos = np.pad(qpos, (0, 7 - qpos.size), constant_values=-1.0)
-    arm = qpos[:7]
-    last_action = np.ravel(np.array(actions[-1], dtype=np.float32)) if actions else np.array([-1.0], dtype=np.float32)
-    gripper = float(last_action[-1]) if last_action.size > 0 else -1.0
-    return np.concatenate([arm, np.array([gripper], dtype=np.float32)])
+    # """用当前 states（qpos）、actions 的最后一个元素拼成 8 维 dummy action（7 joint + 1 gripper）。"""
+    # qpos = np.ravel(np.array(states[-1], dtype=np.float32)) if states else np.zeros(7, dtype=np.float32)
+    # if qpos.size < 7:
+    #     qpos = np.pad(qpos, (0, 7 - qpos.size), constant_values=-1.0)
+    # arm = qpos[:7]
+    # last_action = np.ravel(np.array(actions[-1], dtype=np.float32)) if actions else np.array([-1.0], dtype=np.float32)
+    # gripper = float(last_action[-1]) if last_action.size > 0 else -1.0
+    # return np.concatenate([arm, np.array([gripper], dtype=np.float32)])
+    return np.array([ 0. , 0. , 0. , -1.5707964, 0. , 1.5707964,
+  0.7853982, 1. ], dtype=np.float32)
 
 
 def main():
@@ -144,6 +146,8 @@ def main():
                 dummy_action = _get_dummy_action_joint(states, actions)
 
                 obs_batch, reward_batch, terminated_batch, truncated_batch, info_batch = env.step(dummy_action)
+                
+                print("dummy_action: ", dummy_action)
 
                 # 从 batch 读取（供调试或后续逻辑）
                 maniskill_obs = (obs_batch or {}).get("maniskill_obs", [])
