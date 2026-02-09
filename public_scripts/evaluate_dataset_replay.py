@@ -5,7 +5,7 @@
 import os
 import re
 import sys
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 # 将包根目录、上级目录及 scripts 加入 sys.path，便于作为脚本直接运行（不依赖 PYTHONPATH）
 _ROOT = os.path.abspath(os.path.dirname(__file__))
@@ -27,32 +27,32 @@ from historybench.env_record_wrapper import (
 from save_reset_video import save_listStep_video
 
 # 只启用一个 ACTION_SPACE；其他选项保留在注释中供手动切换
-ACTION_SPACE = "joint_angle"
-# ACTION_SPACE = "ee_pose"
-# ACTION_SPACE = "keypoint"
+#ACTION_SPACE = "joint_angle"
+ACTION_SPACE = "ee_pose"
+#ACTION_SPACE = "keypoint"
 # ACTION_SPACE = "oracle_planner"
 
-GUI_RENDER = False
+GUI_RENDER = True
 MAX_STEPS = 3000
 DATASET_ROOT = "/data/hongzefu/dataset_generate"
 
 DEFAULT_ENV_IDS = [
     "PickXtimes",
-    "StopCube",
-    "SwingXtimes",
-    "BinFill",
-    "VideoUnmaskSwap",
-    "VideoUnmask",
-    "ButtonUnmaskSwap",
-    "ButtonUnmask",
-    "VideoRepick",
-    "VideoPlaceButton",
-    "VideoPlaceOrder",
-    "PickHighlight",
-    "InsertPeg",
-    "MoveCube",
-    "PatternLock",
-    "RouteStick",
+    # "StopCube",
+    # "SwingXtimes",
+    # "BinFill",
+    # "VideoUnmaskSwap",
+    # "VideoUnmask",
+    # "ButtonUnmaskSwap",
+    # "ButtonUnmask",
+    # "VideoRepick",
+    # "VideoPlaceButton",
+    # "VideoPlaceOrder",
+    # "PickHighlight",
+    # "InsertPeg",
+    # "MoveCube",
+    # "PatternLock",
+    # "RouteStick",
 ]
 
 ACTION_SPACE_TO_VIDEO_DIR = {
@@ -69,55 +69,10 @@ ACTION_SPACE_TO_VIDEO_PREFIX = {
     "oracle_planner": "oracle",
 }
 
+# 视频输出目录：独立固定写死，不与 h5 路径或 env_id 对齐
+OUT_VIDEO_DIR = "/data/hongzefu/dataset_generate/videos/replay"
 
-def _flatten_column(batch_dict: Optional[Dict[str, List[Any]]], key: str) -> List[Any]:
-    out = []
-    for item in (batch_dict or {}).get(key, []) or []:
-        if item is None:
-            continue
-        if isinstance(item, (list, tuple)):
-            out.extend([x for x in item if x is not None])
-        else:
-            out.append(item)
-    return out
-
-
-def _last_info(info_batch: Optional[Dict[str, List[Any]]], n: int) -> Dict[str, Any]:
-    if n <= 0:
-        return {}
-    idx = n - 1
-    return {
-        k: v[idx]
-        for k, v in (info_batch or {}).items()
-        if len(v) > idx and v[idx] is not None
-    }
-
-
-def _to_numpy_frame(frame: Any) -> np.ndarray:
-    if hasattr(frame, "detach"):
-        frame = frame.detach()
-    if hasattr(frame, "cpu"):
-        frame = frame.cpu()
-    return np.asarray(frame).copy()
-
-
-def _copy_frame_list(frames: List[Any]) -> List[np.ndarray]:
-    return [_to_numpy_frame(frame) for frame in frames]
-
-
-def _success_from_info(info: Dict[str, Any]) -> bool:
-    succ = info.get("success")
-    if succ == torch.tensor([True]):
-        return True
-    if isinstance(succ, torch.Tensor):
-        try:
-            return bool(succ.item())
-        except Exception:
-            return False
-    return bool(succ)
-
-
-def _parse_oracle_command(subgoal_text: Optional[str]) -> Optional[Dict[str, Any]]:
+def _parse_oracle_command(subgoal_text: Optional[str]) -> Optional[dict[str, Any]]:
     if not subgoal_text:
         return None
     point = None
@@ -141,23 +96,13 @@ def _get_replay_action(
     return dataset_resolver.get_action(step)
 
 
-def _get_out_video_dir(action_space: str) -> str:
-    suffix = ACTION_SPACE_TO_VIDEO_DIR[action_space]
-    out_video_dir = os.path.join(DATASET_ROOT, "videos", suffix)
-    os.makedirs(out_video_dir, exist_ok=True)
-    return out_video_dir
-
-
 def main():
-    if ACTION_SPACE not in ACTION_SPACE_TO_VIDEO_DIR:
-        raise ValueError(
-            f"Unsupported ACTION_SPACE: {ACTION_SPACE}. "
-            f"Allowed: {sorted(ACTION_SPACE_TO_VIDEO_DIR)}"
-        )
-
+ 
     env_id_list = list(DEFAULT_ENV_IDS)
     print(f"Running envs: {env_id_list}")
     print(f"Using action_space: {ACTION_SPACE}")
+
+    os.makedirs(OUT_VIDEO_DIR, exist_ok=True)
 
     for env_id in env_id_list:
         env_builder = BenchmarkEnvBuilder(
@@ -170,7 +115,6 @@ def main():
         print(f"[{env_id}] episode_count from metadata: {episode_count}")
 
         h5_path = f"{DATASET_ROOT}/record_dataset_{env_id}.h5"
-        out_video_dir = _get_out_video_dir(ACTION_SPACE)
 
         for episode in range(episode_count):
             env = None
@@ -210,20 +154,35 @@ def main():
                 subgoal_grounded = info_batch["subgoal_grounded"]
                 available_options = info_batch["available_options"]
 
-                n = int(reward_batch.numel()) if hasattr(reward_batch, "numel") else 0
-                info = _last_info(info_batch, n)
-                terminated = bool(terminated_batch[-1].item()) if n > 0 else False
-                truncated = bool(truncated_batch[-1].item()) if n > 0 else False
+                info = {k: v[-1] for k, v in info_batch.items()}
+                terminated = bool(terminated_batch[-1].item())
+                truncated = bool(truncated_batch[-1].item())
 
-                reset_base_frames = _copy_frame_list(_flatten_column(obs_batch, "base_camera"))
-                reset_wrist_frames = _copy_frame_list(_flatten_column(obs_batch, "wrist_camera"))
-                reset_subgoal_grounded = list(_flatten_column(info_batch, "subgoal_grounded"))
+                reset_base_frames = []
+                for frame in base_camera:
+                    f = frame
+                    if hasattr(f, "detach"):
+                        f = f.detach()
+                    if hasattr(f, "cpu"):
+                        f = f.cpu()
+                    reset_base_frames.append(np.asarray(f).copy())
+
+                reset_wrist_frames = []
+                for frame in wrist_camera:
+                    f = frame
+                    if hasattr(f, "detach"):
+                        f = f.detach()
+                    if hasattr(f, "cpu"):
+                        f = f.cpu()
+                    reset_wrist_frames.append(np.asarray(f).copy())
+
+                reset_subgoal_grounded = list(subgoal_grounded) if subgoal_grounded else []
 
                 step = 0
                 episode_success = False
-                replay_base_frames: List[np.ndarray] = []
-                replay_wrist_frames: List[np.ndarray] = []
-                replay_subgoal_grounded: List[Any] = []
+                replay_base_frames: list[np.ndarray] = []
+                replay_wrist_frames: list[np.ndarray] = []
+                replay_subgoal_grounded: list[Any] = []
 
                 while step < MAX_STEPS:
                     action = _get_replay_action(ACTION_SPACE, dataset_resolver, step)
@@ -256,14 +215,29 @@ def main():
                     subgoal_grounded = info_batch["subgoal_grounded"]
                     available_options = info_batch["available_options"]
 
-                    replay_base_frames.extend(_copy_frame_list(_flatten_column(obs_batch, "base_camera")))
-                    replay_wrist_frames.extend(_copy_frame_list(_flatten_column(obs_batch, "wrist_camera")))
-                    replay_subgoal_grounded.extend(_flatten_column(info_batch, "subgoal_grounded"))
+                    for frame in base_camera:
+                        f = frame
+                        if hasattr(f, "detach"):
+                            f = f.detach()
+                        if hasattr(f, "cpu"):
+                            f = f.cpu()
+                        replay_base_frames.append(np.asarray(f).copy())
 
-                    n = int(reward_batch.numel()) if hasattr(reward_batch, "numel") else 0
-                    info = _last_info(info_batch, n)
-                    terminated = bool(terminated_batch[-1].item()) if n > 0 else False
-                    truncated = bool(truncated_batch[-1].item()) if n > 0 else False
+                    for frame in wrist_camera:
+                        f = frame
+                        if hasattr(f, "detach"):
+                            f = f.detach()
+                        if hasattr(f, "cpu"):
+                            f = f.cpu()
+                        replay_wrist_frames.append(np.asarray(f).copy())
+
+                    for text in subgoal_grounded:
+                        if text is not None:
+                            replay_subgoal_grounded.append(text)
+
+                    info = {k: v[-1] for k, v in info_batch.items()}
+                    terminated = bool(terminated_batch[-1].item())
+                    truncated = bool(truncated_batch[-1].item())
 
                     step += 1
                     if GUI_RENDER:
@@ -272,7 +246,10 @@ def main():
                         print(f"[{env_id}] episode {episode} 步数超限，步 {step}。")
                         break
                     if terminated:
-                        if _success_from_info(info):
+                        succ = info.get("success")
+                        if succ == torch.tensor([True]) or (
+                            isinstance(succ, torch.Tensor) and succ.item()
+                        ):
                             print(f"[{env_id}] episode {episode} 成功。")
                             episode_success = True
                         elif info.get("fail", False):
@@ -282,7 +259,7 @@ def main():
                 success_prefix = "success" if episode_success else "fail"
                 mode_prefix = ACTION_SPACE_TO_VIDEO_PREFIX[ACTION_SPACE]
                 out_video_path = os.path.join(
-                    out_video_dir,
+                    OUT_VIDEO_DIR,
                     f"{success_prefix}_replay_{mode_prefix}_{env_id}_ep{episode}.mp4",
                 )
 
