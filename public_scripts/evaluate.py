@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# 脚本功能：统一评测入口，支持 joint_angle / ee_pose / keypoint / oracle_planner 四种 action_space。
+# 脚本功能：统一评测入口，支持 joint_angle / ee_pose / keypoint / grounded_subgoal 四种 action_space。
 
 import os
 import sys
@@ -26,7 +26,7 @@ from historybench.env_record_wrapper import (
 ACTION_SPACE = "joint_angle"
 #ACTION_SPACE = "ee_pose"
 #ACTION_SPACE = "keypoint"
-#ACTION_SPACE = "oracle_planner"
+#ACTION_SPACE = "grounded_subgoal"
 
 GUI_RENDER = True
 MAX_STEPS = 3000
@@ -108,7 +108,7 @@ def _get_dummy_action(action_space):
             [-0.120827354, 0.17769682, 0.15, 0.0, 0.972572, 0.23260213, 0.0, 1.0],
             dtype=np.float32,
         )
-    if action_space == "oracle_planner":
+    if action_space == "grounded_subgoal":
         return {
             "action": "pick up the cube",
             "point": [0, 0],

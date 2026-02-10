@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# 脚本功能：统一 dataset replay 入口，支持 joint_angle / ee_pose / keypoint / oracle_planner 四种 action_space。
+# 脚本功能：统一 dataset replay 入口，支持 joint_angle / ee_pose / keypoint / grounded_subgoal 四种 action_space。
 # 与 evaluate.py 的主循环与调试字段保持一致；差异在于动作来自 EpisodeDatasetResolver。
 
 import os
@@ -30,7 +30,8 @@ from save_reset_video import save_robomme_video
 #ACTION_SPACE = "joint_angle"
 #ACTION_SPACE = "ee_pose"
 #ACTION_SPACE = "keypoint"
-ACTION_SPACE = "oracle_planner"
+#ACTION_SPACE = "grounded_subgoal"
+ACTION_SPACE = "grounded_subgoal"
 
 GUI_RENDER = True
 MAX_STEPS = 3000
@@ -71,21 +72,6 @@ def _parse_oracle_command(subgoal_text: Optional[str]) -> Optional[dict[str, Any
         # 数据集文本通常是 <x, y>，Oracle wrapper 期望 [row, col]，即 [y, x]
         point = [y, x]
     return {"action": subgoal_text, "point": point}
-
-
-def _get_replay_action(
-    action_space: str,
-    dataset_resolver: EpisodeDatasetResolver,
-    step: int,
-) -> Optional[Any]:
-    if action_space == "oracle_planner":
-        subgoal_text = dataset_resolver.get_step("grounded_subgoal", step)
-        return _parse_oracle_command(subgoal_text)
-    if action_space == "ee_pose":
-        return dataset_resolver.get_step("ee_pose", step)
-    if action_space == "keypoint":
-        return dataset_resolver.get_step("keypoint", step)
-    return dataset_resolver.get_step("joint_angle", step)
 
 
 def main():
@@ -162,7 +148,10 @@ def main():
                 # ######## 视频保存变量初始化结束 ########
 
                 while step < MAX_STEPS:
-                    action = _get_replay_action(ACTION_SPACE, dataset_resolver, step)
+                    replay_key = ACTION_SPACE
+                    action = dataset_resolver.get_step(replay_key, step)
+                    if ACTION_SPACE == "grounded_subgoal":
+                        action = _parse_oracle_command(action)
                     if action is None:
                         break
 
