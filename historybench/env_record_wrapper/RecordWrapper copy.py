@@ -212,222 +212,6 @@ class HistoryBenchRecordWrapper(gym.Wrapper):
         # Stack text area above frame; position argument retained for compatibility.
         return np.vstack((text_area, frame))
 
-    def _video_should_record(self, current_task_name):
-        """判断当前 step 是否需要执行视频链路。"""
-        return self.save_video and current_task_name != "NO RECORD"
-
-    def _video_prepare_step_frames(
-        self,
-        base_frame,
-        wrist_frame,
-        segmentation,
-        segmentation_result,
-        segmentation_result_online,
-    ):
-        """
-        为单步视频构建准备拼接素材，返回 planner/online 两行的基础图像。
-        """
-        # Use deepcopy to avoid modifying original frames that will be saved to HDF5
-        base_camera_frame_for_video = copy.deepcopy(base_frame)
-        wrist_camera_frame_for_video = copy.deepcopy(wrist_frame)
-        segmentation_for_video = copy.deepcopy(segmentation)
-        segmentation_result_for_video = copy.deepcopy(segmentation_result)
-        segmentation_result_online_for_video = copy.deepcopy(segmentation_result_online)
-
-        # 调整 wrist 相机图像大小以匹配 base 相机
-        if base_camera_frame_for_video.shape[:2] != wrist_camera_frame_for_video.shape[:2]:
-            wrist_camera_frame_for_video = cv2.resize(
-                wrist_camera_frame_for_video,
-                (base_camera_frame_for_video.shape[1], base_camera_frame_for_video.shape[0]),
-                interpolation=cv2.INTER_LINEAR,
-            )
-
-        # 生成分割可视化图像（上色）和带红点的目标图像
-        (
-            segmentation_vis,
-            segmentation_result_vis,
-            target_for_video,
-        ) = create_segmentation_visuals(
-            segmentation_for_video,
-            segmentation_result_for_video,
-            base_camera_frame_for_video,
-            self.color_map,
-            self.segmentation_points,
-        )
-
-        (
-            segmentation_vis_online,
-            segmentation_result_vis_online,
-            target_for_video_online,
-        ) = create_segmentation_visuals(
-            segmentation_for_video,
-            segmentation_result_online_for_video,
-            base_camera_frame_for_video,
-            self.color_map,
-            self.segmentation_points_online,
-        )
-
-        # 最终视频帧拼接结构：base | wrist | 原 segmentation | filtered segmentation | base+红点
-        combined = np.hstack(
-            [
-                base_camera_frame_for_video,
-                wrist_camera_frame_for_video,
-                segmentation_vis,
-                segmentation_result_vis,
-                target_for_video,
-            ]
-        )
-        combined_online = np.hstack(
-            [
-                base_camera_frame_for_video,
-                wrist_camera_frame_for_video,
-                segmentation_vis_online,
-                segmentation_result_vis_online,
-                target_for_video_online,
-            ]
-        )
-
-        return {
-            "combined": combined,
-            "combined_online": combined_online,
-        }
-
-    def _video_compose_planner_online_rows(
-        self,
-        prepared,
-        subgoal_text,
-        grounded_text,
-        subgoal_online_text,
-        grounded_online_text,
-    ):
-        """拼接并叠加 planner / online 两行文本。"""
-        combined = prepared["combined"]
-        combined_online = prepared["combined_online"]
-
-        # 为第一行添加 subgoal_text 和 grounded_subgoal 文本（PLANNER 视角）
-        combined = self._add_text_to_frame(
-            combined,
-            ["PLANNER:", subgoal_text, grounded_text],
-            position="top_right",
-        )
-
-        # 为第二行添加 ONLINE: 标记和 online 文本（ONLINE 视角）
-        combined_online = self._add_text_to_frame(
-            combined_online,
-            ["ONLINE:", subgoal_online_text, grounded_online_text],
-            position="top_right",
-        )
-
-        # 将两行视频流垂直堆叠
-        return np.vstack([combined, combined_online])
-
-    def _video_apply_overlays(self, frame, is_demonstration, language_goal):
-        """应用演示红框与语言目标文本。"""
-        # 如果是演示阶段，给整个帧加红框
-        if is_demonstration:
-            frame = self._add_red_border(frame)
-
-        return self._add_text_to_frame(frame, [language_goal], position="top_right")
-
-    def _video_append_step_frame(self, frame, no_object_flag):
-        """追加单步视频帧到对应缓冲区。"""
-        self.video_frames.append(frame)
-        if no_object_flag == True:
-            self.no_object_video_frames.append(frame)
-
-    def _video_build_filename_parts(self, language_goal, difficulty):
-        """构建视频文件名中的 suffix。"""
-        sanitized_goal = (
-            language_goal.replace(" ", "_").replace("/", "_")
-            if language_goal
-            else "no_goal"
-        )
-        difficulty_tag = (
-            str(difficulty).replace(" ", "_").replace("/", "_")
-            if difficulty
-            else None
-        )
-        filename_suffix = sanitized_goal
-        if difficulty_tag:
-            filename_suffix = (
-                f"{difficulty_tag}_{filename_suffix}"
-                if filename_suffix
-                else difficulty_tag
-            )
-        return {"filename_suffix": filename_suffix}
-
-    def _video_write_mp4(self, frames, output_path):
-        """按统一参数写出 mp4。"""
-        with imageio.get_writer(
-            output_path.as_posix(), fps=30, codec="libx264", quality=8
-        ) as writer:
-            for frame in frames:
-                writer.append_data(frame)
-
-    def _video_flush_episode_files(self, success, video_prefix, filename_suffix):
-        """写出当前 episode 视频（主视频与 no-object 视频）。"""
-        if not self.save_video:
-            return
-
-        if len(self.video_frames) == 0 and len(self.no_object_video_frames) == 0:
-            return
-
-        videos_dir = self.output_root / "videos"
-
-        if len(self.video_frames) > 0:
-            try:
-                videos_dir.mkdir(parents=True, exist_ok=True)
-                if success:
-                    combined_video_path = videos_dir / f"{video_prefix}_{filename_suffix}.mp4"
-                    self._video_write_mp4(self.video_frames, combined_video_path)
-                    print(f"Saved combined video to {combined_video_path}")
-                else:
-                    combined_video_path = (
-                        videos_dir / f"FAILED_{video_prefix}_{filename_suffix}.mp4"
-                    )
-                    self._video_write_mp4(self.video_frames, combined_video_path)
-                    print(f"Saved failed episode video to {combined_video_path}")
-            except Exception as e:
-                if success:
-                    print(
-                        f"Warning: Failed to save combined video for episode {self.HistoryBench_episode}: {e}"
-                    )
-                else:
-                    print(
-                        f"Warning: Failed to save failed episode video for episode {self.HistoryBench_episode}: {e}"
-                    )
-
-        if len(self.no_object_video_frames) > 0:
-            try:
-                videos_dir.mkdir(parents=True, exist_ok=True)
-                if success:
-                    no_object_video_path = (
-                        videos_dir
-                        / f"success_NO_OBJECT_{video_prefix}_{filename_suffix}.mp4"
-                    )
-                    self._video_write_mp4(
-                        self.no_object_video_frames, no_object_video_path
-                    )
-                    print(f"Saved no-object video to {no_object_video_path}")
-                else:
-                    no_object_video_path = (
-                        videos_dir
-                        / f"FAILED_NO_OBJECT_{video_prefix}_{filename_suffix}.mp4"
-                    )
-                    self._video_write_mp4(
-                        self.no_object_video_frames, no_object_video_path
-                    )
-                    print(f"Saved failed no-object video to {no_object_video_path}")
-            except Exception as e:
-                if success:
-                    print(
-                        f"Warning: Failed to save no-object video for episode {self.HistoryBench_episode}: {e}"
-                    )
-                else:
-                    print(
-                        f"Warning: Failed to save failed no-object video for episode {self.HistoryBench_episode}: {e}"
-                    )
-
     def step(self, action):
         self.no_object_flag=False
         obs, reward, terminated, truncated, info = super().step(action)
@@ -507,34 +291,87 @@ class HistoryBenchRecordWrapper(gym.Wrapper):
         current_task=self.current_task_name if hasattr(self, 'current_task_name') else "Unknown"
         
         # 视频录制逻辑：仅在任务名称不为 NO RECORD 且启用视频保存时执行
-        if self._video_should_record(current_task):
+        if self.save_video and current_task!='NO RECORD':
                 
             # 如果是 demonstration 任务，添加红色边框（仅用于视频，不影响HDF5）
             is_demonstration = getattr(self, 'current_task_demonstration', False)
             subgoal_text = getattr(self, 'current_task_name', 'Unknown')
             subgoal_online_text = getattr(self, 'current_task_name_online', 'Unknown')
 
+
+
+            # Use deepcopy to avoid modifying original frames that will be saved to HDF5
+            base_camera_frame_for_video = copy.deepcopy(base_camera_frame)
+            wrist_camera_frame_for_video = copy.deepcopy(wrist_camera_frame)
+            segmentation_for_video=copy.deepcopy(segmentation)
+            segmentation_result_for_video=copy.deepcopy(segmentation_result)
+            segmentation_result_online_for_video=copy.deepcopy(segmentation_result_online)
+
+            # 调整 wrist 相机图像大小以匹配 base 相机
+            if base_camera_frame_for_video.shape[:2] != wrist_camera_frame_for_video.shape[:2]:
+                wrist_camera_frame_for_video = cv2.resize(
+                    wrist_camera_frame_for_video,
+                    (base_camera_frame_for_video.shape[1], base_camera_frame_for_video.shape[0]),
+                    interpolation=cv2.INTER_LINEAR,
+                )
+
+            # 生成分割可视化图像（上色）和带红点的目标图像
+            (
+                segmentation_vis,
+                segmentation_result_vis,
+                target_for_video,
+            ) = create_segmentation_visuals(
+                segmentation_for_video,
+                segmentation_result_for_video,
+                base_camera_frame_for_video,
+                self.color_map,
+                self.segmentation_points,
+            )
+
+            (
+                segmentation_vis_online,
+                segmentation_result_vis_online,
+                target_for_video_online,
+            ) = create_segmentation_visuals(
+                segmentation_for_video,
+                segmentation_result_online_for_video,
+                base_camera_frame_for_video,
+                self.color_map,
+                self.segmentation_points_online,
+            )
+
+            # 最终视频帧拼接结构：base | wrist | 原 segmentation | filtered segmentation | base+红点
+            combined=np.hstack([base_camera_frame_for_video, wrist_camera_frame_for_video,
+                              segmentation_vis, segmentation_result_vis,target_for_video])
+            combined_online=np.hstack([base_camera_frame_for_video, wrist_camera_frame_for_video,
+                              segmentation_vis_online, segmentation_result_vis_online,target_for_video_online])
+
+            # 为第一行添加 subgoal_text 和 grounded_subgoal 文本（PLANNER 视角）
+            combined = self._add_text_to_frame(combined, ["PLANNER:",subgoal_text, self.current_subgoal_segment_filled], position='top_right')
+
+            # 为第二行添加 ONLINE: 标记和 subgoal_online_text 和 grounded_subgoal_online 文本（ONLINE 视角）
+            combined_online = self._add_text_to_frame(combined_online, ["ONLINE:", subgoal_online_text, self.current_subgoal_segment_online_filled], position='top_right')
+
+            # 将两行视频流垂直堆叠
+            combined=np.vstack([combined,combined_online])
+
+            # combined=np.hstack([base_camera_frame_for_video, wrist_camera_frame_for_video,
+            #                   ])
+
+
+            # 如果是演示阶段，给整个帧加红框
+            if is_demonstration:
+                combined = self._add_red_border(combined)
+
+
             language_goal = task_goal.get_language_goal(self.env, self.HistoryBench_env)
-            prepared = self._video_prepare_step_frames(
-                base_camera_frame,
-                wrist_camera_frame,
-                segmentation,
-                segmentation_result,
-                segmentation_result_online,
-            )
-            combined = self._video_compose_planner_online_rows(
-                prepared,
-                subgoal_text,
-                self.current_subgoal_segment_filled,
-                subgoal_online_text,
-                self.current_subgoal_segment_online_filled,
-            )
-            combined = self._video_apply_overlays(
-                combined,
-                is_demonstration,
-                language_goal,
-            )
-            self._video_append_step_frame(combined, self.no_object_flag)
+            combined = self._add_text_to_frame(combined, [language_goal], position='top_right')
+            #wrist_camera_frame_for_video = self._add_text_to_frame(wrist_camera_frame_for_video, language_goal, position='top_right')
+
+            self.video_frames.append(combined)
+
+            if self.no_object_flag==True:
+                self.no_object_video_frames.append(combined)
 
             #print(self.current_task_name)
 
@@ -648,8 +485,19 @@ class HistoryBenchRecordWrapper(gym.Wrapper):
        
         # language_goal 主要用于视频命名和 HDF5 中的 metadata，失败/成功都需要
         language_goal=task_goal.get_language_goal(self.env,self.HistoryBench_env)
-        filename_parts = self._video_build_filename_parts(language_goal, difficulty)
-        filename_suffix = filename_parts["filename_suffix"]
+        sanitized_goal = language_goal.replace(" ", "_").replace("/", "_") if language_goal else "no_goal"
+        difficulty_tag = (
+            str(difficulty).replace(" ", "_").replace("/", "_")
+            if difficulty
+            else None
+        )
+        filename_suffix = sanitized_goal
+        if difficulty_tag:
+            filename_suffix = (
+                f"{difficulty_tag}_{filename_suffix}"
+                if filename_suffix
+                else difficulty_tag
+            )
         fail_recover_suffix = ""
         if getattr(self.env, "use_fail_planner", False):
             fail_mode = getattr(self.env, "fail", None)
@@ -829,11 +677,32 @@ class HistoryBenchRecordWrapper(gym.Wrapper):
 
             # 保存成功视频（如果启用）。文件名包含语言目标/难度，方便查找
             # 注意：视频保存失败不应该影响HDF5数据的保存
-            self._video_flush_episode_files(
-                success=True,
-                video_prefix=video_prefix,
-                filename_suffix=filename_suffix,
-            )
+            if self.save_video and len(self.video_frames) > 0:
+                try:
+                    videos_dir = self.output_root / "videos"
+                    videos_dir.mkdir(parents=True, exist_ok=True)
+                    combined_video_path = videos_dir / f"{video_prefix}_{filename_suffix}.mp4"
+
+                    with imageio.get_writer(combined_video_path.as_posix(), fps=30, codec="libx264", quality=8) as writer:
+                        for combined_frame in self.video_frames:
+                            writer.append_data(combined_frame)
+                    print(f"Saved combined video to {combined_video_path}")
+                except Exception as e:
+                    print(f"Warning: Failed to save combined video for episode {self.HistoryBench_episode}: {e}")
+                    # 视频保存失败不影响HDF5数据保存
+            if self.save_video and len(self.no_object_video_frames) > 0:
+                try:
+                    videos_dir = self.output_root / "videos"
+                    videos_dir.mkdir(parents=True, exist_ok=True)
+                    no_object_video_path = videos_dir / f"success_NO_OBJECT_{video_prefix}_{filename_suffix}.mp4"
+
+                    with imageio.get_writer(no_object_video_path.as_posix(), fps=30, codec="libx264", quality=8) as writer:
+                        for combined_frame in self.no_object_video_frames:
+                            writer.append_data(combined_frame)
+                    print(f"Saved no-object video to {no_object_video_path}")
+                except Exception as e:
+                    print(f"Warning: Failed to save no-object video for episode {self.HistoryBench_episode}: {e}")
+                    # 视频保存失败不影响HDF5数据保存
 
             print(f"Successfully saved episode {self.HistoryBench_episode}")
         else:
@@ -841,11 +710,31 @@ class HistoryBenchRecordWrapper(gym.Wrapper):
 
             # 保存失败视频（如果启用），但不写入 HDF5
             # 注意：视频保存失败不应该抛出异常
-            self._video_flush_episode_files(
-                success=False,
-                video_prefix=video_prefix,
-                filename_suffix=filename_suffix,
-            )
+            if self.save_video and len(self.video_frames) > 0:
+                try:
+                    videos_dir = self.output_root / "videos"
+                    videos_dir.mkdir(parents=True, exist_ok=True)
+                    # Add FAILED_ prefix to the filename
+                    combined_video_path = videos_dir / f"FAILED_{video_prefix}_{filename_suffix}.mp4"
+
+                    with imageio.get_writer(combined_video_path.as_posix(), fps=30, codec="libx264", quality=8) as writer:
+                        for combined_frame in self.video_frames:
+                            writer.append_data(combined_frame)
+                    print(f"Saved failed episode video to {combined_video_path}")
+                except Exception as e:
+                    print(f"Warning: Failed to save failed episode video for episode {self.HistoryBench_episode}: {e}")
+            if self.save_video and len(self.no_object_video_frames) > 0:
+                try:
+                    videos_dir = self.output_root / "videos"
+                    videos_dir.mkdir(parents=True, exist_ok=True)
+                    no_object_video_path = videos_dir / f"FAILED_NO_OBJECT_{video_prefix}_{filename_suffix}.mp4"
+
+                    with imageio.get_writer(no_object_video_path.as_posix(), fps=30, codec="libx264", quality=8) as writer:
+                        for combined_frame in self.no_object_video_frames:
+                            writer.append_data(combined_frame)
+                    print(f"Saved failed no-object video to {no_object_video_path}")
+                except Exception as e:
+                    print(f"Warning: Failed to save failed no-object video for episode {self.HistoryBench_episode}: {e}")
 
             # 如果 episode 失败，删除已经创建的 group（如果有的话）
             env_group_name = f"env_{self.HistoryBench_env}"
