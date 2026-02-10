@@ -194,7 +194,11 @@ class DemonstrationWrapper(gym.Wrapper):
             'wrist_camera_extrinsic_opencv': wrist_camera_extrinsic_opencv,
             'wrist_camera_intrinsic_opencv': wrist_camera_intrinsic_opencv,
             'wrist_camera_cam2world_opengl': wrist_camera_cam2world_opengl,
-            'robot_endeffector_pose': robot_endeffector_pose,
+            'end_effector_pose_raw': robot_endeffector_pose,
+            'end_effector_pose': (
+                robot_endeffector_pose['pose'].detach().cpu().tolist()[:3]
+                + robot_endeffector_pose['rpy'].detach().cpu().tolist()[:3]
+            ),
         }
         new_info = {
             **info,
