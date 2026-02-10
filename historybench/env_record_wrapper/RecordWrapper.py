@@ -607,11 +607,16 @@ class HistoryBenchRecordWrapper(gym.Wrapper):
                 'action': {
                     'joint_action': action,
                     'keypoint': current_keypoint if current_keypoint else None,
-                    'eef_action': {
+                    'eef_action_raw': {
                         'pose': _to_numpy(eef_pose_dict['pose']),
                         'quat': _to_numpy(eef_pose_dict['quat']),
                         'rpy': _to_numpy(eef_pose_dict['rpy']),
                     },
+                    'eef_action': np.concatenate([
+                        _to_numpy(eef_pose_dict['pose']).flatten()[:3],
+                        _to_numpy(eef_pose_dict['rpy']).flatten()[:3],
+                        _to_numpy(action).flatten()[-1:] if action is not None else np.array([-1.0]),
+                    ]).astype(np.float64),
                 },
                 'info': {
                     'record_timestep': record_timestep,
@@ -773,11 +778,14 @@ class HistoryBenchRecordWrapper(gym.Wrapper):
                             action_data = action_data.reshape(1, 8)
                     action_group.create_dataset("joint_action", data=action_data)
 
-                # eef_action information
-                eef_action_group = action_group.create_group("eef_action")
-                eef_action_group.create_dataset("pose", data=action_data_dict['eef_action']['pose'])
-                eef_action_group.create_dataset("quat", data=action_data_dict['eef_action']['quat'])
-                eef_action_group.create_dataset("rpy", data=action_data_dict['eef_action']['rpy'])
+                # eef_action_raw information (pose/quat/rpy sub-datasets)
+                eef_action_raw_group = action_group.create_group("eef_action_raw")
+                eef_action_raw_group.create_dataset("pose", data=action_data_dict['eef_action_raw']['pose'])
+                eef_action_raw_group.create_dataset("quat", data=action_data_dict['eef_action_raw']['quat'])
+                eef_action_raw_group.create_dataset("rpy", data=action_data_dict['eef_action_raw']['rpy'])
+
+                # eef_action: 7-dim [pose(3), rpy(3), gripper(1)]
+                action_group.create_dataset("eef_action", data=action_data_dict['eef_action'])
 
                 # 写入keypoint信息（如果存在）
                 keypoint = action_data_dict.get('keypoint', None)

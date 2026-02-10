@@ -146,26 +146,13 @@ class EpisodeDatasetResolver:
         return _action_to_8d(raw_action)
 
     def _extract_ee_pose_gripper(self, timestep_group: h5py.Group) -> Optional[np.ndarray]:
-        # 从新 HDF5 结构读取：action/eef_action/pose(3) + action/eef_action/rpy(3)
-        # 输出 [pose(3), rpy(3), gripper(1)] = 7 维
+        # 直接读取 action/eef_action 7 维 dataset [pose(3), rpy(3), gripper(1)]
         action_grp = timestep_group.get("action")
         if action_grp is None or not isinstance(action_grp, h5py.Group):
             return None
-        eef_grp = action_grp.get("eef_action")
-        if eef_grp is None or not isinstance(eef_grp, h5py.Group):
+        if "eef_action" not in action_grp:
             return None
-        if "pose" not in eef_grp or "rpy" not in eef_grp:
-            return None
-        pose = np.asarray(eef_grp["pose"][()], dtype=np.float64).flatten()
-        rpy = np.asarray(eef_grp["rpy"][()], dtype=np.float64).flatten()
-        if pose.size < 3 or rpy.size < 3:
-            return None
-        # gripper 从 joint_action 最后一位获取
-        with np.printoptions(suppress=True):
-            print(np.degrees(rpy))
-        action_8d = self._extract_joint_action(timestep_group)
-        gripper = float(action_8d[-1]) if action_8d is not None and action_8d.size > 0 else -1.0
-        return np.concatenate([pose[:3], rpy[:3], [gripper]]).astype(np.float64)
+        return np.asarray(action_grp["eef_action"][()], dtype=np.float64).flatten()
 
     def _extract_keypoint_action(self, timestep_group: h5py.Group) -> Optional[np.ndarray]:
         # 新结构: action/keypoint_p, action/keypoint_q；兼容旧结构

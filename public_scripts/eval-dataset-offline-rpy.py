@@ -48,10 +48,10 @@ def _extract_rpy_from_timestep(ts_group: h5py.Group) -> list[np.ndarray]:
     """从单个 timestep 提取 RPY 向量列表。"""
     if (
         "action" in ts_group
-        and "eef_action" in ts_group["action"]
-        and "rpy" in ts_group["action"]["eef_action"]
+        and "eef_action_raw" in ts_group["action"]
+        and "rpy" in ts_group["action"]["eef_action_raw"]
     ):
-        rpy_data = ts_group["action"]["eef_action"]["rpy"][()]
+        rpy_data = ts_group["action"]["eef_action_raw"]["rpy"][()]
         rpy_arr = np.asarray(rpy_data, dtype=np.float64)
         if rpy_arr.ndim == 1:
             rpy_arr = rpy_arr.reshape(1, -1)

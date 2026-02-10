@@ -40,7 +40,7 @@ DEFAULT_ENV_IDS = [
     #"PickXtimes",
     # "StopCube",
     # "SwingXtimes",
-    # "BinFill",
+    "BinFill",
     # "VideoUnmaskSwap",
     # "VideoUnmask",
     # "ButtonUnmaskSwap",
@@ -50,7 +50,7 @@ DEFAULT_ENV_IDS = [
     # "VideoPlaceOrder",
     # "PickHighlight",
     # "InsertPeg",
-    "MoveCube",
+    #"MoveCube",
     # "PatternLock",
     # "RouteStick",
 ]
