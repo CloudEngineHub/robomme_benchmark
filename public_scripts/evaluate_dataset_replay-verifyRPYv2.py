@@ -88,11 +88,11 @@ def _parse_oracle_command(subgoal_text: Optional[str]) -> Optional[dict[str, Any
 
 def _extract_rpy_from_obs_batch(obs_batch: dict[str, Any]) -> list[np.ndarray]:
     """
-    从 columnar 结构的 obs_batch 中提取 RPY 序列（最后三维）。
+    从 columnar 结构的 obs_batch 中提取 RPY 序列。
 
     输入兼容说明：
-    - obs_batch["robot_endeffector_pose"] 的元素可能是 torch.Tensor / np.ndarray / list
-    - 形状可能是 (6,), (1, 6), (N, 6) 等，统一 reshape 后按行提取
+    - 新格式：obs_batch["robot_endeffector_pose"] 的元素为 dict {"pose": ..., "quat": ..., "rpy": ...}
+    - 旧格式（兼容）：元素为 torch.Tensor / np.ndarray / list，取最后 3 维作为 RPY
 
     返回值：
     - list[np.ndarray]，每个元素是 shape=(3,) 的 [roll, pitch, yaw]（float64）
@@ -106,6 +106,22 @@ def _extract_rpy_from_obs_batch(obs_batch: dict[str, Any]) -> list[np.ndarray]:
     for item in pose_column:
         if item is None:
             continue
+
+        # ---------- 新字典格式 ----------
+        if isinstance(item, dict):
+            rpy_val = item.get("rpy")
+            if rpy_val is None:
+                continue
+            if isinstance(rpy_val, torch.Tensor):
+                rpy_arr = rpy_val.detach().cpu().numpy()
+            else:
+                rpy_arr = np.asarray(rpy_val)
+            rpy_arr = np.asarray(rpy_arr, dtype=np.float64).reshape(-1, 3)
+            for row in rpy_arr:
+                rpy_rows.append(row.copy())
+            continue
+
+        # ---------- 旧 Tensor/array 格式（兼容） ----------
         if isinstance(item, torch.Tensor):
             pose_arr = item.detach().cpu().numpy()
         else:

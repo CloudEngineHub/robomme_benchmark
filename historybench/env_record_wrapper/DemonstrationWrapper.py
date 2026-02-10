@@ -187,9 +187,9 @@ class DemonstrationWrapper(gym.Wrapper):
         """
         return unwrap_rpy_with_prev_torch(rpy, self._prev_ee_rpy_xyz)
 
-    def _build_robot_endeffector_pose_xyzrpy(self) -> torch.Tensor:
+    def _build_robot_endeffector_pose_dict(self) -> dict:
         """
-        构建 xyz+rpy（连续）形式的末端位姿。
+        构建末端位姿字典，包含 pose / quat / rpy 三个键。
 
         流水线：
         1) 读取当前 tcp pose 的 p/q；
@@ -198,7 +198,7 @@ class DemonstrationWrapper(gym.Wrapper):
         4) quat -> rpy 主值；
         5) 基于上一帧做 unwrap，得到连续 RPY；
         6) 更新缓存（对齐后 quat + unwrap 后 rpy）；
-        7) 输出 [x, y, z, roll, pitch, yaw]。
+        7) 输出 {"pose": xyz, "quat": wxyz, "rpy": [roll, pitch, yaw]}。
 
         备注：该流程只做连续化稳定处理，不尝试全局最优欧拉参数化。
         """
@@ -213,7 +213,11 @@ class DemonstrationWrapper(gym.Wrapper):
         # 缓存“本帧最终参与连续化的表示”，供下一帧继续使用。
         self._prev_ee_quat_wxyz = quat_aligned.detach().clone()
         self._prev_ee_rpy_xyz = rpy_xyz_unwrapped.detach().clone()
-        return torch.cat((robot_endeffector_p, rpy_xyz_unwrapped), dim=-1)
+        return {
+            "pose": robot_endeffector_p,      # xyz 位置
+            "quat": quat_aligned,              # wxyz 四元数（归一化 + 符号对齐后）
+            "rpy": rpy_xyz_unwrapped,          # 连续化 RPY (roll, pitch, yaw)
+        }
 
     def _augment_obs_and_info(self, obs, info, action):
         """直接从 obs 提取当前步数据并合并进 obs 和 info 后返回，不经过 list 缓冲区中转。"""
@@ -244,9 +248,8 @@ class DemonstrationWrapper(gym.Wrapper):
         wrist_camera_extrinsic_opencv = obs["sensor_param"]["hand_camera"]["extrinsic_cv"]
         wrist_camera_intrinsic_opencv = obs["sensor_param"]["hand_camera"]["intrinsic_cv"]
         wrist_camera_cam2world_opengl = obs["sensor_param"]["hand_camera"]["cam2world_gl"]
-        # 这里统一产出 xyz+rpy（连续）而非历史的 xyz+quat，
-        # 便于下游直接做角度连续性统计与控制。
-        robot_endeffector_pose = self._build_robot_endeffector_pose_xyzrpy()
+        # 末端位姿以字典形式输出，包含 pose/quat/rpy 三个表示。
+        robot_endeffector_pose = self._build_robot_endeffector_pose_dict()
 
         new_obs = {
             'maniskill_obs': base_obs,
