@@ -452,10 +452,10 @@ class HistoryBenchRecordWrapper(gym.Wrapper):
         wrist_camera_frame = obs['sensor_data']['hand_camera']['rgb'][0].cpu().numpy()
         wrist_camera_depth = obs['sensor_data']['hand_camera']['depth'][0].cpu().numpy()
 
-        base_camera_extrinsic_opencv=obs['sensor_param']['base_camera']['extrinsic_cv']
-        base_camera_intrinsic_opencv=obs['sensor_param']['base_camera']['intrinsic_cv']
-        wrist_camera_extrinsic_opencv=obs['sensor_param']['hand_camera']['extrinsic_cv']
-        wrist_camera_intrinsic_opencv=obs['sensor_param']['hand_camera']['intrinsic_cv']
+        base_camera_extrinsic=obs['sensor_param']['base_camera']['extrinsic_cv']
+        base_camera_intrinsic=obs['sensor_param']['base_camera']['intrinsic_cv']
+        wrist_camera_extrinsic=obs['sensor_param']['hand_camera']['extrinsic_cv']
+        wrist_camera_intrinsic=obs['sensor_param']['hand_camera']['intrinsic_cv']
         
         
         segmentation=obs['sensor_data']['base_camera']['segmentation'].cpu().numpy()[0]
@@ -598,7 +598,7 @@ class HistoryBenchRecordWrapper(gym.Wrapper):
             elif joint_state_flat.size < 9:
                 joint_state_flat = np.pad(joint_state_flat, (0, 9 - joint_state_flat.size), constant_values=0.0)
             gripper_state = joint_state_flat[-2:].astype(np.float64)
-            gripper_open = bool(np.any(gripper_state < 0.03))
+            gripper_close= bool(np.any(gripper_state < 0.03))
 
             eef_action = np.concatenate([
                 _to_numpy(eef_pose_dict['pose']).flatten()[:3],
@@ -616,12 +616,12 @@ class HistoryBenchRecordWrapper(gym.Wrapper):
                     'joint_state': joint_state,
                     'eef_state': eef_state,
                     'gripper_state': gripper_state,
-                    'gripper_open': gripper_open,
+                    'gripper_close': gripper_close,
                     'eef_velocity': end_effector_velocity,
                     'front_camera_segmentation': segmentation,
                     'front_camera_segmentation_result': segmentation_result,
-                    'front_camera_extrinsic_opencv': base_camera_extrinsic_opencv,
-                    'wrist_camera_extrinsic_opencv': wrist_camera_extrinsic_opencv,
+                    'front_camera_extrinsic': base_camera_extrinsic,
+                    'wrist_camera_extrinsic': wrist_camera_extrinsic,
                 },
                 'action': {
                     'joint_action': action,
@@ -642,8 +642,8 @@ class HistoryBenchRecordWrapper(gym.Wrapper):
                     'is_video_demo': self.current_task_demonstration if hasattr(self, 'current_task_demonstration') else False,
                 },
                 '_setup_camera_intrinsics': {
-                    'front_camera_intrinsic_opencv': base_camera_intrinsic_opencv,
-                    'wrist_camera_intrinsic_opencv': wrist_camera_intrinsic_opencv,
+                    'front_camera_intrinsic': base_camera_intrinsic,
+                    'wrist_camera_intrinsic': wrist_camera_intrinsic,
                 },
             }
 
@@ -763,13 +763,13 @@ class HistoryBenchRecordWrapper(gym.Wrapper):
                 obs_group.create_dataset("joint_state", data=state_data)
                 obs_group.create_dataset("eef_state", data=obs_data['eef_state'])
                 obs_group.create_dataset("gripper_state", data=obs_data['gripper_state'])
-                obs_group.create_dataset("gripper_open", data=obs_data['gripper_open'])
+                obs_group.create_dataset("gripper_close", data=obs_data['gripper_close'])
 
                 obs_group.create_dataset("eef_velocity", data=obs_data['eef_velocity'])
                 obs_group.create_dataset("front_camera_segmentation", data=obs_data['front_camera_segmentation'])
                 obs_group.create_dataset("front_camera_segmentation_result", data=obs_data['front_camera_segmentation_result'])
-                obs_group.create_dataset("front_camera_extrinsic_opencv", data=obs_data['front_camera_extrinsic_opencv'])
-                obs_group.create_dataset("wrist_camera_extrinsic_opencv", data=obs_data['wrist_camera_extrinsic_opencv'])
+                obs_group.create_dataset("front_camera_extrinsic", data=obs_data['front_camera_extrinsic'])
+                obs_group.create_dataset("wrist_camera_extrinsic", data=obs_data['wrist_camera_extrinsic'])
 
 
                 # ── action 子 group ──
@@ -873,15 +873,15 @@ class HistoryBenchRecordWrapper(gym.Wrapper):
             # 相机内参：每 episode 只保存一次（取第一条 buffer 的值）
             if self.buffer:
                 intrinsics = self.buffer[0].get('_setup_camera_intrinsics', {})
-                if 'front_camera_intrinsic_opencv' in intrinsics:
-                    setup_group.create_dataset("front_camera_intrinsic_opencv", data=intrinsics['front_camera_intrinsic_opencv'])
-                if 'wrist_camera_intrinsic_opencv' in intrinsics:
-                    setup_group.create_dataset("wrist_camera_intrinsic_opencv", data=intrinsics['wrist_camera_intrinsic_opencv'])
+                if 'front_camera_intrinsic' in intrinsics:
+                    setup_group.create_dataset("front_camera_intrinsic", data=intrinsics['front_camera_intrinsic'])
+                if 'wrist_camera_intrinsic' in intrinsics:
+                    setup_group.create_dataset("wrist_camera_intrinsic", data=intrinsics['wrist_camera_intrinsic'])
 
             # 记录任务列表（如果存在），便于离线复现每个 simple_subgoal 的语义
-            if hasattr(self, 'task_list'):
-                tasks_group = setup_group.create_group("task_list")
-                for i, task_entry in enumerate(self.task_list):
+            if hasattr(self, 'subgoal_list'):
+                tasks_group = setup_group.create_group("subgoal_list")
+                for i, task_entry in enumerate(self.subgoal_list):
                     if isinstance(task_entry, dict):
                         task_name = task_entry.get("name", "Unknown")
                         demonstration = bool(task_entry.get("demonstration", False))
@@ -893,11 +893,11 @@ class HistoryBenchRecordWrapper(gym.Wrapper):
                             _, task_name, demonstration = task_entry
 
                     task_name_encoded = task_name.encode('utf-8')
-                    tasks_group.create_dataset(f"task_{i}_name", data=task_name_encoded)
-                    tasks_group.create_dataset(f"task_{i}_demonstration", data=demonstration)
+                    tasks_group.create_dataset(f"subgoal_{i}_name", data=task_name_encoded)
+                    tasks_group.create_dataset(f"subgoal_{i}_demonstration", data=demonstration)
 
             if language_goal:
-                setup_group.create_dataset("language goal", data=language_goal)
+                setup_group.create_dataset("task_goal", data=language_goal)
 
             # 保存成功视频（如果启用）。文件名包含语言目标/难度，方便查找
             # 注意：视频保存失败不应该影响HDF5数据的保存
