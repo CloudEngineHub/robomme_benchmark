@@ -17,7 +17,7 @@ from mani_skill.utils.structs.pose import Pose
 
 #Robomme
 import matplotlib.pyplot as plt
-import h5py
+
 import random
 from mani_skill.utils.geometry.rotation_conversions import (
     euler_angles_to_matrix,

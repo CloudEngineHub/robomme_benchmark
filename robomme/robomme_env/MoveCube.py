@@ -17,7 +17,7 @@ from mani_skill.utils import common, sapien_utils
 from mani_skill.utils.structs import Actor
 #Robomme
 import matplotlib.pyplot as plt
-import h5py
+
 from mani_skill.utils.geometry.rotation_conversions import (
     euler_angles_to_matrix,
     matrix_to_quaternion,

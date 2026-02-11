@@ -17,9 +17,7 @@ from mani_skill.utils.structs.pose import Pose
 from mani_skill.utils.structs import Actor, Link
 #Robomme
 import matplotlib.pyplot as plt
-import h5py
 import random
-import json
 from mani_skill.utils.geometry.rotation_conversions import (
     euler_angles_to_matrix,
     matrix_to_quaternion,

@@ -1,6 +1,4 @@
-import json
-import os
-import uuid
+
 from pathlib import Path
 from typing import Any, Dict, Union
 
@@ -21,8 +19,7 @@ from mani_skill.utils.structs.pose import Pose
 
 #Robomme
 import matplotlib.pyplot as plt
-import h5py
-import random
+
 from mani_skill.utils.geometry.rotation_conversions import (
     euler_angles_to_matrix,
     matrix_to_quaternion,
@@ -370,25 +367,7 @@ class VideoPlaceOrder(BaseEnv):
                 "button_task_index": self.button_task_index,
             }
 
-            try:
-                log_path = Path(__file__).resolve().parent / "target_selection.json"
-                payload_list = []
-                if log_path.exists():
-                    try:
-                        with open(log_path, "r") as fp:
-                            existing_payload = json.load(fp)
-                        if isinstance(existing_payload, list):
-                            payload_list = existing_payload
-                        elif existing_payload is not None:
-                            payload_list = [existing_payload]
-                    except json.JSONDecodeError:
-                        log_path.with_suffix(".json.bak").write_text(log_path.read_text())
-                        payload_list = []
-                payload_list.append(target_debug_payload)
-                with open(log_path, "w") as fp:
-                    json.dump(payload_list, fp, indent=2)
-            except Exception as exc:
-                print(f"Failed to write target selection log: {exc}")
+
 
         except SceneGenerationError:
             raise
@@ -542,37 +521,7 @@ class VideoPlaceOrder(BaseEnv):
 
 
                 
-            try:
-                task_entries = []
-                for task in tasks:
-                    if isinstance(task, dict):
-                        task_name = task.get("name", "Unknown")
-                    elif isinstance(task, (list, tuple)):
-                        if len(task) >= 2:
-                            task_name = task[1]
-                        else:
-                            task_name = str(task)
-                    else:
-                        task_name = str(task)
-                    task_entries.append(
-                        {
-                            "name": task_name,
-                        }
-                    )
 
-                self._task_log_dir = Path(__file__).resolve().parent / "task_name_logs"
-                self._task_log_dir.mkdir(parents=True, exist_ok=True)
-
-                payload = {
-                    "robomme_seed": int(self.Robomme_seed),
-                    "difficulty": self.difficulty,
-                    "tasks": task_entries,
-                }
-
-                self._task_log_payload = payload
-                self._task_log_written = False
-            except Exception as exc:
-                print(f"Failed to write task names log: {exc}")
 
     def _get_obs_extra(self, info: Dict):
         return dict()
@@ -604,12 +553,12 @@ class VideoPlaceOrder(BaseEnv):
         if task_failed:
             self.failureflag = torch.tensor([True])
             print(f"Task failed: {current_task_name}")
-            self._write_task_log(status="failed")
+
 
         # 如果static_check成功或者所有任务完成，则设置成功标志
         if all_tasks_completed and not task_failed:
             self.successflag = torch.tensor([True])
-            self._write_task_log(status="success")
+
 
         return {
             "success": self.successflag,
@@ -662,29 +611,4 @@ class VideoPlaceOrder(BaseEnv):
         obs, reward, terminated, truncated, info = super().step(action)
         return obs, reward, terminated, truncated, info
 
-    def _write_task_log(self, status: str) -> None:
-        if getattr(self, "_task_log_written", False):
-            return
 
-        payload = getattr(self, "_task_log_payload", None)
-        log_dir = getattr(self, "_task_log_dir", None)
-
-        if not payload or log_dir is None:
-            return
-
-        payload_to_write = dict(payload)
-        payload_to_write["status"] = status
-
-        log_dir.mkdir(parents=True, exist_ok=True)
-
-        log_file = log_dir / (
-            f"task_names_seed_{payload_to_write.get('robomme_seed', 'unknown')}_"
-            f"pid_{os.getpid()}_{uuid.uuid4().hex}.json"
-        )
-
-        try:
-            with open(log_file, "w", encoding="utf-8") as fp:
-                json.dump(payload_to_write, fp, indent=2)
-            self._task_log_written = True
-        except Exception as exc:
-            print(f"Failed to write task names log: {exc}")
