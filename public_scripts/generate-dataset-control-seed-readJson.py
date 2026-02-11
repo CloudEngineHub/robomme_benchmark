@@ -45,25 +45,25 @@ from planner_fail_safe import (
 
 # 所有支持的环境模块名称列表
 DEFAULT_ENVS =[
-# "PickXtimes",
-# "StopCube",
-# "SwingXtimes",
+"PickXtimes",
+"StopCube",
+"SwingXtimes",
 "BinFill",
 
-# "VideoUnmaskSwap",
-# "VideoUnmask",
-# "ButtonUnmaskSwap",
-# "ButtonUnmask",
+"VideoUnmaskSwap",
+"VideoUnmask",
+"ButtonUnmaskSwap",
+"ButtonUnmask",
 
-#  "VideoRepick",
-# "VideoPlaceButton",
-# "VideoPlaceOrder",
-# "PickHighlight",
+ "VideoRepick",
+"VideoPlaceButton",
+"VideoPlaceOrder",
+"PickHighlight",
 
-# "InsertPeg",
-# 'MoveCube',
-# "PatternLock",
-# "RouteStick"
+"InsertPeg",
+'MoveCube',
+"PatternLock",
+"RouteStick"
     ]
 
 # 参考数据集 metadata 根目录：用于读取 difficulty 和 HistoryBench_seed

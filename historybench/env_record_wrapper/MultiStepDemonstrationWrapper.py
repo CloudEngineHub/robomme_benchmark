@@ -1,17 +1,19 @@
 """
 MultiStepDemonstrationWrapper：封装 DemonstrationWrapper，对外提供 keypoint step 接口。
 
-每次 step(action) 接收 action = keypoint_p(3) + keypoint_q(4) + gripper_action(1)，共 8 维。
-内部通过 planner_denseStep 调用 move_to_pose_with_RRTStar 与 close_gripper/open_gripper，
+每次 step(action) 接收 action = keypoint_p(3) + rpy(3) + gripper_action(1)，共 7 维。
+内部将 RPY 转为 quat 后通过 planner_denseStep 调用 move_to_pose_with_screw 与 close_gripper/open_gripper，
 其中 PatternLock/RouteStick 会强制跳过 close_gripper/open_gripper。
 返回统一批次（obs/info 为字典列式列表，reward/terminated/truncated 为一维张量）。
 调用方需保证 scripts/ 在 sys.path 中，以便导入 planner_fail_safe。
 """
 import numpy as np
 import sapien
+import torch
 import gymnasium as gym
 
 from . import planner_denseStep
+from .rpy_util import rpy_xyz_to_quat_wxyz_torch
 
 
 class RRTPlanFailure(RuntimeError):
@@ -21,8 +23,8 @@ class RRTPlanFailure(RuntimeError):
 class MultiStepDemonstrationWrapper(gym.Wrapper):
     """
     封装 DemonstrationWrapper。step(action) 会把 action 解释为
-    (keypoint_p, keypoint_q, gripper_action)，并通过 planner_denseStep 执行规划，
-    返回统一批次。
+    (keypoint_p, rpy, gripper_action) 共 7 维，内部将 RPY 转为 quat 后
+    通过 planner_denseStep 执行规划，返回统一批次。
     """
 
     def __init__(self, env, gui_render=True, vis=True, **kwargs):
@@ -31,7 +33,7 @@ class MultiStepDemonstrationWrapper(gym.Wrapper):
         self._gui_render = gui_render
         self._vis = vis
         self.action_space = gym.spaces.Box(
-            low=-np.inf, high=np.inf, shape=(8,), dtype=np.float32
+            low=-np.inf, high=np.inf, shape=(7,), dtype=np.float32
         )
 
     @staticmethod
@@ -101,11 +103,15 @@ class MultiStepDemonstrationWrapper(gym.Wrapper):
     def step(self, action):
         """执行关键点 step：RRT* 移动 + 可选夹爪动作，返回统一批次。"""
         action = np.asarray(action, dtype=np.float64).flatten()
-        if action.size < 8:
-            raise ValueError(f"action must have at least 8 elements, got {action.size}")
+        if action.size < 7:
+            raise ValueError(f"action must have at least 7 elements, got {action.size}")
         keypoint_p = action[:3]
-        keypoint_q = action[3:7]
-        gripper_action = float(action[7])
+        rpy = action[3:6]
+        gripper_action = float(action[6])
+
+        # RPY → quat (wxyz) for sapien.Pose
+        rpy_t = torch.as_tensor(rpy, dtype=torch.float64)
+        keypoint_q = rpy_xyz_to_quat_wxyz_torch(rpy_t).numpy()
 
         pose = sapien.Pose(p=keypoint_p, q=keypoint_q)
         planner = self._get_planner()

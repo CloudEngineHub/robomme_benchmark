@@ -153,23 +153,15 @@ class EpisodeDatasetResolver:
         return np.asarray(action_grp["eef_action"][()], dtype=np.float64).flatten()
 
     def _extract_keypoint_action(self, timestep_group: h5py.Group) -> Optional[np.ndarray]:
-        # 新结构: action/keypoint_p, action/keypoint_q；兼容旧结构
+        # 新结构: action/keypoint_action (7D: pos(3)+rpy(3)+gripper(1))
         action_grp = timestep_group.get("action")
         if action_grp is not None and isinstance(action_grp, h5py.Group):
             src = action_grp
         else:
             src = timestep_group
-        p = src["keypoint_p"][()] if "keypoint_p" in src else None
-        q = src["keypoint_q"][()] if "keypoint_q" in src else None
-        if p is None or q is None:
+        if "keypoint_action" not in src:
             return None
-        p_flat = np.asarray(p, dtype=np.float64).flatten()
-        q_flat = np.asarray(q, dtype=np.float64).flatten()
-        if p_flat.size < 3 or q_flat.size < 4:
-            return None
-        action_8d = self._extract_joint_action(timestep_group)
-        gripper = float(action_8d[-1]) if action_8d is not None and action_8d.size > 0 else -1.0
-        return np.concatenate([p_flat[:3], q_flat[:4], [gripper]]).astype(np.float64)
+        return np.asarray(src["keypoint_action"][()], dtype=np.float64).flatten()
 
     def _extract_subgoal_text(self, timestep_group: h5py.Group) -> Optional[str]:
         val = None
@@ -197,10 +189,10 @@ class EpisodeDatasetResolver:
                 continue
 
             self._non_demo_steps.append(record_step)
-            # 新结构: action/keypoint_p, action/keypoint_q；兼容旧结构
+            # keypoint_action: 7D [pos(3), rpy(3), gripper(1)]
             action_grp = timestep_group.get("action")
             kp_src = action_grp if (action_grp is not None and isinstance(action_grp, h5py.Group)) else timestep_group
-            if "keypoint_p" in kp_src and "keypoint_q" in kp_src:
+            if "keypoint_action" in kp_src:
                 self._keypoint_steps.append(record_step)
 
             current_subgoal = self._extract_subgoal_text(timestep_group)

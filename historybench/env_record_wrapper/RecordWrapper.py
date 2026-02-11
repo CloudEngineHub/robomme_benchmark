@@ -556,10 +556,10 @@ class HistoryBenchRecordWrapper(gym.Wrapper):
             end_effector_velocity = self.agent.robot.links[9].get_linear_velocity().tolist()[0] + self.agent.robot.links[9].get_angular_velocity().tolist()[0]
 
             # 处理keypoint信息：读取env中的待记录keypoint（如果存在则记录一次后清除）
-            current_keypoint = None
+            # 转换为 7D keypoint_action: [position(3), rpy(3), gripper(1)]
+            keypoint_action = None
             env_unwrapped = getattr(self.env, 'unwrapped', self.env)
             if hasattr(env_unwrapped, '_pending_keypoint') and env_unwrapped._pending_keypoint is not None:
-                # 获取待记录的keypoint并立即清除，确保每个keypoint只记录一次
                 current_keypoint = env_unwrapped._pending_keypoint
 
                 if 'keypoint_p' not in current_keypoint or 'keypoint_q' not in current_keypoint:
@@ -574,9 +574,21 @@ class HistoryBenchRecordWrapper(gym.Wrapper):
                         f"_pending_keypoint keypoint shape invalid: p={keypoint_p_np.shape}, q={keypoint_q_np.shape}"
                     )
 
-                current_keypoint['keypoint_p'] = keypoint_p_np
-                current_keypoint['keypoint_q'] = keypoint_q_np
-                
+                # 复用当前帧的 prev_quat/prev_rpy 将 keypoint quat 转为连续 RPY
+                kp_pose_dict, _, _ = build_endeffector_pose_dict(
+                    torch.as_tensor(keypoint_p_np),
+                    torch.as_tensor(keypoint_q_np),
+                    self._prev_ee_quat_wxyz,
+                    self._prev_ee_rpy_xyz,
+                )
+                kp_type = current_keypoint.get('keypoint_type', 'unknown')
+                gripper_val = 1.0 if kp_type == 'open' else -1.0
+                keypoint_action = np.concatenate([
+                    kp_pose_dict['pose'].detach().cpu().numpy().flatten()[:3],
+                    kp_pose_dict['rpy'].detach().cpu().numpy().flatten()[:3],
+                    [gripper_val],
+                ]).astype(np.float64)
+
                 env_unwrapped._pending_keypoint = None
 
             eef_pose_dict, self._prev_ee_quat_wxyz, self._prev_ee_rpy_xyz = build_endeffector_pose_dict(
@@ -625,7 +637,7 @@ class HistoryBenchRecordWrapper(gym.Wrapper):
                 },
                 'action': {
                     'joint_action': action,
-                    'keypoint': current_keypoint if current_keypoint else None,
+                    'keypoint_action': keypoint_action,  # 7D ndarray or None
                     'eef_action_raw': {
                         'pose': _to_numpy(eef_pose_dict['pose']),
                         'quat': _to_numpy(eef_pose_dict['quat']),
@@ -805,25 +817,10 @@ class HistoryBenchRecordWrapper(gym.Wrapper):
                 # eef_action: 7-dim [pose(3), rpy(3), gripper(1)]
                 action_group.create_dataset("eef_action", data=action_data_dict['eef_action'])
 
-                # 写入keypoint信息（如果存在）
-                keypoint = action_data_dict.get('keypoint', None)
-                if keypoint:  # keypoint 条件写入 action 子 group
-                    action_group.create_dataset("keypoint_p", data=keypoint['keypoint_p'])
-                    action_group.create_dataset("keypoint_q", data=keypoint['keypoint_q'])
-
-                    solve_function_name = keypoint.get('solve_function', 'unknown')
-                    if isinstance(solve_function_name, str):
-                        solve_function_name_encoded = solve_function_name.encode('utf-8')
-                    else:
-                        solve_function_name_encoded = solve_function_name
-                    action_group.create_dataset("keypoint_solve_function", data=solve_function_name_encoded)
-
-                    keypoint_type = keypoint.get('keypoint_type', 'unknown')
-                    if isinstance(keypoint_type, str):
-                        keypoint_type_encoded = keypoint_type.encode('utf-8')
-                    else:
-                        keypoint_type_encoded = keypoint_type
-                    action_group.create_dataset("keypoint_type", data=keypoint_type_encoded)
+                # 写入 keypoint_action（7D: pos(3)+rpy(3)+gripper(1)，如果存在）
+                kp_action = action_data_dict.get('keypoint_action', None)
+                if kp_action is not None:
+                    action_group.create_dataset("keypoint_action", data=kp_action)
 
                 # ── info 子 group ──
                 info_group = ts_group.create_group("info")

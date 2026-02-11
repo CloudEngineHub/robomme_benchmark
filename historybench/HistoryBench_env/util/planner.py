@@ -1697,6 +1697,15 @@ def solve_button(env, planner,obj,steps_press=None,interval=20,without_hold=Fals
         keypoint_q=rotate,
     )
     planner.close_gripper()
+
+    _record_keypoint(
+        env,
+        "solve_button",
+        "close",
+        keypoint_p=ready_position,
+        keypoint_q=rotate,
+    )
+
     steps=env.elapsed_steps.item()
     print("press button at step",steps)
     planner.move_to_pose_with_screw(sapien.Pose(p=position,q=rotate))
