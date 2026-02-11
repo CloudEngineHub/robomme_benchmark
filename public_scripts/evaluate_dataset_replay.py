@@ -27,8 +27,8 @@ from historybench.env_record_wrapper import (
 from save_reset_video import save_robomme_video
 
 # 只启用一个 ACTION_SPACE；其他选项保留在注释中供手动切换
-ACTION_SPACE = "joint_angle"
-#ACTION_SPACE = "ee_pose"
+#ACTION_SPACE = "joint_angle"
+ACTION_SPACE = "ee_pose"
 #ACTION_SPACE = "keypoint"
 #ACTION_SPACE = "oracle_planner"
 
@@ -37,22 +37,22 @@ MAX_STEPS = 3000
 DATASET_ROOT = "/data/hongzefu/dataset_generate"
 
 DEFAULT_ENV_IDS = [
-    #"PickXtimes",
-    # "StopCube",
-    # "SwingXtimes",
+    "PickXtimes",
+    "StopCube",
+    "SwingXtimes",
     "BinFill",
-    # "VideoUnmaskSwap",
-    # "VideoUnmask",
-    # "ButtonUnmaskSwap",
-    # "ButtonUnmask",
-    # "VideoRepick",
-    # "VideoPlaceButton",
-    # "VideoPlaceOrder",
-    # "PickHighlight",
-    # "InsertPeg",
-    #"MoveCube",
-    # "PatternLock",
-    # "RouteStick",
+    "VideoUnmaskSwap",
+    "VideoUnmask",
+    "ButtonUnmaskSwap",
+    "ButtonUnmask",
+    "VideoRepick",
+    "VideoPlaceButton",
+    "VideoPlaceOrder",
+    "PickHighlight",
+    "InsertPeg",
+    "MoveCube",
+    "PatternLock",
+    "RouteStick",
 ]
 
 # ######## 视频保存变量（输出目录）开始 ########
@@ -92,7 +92,7 @@ def main():
         print(f"[{env_id}] episode_count from metadata: {episode_count}")
 
         for episode in range(episode_count):
-            if episode !=0:
+            if episode !=6:
                 continue    
             env = None
             dataset_resolver = None

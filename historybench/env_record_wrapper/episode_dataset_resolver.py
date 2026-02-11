@@ -189,11 +189,11 @@ class EpisodeDatasetResolver:
                 continue
 
             self._non_demo_steps.append(record_step)
-            # keypoint_action: 7D [pos(3), rpy(3), gripper(1)]
-            action_grp = timestep_group.get("action")
-            kp_src = action_grp if (action_grp is not None and isinstance(action_grp, h5py.Group)) else timestep_group
-            if "keypoint_action" in kp_src:
-                self._keypoint_steps.append(record_step)
+            # is_keyframe: 通过 info/is_keyframe 标记判断是否为 keypoint 刷新帧
+            info_grp = timestep_group.get("info")
+            if info_grp is not None and "is_keyframe" in info_grp:
+                if _as_bool(info_grp["is_keyframe"][()]):
+                    self._keypoint_steps.append(record_step)
 
             current_subgoal = self._extract_subgoal_text(timestep_group)
             if prev_subgoal is None or current_subgoal != prev_subgoal:

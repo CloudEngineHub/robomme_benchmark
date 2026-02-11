@@ -438,6 +438,7 @@ class HistoryBenchRecordWrapper(gym.Wrapper):
         # 每个 episode 重置连续化缓存，避免跨 episode 污染
         self._prev_ee_quat_wxyz = None
         self._prev_ee_rpy_xyz = None
+        self._current_keypoint_action = None  # 持久化 keypoint_action（7D ndarray）
         self._failsafe_triggered = False
         return super().reset(**kwargs)
 
@@ -555,9 +556,10 @@ class HistoryBenchRecordWrapper(gym.Wrapper):
             #print(f"End-effector linear velocity: {self.agent.robot.links[9].get_linear_velocity().tolist()[0]}, angular velocity: {self.agent.robot.links[9].get_angular_velocity().tolist()[0]}")
             end_effector_velocity = self.agent.robot.links[9].get_linear_velocity().tolist()[0] + self.agent.robot.links[9].get_angular_velocity().tolist()[0]
 
-            # 处理keypoint信息：读取env中的待记录keypoint（如果存在则记录一次后清除）
+            # 处理keypoint信息：读取env中的待记录keypoint（如果存在则刷新缓存）
             # 转换为 7D keypoint_action: [position(3), rpy(3), gripper(1)]
-            keypoint_action = None
+            # keypoint_action 持久化：每帧都写入最新的 keypoint_action（刷新前复用上一次的值）
+            is_keyframe = False
             env_unwrapped = getattr(self.env, 'unwrapped', self.env)
             if hasattr(env_unwrapped, '_pending_keypoint') and env_unwrapped._pending_keypoint is not None:
                 current_keypoint = env_unwrapped._pending_keypoint
@@ -583,11 +585,12 @@ class HistoryBenchRecordWrapper(gym.Wrapper):
                 )
                 kp_type = current_keypoint.get('keypoint_type', 'unknown')
                 gripper_val = 1.0 if kp_type == 'open' else -1.0
-                keypoint_action = np.concatenate([
+                self._current_keypoint_action = np.concatenate([
                     kp_pose_dict['pose'].detach().cpu().numpy().flatten()[:3],
                     kp_pose_dict['rpy'].detach().cpu().numpy().flatten()[:3],
                     [gripper_val],
                 ]).astype(np.float64)
+                is_keyframe = True
 
                 env_unwrapped._pending_keypoint = None
 
@@ -637,7 +640,7 @@ class HistoryBenchRecordWrapper(gym.Wrapper):
                 },
                 'action': {
                     'joint_action': action,
-                    'keypoint_action': keypoint_action,  # 7D ndarray or None
+                    'keypoint_action': self._current_keypoint_action,  # 7D ndarray or None（首个 keypoint 前为 None）
                     'eef_action_raw': {
                         'pose': _to_numpy(eef_pose_dict['pose']),
                         'quat': _to_numpy(eef_pose_dict['quat']),
@@ -652,6 +655,7 @@ class HistoryBenchRecordWrapper(gym.Wrapper):
                     'grounded_subgoal': self.current_subgoal_segment_filled,
                     'grounded_subgoal_online': self.current_subgoal_segment_online_filled,
                     'is_video_demo': self.current_task_demonstration if hasattr(self, 'current_task_demonstration') else False,
+                    'is_keyframe': is_keyframe,
                 },
                 '_setup_camera_intrinsics': {
                     'front_camera_intrinsic': base_camera_intrinsic,
@@ -817,10 +821,11 @@ class HistoryBenchRecordWrapper(gym.Wrapper):
                 # eef_action: 7-dim [pose(3), rpy(3), gripper(1)]
                 action_group.create_dataset("eef_action", data=action_data_dict['eef_action'])
 
-                # 写入 keypoint_action（7D: pos(3)+rpy(3)+gripper(1)，如果存在）
+                # 写入 keypoint_action（7D: pos(3)+rpy(3)+gripper(1)，每帧都写入）
                 kp_action = action_data_dict.get('keypoint_action', None)
-                if kp_action is not None:
-                    action_group.create_dataset("keypoint_action", data=kp_action)
+                if kp_action is None:
+                    kp_action = np.zeros(7, dtype=np.float64)
+                action_group.create_dataset("keypoint_action", data=kp_action)
 
                 # ── info 子 group ──
                 info_group = ts_group.create_group("info")
@@ -857,6 +862,7 @@ class HistoryBenchRecordWrapper(gym.Wrapper):
                 info_group.create_dataset("grounded_subgoal_online", data=task_name_encoded)
 
                 info_group.create_dataset("is_video_demo", data=info_data['is_video_demo'])
+                info_group.create_dataset("is_keyframe", data=info_data['is_keyframe'])
 
             # 写入 setup 信息（种子、难度、任务列表、相机内参）
             setup_group = episode_group.create_group(f"setup")
