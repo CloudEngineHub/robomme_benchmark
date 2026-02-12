@@ -17,6 +17,7 @@ for _path in (_PARENT, _ROOT, _SCRIPTS):
 
 import numpy as np
 import torch
+import cv2
 
 from robomme.robomme_env import *
 from robomme.robomme_env.util import *
@@ -27,13 +28,13 @@ from robomme.env_record_wrapper import (
 from robomme.robomme_env.util.save_reset_video import save_robomme_video
 
 # 只启用一个 ACTION_SPACE；其他选项保留在注释中供手动切换
-#ACTION_SPACE = "joint_angle"
-ACTION_SPACE = "ee_pose"
+ACTION_SPACE = "joint_angle"
+#ACTION_SPACE = "ee_pose"
 #ACTION_SPACE = "ee_quat"
 #ACTION_SPACE = "keypoint"
 #ACTION_SPACE = "oracle_planner"
 
-GUI_RENDER = True
+GUI_RENDER = False
 MAX_STEPS = 3000
 DATASET_ROOT = "/data/hongzefu/dataset_0211"
 #OVERRIDE_METADATA_PATH = "/data/hongzefu/dataset_generate-b4"   
@@ -107,7 +108,8 @@ def main():
                     
                 )
 
-                obs_batch, reward_batch, terminated_batch, truncated_batch, info_batch = env.reset()
+                # obs_batch, reward_batch, terminated_batch, truncated_batch, info_batch = env.reset()
+                obs_batch, info_batch = env.reset()
 
                 # 保持 evaluate.py 中的调试变量语义
                 maniskill_obs = obs_batch["maniskill_obs"]
@@ -134,8 +136,75 @@ def main():
                 available_options = info_batch["available_options"]
 
                 info = {k: v[-1] for k, v in info_batch.items()}
-                terminated = bool(terminated_batch[-1].item())
-                truncated = bool(truncated_batch[-1].item())
+                # terminated = bool(terminated_batch[-1].item())
+                # truncated = bool(truncated_batch[-1].item())
+
+                # #todo：保存最后两张front camera为图片 左右拼接加上注释
+                # if len(front_camera) >= 2:
+                #     def _tensor_to_numpy_img(f):
+                #         img = torch.as_tensor(f).detach().cpu().numpy()
+                #         if img.dtype != np.uint8:
+                #             # 假设是[0,1] float，转为[0,255] uint8
+                #             if img.max() <= 1.0:
+                #                 img = (img * 255).astype(np.uint8)
+                #             else:
+                #                 img = img.astype(np.uint8)
+                #         return img.copy()  # Ensure writable copy
+
+                #     def _draw_text_with_wrap(img, text, position=(10, 30), font=cv2.FONT_HERSHEY_SIMPLEX, font_scale=0.5, color=(0, 255, 0), thickness=1):
+                #         """绘制文本，支持自动换行"""
+                #         if not text:
+                #             return img
+                        
+                #         img_h, img_w = img.shape[:2]
+                #         x, y = position
+                #         line_height = int(30 * font_scale) + 5
+                        
+                #         words = text.split(' ')
+                #         current_line = ""
+                        
+                #         # 简单的逐词换行逻辑
+                #         for word in words:
+                #             test_line = current_line + word + " "
+                #             (w, h), _ = cv2.getTextSize(test_line, font, font_scale, thickness)
+                #             if x + w > img_w - 10:  # 留出右侧 margin
+                #                 # 绘制当前行
+                #                 cv2.putText(img, current_line, (x, y), font, font_scale, color, thickness, cv2.LINE_AA)
+                #                 # 重置新行
+                #                 current_line = word + " "
+                #                 y += line_height
+                #             else:
+                #                 current_line = test_line
+                        
+                #         # 绘制最后一行
+                #         if current_line:
+                #             cv2.putText(img, current_line, (x, y), font, font_scale, color, thickness, cv2.LINE_AA)
+                        
+                #         return img
+
+                #     img_prev = _tensor_to_numpy_img(front_camera[-2])
+                #     img_curr = _tensor_to_numpy_img(front_camera[-1])
+
+                #     # 为两张图分别添加对应的 subgoal
+                #     # 注意：subgoal_grounded 的长度可能与 front_camera 一致，取倒数第二个和最后一个
+                #     subgoal_text_prev = str(subgoal_grounded[-2]) if len(subgoal_grounded) >= 2 else "No Subgoal"
+                #     subgoal_text_curr = str(subgoal_grounded[-1]) if subgoal_grounded else "No Subgoal"
+                    
+                #     # 绘制文字
+                #     _draw_text_with_wrap(img_prev, f"Prev: {subgoal_text_prev}")
+                #     _draw_text_with_wrap(img_curr, f"Curr: {subgoal_text_curr}")
+
+                #     # 水平拼接
+                #     concat_img = np.hstack((img_prev, img_curr))
+                    
+                #     # 转换为 BGR 用于保存
+                #     concat_img_bgr = cv2.cvtColor(concat_img, cv2.COLOR_RGB2BGR)
+                    
+                #     save_path = os.path.join(OUT_VIDEO_DIR, f"{env_id}-{episode}-reset-comparison.png")
+                #     os.makedirs(OUT_VIDEO_DIR, exist_ok=True)
+                #     cv2.imwrite(save_path, concat_img_bgr)
+                #     print(f"[{env_id}] episode {episode} reset comparison image saved to {save_path}")
+                
 
                 # ######## 视频保存变量准备（reset 阶段）开始 ########
                 reset_base_frames = [torch.as_tensor(f).detach().cpu().numpy().copy() for f in front_camera]

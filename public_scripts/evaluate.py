@@ -105,7 +105,8 @@ def main():
 
         for episode in range(episode_count):
             env, seed, difficulty = env_builder.make_env_for_episode(episode)
-            obs_batch, reward_batch, terminated_batch, truncated_batch, info_batch = env.reset()
+            # obs_batch, reward_batch, terminated_batch, truncated_batch, info_batch = env.reset()
+            obs_batch, info_batch = env.reset()
 
             # 保持四个原评测脚本中的调试变量语义
             maniskill_obs = obs_batch["maniskill_obs"]
@@ -126,7 +127,6 @@ def main():
             velocity = obs_batch["velocity"]
             language_goal_list = info_batch["language_goal"]
 
-
             language_goal = language_goal_list[0] if language_goal_list else None
             subgoal = info_batch["subgoal"]
             subgoal_grounded = info_batch["subgoal_grounded"]
@@ -134,8 +134,8 @@ def main():
 
          
             info ={k: v[-1] for k, v in info_batch.items()}
-            terminated = bool(terminated_batch[-1].item())
-            truncated = bool(truncated_batch[-1].item())
+            # terminated = bool(terminated_batch[-1].item())
+            # truncated = bool(truncated_batch[-1].item())
 
             episode_success = False
             step = 0

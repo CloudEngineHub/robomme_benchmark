@@ -102,7 +102,8 @@ def main():
                 dataset_directory=DATASET_ROOT,
             )
 
-            obs_batch, reward_batch, terminated_batch, truncated_batch, info_batch = env.reset()
+            # obs_batch, reward_batch, terminated_batch, truncated_batch, info_batch = env.reset()
+            obs_batch, info_batch = env.reset()
 
             # 保持 evaluate.py 中的调试变量语义
             maniskill_obs = obs_batch["maniskill_obs"]
@@ -129,8 +130,8 @@ def main():
             available_options = info_batch["available_options"]
 
             info = {k: v[-1] for k, v in info_batch.items()}
-            terminated = bool(terminated_batch[-1].item())
-            truncated = bool(truncated_batch[-1].item())
+            # terminated = bool(terminated_batch[-1].item())
+            # truncated = bool(truncated_batch[-1].item())
 
             # ######## 视频保存变量准备（reset 阶段）开始 ########
             reset_base_frames = [torch.as_tensor(f).detach().cpu().numpy().copy() for f in front_camera]

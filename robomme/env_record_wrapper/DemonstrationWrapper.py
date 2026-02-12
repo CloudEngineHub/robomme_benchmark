@@ -139,7 +139,10 @@ class DemonstrationWrapper(gym.Wrapper):
         merged_batch = planner_denseStep.concat_step_batches([demo_batch, init_batch])
         merged_batch = self._filter_no_record_from_step_batch(merged_batch)
         self.demonstration_data = merged_batch
-        return merged_batch
+        
+        # Unpack the batch to return only obs and info, but keep the full batch in self.demonstration_data
+        obs_batch, reward_batch, terminated_batch, truncated_batch, info_batch = merged_batch
+        return obs_batch, info_batch
 
     def _filter_no_record_from_step_batch(self, batch):
         """

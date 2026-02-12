@@ -31,16 +31,16 @@ from robomme.env_record_wrapper import (
 from robomme.robomme_env.util.save_reset_video import save_robomme_video
 
 # 只启用一个 ACTION_SPACE；其他选项保留在注释中供手动切换
-#ACTION_SPACE = "joint_angle"
+ACTION_SPACE = "joint_angle"
 #ACTION_SPACE = "ee_pose"
-ACTION_SPACE = "ee_quat"
+#ACTION_SPACE = "ee_quat"
 #ACTION_SPACE = "keypoint"
 #ACTION_SPACE = "oracle_planner"
 
 GUI_RENDER = False
 MAX_STEPS = 3000
-DATASET_ROOT = "/data/hongzefu/dataset_0211"
-OVERRIDE_METADATA_PATH = "/data/hongzefu/dataset_0211"
+DATASET_ROOT = "/data/hongzefu/dataset_generate-b4"
+OVERRIDE_METADATA_PATH = "/data/hongzefu/dataset_generate-b4"
 
 # ######## 视频保存变量（输出目录）开始 ########
 # 视频输出目录：独立固定写死，不与 h5 路径或 env_id 对齐
@@ -118,7 +118,8 @@ def evaluate_episode(
             dataset_directory=dataset_root,
         )
 
-        obs_batch, reward_batch, terminated_batch, truncated_batch, info_batch = env.reset()
+        # obs_batch, reward_batch, terminated_batch, truncated_batch, info_batch = env.reset()
+        obs_batch, info_batch = env.reset()
 
         # 保持 evaluate.py 中的调试变量语义
         # 注意：多进程中这些局部变量如果不需要打印可以简化，但为了保持逻辑一致，保留解包逻辑
