@@ -137,8 +137,77 @@ class DemonstrationWrapper(gym.Wrapper):
         # 执行一步初始动作，拼接到演示轨迹批次
         init_batch = self.step(action)
         merged_batch = planner_denseStep.concat_step_batches([demo_batch, init_batch])
+        merged_batch = self._filter_no_record_from_step_batch(merged_batch)
         self.demonstration_data = merged_batch
         return merged_batch
+
+    def _filter_no_record_from_step_batch(self, batch):
+        """
+        仅用于 reset 返回前：过滤 info_batch['subgoal'] 为 "NO RECORD" 的整帧数据。
+
+        返回值与输入 batch 契约一致：
+        (obs_batch, reward_batch, terminated_batch, truncated_batch, info_batch)
+        """
+        if not (isinstance(batch, tuple) and len(batch) == 5):
+            return batch
+        obs_batch, reward_batch, terminated_batch, truncated_batch, info_batch = batch
+
+        if (
+            not isinstance(reward_batch, torch.Tensor)
+            or not isinstance(terminated_batch, torch.Tensor)
+            or not isinstance(truncated_batch, torch.Tensor)
+        ):
+            return batch
+        if not isinstance(info_batch, dict):
+            return batch
+
+        n = int(reward_batch.numel())
+        if n == 0:
+            return batch
+        if int(terminated_batch.numel()) != n or int(truncated_batch.numel()) != n:
+            return batch
+
+        subgoal_list = info_batch.get("subgoal")
+        if not isinstance(subgoal_list, list) or len(subgoal_list) != n:
+            return batch
+
+        keep_indices = [
+            idx for idx, subgoal in enumerate(subgoal_list)
+            if str(subgoal).strip() != "NO RECORD"
+        ]
+        if len(keep_indices) == n:
+            return batch
+        # 防御性回退：避免过滤后空 batch 破坏上层对 [-1] 的访问。
+        if len(keep_indices) == 0:
+            return batch
+
+        index_reward = torch.as_tensor(keep_indices, dtype=torch.long, device=reward_batch.device)
+        index_terminated = torch.as_tensor(keep_indices, dtype=torch.long, device=terminated_batch.device)
+        index_truncated = torch.as_tensor(keep_indices, dtype=torch.long, device=truncated_batch.device)
+
+        def _filter_columnar_dict(batch_dict):
+            if not isinstance(batch_dict, dict):
+                return batch_dict
+            filtered = {}
+            for key, value in batch_dict.items():
+                if isinstance(value, list) and len(value) == n:
+                    filtered[key] = [value[i] for i in keep_indices]
+                else:
+                    filtered[key] = value
+            return filtered
+
+        filtered_obs_batch = _filter_columnar_dict(obs_batch)
+        filtered_info_batch = _filter_columnar_dict(info_batch)
+        filtered_reward_batch = reward_batch.index_select(0, index_reward)
+        filtered_terminated_batch = terminated_batch.index_select(0, index_terminated)
+        filtered_truncated_batch = truncated_batch.index_select(0, index_truncated)
+        return (
+            filtered_obs_batch,
+            filtered_reward_batch,
+            filtered_terminated_batch,
+            filtered_truncated_batch,
+            filtered_info_batch,
+        )
 
 
     def _augment_obs_and_info(self, obs, info, action):
