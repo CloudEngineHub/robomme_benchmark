@@ -453,10 +453,10 @@ class RobommeRecordWrapper(gym.Wrapper):
         wrist_camera_frame = obs['sensor_data']['hand_camera']['rgb'][0].cpu().numpy()
         wrist_camera_depth = obs['sensor_data']['hand_camera']['depth'][0].cpu().numpy()
 
-        base_camera_extrinsic=obs['sensor_param']['base_camera']['extrinsic_cv']
-        base_camera_intrinsic=obs['sensor_param']['base_camera']['intrinsic_cv']
-        wrist_camera_extrinsic=obs['sensor_param']['hand_camera']['extrinsic_cv']
-        wrist_camera_intrinsic=obs['sensor_param']['hand_camera']['intrinsic_cv']
+        base_camera_extrinsic=obs['sensor_param']['base_camera']['extrinsic_cv'].reshape(3, 4)
+        base_camera_intrinsic=obs['sensor_param']['base_camera']['intrinsic_cv'].reshape(3, 3)
+        wrist_camera_extrinsic=obs['sensor_param']['hand_camera']['extrinsic_cv'].reshape(3, 4)
+        wrist_camera_intrinsic=obs['sensor_param']['hand_camera']['intrinsic_cv'].reshape(3, 3)
         
         
         segmentation=obs['sensor_data']['base_camera']['segmentation'].cpu().numpy()[0]
@@ -589,7 +589,7 @@ class RobommeRecordWrapper(gym.Wrapper):
                     kp_pose_dict['pose'].detach().cpu().numpy().flatten()[:3],
                     kp_pose_dict['rpy'].detach().cpu().numpy().flatten()[:3],
                     [gripper_val],
-                ]).astype(np.float64)
+                ]).astype(np.float32)
                 is_keyframe = True
 
                 env_unwrapped._pending_keypoint = None
@@ -607,20 +607,21 @@ class RobommeRecordWrapper(gym.Wrapper):
                 return np.asarray(value)
 
             joint_state = self.agent.robot.qpos.cpu().numpy() if hasattr(self.agent.robot.qpos, 'cpu') else self.agent.robot.qpos
-            joint_state_flat = np.asarray(joint_state, dtype=np.float64).reshape(-1)
+            joint_state = np.asarray(joint_state, dtype=np.float32)
+            joint_state_flat = joint_state.flatten()
             if joint_state_flat.size == 7:
                 joint_state_flat = np.concatenate([joint_state_flat, [0.0, 0.0]])
             elif joint_state_flat.size < 9:
                 joint_state_flat = np.pad(joint_state_flat, (0, 9 - joint_state_flat.size), constant_values=0.0)
-            gripper_state = joint_state_flat[-2:].astype(np.float64)
+            gripper_state = joint_state_flat[-2:].astype(np.float32)
             gripper_close= bool(np.any(gripper_state < 0.03))
 
             eef_action = np.concatenate([
                 _to_numpy(eef_pose_dict['pose']).flatten()[:3],
                 _to_numpy(eef_pose_dict['rpy']).flatten()[:3],
                 _to_numpy(action).flatten()[-1:] if action is not None else np.array([-1.0]),
-            ]).astype(np.float64)
-            eef_state = eef_action[:6].astype(np.float64)
+            ]).astype(np.float32)
+            eef_state = eef_action[:6].astype(np.float32)
 
             record_data = {
                 'obs': {
@@ -642,9 +643,9 @@ class RobommeRecordWrapper(gym.Wrapper):
                     'joint_action': action,
                     'keypoint_action': self._current_keypoint_action,  # 7D ndarray or None（首个 keypoint 前为 None）
                     'eef_action_raw': {
-                        'pose': _to_numpy(eef_pose_dict['pose']),
-                        'quat': _to_numpy(eef_pose_dict['quat']),
-                        'rpy': _to_numpy(eef_pose_dict['rpy']),
+                        'pose': _to_numpy(eef_pose_dict['pose']).flatten(),
+                        'quat': _to_numpy(eef_pose_dict['quat']).flatten(),
+                        'rpy': _to_numpy(eef_pose_dict['rpy']).flatten(),
                     },
                     'eef_action': eef_action,
                 },
@@ -733,13 +734,15 @@ class RobommeRecordWrapper(gym.Wrapper):
         if self.episode_success:
             print(f"Writing {len(self.buffer)} records to HDF5...")
 
-            # HDF5 层级: env_xxx / episode_xxx / record_timestep_xxx，便于按环境和轮次检索
-            env_group_name = f"env_{self.Robomme_env}"
-            env_group = self.h5_file.require_group(env_group_name)
+            # HDF5 层级: episode_xxx / timestep_xxx，便于按环境和轮次检索
+            # env_group_name = f"env_{self.Robomme_env}"
+            # env_group = self.h5_file.require_group(env_group_name)
             episode_group_name = f"episode_{self.Robomme_episode}"
-            if episode_group_name in env_group:
-                del env_group[episode_group_name]
-            episode_group = env_group.create_group(episode_group_name)
+            # if episode_group_name in env_group:
+            #     del env_group[episode_group_name]
+            if episode_group_name in self.h5_file:
+                del self.h5_file[episode_group_name]
+            episode_group = self.h5_file.create_group(episode_group_name)
 
             # 写入所有缓冲的数据
             for record_data in self.buffer:
@@ -749,7 +752,7 @@ class RobommeRecordWrapper(gym.Wrapper):
                 else:
                     record_timestep = int(record_timestep)
 
-                base_group_name = f"record_timestep_{record_timestep}"
+                base_group_name = f"timestep_{record_timestep}"
                 group_name = base_group_name
                 duplicate_index = 1
                 # Avoid collisions when multiple records share the same timestep
@@ -801,6 +804,8 @@ class RobommeRecordWrapper(gym.Wrapper):
                         action_data = action_data.cpu().numpy()
                     if isinstance(action_data, list):
                         action_data = np.array(action_data)
+                    
+                    action_data = action_data.astype(np.float32)
 
                     # joint_action 保证8维度 如果是7维度则填充一个-1
                     if isinstance(action_data, np.ndarray):
@@ -824,7 +829,12 @@ class RobommeRecordWrapper(gym.Wrapper):
                 # 写入 keypoint_action（7D: pos(3)+rpy(3)+gripper(1)，每帧都写入）
                 kp_action = action_data_dict.get('keypoint_action', None)
                 if kp_action is None:
-                    kp_action = np.zeros(7, dtype=np.float64)
+                    kp_action = np.zeros(7, dtype=np.float32)
+                
+                # Ensure float32
+                if kp_action.dtype == np.float64:
+                    kp_action = kp_action.astype(np.float32)
+                    
                 action_group.create_dataset("keypoint_action", data=kp_action)
 
                 # ── info 子 group ──
@@ -877,9 +887,9 @@ class RobommeRecordWrapper(gym.Wrapper):
             if self.buffer:
                 intrinsics = self.buffer[0].get('_setup_camera_intrinsics', {})
                 if 'front_camera_intrinsic' in intrinsics:
-                    setup_group.create_dataset("front_camera_intrinsic", data=intrinsics['front_camera_intrinsic'])
+                    setup_group.create_dataset("front_camera_intrinsic", data=intrinsics['front_camera_intrinsic'].reshape(3, 3))
                 if 'wrist_camera_intrinsic' in intrinsics:
-                    setup_group.create_dataset("wrist_camera_intrinsic", data=intrinsics['wrist_camera_intrinsic'])
+                    setup_group.create_dataset("wrist_camera_intrinsic", data=intrinsics['wrist_camera_intrinsic'].reshape(3, 3))
 
             # 记录任务列表（如果存在），便于离线复现每个 simple_subgoal 的语义
             if hasattr(self, 'subgoal_list'):
@@ -923,13 +933,10 @@ class RobommeRecordWrapper(gym.Wrapper):
             )
 
             # 如果 episode 失败，删除已经创建的 group（如果有的话）
-            env_group_name = f"env_{self.Robomme_env}"
             episode_group_name = f"episode_{self.Robomme_episode}"
-            if env_group_name in self.h5_file:
-                env_group = self.h5_file[env_group_name]
-                if episode_group_name in env_group:
-                    del env_group[episode_group_name]
-                    print(f"Deleted episode group: {episode_group_name}")
+            if episode_group_name in self.h5_file:
+                del self.h5_file[episode_group_name]
+                print(f"Deleted episode group: {episode_group_name}")
 
         # 清空缓冲区，防止 close 被多次调用时重复写入
         self.buffer.clear()

@@ -9,7 +9,7 @@ from typing import Dict, List, Optional, Tuple, Union
 import gymnasium as gym
 
 DATASET_ROOT = Path(__file__).resolve().parents[2] / "env_metadata"
-_ALLOWED_DATASETS = {"train"}
+_ALLOWED_DATASETS = {"train", "eval"}
 _ALLOWED_ACTION_SPACES = {"joint_angle", "ee_pose", "ee_quat", "keypoint", "oracle_planner"}
 _DEFAULT_TASK_LIST = [
     "PickXtimes",
@@ -134,8 +134,8 @@ class BenchmarkEnvBuilder:
             return str(
                 self.override_metadata_path / f"record_dataset_{self.env_id}_metadata.json"
             )
-        if self.dataset == "train":
-            return os.path.join(str(DATASET_ROOT), f"record_dataset_{self.env_id}_metadata.json")
+        if self.dataset in _ALLOWED_DATASETS:
+            return os.path.join(str(DATASET_ROOT), self.dataset, f"record_dataset_{self.env_id}_metadata.json")
         raise ValueError(f"Unsupported dataset '{self.dataset}'.")
 
     def resolve_episode(self, episode: int):

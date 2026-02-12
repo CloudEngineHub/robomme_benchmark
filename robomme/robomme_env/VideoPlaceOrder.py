@@ -447,7 +447,7 @@ class VideoPlaceOrder(BaseEnv):
                 "subgoal_segment":f"drop the cube onto table",
                     "demonstration": True,
                     "failure_func": None,
-                    "solve": lambda env, planner: [solve_putonto_whenhold(env, planner,target=self.goal_site)],
+                    "solve": lambda env, planner: [solve_putonto_whenhold(env, planner,target=self.goal_site,height=0.01)],
              
             })
             tasks.append(       {

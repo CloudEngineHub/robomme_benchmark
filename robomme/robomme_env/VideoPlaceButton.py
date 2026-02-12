@@ -517,7 +517,7 @@ class VideoPlaceButton(BaseEnv):
                     "demonstration": True,
                     "failure_func": None,
                     "solve": lambda env, planner: [
-                        solve_putonto_whenhold(env, planner, target=self.goal_site),
+                        solve_putonto_whenhold(env, planner, target=self.goal_site,height=0.01),
                     ],
                 }
             )

@@ -1219,7 +1219,7 @@ def solve_pickup_bin(env, planner, obj=None, fail_grasp=False, mode=None):
 #     return res
 
 
-def solve_putonto_whenhold(env, planner,target=None):
+def solve_putonto_whenhold(env, planner,target=None,height=None):
     FINGER_LENGTH = 0.025
     env = env.unwrapped
 
@@ -1254,6 +1254,10 @@ def solve_putonto_whenhold(env, planner,target=None):
     )
 
     goal_pose_P=target.pose.p.tolist()[0]
+    #modify 0211
+    if height is not None:
+        goal_pose_P[2]=height
+
     goal_pose = sapien.Pose(goal_pose_P, grasp_pose_q)
     res = planner.move_to_pose_with_screw(goal_pose)
 

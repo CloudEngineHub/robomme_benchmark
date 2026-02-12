@@ -35,8 +35,8 @@ ACTION_SPACE = "ee_pose"
 
 GUI_RENDER = False
 MAX_STEPS = 3000
-DATASET_ROOT = "/data/hongzefu/dataset_generate-rpy4-v2"
-OVERRIDE_METADATA_PATH = "/data/hongzefu/dataset_generate-rpy4-v2"
+DATASET_ROOT = "/data/hongzefu/dataset_generate-b4"
+OVERRIDE_METADATA_PATH = "/data/hongzefu/dataset_generate-b4"   
 
 DEFAULT_ENV_IDS = [
     # "PickXtimes",
@@ -48,11 +48,11 @@ DEFAULT_ENV_IDS = [
     # "ButtonUnmaskSwap",
     # "ButtonUnmask",
     # "VideoRepick",
-    # "VideoPlaceButton",
-    # "VideoPlaceOrder",
+    "VideoPlaceButton",
+    "VideoPlaceOrder",
     # "PickHighlight",
     # "InsertPeg",
-     "MoveCube",
+    # "MoveCube",
     # "PatternLock",
     # "RouteStick",
 ]

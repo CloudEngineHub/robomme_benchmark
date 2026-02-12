@@ -45,19 +45,19 @@ from robomme.robomme_env.util.planner_fail_safe import (
 
 # 所有支持的环境模块名称列表
 DEFAULT_ENVS =[
-#"PickXtimes",
+# "PickXtimes",
 # "StopCube",
 # "SwingXtimes",
- "BinFill",
+# "BinFill",
 
 # "VideoUnmaskSwap",
 # "VideoUnmask",
 # "ButtonUnmaskSwap",
 # "ButtonUnmask",
 
-#  "VideoRepick",
-# "VideoPlaceButton",
-# "VideoPlaceOrder",
+# "VideoRepick",
+"VideoPlaceButton",
+"VideoPlaceOrder",
 # "PickHighlight",
 
 # "InsertPeg",
@@ -662,7 +662,7 @@ def parse_args() -> argparse.Namespace:
         "--episodes",
         "-n",
         type=int,
-        default=1,
+        default=25,
         help="每个环境生成的 episode 数量 (默认: 50)",
     )
     parser.add_argument(
