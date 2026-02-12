@@ -1,5 +1,5 @@
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+
 import sys
 import argparse
 import json
@@ -45,25 +45,25 @@ from robomme.robomme_env.util.planner_fail_safe import (
 
 # 所有支持的环境模块名称列表
 DEFAULT_ENVS =[
-"PickXtimes",
-"StopCube",
-"SwingXtimes",
-"BinFill",
+# "PickXtimes",
+# "StopCube",
+# "SwingXtimes",
+# "BinFill",
 
-"VideoUnmaskSwap",
-"VideoUnmask",
-"ButtonUnmaskSwap",
-"ButtonUnmask",
+# "VideoUnmaskSwap",
+# "VideoUnmask",
+# "ButtonUnmaskSwap",
+# "ButtonUnmask",
 
-"VideoRepick",
+# "VideoRepick",
 "VideoPlaceButton",
 "VideoPlaceOrder",
-"PickHighlight",
+# "PickHighlight",
 
-"InsertPeg",
-'MoveCube',
-"PatternLock",
-"RouteStick"
+# "InsertPeg",
+# 'MoveCube',
+# "PatternLock",
+# "RouteStick"
     ]
 
 # 参考数据集 metadata 根目录：用于读取 difficulty 和 Robomme_seed
@@ -434,6 +434,7 @@ def run_env_dataset(
     temp_folder: Path,
     save_video: bool,
     metadata_records: List[Dict[str, Any]],
+    gpu_id: int,
 ) -> List[Dict[str, Any]]:
     """
     运行一批 episode 的数据集生成，并将数据保存到临时文件夹。
@@ -444,10 +445,14 @@ def run_env_dataset(
         temp_folder: 保存数据的临时文件夹
         save_video: 是否保存视频
         metadata_records: 来源于参考数据集 metadata 的记录
+        gpu_id: 使用的 GPU ID
     
     Returns:
         生成的 episode 元数据记录列表
     """
+    # 设置当前进程使用的 GPU
+    os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu_id)
+
     temp_folder.mkdir(parents=True, exist_ok=True)
     episode_indices = list(episode_indices)
     if not episode_indices:
@@ -674,7 +679,7 @@ def parse_args() -> argparse.Namespace:
         "--episodes",
         "-n",
         type=int,
-        default=25,
+        default=50,
         help="每个环境生成的 episode 数量 (默认: 50)",
     )
     parser.add_argument(
@@ -694,7 +699,7 @@ def parse_args() -> argparse.Namespace:
         "--max-workers",
         "-w",
         type=int,
-        default=25,
+        default=50,
         help="运行多个环境时的并行 worker 数量。",
     )
     return parser.parse_args()
@@ -750,6 +755,7 @@ def main() -> None:
                     temp_folder,
                     args.save_video,
                     source_metadata_records,
+                    0,  # 默认使用 GPU 0
                 )
             else:
                 worker_count = len(episode_chunks)
@@ -757,22 +763,56 @@ def main() -> None:
                     f"Running {env_id} with {worker_count} workers across {args.episodes} episodes..."
                 )
 
-                # 2. 并行执行
-                # 每个 worker 写入同一个临时文件夹（但使用不同的文件/目录名）
-                with ProcessPoolExecutor(max_workers=worker_count) as executor:
-                    future_to_chunk = {
-                        executor.submit(
-                            run_env_dataset,
-                            env_id,
-                            chunk,
-                            temp_folder,  # 所有 worker 使用相同的临时文件夹路径
-                            args.save_video,
-                            source_metadata_records,
-                        ): chunk
-                        for chunk in episode_chunks
-                    }
+                # 2. 并行执行 - 使用两个独立的 Executor 分别管理 GPU 0 和 GPU 1 的任务
+                # 将 chunks 分配给 GPU 0 和 GPU 1
+                chunks_gpu0 = episode_chunks[0::2]
+                chunks_gpu1 = episode_chunks[1::2]
+                
+                # 分配 worker 数量
+                workers_gpu0 = num_workers // 2
+                workers_gpu1 = num_workers - workers_gpu0
+                
+                # 确保每个 GPU 至少有 1 个 worker (如果有任务的话)
+                if workers_gpu0 == 0 and chunks_gpu0: workers_gpu0 = 1
+                if workers_gpu1 == 0 and chunks_gpu1: workers_gpu1 = 1
+                
+                print(f"Assigning {len(chunks_gpu0)} chunks to GPU 0 ({workers_gpu0} workers)")
+                print(f"Assigning {len(chunks_gpu1)} chunks to GPU 1 ({workers_gpu1} workers)")
 
-                    for future in as_completed(future_to_chunk):
+                from contextlib import ExitStack
+                
+                future_to_chunk = {}
+                futures = []
+                
+                with ExitStack() as stack:
+                    executor0 = None
+                    if workers_gpu0 > 0:
+                        executor0 = stack.enter_context(ProcessPoolExecutor(max_workers=workers_gpu0))
+                    
+                    executor1 = None
+                    if workers_gpu1 > 0:
+                        executor1 = stack.enter_context(ProcessPoolExecutor(max_workers=workers_gpu1))
+                    
+                    # Submit GPU 0
+                    if executor0:
+                        for chunk in chunks_gpu0:
+                            f = executor0.submit(
+                                run_env_dataset, env_id, chunk, temp_folder, args.save_video, source_metadata_records, 0
+                            )
+                            future_to_chunk[f] = chunk
+                            futures.append(f)
+                            
+                    # Submit GPU 1
+                    if executor1:
+                        for chunk in chunks_gpu1:
+                            f = executor1.submit(
+                                run_env_dataset, env_id, chunk, temp_folder, args.save_video, source_metadata_records, 1
+                            )
+                            future_to_chunk[f] = chunk
+                            futures.append(f)
+
+                    # Process results
+                    for future in as_completed(futures):
                         chunk = future_to_chunk[future]
                         chunk_label = (chunk[0], chunk[-1]) if chunk else ("?", "?")
                         try:
@@ -800,6 +840,7 @@ def main() -> None:
                 temp_folder,
                 args.save_video,
                 source_metadata_records,
+                0, # gpu_id
             )
 
             # 合并 episode 到最终数据集

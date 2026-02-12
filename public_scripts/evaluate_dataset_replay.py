@@ -33,10 +33,10 @@ ACTION_SPACE = "ee_pose"
 #ACTION_SPACE = "keypoint"
 #ACTION_SPACE = "oracle_planner"
 
-GUI_RENDER = False
+GUI_RENDER = True
 MAX_STEPS = 3000
-DATASET_ROOT = "/data/hongzefu/dataset_generate-b4"
-OVERRIDE_METADATA_PATH = "/data/hongzefu/dataset_generate-b4"   
+DATASET_ROOT = "/data/hongzefu/dataset_0211"
+#OVERRIDE_METADATA_PATH = "/data/hongzefu/dataset_generate-b4"   
 
 DEFAULT_ENV_IDS = [
     # "PickXtimes",
@@ -48,9 +48,9 @@ DEFAULT_ENV_IDS = [
     # "ButtonUnmaskSwap",
     # "ButtonUnmask",
     # "VideoRepick",
-    "VideoPlaceButton",
-    "VideoPlaceOrder",
-    # "PickHighlight",
+    # "VideoPlaceButton",
+    # "VideoPlaceOrder",
+    "PickHighlight",
     # "InsertPeg",
     # "MoveCube",
     # "PatternLock",
@@ -86,7 +86,7 @@ def main():
     for env_id in DEFAULT_ENV_IDS:
         env_builder = BenchmarkEnvBuilder(
             env_id=env_id,
-            dataset="eval",
+            dataset="train",
             action_space=ACTION_SPACE,
             gui_render=GUI_RENDER,
             #override_metadata_path=OVERRIDE_METADATA_PATH,
