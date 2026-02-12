@@ -442,6 +442,60 @@ class RobommeRecordWrapper(gym.Wrapper):
         self._failsafe_triggered = False
         return super().reset(**kwargs)
 
+    def _backfill_keypoint_actions_in_buffer(self) -> None:
+        # close() 前对 buffer 做一次 keypoint 回填：
+        # 对相邻 keyframe (k_prev, k_curr) 区间，把 (k_prev, k_curr] 全部设为 k_curr 的 keypoint_action。
+        if not self.buffer:
+            return
+
+        def _as_bool_flag(value) -> bool:
+            if isinstance(value, torch.Tensor):
+                if value.numel() == 0:
+                    return False
+                return bool(value.detach().cpu().bool().any().item())
+            if isinstance(value, np.ndarray):
+                if value.size == 0:
+                    return False
+                return bool(np.asarray(value).astype(bool).any())
+            return bool(value)
+
+        keyframe_indices = []
+        for idx, record_data in enumerate(self.buffer):
+            info_data = record_data.get("info", {})
+            if _as_bool_flag(info_data.get("is_keyframe", False)):
+                keyframe_indices.append(idx)
+
+        if len(keyframe_indices) < 2:
+            return
+
+        for prev_idx, curr_idx in zip(keyframe_indices, keyframe_indices[1:]):
+            curr_action = self.buffer[curr_idx].get("action", {})
+            curr_keypoint_action = curr_action.get("keypoint_action", None)
+            if curr_keypoint_action is None:
+                print(
+                    f"Warning: keyframe {curr_idx} has None keypoint_action, skip backfill "
+                    f"for interval ({prev_idx}, {curr_idx}]"
+                )
+                continue
+
+            target_kp = np.asarray(curr_keypoint_action, dtype=np.float32).flatten()
+            if target_kp.size != 7:
+                print(
+                    f"Warning: keyframe {curr_idx} keypoint_action shape invalid {target_kp.shape}, "
+                    f"skip backfill for interval ({prev_idx}, {curr_idx}]"
+                )
+                continue
+            if not np.isfinite(target_kp).all():
+                print(
+                    f"Warning: keyframe {curr_idx} keypoint_action has non-finite values, "
+                    f"skip backfill for interval ({prev_idx}, {curr_idx}]"
+                )
+                continue
+
+            for fill_idx in range(prev_idx + 1, curr_idx + 1):
+                fill_action = self.buffer[fill_idx].setdefault("action", {})
+                fill_action["keypoint_action"] = target_kp.copy()
+
     def step(self, action):
         self.no_object_flag=False
         obs, reward, terminated, truncated, info = super().step(action)
@@ -558,7 +612,7 @@ class RobommeRecordWrapper(gym.Wrapper):
 
             # 处理keypoint信息：读取env中的待记录keypoint（如果存在则刷新缓存）
             # 转换为 7D keypoint_action: [position(3), rpy(3), gripper(1)]
-            # keypoint_action 持久化：每帧都写入最新的 keypoint_action（刷新前复用上一次的值）
+            # 这里先按“当前最新 keypoint”缓存；最终在 close() 前做一次 backward fill 后处理。
             is_keyframe = False
             env_unwrapped = getattr(self.env, 'unwrapped', self.env)
             if hasattr(env_unwrapped, '_pending_keypoint') and env_unwrapped._pending_keypoint is not None:
@@ -641,7 +695,7 @@ class RobommeRecordWrapper(gym.Wrapper):
                 },
                 'action': {
                     'joint_action': action,
-                    'keypoint_action': self._current_keypoint_action,  # 7D ndarray or None（首个 keypoint 前为 None）
+                    'keypoint_action': self._current_keypoint_action,  # 7D ndarray or None（close() 前会做 backward fill）
                     'eef_action_raw': {
                         'pose': _to_numpy(eef_pose_dict['pose']).flatten(),
                         'quat': _to_numpy(eef_pose_dict['quat']).flatten(),
@@ -733,6 +787,8 @@ class RobommeRecordWrapper(gym.Wrapper):
         # 只有在 episode 成功时才写入数据到 HDF5
         if self.episode_success:
             print(f"Writing {len(self.buffer)} records to HDF5...")
+            # keypoint_action 回填在写盘前统一处理，避免改变 step() 时的实时逻辑。
+            self._backfill_keypoint_actions_in_buffer()
 
             # HDF5 层级: episode_xxx / timestep_xxx，便于按环境和轮次检索
             # env_group_name = f"env_{self.Robomme_env}"
@@ -826,7 +882,7 @@ class RobommeRecordWrapper(gym.Wrapper):
                 # eef_action: 7-dim [pose(3), rpy(3), gripper(1)]
                 action_group.create_dataset("eef_action", data=action_data_dict['eef_action'])
 
-                # 写入 keypoint_action（7D: pos(3)+rpy(3)+gripper(1)，每帧都写入）
+                # 写入 keypoint_action（7D: pos(3)+rpy(3)+gripper(1)，值已在 close() 前完成回填）
                 kp_action = action_data_dict.get('keypoint_action', None)
                 if kp_action is None:
                     kp_action = np.zeros(7, dtype=np.float32)
