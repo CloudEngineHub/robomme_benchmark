@@ -78,7 +78,7 @@ class PickHighlight(BaseEnv):
         "pickup": 2
     }
 
-    # 组合成一个字典
+    # Combine into a dictionary
     configs = {
         'hard': config_hard,
         'easy': config_easy,
@@ -174,23 +174,23 @@ class PickHighlight(BaseEnv):
         )
         avoid = [button_obb]
 
-        self.all_cubes = []  # 保存所有 cube 对象
+        self.all_cubes = []  # Save all cube objects
         self.all_cube_names = []
         self.all_cube_colors = []
 
-        # 可用颜色列表
+        # List of available colors
         available_colors = [
             {"color": (1, 0, 0, 1), "name": "red"},
             {"color": (0, 0, 1, 1), "name": "blue"},
             {"color": (0, 1, 0, 1), "name": "green"}
         ]
 
-        # 根据难度获取需要生成的cube数量
+        # Get number of cubes to spawn based on difficulty
         num_cubes_to_spawn = self.configs[self.difficulty]['spawn']
 
-        # 生成指定数量的cube，每个cube颜色随机选择
+        # Spawn specified number of cubes, each with random color
         for cube_idx in range(num_cubes_to_spawn):
-            # 随机选择一个颜色
+            # Randomly select a color
             color_choice_idx = torch.randint(0, len(available_colors), (1,), generator=self.generator).item()
             chosen_color = available_colors[color_choice_idx]
 
@@ -220,7 +220,7 @@ class PickHighlight(BaseEnv):
                 avoid.append(cube)
 
             except RuntimeError as e:
-                print(f"生成 cube {cube_idx} ({chosen_color['name']}) 失败：{e}")
+                print(f"Failed to spawn cube {cube_idx} ({chosen_color['name']}): {e}")
                 break
 
         print(f"Generated {len(self.all_cubes)} cubes total")
@@ -237,10 +237,10 @@ class PickHighlight(BaseEnv):
             (color or name or "target") 
             for color, name in zip(self.target_cube_colors, self.target_cube_names)
         ]
-        # 记录每个目标方块被抓起的次数；所有目标方块计数均大于1才算成功
+        # Record pick count for each target cube; all must be > 1 for success
         self.target_cube_pickup_counts = {name: 0 for name in self.target_cube_names}
 
-        # 定义任务列表，每个任务包含一个带函数、名称、demonstration 标志和可选 failure_func 的字典
+        # Define task list, each task contains a dictionary with function, name, demonstration flag, and optional failure_func
         tasks = []
         target_label = getattr(self, "target_cube_color", None) or getattr(
             self, "target_cube_name", None
@@ -256,10 +256,10 @@ class PickHighlight(BaseEnv):
                 "solve": lambda env, planner:solve_button(env, planner, obj=self.button),
                  "segment":self.cap_link,
             })
-        # 每个目标方块各挑一次，循环内的 lambda 显式捕获当前 cube，避免闭包引用同一对象
+        # Pick each target cube once, lambda captures current cube explicitly to avoid closure issue
         num_targets = len(self.target_cubes)
         for cube_idx, cube in enumerate(self.target_cubes):
-                # 如果只有一个目标cube，不显示序号
+                # If only one target cube, do not show index
                 if num_targets == 1:
                     task_name = f"pick up the highlighted cube, which is {self.target_labels[cube_idx]}"
                     task_subgoal = f"pick up the highlighted cube at <>, which is {self.target_labels[cube_idx]}"
@@ -289,7 +289,7 @@ class PickHighlight(BaseEnv):
                            ],
                         "solve": lambda env, planner, c=cube: [solve_putdown_whenhold(env, planner, release_z=0.01),
                                                         # solve_pickup(env, planner, obj=c),
-                                                        # solve_putdown_whenhold(env, planner, obj=c,release_z=0.01)#测试用
+                                                        # solve_putdown_whenhold(env, planner, obj=c,release_z=0.01)# For testing
                                                         ],
                         "segment":None,
                     })
@@ -297,11 +297,11 @@ class PickHighlight(BaseEnv):
         
 
 
-        # 存储任务列表供RecordWrapper使用
+        # Store task list for RecordWrapper use
         self.task_list = tasks            
 
 
-        # 记录用于恢复的 pickup 相关任务索引和条目
+        # Record pickup related task indices and items for recovery
         self.recovery_pickup_indices, self.recovery_pickup_tasks = task4recovery(self.task_list)
         if self.robomme_failure_recovery:
             # Only inject an intentional failed grasp when recovery mode is enabled
@@ -327,43 +327,43 @@ class PickHighlight(BaseEnv):
 
     def evaluate(self,solve_complete_eval=False):
         self.successflag=torch.tensor([False])
-        # 保留之前的失败状态（一旦失败，永远失败）
+        # Keep previous failure state (once failed, always failed)
         if not hasattr(self, 'failureflag') or self.failureflag is None:
             self.failureflag = torch.tensor([False])
         previous_failure = bool(self.failureflag.detach().cpu().item()) if isinstance(self.failureflag, torch.Tensor) else False
-        # 如果之前已经失败，不要重置，保持失败状态；否则重置
+        # If previously failed, do not reset, keep failed state; otherwise reset
         if previous_failure:
-            # 保持失败状态，不重置
+            # Keep failed state, do not reset
             pass
         else:
             self.failureflag = torch.tensor([False])
 
 
 
-        if(self.use_demonstrationwrapper==False):#record时候planner结束再改变subgoal
+        if(self.use_demonstrationwrapper==False):# change subgoal after planner ends during recording
             if solve_complete_eval==True:
                 allow_subgoal_change_this_timestep=True
             else:
                 allow_subgoal_change_this_timestep=False
-        else:#demonstration时候video需要call evaluate(solve_complete_eval) video结束在demonstrationwrapper里面改变flag
+        else:# during demonstration, video needs to call evaluate(solve_complete_eval), video ends and flag changes in demonstrationwrapper
             if solve_complete_eval==True or self.demonstration_record_traj==False:
                 allow_subgoal_change_this_timestep=True
             else:
                 allow_subgoal_change_this_timestep=False
             
-        # 使用封装的序列任务检查函数
+        # Use encapsulated sequence task check function
         all_tasks_completed, current_task_name, task_failed ,self.current_task_specialflag= sequential_task_check(self, self.task_list,allow_subgoal_change_this_timestep=allow_subgoal_change_this_timestep)
 
         if task_failed:
             self.failureflag = torch.tensor([True])
             print(f"Task failed: {current_task_name}")
         
-        # 如果之前已经失败，保持失败状态
+        # If previously failed, keep failed state
         if previous_failure:
             self.failureflag = torch.tensor([True])
 
 
-        #############上升沿检测 必须放在fail检测之前
+        ############# Rising edge detection must be placed before fail detection
         target_cubes = getattr(self, "target_cubes", [])
         target_cube_names = getattr(self, "target_cube_names", [])
 
@@ -375,7 +375,7 @@ class PickHighlight(BaseEnv):
         if target_cubes and not hasattr(self, "target_cube_pickup_active"):
             self.target_cube_pickup_active = {name: False for name in target_cube_names}
 
-        # 仅在某个方块从“未抓取”变为“抓取”时计数，避免同一次抓取在多帧内重复累计
+        # Only count when cube changes from "not picked" to "picked", avoid duplicate counting in multiple frames for same pick
         for cube, name in zip(target_cubes, target_cube_names):
             pickup_tensor = is_obj_pickup(self, cube)
             if isinstance(pickup_tensor, torch.Tensor):
@@ -395,14 +395,14 @@ class PickHighlight(BaseEnv):
             len(pickup_counts) > 0
             and all(count >= 1 for count in pickup_counts.values())
         )
-        #############上升沿检测 必须放在fail检测之前
+        ############# Rising edge detection must be placed before fail detection
 
 
-        # 任何情况下只要都 pick 至少一次即刻成功（计数记录离散抓取事件）
+        # Success if all picked at least once (counting discrete pick events)
         if counts_satisfied:
             self.successflag = torch.tensor([True])
        
-       #planner全执行完仍然不成功fail
+       # Fail if planner finished but not successful
         if all_tasks_completed and not counts_satisfied:
             self.failureflag = torch.tensor([True])
             print(f"Pickup counts not satisfied: {pickup_counts}")

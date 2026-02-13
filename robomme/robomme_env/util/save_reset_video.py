@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# 用于保存 reset 阶段（演示阶段）带字幕视频的公共工具。
+# Common utility for saving videos with captions during reset phase (demonstration phase).
 
 import os
 from typing import Dict, List, Any, Tuple
@@ -60,7 +60,7 @@ def add_text_to_frame(
     text: Any,
     text_area_height: int = TEXT_AREA_HEIGHT,
 ) -> np.ndarray:
-    """在帧顶部叠加字幕（黑底+白字），样式与 DemonstrationWrapper.save_video 一致。"""
+    """Overlay caption at the top of the frame (white text on black background), style consistent with DemonstrationWrapper.save_video."""
     frame = _frame_to_numpy(frame).copy()
     if frame.ndim == 2:
         frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2RGB)
@@ -105,7 +105,7 @@ def add_border_to_frame(
     color: Tuple[int, int, int] = (255, 0, 0),
     thickness: int = 4,
 ) -> np.ndarray:
-    """在帧四周叠加边框（RGB 颜色）。"""
+    """Overlay border around the frame (RGB color)."""
     frame = _frame_to_numpy(frame).copy()
     if frame.ndim == 2:
         frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2RGB)
@@ -140,23 +140,23 @@ def save_robomme_video(
     highlight_thickness: int = 4,
 ) -> bool:
     """
-    统一保存 replay 视频（含 reset 前缀高亮、命名与输出路径拼接）。
+    Unified method to save replay videos (including reset prefix highlighting, naming, and output path concatenation).
 
     Args:
-        reset_base_frames/reset_wrist_frames: reset 阶段双相机帧列表。
-        rollout_base_frames/rollout_wrist_frames: rollout 阶段双相机帧列表。
-        reset_subgoal_grounded/rollout_subgoal_grounded: 对应阶段字幕列表。
-        out_video_dir: 输出目录。
-        action_space: 当前动作空间，用于生成文件名前缀。
-        env_id: 环境 ID。
-        episode: 当前 episode 序号。
-        episode_success: 当前 episode 是否成功。
-        fps: 输出帧率。
-        highlight_color: 边框颜色（RGB）。
-        highlight_thickness: 边框厚度（像素）。
+        reset_base_frames/reset_wrist_frames: List of dual camera frames from reset phase.
+        rollout_base_frames/rollout_wrist_frames: List of dual camera frames from rollout phase.
+        reset_subgoal_grounded/rollout_subgoal_grounded: List of captions for corresponding phases.
+        out_video_dir: Output directory.
+        action_space: Current action space, used for filename prefix.
+        env_id: Environment ID.
+        episode: Current episode index.
+        episode_success: Whether the current episode was successful.
+        fps: Output frame rate.
+        highlight_color: Border color (RGB).
+        highlight_thickness: Border thickness (pixels).
 
     Returns:
-        至少写入一帧时返回 True，否则返回 False。
+        True if at least one frame was written, False otherwise.
     """
     success_prefix = "success" if episode_success else "fail"
     mode_prefix = action_space

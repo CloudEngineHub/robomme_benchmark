@@ -1,12 +1,12 @@
 """
-逐步收集规划工具。
+Step-by-step planning collection tool.
 
-所有逐步收集接口统一返回 5 元组：
+All step-by-step collection interfaces uniformly return a 5-tuple:
     (obs_batch, reward_batch, terminated_batch, truncated_batch, info_batch)
 
-- obs_batch/info_batch: dict[str, list]，键来自单步字典。
-- reward_batch: torch.float32，形状为 [N]。
-- terminated_batch/truncated_batch: torch.bool，形状为 [N]。
+- obs_batch/info_batch: dict[str, list], keys from single step dictionary.
+- reward_batch: torch.float32, shape [N].
+- terminated_batch/truncated_batch: torch.bool, shape [N].
 """
 
 import numpy as np
@@ -14,7 +14,7 @@ import torch
 
 
 def _to_scalar(value):
-    """将标量或张量值转换为 Python 标量。"""
+    """Convert scalar or tensor value to Python scalar."""
     if isinstance(value, torch.Tensor):
         if value.numel() == 0:
             return 0
@@ -23,7 +23,7 @@ def _to_scalar(value):
 
 
 def _snapshot_value(value):
-    """对可能复用底层内存的值做快照，避免后续步骤覆盖前序帧。"""
+    """Snapshot values that might reuse underlying memory to avoid overwriting previous frames in subsequent steps."""
     if isinstance(value, torch.Tensor):
         return value.detach().clone()
     if isinstance(value, np.ndarray):
@@ -38,7 +38,7 @@ def _snapshot_value(value):
 
 
 def _snapshot_step(out):
-    """对单步输出做深拷贝快照。"""
+    """Deep copy snapshot of single step output."""
     if not (isinstance(out, tuple) and len(out) == 5):
         return out
     obs, reward, terminated, truncated, info = out
@@ -64,8 +64,8 @@ def _is_columnar_dict(batch_dict, n):
 
 def _output_to_steps(out):
     """
-    将 step 输出规范化为“原始逐步 tuple 列表”。
-    同时支持单步 tuple 和统一批次 tuple 两种输入格式。
+    Normalize step output to "list of raw step tuples".
+    Supports both single step tuple and unified batch tuple input formats.
     """
     if isinstance(out, tuple) and len(out) == 5:
         obs_part, reward_part, terminated_part, truncated_part, info_part = out
@@ -105,7 +105,7 @@ def _output_to_steps(out):
 
 def _dicts_to_columnar_dict(dict_steps):
     """
-    将逐步字典转换为 dict[str, list]，缺失键使用 None 补齐。
+    Convert step dictionaries to dict[str, list], filling missing keys with None.
     """
     n = len(dict_steps)
     out = {}
@@ -123,7 +123,7 @@ def _dicts_to_columnar_dict(dict_steps):
 
 
 def empty_step_batch():
-    """按统一契约返回一个空 batch。"""
+    """Return an empty batch following the unified contract."""
     return (
         {},
         torch.empty(0, dtype=torch.float32),
@@ -135,7 +135,7 @@ def empty_step_batch():
 
 def to_step_batch(collected_steps):
     """
-    将收集到的逐步 tuple 转换为统一 batch 输出。
+    Convert collected step tuples to unified batch output.
     collected_steps: [(obs, reward, terminated, truncated, info), ...]
     """
     if not collected_steps:
@@ -157,7 +157,7 @@ def to_step_batch(collected_steps):
 
 def concat_step_batches(batches):
     """
-    将多个统一 batch 拼接为一个统一 batch。
+    Concatenate multiple unified batches into one unified batch.
     """
     valid = []
     for batch in batches:
@@ -215,8 +215,8 @@ def concat_step_batches(batches):
 
 def _collect_dense_steps(planner, fn):
     """
-    运行 fn() 时拦截 planner.env.step，收集原始逐步 tuple。
-    若 fn 返回 -1，则返回 -1；否则返回收集结果列表。
+    Intercept planner.env.step when running fn(), collecting raw step tuples.
+    If fn returns -1, return -1; otherwise return collected result list.
     """
     collected = []
     original_step = planner.env.step
@@ -238,7 +238,7 @@ def _collect_dense_steps(planner, fn):
 
 def _run_with_dense_collection(planner, fn):
     """
-    运行 fn() 并返回统一批次；若 fn 返回 -1 则返回 -1。
+    Run fn() and return unified batch; return -1 if fn returns -1.
     """
     collected = _collect_dense_steps(planner, fn)
     if collected == -1:
@@ -248,8 +248,8 @@ def _run_with_dense_collection(planner, fn):
 
 def move_to_pose_with_RRTStar(planner, pose):
     """
-    调用 planner.move_to_pose_with_RRTStar(pose) 并返回统一批次。
-    规划失败时返回 -1。
+    Call planner.move_to_pose_with_RRTStar(pose) and return unified batch.
+    Return -1 on planning failure.
     """
     return _run_with_dense_collection(
         planner, lambda: planner.move_to_pose_with_RRTStar(pose)
@@ -258,8 +258,8 @@ def move_to_pose_with_RRTStar(planner, pose):
 
 def move_to_pose_with_screw(planner, pose):
     """
-    调用 planner.move_to_pose_with_screw(pose) 并返回统一批次。
-    规划失败时返回 -1。
+    Call planner.move_to_pose_with_screw(pose) and return unified batch.
+    Return -1 on planning failure.
     """
     return _run_with_dense_collection(
         planner, lambda: planner.move_to_pose_with_screw(pose)
@@ -268,41 +268,41 @@ def move_to_pose_with_screw(planner, pose):
 
 def close_gripper(planner):
     """
-    调用 planner.close_gripper() 并返回统一批次。
-    失败时返回 -1。
+    Call planner.close_gripper() and return unified batch.
+    Return -1 on failure.
     """
     return _run_with_dense_collection(planner, lambda: planner.close_gripper())
 
 
 def open_gripper(planner):
     """
-    调用 planner.open_gripper() 并返回统一批次。
-    失败时返回 -1。
+    Call planner.open_gripper() and return unified batch.
+    Return -1 on failure.
     """
     return _run_with_dense_collection(planner, lambda: planner.open_gripper())
 
 
-# ---- 调用关系 ----
+# ---- Call Relationships ----
 #
 # _collect_dense_steps:
 #   - DemonstrationWrapper.get_demonstration_trajectory()
-#     包裹整个 solve_callable，monkey-patch planner.env.step 收集所有底层 step
+#     Wrap entire solve_callable, monkey-patch planner.env.step to collect all underlying steps
 #
 # _run_with_dense_collection:
 #   - OraclePlannerDemonstrationWrapper
-#     包裹 solve_options 的 solve()，收集所有底层 step 并直接返回统一批次
+#     Wrap solve() in solve_options, collect all underlying steps and directly return unified batch
 #
 # move_to_pose_with_RRTStar:
-#   - MultiStepDemonstrationWrapper 中单步执行移动
-#     （MultiStepDemonstrationWrapper.py 第 106 行）
+#   - Execute single step move in MultiStepDemonstrationWrapper
+#     (MultiStepDemonstrationWrapper.py line 106)
 #
 # move_to_pose_with_screw:
-#   - 目前无外部调用，作为与 move_to_pose_with_RRTStar 对称的 API 保留
+#   - Currently no external call, reserved as symmetric API to move_to_pose_with_RRTStar
 #
 # close_gripper:
-#   - MultiStepDemonstrationWrapper 中执行夹爪关闭
-#     （MultiStepDemonstrationWrapper.py 第 112 行）
+#   - Execute gripper close in MultiStepDemonstrationWrapper
+#     (MultiStepDemonstrationWrapper.py line 112)
 #
 # open_gripper:
-#   - MultiStepDemonstrationWrapper 中执行夹爪打开
-#     （MultiStepDemonstrationWrapper.py 第 121 行）
+#   - Execute gripper open in MultiStepDemonstrationWrapper
+#     (MultiStepDemonstrationWrapper.py line 121)

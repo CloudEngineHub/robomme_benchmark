@@ -81,7 +81,7 @@ class SwingXtimes(BaseEnv):
     'number_max':2
     }
 
-    # 组合成一个字典
+    # Combine into a dictionary
     configs = {
         'hard': config_hard,
         'easy': config_easy,
@@ -134,7 +134,7 @@ class SwingXtimes(BaseEnv):
             else:  # seed_mod == 2
                 self.difficulty = "hard"
 
-               # 使用 seed 随机确定需要重复的次数 (1-5)
+               # Use seed to randomly determine number of repetitions (1-5)
         generator = torch.Generator()
         generator.manual_seed(Robomme_seed)
         self.num_repeats = torch.randint(self.configs[self.difficulty]['number_min'], self.configs[self.difficulty]['number_max']+1, (1,), generator=generator).item()
@@ -183,7 +183,7 @@ class SwingXtimes(BaseEnv):
             )
             avoid = [button_obb]
 
-            self.all_cubes = []  # 保存所有 cube 对象
+            self.all_cubes = []  # Save all cube objects
 
             # Initialize storage for each color group
             self.red_cubes = []
@@ -228,7 +228,7 @@ class SwingXtimes(BaseEnv):
                             )
                         except RuntimeError as e:
                             raise SceneGenerationError(
-                                f"生成{group['name']} cube {cube_idx} 失败：{e}"
+                                f"Failed to generate {group['name']} cube {cube_idx}: {e}"
                             ) from e
 
                         self.all_cubes.append(cube)
@@ -246,14 +246,14 @@ class SwingXtimes(BaseEnv):
             try:
                 temp_target_0 = spawn_random_target(
                     self,
-                    avoid=avoid,  # 使用当前避让清单，包含所有已生成的cubes
-                    include_existing=False,  # 手动维护清单
-                    include_goal=False,  # 手动维护清单
+                    avoid=avoid,  # Use current avoidance list, containing all spawned cubes
+                    include_existing=False,  # Manually maintain list
+                    include_goal=False,  # Manually maintain list
                     region_center=[-0.1, -0.2],
                     region_half_size=0.1,
-                    radius=self.cube_half_size*2,  # 使用radius而不是half_size
-                    thickness=0.005,  # target的厚度
-                    min_gap=self.cube_half_size*1,  # 与cube相同的间隙要求
+                    radius=self.cube_half_size*2,  # Use radius instead of half_size
+                    thickness=0.005,  # target thickness
+                    min_gap=self.cube_half_size*1,  # Gap requirement same as cube
                     name_prefix=f"temp_target_0",
                     generator=generator,
                     target_style="gray"
@@ -261,20 +261,20 @@ class SwingXtimes(BaseEnv):
                 avoid.append(temp_target_0)
                 print(f"Generated first target")
             except RuntimeError as e:
-                raise SceneGenerationError("First target采样失败") from e
+                raise SceneGenerationError("First target sampling failed") from e
 
             # Generate second target
             try:
                 temp_target_1 = spawn_random_target(
                     self,
-                    avoid=avoid,  # 使用当前避让清单，包含所有已生成的cubes和第一个target
-                    include_existing=False,  # 手动维护清单
-                    include_goal=False,  # 手动维护清单
+                    avoid=avoid,  # Use current avoidance list, containing all spawned cubes and first target
+                    include_existing=False,  # Manually maintain list
+                    include_goal=False,  # Manually maintain list
                     region_center=[-0.1, 0.2],
                     region_half_size=0.1,
-                    radius=self.cube_half_size*2,  # 使用radius而不是half_size
-                    thickness=0.005,  # target的厚度
-                    min_gap=self.cube_half_size*1,  # 与cube相同的间隙要求
+                    radius=self.cube_half_size*2,  # Use radius instead of half_size
+                    thickness=0.005,  # target thickness
+                    min_gap=self.cube_half_size*1,  # Gap requirement same as cube
                     name_prefix=f"temp_target_1",
                     generator=generator,
                     target_style="gray"
@@ -282,7 +282,7 @@ class SwingXtimes(BaseEnv):
                 avoid.append(temp_target_1)
                 print(f"Generated second target")
             except RuntimeError as e:
-                raise SceneGenerationError("Second target采样失败") from e
+                raise SceneGenerationError("Second target sampling failed") from e
 
             # Swap names if necessary to ensure target_0.y < target_1.y
             temp_0_y = temp_target_0.pose.p[0, 1].item()  # Get y coordinate
@@ -391,10 +391,10 @@ class SwingXtimes(BaseEnv):
             })
 
 
-        # 存储任务列表供RecordWrapper使用
+        # Store task list for RecordWrapper use
         self.task_list = tasks
 
-        # 记录用于恢复的 pickup 相关任务索引和条目
+        # Record pickup related task indices and items for recovery
         self.recovery_pickup_indices, self.recovery_pickup_tasks = task4recovery(self.task_list)
         if self.robomme_failure_recovery:
             # Only inject an intentional failed grasp when recovery mode is enabled
@@ -414,15 +414,15 @@ class SwingXtimes(BaseEnv):
             self.agent.reset(qpos)
             self.highlight_right_start = None
             self.highlight_left_start = None
-            # 摆动计数初始化：
-            # swing_count     记录累计摆动/落点次数（左右各算一次）
-            # swing_over_limit 标记是否超过允许次数，一旦为 True 就判定失败
-            # _was_on_right/_was_on_left 用于做“边沿检测”，防止同一落点连续多帧重复计数
+            # Swing count initialization:
+            # swing_count     Record cumulative swing/landing counts (left and right each count as one)
+            # swing_over_limit Mark whether allowed count is exceeded, if True then failed
+            # _was_on_right/_was_on_left Used for "edge detection" to prevent duplicate counting of same landing across multiple frames
             self.swing_count = 0
             self.swing_over_limit = False
             self._was_on_right = False
             self._was_on_left = False
-            # 期望的最大摆动次数（左右各 self.num_repeats 次）
+            # Expected max swing count (left and right each self.num_repeats times)
             self.max_swings = self.num_repeats * 2
 
     def _get_obs_extra(self, info: Dict):
@@ -439,32 +439,32 @@ class SwingXtimes(BaseEnv):
         else:
             self.failureflag = torch.tensor([False])
 
-        # 为测试“超出摆动上限”场景，强行降低上限（例如 1 次）
-        # 这样第二次落点就会触发 too_many_swings 失败逻辑，便于验证
+        # To test "exceed swing limit" scenario, forcibly lower limit (e.g. 1 time)
+        # This way second landing triggers too_many_swings failure logic, for easy verification
         #self.max_swings = 2
 
 
 
        
-        # 使用封装的序列任务检查函数
-        if(self.use_demonstrationwrapper==False):#record时候planner结束再改变subgoal
+        # Use encapsulated sequence task check function
+        if(self.use_demonstrationwrapper==False):# change subgoal after planner ends during recording
             if solve_complete_eval==True:
                 allow_subgoal_change_this_timestep=True
             else:
                 allow_subgoal_change_this_timestep=False
-        else:#demonstration时候video需要call evaluate(solve_complete_eval) video结束在demonstrationwrapper里面改变flag
+        else:# during demonstration, video needs to call evaluate(solve_complete_eval), video ends and flag changes in demonstrationwrapper
             if solve_complete_eval==True or self.demonstration_record_traj==False:
                 allow_subgoal_change_this_timestep=True
             else:
                 allow_subgoal_change_this_timestep=False
         all_tasks_completed, current_task_name, task_failed,self.current_task_specialflag = sequential_task_check(self, self.task_list,allow_subgoal_change_this_timestep=allow_subgoal_change_this_timestep)
 
-        # 如果任务失败，立即标记失败
+        # If task failed, mark as failed immediately
         if task_failed:
             self.failureflag = torch.tensor([True])
             print(f"Task failed: {current_task_name}")
 
-        # 如果static_check成功或者所有任务完成，则设置成功标志
+        # If static_check succeeds or all tasks completed, set success flag
         if all_tasks_completed and not task_failed:
             self.successflag = torch.tensor([True])
 
@@ -492,13 +492,13 @@ class SwingXtimes(BaseEnv):
 
 
         obs, reward, terminated, truncated, info = super().step(action)
-        # 先检测当前帧是否"落"在左右目标上，用于高亮与计数
-        # 注意：policy 在 z 轴上下抖动时，is_obj_swing_onto 的 z_threshold 判定可能导致 on/off 反复翻转，
-        # 从而触发多次 "False->True" 边沿，造成重复计数。这里用 enter/exit 滞回阈值缓解抖动。
-        # 为防止 z 轴在阈值附近抖动造成 on/off 反复翻转、重复计数：
-        # 使用 enter/exit 两套阈值（滞回 hysteresis）。
-        # - enter 更严格：进入目标区域才算一次落点
-        # - exit 更宽松：在目标区域内的小抖动不会被误判为离开
+        # First check if current frame "lands" on left/right targets, for highlight and counting
+        # Note: When policy jitters in z-axis, is_obj_swing_onto's z_threshold check might cause on/off flipping,
+        # triggering multiple "False->True" edges and duplicate counting. Here use enter/exit hysteresis thresholds to mitigate jitter.
+        # To prevent z-axis jitter near threshold from causing on/off flipping and duplicate counting:
+        # Use enter/exit two sets of thresholds (hysteresis).
+        # - enter strictly: entering target region counts as one-time landing
+        # - exit loosely: small jitter within target region won't be misjudged as leaving
         swing_enter_distance_threshold = 0.03
         swing_exit_distance_threshold = 0.04  # >= enter
         swing_enter_z_threshold = 0.12
@@ -539,22 +539,22 @@ class SwingXtimes(BaseEnv):
             )
         if on_right:
              self.highlight_right_start=int(self.elapsed_steps[0].item())
-             # 只在“首次”落点时累计一次摆动次数，避免连续帧重复累计
+             # Only accumulate swing count on "first" landing, avoid duplicate counting across continuous frames
              if not self._was_on_right:
                 self.swing_count += 1
         if on_left:
              self.highlight_left_start=int(self.elapsed_steps[0].item())
-             # 只在“首次”落点时累计一次摆动次数，避免连续帧重复累计
+             # Only accumulate swing count on "first" landing, avoid duplicate counting across continuous frames
              if not self._was_on_left:
                 self.swing_count += 1
 
-        # 边沿检测记录完后更新状态
+        # Update status after recording edge detection
         self._was_on_right = on_right
         self._was_on_left = on_left
 
         if self.swing_count > self.max_swings:
             if not self.swing_over_limit:
-                # 只打印一次，提示摆动次数已超上限
+                # Print only once, warn swing count exceeded limit
                 print(f"Swing count exceeded: {self.swing_count}>{self.max_swings}")
             self.swing_over_limit = True
              

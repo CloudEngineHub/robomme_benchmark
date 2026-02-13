@@ -29,7 +29,7 @@ TARGET_GRAY = (np.array([128, 128, 128, 255]) / 255).tolist()
 
 
 def _vec3_of(self, actor):
-    """取 actor 的 (x,y,z)，兼容 torch / numpy / sapien"""
+    """Get actor's (x,y,z), compatible with torch / numpy / sapien"""
     p = actor.pose.p if hasattr(actor, "pose") else actor.get_pose().p
     try:
         import torch, numpy as np
@@ -45,48 +45,48 @@ def swap_flat_two_lane(
         self,
         cube_a, cube_b,
         start_step: int, end_step: int,
-        cur_step: int,  # ✅ 显式传入当前 timestep
+        cur_step: int,  # ✅ Explicitly pass current timestep
         ax=None, ay=None, bx=None, by=None,
         z=None,
         lane_offset=0.05,
         keep_upright=True,
         smooth=True,
-        lock_cube_offset=True,  # 预留参数
-        other_cube=None,  # 新增：额外的cube(s)，可以是单个cube或cube列表，每个timestep设置其pose以防止碰撞
+        lock_cube_offset=True,  # Reserved parameter
+        other_cube=None,  # New: Extra cube(s), can be single cube or list of cubes, set pose at each timestep to prevent collision
 ):
     """
-    在同一平面进行"错车道"对调（A<->B）：
-    - 用 [start_step, end_step] 控制时间窗口；
-    - 第一次进入窗口时自动捕获端点位姿，整段动画内固定使用；
-    - 窗口外自动 no-op；到达 end_step 时清理缓存。
-    - 如果提供了 other_bins，则在每个时间步将其保持在原位置以防止碰撞
-    - other_bins 可以是单个bin或bin列表
+    Perform "lane change" swap on same plane (A<->B):
+    - Use [start_step, end_step] to control time window;
+    - Automatically capture endpoint poses when entering window for first time, fixed for entire animation;
+    - Auto no-op outside window; clear cache when reaching end_step.
+    - If other_bins provided, keep them in original position at each timestep to prevent collision
+    - other_bins can be single bin or list of bins
     """
 
     import math
     import numpy as np
     import sapien
 
-    # 窗口外直接返回（允许每步都调用）
+    # Return directly outside window (allow calling every step)
     if cur_step < int(start_step) or cur_step > int(end_step):
         return
 
-    # 懒初始化缓存容器
+    # Lazy initialize cache container
     if not hasattr(self, "_two_lane_swaps"):
         self._two_lane_swaps = {}
     #print("swap!")
     key = (id(cube_a), id(cube_b), int(start_step), int(end_step))
 
-    # --- 端点捕获（进入窗口首帧或缓存缺失） ---
+    # --- Endpoint capture (first frame entering window or cache missing) ---
     if cur_step == int(start_step) or key not in self._two_lane_swaps:
         ax0, ay0, az0 = _vec3_of(self,cube_a)
         bx0, by0, bz0 = _vec3_of(self,cube_b)
 
-        # 捕获初始四元数（保持物体的原始旋转状态）
+        # Capture initial quaternion (keep object's original rotation state)
         qa0 = cube_a.pose.q if hasattr(cube_a, "pose") else cube_a.get_pose().q
         qb0 = cube_b.pose.q if hasattr(cube_b, "pose") else cube_b.get_pose().q
 
-        # 处理torch tensor格式并确保quaternion为1D数组
+        # Process torch tensor format and ensure quaternion is 1D array
         try:
             import torch
             if isinstance(qa0, torch.Tensor):
@@ -94,7 +94,7 @@ def swap_flat_two_lane(
             if isinstance(qb0, torch.Tensor):
                 qb0 = qb0.detach().cpu().numpy()
 
-            # 确保quaternion为1D数组 [w, x, y, z]
+            # Ensure quaternion is 1D array [w, x, y, z]
             qa0 = np.asarray(qa0, dtype=np.float32).flatten()
             qb0 = np.asarray(qb0, dtype=np.float32).flatten()
         except Exception:
@@ -110,10 +110,10 @@ def swap_flat_two_lane(
         else:
             z_a0 = z_b0 = float(z)
 
-        # 如果提供了 other_bins，捕获其初始位姿（支持单个bin或列表）
+        # If other_bins provided, capture initial poses (support single bin or list)
         other_bins_poses = []
         if other_cube is not None:
-            # 确保other_bins是列表
+            # Ensure other_bins is list
             bins_to_lock = other_cube if isinstance(other_cube, list) else [other_cube]
 
             for bin_obj in bins_to_lock:
@@ -142,7 +142,7 @@ def swap_flat_two_lane(
             "other_bins_poses": other_bins_poses
         }
 
-    # 取缓存端点
+    # Get cached endpoints
     ax = self._two_lane_swaps[key]["ax"]
     ay = self._two_lane_swaps[key]["ay"]
     z_a0 = self._two_lane_swaps[key]["az"]
@@ -153,26 +153,26 @@ def swap_flat_two_lane(
     qb0 = self._two_lane_swaps[key]["qb"]
     other_bins_poses = self._two_lane_swaps[key]["other_bins_poses"]
 
-    # 归一化进度 alpha ∈ [0,1]
+    # Normalized progress alpha in [0,1]
     denom = max(1, int(end_step) - int(start_step))
     alpha = (int(cur_step) - int(start_step)) / denom
     alpha = float(np.clip(alpha, 0.0, 1.0))
     if smooth:
         alpha = alpha * alpha * (3.0 - 2.0 * alpha)  # smoothstep
 
-    # 主方向与法向
+    # Main direction and normal
     dx, dy = (bx - ax), (by - ay)
     nx, ny = -dy, dx
     n_norm = (nx * nx + ny * ny) ** 0.5
     if n_norm > 1e-9:
         nx, ny = nx / n_norm, ny / n_norm
     else:
-        nx, ny = 0.0, 0.0  # 起终点重合：无法向偏移
+        nx, ny = 0.0, 0.0  # Start and end points coincide: no normal offset
 
-    # 钟形偏移（中段最大）
+    # Bell-shaped offset (max at middle)
     offset = float(lane_offset) * math.sin(math.pi * alpha)
 
-    # 在每个timestep，如果提供了other_bins列表，保持它们在原位置以防止碰撞
+    # At each timestep, if other_bins list provided, keep them in original position to prevent collision
     if other_bins_poses:
         for pose_data in other_bins_poses:
             try:
@@ -183,30 +183,30 @@ def swap_flat_two_lane(
             except Exception as e:
                 print(f"Failed to set pose for locked bin: {e}")
 
-    # 检查是否到达结束时间
+    # Check if end time reached
     if int(cur_step) >= int(end_step):
         cube_a.set_pose(sapien.Pose(p=[bx, by, z_a0], q=qb0))
         cube_b.set_pose(sapien.Pose(p=[ax, ay, z_b0], q=qa0))
 
-        # 清理缓存
+        # Clear cache
         if key in self._two_lane_swaps:
             del self._two_lane_swaps[key]
         return
 
-    # 插值路径：A 正向 + 偏移；B 反向 - 偏移
+    # Interpolation path: A forward + offset; B backward - offset
     xa = ax + dx * alpha + nx * offset
     ya = ay + dy * alpha + ny * offset
     xb = bx - dx * alpha - nx * offset
     yb = by - dy * alpha - ny * offset
 
-    # 在交换过程中，四元数也应该交换：A趋向B的旋转，B趋向A的旋转
-    # 使用slerp进行四元数插值（简化为线性混合）
+    # During swap, quaternions should also swap: A tends to B's rotation, B tends to A's rotation
+    # Use slerp for quaternion interpolation (simplified as linear blending)
     try:
-        # 计算当前应该使用的四元数（从原始旋转过渡到目标旋转）
-        qa_current = qa0 * (1 - alpha) + qb0 * alpha  # A从qa0过渡到qb0
-        qb_current = qb0 * (1 - alpha) + qa0 * alpha  # B从qb0过渡到qa0
+        # Calculate current quaternion to use (transition from original rotation to target rotation)
+        qa_current = qa0 * (1 - alpha) + qb0 * alpha  # A transitions from qa0 to qb0
+        qb_current = qb0 * (1 - alpha) + qa0 * alpha  # B transitions from qb0 to qa0
 
-        # 归一化四元数
+        # Normalize quaternion
         qa_norm = np.linalg.norm(qa_current)
         qb_norm = np.linalg.norm(qb_current)
         if qa_norm > 1e-6:
@@ -218,7 +218,7 @@ def swap_flat_two_lane(
         cube_b.set_pose(sapien.Pose(p=[xb, yb, z_b0], q=qb_current))
 
     except Exception as e:
-        # 如果四元数插值失败，回退到原始方案
+        # If quaternion interpolation fails, fallback to original scheme
         cube_a.set_pose(sapien.Pose(p=[xa, ya, z_a0], q=qa0))
         cube_b.set_pose(sapien.Pose(p=[xb, yb, z_b0], q=qb0))
     
@@ -867,7 +867,7 @@ def lift_and_drop_objects_back_to_original(
         end_step: int,
         cur_step: int,
 ):
-    """在窗口内将物体临时移走，并在中点释放于原位置上方。"""
+    """Temporarily move object away within window, and release above original position at midpoint."""
 
     import numpy as np
     import sapien
@@ -911,10 +911,10 @@ def lift_and_drop_objects_back_to_original(
 
         drop_height = cache["height"]
 
-        # 远离桌面的临时位置：固定传送到 (10, 10, 10)
+        # Temporary position away from table: fixed teleport to (10, 10, 10)
         away = np.array([10.0, 10.0, 10.0], dtype=np.float32)
 
-        # 释放时的位置：回到原点正上方
+        # Release position: return to directly above origin
         drop_target = cache["origin"].copy()
         drop_target[2] += drop_height
 
@@ -1066,15 +1066,15 @@ def lift_and_drop_objectA_onto_objectB(
 
 def rotate_points_random(points, angle_range, generator=None):
     """
-    生成随机旋转后的点
+    Generate randomly rotated points
 
     Args:
-        points: torch.Tensor or list, shape (N, 2) - N个2D点
-        angle_range: tuple - (min_angle, max_angle) 角度范围（弧度）
-        generator: torch.Generator, optional - 随机数生成器
+        points: torch.Tensor or list, shape (N, 2) - N 2D points
+        angle_range: tuple - (min_angle, max_angle) angle range (radians)
+        generator: torch.Generator, optional - random number generator
 
     Returns:
-        tuple: (angle, rotated_points) - 旋转角度和旋转后的点
+        tuple: (angle, rotated_points) - rotation angle and rotated points
     """
     # Convert to tensor if input is a list
     if not isinstance(points, torch.Tensor):
@@ -1082,10 +1082,10 @@ def rotate_points_random(points, angle_range, generator=None):
 
     min_angle, max_angle = angle_range
 
-    # 生成指定范围内的随机旋转角度
+    # Generate random rotation angle within specified range
     angle = torch.rand(1, generator=generator) * (max_angle - min_angle) + min_angle
 
-    # 构建2D旋转矩阵
+    # Build 2D rotation matrix
     cos_angle = torch.cos(angle)
     sin_angle = torch.sin(angle)
     rotation_matrix = torch.tensor([
@@ -1093,7 +1093,7 @@ def rotate_points_random(points, angle_range, generator=None):
         [sin_angle, cos_angle]
     ], dtype=points.dtype).squeeze()
 
-    # 旋转所有点
+    # Rotate all points
     rotated_points = torch.matmul(points, rotation_matrix.T)
 
     return angle.item(), rotated_points.tolist()

@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
-# 脚本功能：统一 dataset replay 入口，支持 joint_angle / ee_pose / ee_quat / keypoint / oracle_planner 五种 action_space。
-# 与 evaluate.py 的主循环与调试字段保持一致；差异在于动作来自 EpisodeDatasetResolver。
+# Script function: Unified dataset replay entry point, supporting 5 action spaces: joint_angle / ee_pose / ee_quat / keypoint / oracle_planner.
+# Consistent with evaluate.py main loop; difference is actions come from EpisodeDatasetResolver.
 
 import os
 import re
 import sys
 from typing import Any, Optional
 
-# 将包根目录、上级目录及 scripts 加入 sys.path，便于作为脚本直接运行（不依赖 PYTHONPATH）
+# Add package root, parent dir, and scripts to sys.path for direct execution (no PYTHONPATH needed)
 _ROOT = os.path.abspath(os.path.dirname(__file__))
 _PARENT = os.path.dirname(_ROOT)
 _SCRIPTS = os.path.join(_PARENT, "scripts")
@@ -27,7 +27,7 @@ from robomme.env_record_wrapper import (
 )
 from robomme.robomme_env.util.save_reset_video import save_robomme_video
 
-# 只启用一个 ACTION_SPACE；其他选项保留在注释中供手动切换
+# Only enable one ACTION_SPACE; others are commented out for manual switching
 ACTION_SPACE = "joint_angle"
 #ACTION_SPACE = "ee_pose"
 #ACTION_SPACE = "ee_quat"
@@ -58,10 +58,10 @@ DEFAULT_ENV_IDS = [
     # "RouteStick",
 ]
 
-# ######## 视频保存变量（输出目录）开始 ########
-# 视频输出目录：独立固定写死，不与 h5 路径或 env_id 对齐
+# ######## Video saving variables (output dir) start ########
+# Video output directory: Independent fixed path, not aligned with h5 path or env_id
 OUT_VIDEO_DIR = "/data/hongzefu/dataset_replay"
-# ######## 视频保存变量（输出目录）结束 ########
+# ######## Video saving variables (output dir) end ########
 
 def _parse_oracle_command(subgoal_text: Optional[str]) -> Optional[dict[str, Any]]:
     if not subgoal_text:
@@ -71,7 +71,7 @@ def _parse_oracle_command(subgoal_text: Optional[str]) -> Optional[dict[str, Any
     if match:
         x = int(match.group(1))
         y = int(match.group(2))
-        # 数据集文本通常是 <x, y>，Oracle wrapper 期望 [row, col]，即 [y, x]
+        # Dataset text is usually <x, y>, Oracle wrapper expects [row, col], i.e., [y, x]
         point = [y, x]
     return {"action": subgoal_text, "point": point}
 
@@ -111,7 +111,7 @@ def main():
                 # obs_batch, reward_batch, terminated_batch, truncated_batch, info_batch = env.reset()
                 obs_batch, info_batch = env.reset()
 
-                # 保持 evaluate.py 中的调试变量语义
+                # Keep debug variable semantics from evaluate.py
                 maniskill_obs = obs_batch["maniskill_obs"]
                 front_camera = obs_batch["front_camera"]
                 wrist_camera = obs_batch["wrist_camera"]
@@ -124,7 +124,6 @@ def main():
                 wrist_camera_extrinsic_opencv = obs_batch["wrist_camera_extrinsic_opencv"]
                 wrist_camera_intrinsic_opencv = obs_batch["wrist_camera_intrinsic_opencv"]
                 wrist_camera_cam2world_opengl = obs_batch["wrist_camera_cam2world_opengl"]
-                end_effector_pose_raw = obs_batch["end_effector_pose_raw"]
                 end_effector_pose = obs_batch["end_effector_pose"]
                 joint_states = obs_batch["joint_states"]
                 velocity = obs_batch["velocity"]
@@ -139,12 +138,12 @@ def main():
                 # terminated = bool(terminated_batch[-1].item())
                 # truncated = bool(truncated_batch[-1].item())
 
-                # #todo：保存最后两张front camera为图片 左右拼接加上注释
+                # #todo: Save the last two front camera images, stitch them side-by-side and add annotations
                 # if len(front_camera) >= 2:
                 #     def _tensor_to_numpy_img(f):
                 #         img = torch.as_tensor(f).detach().cpu().numpy()
                 #         if img.dtype != np.uint8:
-                #             # 假设是[0,1] float，转为[0,255] uint8
+                #             # Assume [0,1] float, convert to [0,255] uint8
                 #             if img.max() <= 1.0:
                 #                 img = (img * 255).astype(np.uint8)
                 #             else:
@@ -152,7 +151,7 @@ def main():
                 #         return img.copy()  # Ensure writable copy
 
                 #     def _draw_text_with_wrap(img, text, position=(10, 30), font=cv2.FONT_HERSHEY_SIMPLEX, font_scale=0.5, color=(0, 255, 0), thickness=1):
-                #         """绘制文本，支持自动换行"""
+                #         """Draw text with automatic wrapping"""
                 #         if not text:
                 #             return img
                         
@@ -163,20 +162,20 @@ def main():
                 #         words = text.split(' ')
                 #         current_line = ""
                         
-                #         # 简单的逐词换行逻辑
+                #         # Simple word-by-word wrapping logic
                 #         for word in words:
                 #             test_line = current_line + word + " "
                 #             (w, h), _ = cv2.getTextSize(test_line, font, font_scale, thickness)
-                #             if x + w > img_w - 10:  # 留出右侧 margin
-                #                 # 绘制当前行
+                #             if x + w > img_w - 10:  # Leave right margin
+                #                 # Draw current line
                 #                 cv2.putText(img, current_line, (x, y), font, font_scale, color, thickness, cv2.LINE_AA)
-                #                 # 重置新行
+                #                 # Reset new line
                 #                 current_line = word + " "
                 #                 y += line_height
                 #             else:
                 #                 current_line = test_line
                         
-                #         # 绘制最后一行
+                #         # Draw last line
                 #         if current_line:
                 #             cv2.putText(img, current_line, (x, y), font, font_scale, color, thickness, cv2.LINE_AA)
                         
@@ -185,19 +184,19 @@ def main():
                 #     img_prev = _tensor_to_numpy_img(front_camera[-2])
                 #     img_curr = _tensor_to_numpy_img(front_camera[-1])
 
-                #     # 为两张图分别添加对应的 subgoal
-                #     # 注意：subgoal_grounded 的长度可能与 front_camera 一致，取倒数第二个和最后一个
+                #     # Add corresponding subgoal to each image
+                #     # Note: Length of subgoal_grounded may match front_camera, take second to last and last
                 #     subgoal_text_prev = str(subgoal_grounded[-2]) if len(subgoal_grounded) >= 2 else "No Subgoal"
                 #     subgoal_text_curr = str(subgoal_grounded[-1]) if subgoal_grounded else "No Subgoal"
                     
-                #     # 绘制文字
+                #     # Draw text
                 #     _draw_text_with_wrap(img_prev, f"Prev: {subgoal_text_prev}")
                 #     _draw_text_with_wrap(img_curr, f"Curr: {subgoal_text_curr}")
 
-                #     # 水平拼接
+                #     # Horizontal stitching
                 #     concat_img = np.hstack((img_prev, img_curr))
                     
-                #     # 转换为 BGR 用于保存
+                #     # Convert to BGR for saving
                 #     concat_img_bgr = cv2.cvtColor(concat_img, cv2.COLOR_RGB2BGR)
                     
                 #     save_path = os.path.join(OUT_VIDEO_DIR, f"{env_id}-{episode}-reset-comparison.png")
@@ -206,19 +205,19 @@ def main():
                 #     print(f"[{env_id}] episode {episode} reset comparison image saved to {save_path}")
                 
 
-                # ######## 视频保存变量准备（reset 阶段）开始 ########
+                # ######## Video saving variable preparation (reset phase) start ########
                 reset_base_frames = [torch.as_tensor(f).detach().cpu().numpy().copy() for f in front_camera]
                 reset_wrist_frames = [torch.as_tensor(f).detach().cpu().numpy().copy() for f in wrist_camera]
                 reset_subgoal_grounded = subgoal_grounded
-                # ######## 视频保存变量准备（reset 阶段）结束 ########
+                # ######## Video saving variable preparation (reset phase) end ########
 
-                # ######## 视频保存变量初始化开始 ########
+                # ######## Video saving variable initialization start ########
                 step = 0
                 episode_success = False
                 rollout_base_frames: list[np.ndarray] = []
                 rollout_wrist_frames: list[np.ndarray] = []
                 rollout_subgoal_grounded: list[Any] = []
-                # ######## 视频保存变量初始化结束 ########
+                # ######## Video saving variable initialization end ########
 
                 while step < MAX_STEPS:
                     replay_key = ACTION_SPACE
@@ -230,7 +229,7 @@ def main():
 
                     obs_batch, reward_batch, terminated_batch, truncated_batch, info_batch = env.step(action)
 
-                    # 保持 evaluate.py 中的调试变量语义
+                    # Keep debug variable semantics from evaluate.py
                     maniskill_obs = obs_batch["maniskill_obs"]
                     front_camera = obs_batch["front_camera"]
                     wrist_camera = obs_batch["wrist_camera"]
@@ -243,7 +242,6 @@ def main():
                     wrist_camera_extrinsic_opencv = obs_batch["wrist_camera_extrinsic_opencv"]
                     wrist_camera_intrinsic_opencv = obs_batch["wrist_camera_intrinsic_opencv"]
                     wrist_camera_cam2world_opengl = obs_batch["wrist_camera_cam2world_opengl"]
-                    end_effector_pose_raw = obs_batch["end_effector_pose_raw"]
                     end_effector_pose = obs_batch["end_effector_pose"]
                     joint_states = obs_batch["joint_states"]
                     velocity = obs_batch["velocity"]
@@ -255,11 +253,11 @@ def main():
                     subgoal_grounded = info_batch["subgoal_grounded"]
                     available_options = info_batch["available_options"]
 
-                    # ######## 视频保存变量准备（replay 阶段）开始 ########
+                    # ######## Video saving variable preparation (replay phase) start ########
                     rollout_base_frames.extend(torch.as_tensor(f).detach().cpu().numpy().copy() for f in front_camera)
                     rollout_wrist_frames.extend(torch.as_tensor(f).detach().cpu().numpy().copy() for f in wrist_camera)
                     rollout_subgoal_grounded.extend(subgoal_grounded)
-                    # ######## 视频保存变量准备（replay 阶段）结束 ########
+                    # ######## Video saving variable preparation (replay phase) end ########
 
                     info = {k: v[-1] for k, v in info_batch.items()}
                     terminated = bool(terminated_batch[-1].item())
@@ -269,20 +267,20 @@ def main():
                     if GUI_RENDER:
                         env.render()
                     if truncated:
-                        print(f"[{env_id}] episode {episode} 步数超限，步 {step}。")
+                        print(f"[{env_id}] episode {episode} steps exceeded, step {step}.")
                         break
                     if terminated:
                         succ = info.get("success")
                         if succ == torch.tensor([True]) or (
                             isinstance(succ, torch.Tensor) and succ.item()
                         ):
-                            print(f"[{env_id}] episode {episode} 成功。")
+                            print(f"[{env_id}] episode {episode} success.")
                             episode_success = True
                         elif info.get("fail", False):
-                            print(f"[{env_id}] episode {episode} 失败。")
+                            print(f"[{env_id}] episode {episode} failed.")
                         break
 
-                # ######## 视频保存部分开始 ########
+                # ######## Video saving part start ########
                 save_robomme_video(
                     reset_base_frames=reset_base_frames,
                     reset_wrist_frames=reset_wrist_frames,
@@ -296,13 +294,13 @@ def main():
                     episode=episode,
                     episode_success=episode_success,
                 )
-                # ######## 视频保存部分结束 ########
+                # ######## Video saving part end ########
 
             except (FileNotFoundError, KeyError) as exc:
-                print(f"[{env_id}] episode {episode} 数据缺失，跳过。{exc}")
+                print(f"[{env_id}] episode {episode} Data missing, skipping. {exc}")
                 continue
             except Exception as exc:
-                print(f"[{env_id}] episode {episode} 回放异常，跳过。{exc}")
+                print(f"[{env_id}] episode {episode} Replay exception, skipping. {exc}")
                 continue
             finally:
                 if dataset_resolver is not None:

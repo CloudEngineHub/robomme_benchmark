@@ -1,9 +1,9 @@
 """
-DemonstrationWrapper：在 Robomme 环境外再包一层，用于自动生成演示轨迹并记录帧/动作/状态/子目标等。
+DemonstrationWrapper: Wrap another layer outside Robomme environment to automatically generate demonstration trajectories and record frames/actions/states/subgoals, etc.
 
-- reset 后调用 get_demonstration_trajectory()，用 Motion Planner 执行带 demonstration 标记的任务并记录轨迹。
-- step 接收关节空间动作，做分割与子目标占位符填充、轨迹记录、truncate 与成功判断。ee_pose→关节 由外层 EndeffectorDemonstrationWrapper 负责。
-- 不包含视频保存功能；reset/step 返回统一 dense batch；step 通过 _augment_obs_and_info 注入当前步的 frames、subgoal 等。
+- Call get_demonstration_trajectory() after reset, use Motion Planner to execute tasks marked with demonstration and record trajectory.
+- step receives joint space action, performs segmentation and subgoal placeholder filling, trajectory recording, truncate and success judgment. ee_pose->joint is handled by outer EndeffectorDemonstrationWrapper.
+- Does not include video saving function; reset/step returns unified dense batch; step injects current step frames/subgoal etc via _augment_obs_and_info.
 """
 import copy
 import re
@@ -43,55 +43,55 @@ from ..robomme_env.util.vqa_options import get_vqa_options
 from ..robomme_env.util import reset_panda
 
 from ..robomme_env.util import planner_denseStep
-# 姿态连续化与 RPY 统计逻辑统一复用到共享 util，避免多处实现分叉。
+# Pose continuousness and RPY statistics logic unified in shared util to avoid divergent implementations.
 from ..robomme_env.util.rpy_util import build_endeffector_pose_dict
 
 
 class DemonstrationWrapper(gym.Wrapper):
     """
-    Demonstration 包装器（不包含视频保存功能）。
+    Demonstration wrapper (does not include video saving function).
 
-    主要功能：
-    1. 在环境 reset 后自动生成演示轨迹（Trajectory），使用 Motion Planner。
-    2. 记录演示过程中的帧、动作、状态、子目标等数据，供下游任务使用。
+    Main functions:
+    1. Automatically generate demonstration Trajectory after environment reset, using Motion Planner.
+    2. Record data such as frames, actions, states, subgoals during demonstration for downstream tasks.
     """
     def __init__(self, env, max_steps_without_demonstration, gui_render, **kwargs):
-        # **kwargs 兼容旧调用（如 save_video=..., action_space=...），已不再使用
-        # 无演示步数上限：超过此步数未执行演示任务则 truncate episode
+        # **kwargs for compatibility with old calls (e.g. save_video=..., action_space=...), no longer used
+        # Max steps without demonstration: truncate episode if demonstration task not executed exceeding this
         self.max_steps_without_demonstration = max_steps_without_demonstration
         self.gui_render = gui_render
 
         super().__init__(env)
         self.unwrapped.use_demonstrationwrapper = True
 
-        self.demonstration_record_traj = False  # 当前是否处于“演示记录”阶段
+        self.demonstration_record_traj = False  # Whether currently in "demonstration recording" phase
 
-        # 连续未执行“演示任务”的步数，用于 truncate 判断
+        # Consecutive steps without executing "demonstration task", used for truncate judgment
         self.steps_without_demonstration = 0
-        # 防止在“终止时追加一步”逻辑中重复进入 step
+        # Prevent re-entering step in "append extra step at termination" logic
         self._doing_extra_step = False
-        # 本次 episode 的演示轨迹数据（由 get_demonstration_trajectory 填充）
+        # Demonstration trajectory data for this episode (filled by get_demonstration_trajectory)
         self.demonstration_data = None
-        # 当前子目标文本中占位符替换为坐标后的结果
+        # Result of replacing placeholders in current subgoal text with coordinates
         self.current_subgoal_segment_filled = None
-        # 本 episode 是否被判定为成功（用于下游是否保存数据等）
+        # Whether this episode is judged as successful (for downstream data saving etc)
         self.episode_success = False
 
         self._failed_match_save_count = 0
-        # demonstration 阶段 screw 规划失败重试：总尝试次数（含首次）
+        # Total attempts (including first) for screw planning retry during demonstration phase
         self._demo_screw_max_attempts = 1
-        # screw 失败后的 RRT* 规划重试：总尝试次数（含首次）
+        # Total attempts (including first) for RRT* planning retry after screw failure
         self._demo_rrt_max_attempts = 3
-        # 当前 demonstration task 是否出现规划失败（用于 task 级继续执行）
+        # Whether current demonstration task experienced planning failure (for task-level continuation)
         self._current_demo_task_screw_failed = False
-        # 末端姿态连续化缓存（wxyz / XYZ-RPY）：
-        # - _prev_ee_quat_wxyz：保存“符号对齐后”的上一帧四元数表示
-        # - _prev_ee_rpy_xyz：保存“unwrap 后”的上一帧连续 RPY
-        # 这两个缓存共同决定跨帧连续化行为，生命周期限定在单个 episode 内。
+        # End-effector pose continuousness cache (wxyz / XYZ-RPY):
+        # - _prev_ee_quat_wxyz: Save "sign-aligned" quaternion of previous frame
+        # - _prev_ee_rpy_xyz: Save "unwrapped" continuous RPY of previous frame
+        # These two caches jointly determine cross-frame continuousness behavior, lifecycle limited to single episode.
         self._prev_ee_quat_wxyz = None
         self._prev_ee_rpy_xyz = None
 
-        # 与 RecordWrapper 一致：按物体 ID 生成区分度高的颜色表，用于分割可视化
+        # Consistent with RecordWrapper: Generate high-distinctiveness color map by object ID for segmentation visualization
         def generate_color_map(n=100, s_min=0.70, s_max=0.95, v_min=0.78, v_max=0.95):
             phi = 0.6180339887498948
             color_map = {}
@@ -109,32 +109,32 @@ class DemonstrationWrapper(gym.Wrapper):
 
 
     def reset(self, **kwargs):
-        """重置环境并生成演示轨迹，再执行一步初始动作后返回统一批次。"""
-        # 重置锁存状态
+        """Reset environment and generate demonstration trajectory, then execute one initial action step and return unified batch."""
+        # Reset latch state
         self.last_subgoal_segment = None
         self.latched_replacements = None
         self._failed_match_save_count = 0
-        # 每个 episode 从干净缓存开始，避免跨 episode 污染：
-        # 不允许上一局的“上一帧姿态”影响当前局第一帧的展开结果。
+        # Start each episode with clean cache to avoid cross-episode pollution:
+        # Do not allow "previous frame pose" from last game to affect current game's first frame unwrapping result.
         self._prev_ee_quat_wxyz = None
         self._prev_ee_rpy_xyz = None
 
         super().reset(**kwargs)
         self.episode_success = False
-        # 生成演示轨迹批次
+        # Generate demonstration trajectory batch
         demo_batch = self.get_demonstration_trajectory()
 
-        # 根据环境选择夹爪与初始动作：PatternLock/RouteStick 使用 stick 且需在线生成的 action
+        # Select gripper and initial action based on environment: PatternLock/RouteStick use stick and require online generated action
         if self.unwrapped.spec.id == "PatternLock" or self.unwrapped.spec.id == "RouteStick":
             gripper = "stick"
         else:
             gripper = None
         if self.unwrapped.spec.id == "PatternLock" or self.unwrapped.spec.id == "RouteStick":
-            action = self.unwrapped.swing_qpos  # 这两类环境需使用在线生成的初始 action
+            action = self.unwrapped.swing_qpos  # These two types of environments require online generated initial action
         else:
             action = reset_panda.get_reset_panda_param("action", gripper=gripper)
 
-        # 执行一步初始动作，拼接到演示轨迹批次
+        # Execute one initial step, append to demonstration trajectory batch
         init_batch = self.step(action)
         merged_batch = planner_denseStep.concat_step_batches([demo_batch, init_batch])
         merged_batch = self._filter_no_record_from_step_batch(merged_batch)
@@ -146,9 +146,9 @@ class DemonstrationWrapper(gym.Wrapper):
 
     def _filter_no_record_from_step_batch(self, batch):
         """
-        仅用于 reset 返回前：过滤 info_batch['subgoal'] 为 "NO RECORD" 的整帧数据。
+        Only used before reset return: Filter out frames where info_batch['subgoal'] is "NO RECORD".
 
-        返回值与输入 batch 契约一致：
+        Return contract consistent with input batch:
         (obs_batch, reward_batch, terminated_batch, truncated_batch, info_batch)
         """
         if not (isinstance(batch, tuple) and len(batch) == 5):
@@ -180,7 +180,7 @@ class DemonstrationWrapper(gym.Wrapper):
         ]
         if len(keep_indices) == n:
             return batch
-        # 防御性回退：避免过滤后空 batch 破坏上层对 [-1] 的访问。
+        # Defensive fallback: Avoid accessing [-1] on empty batch after filtering.
         if len(keep_indices) == 0:
             return batch
 
@@ -214,18 +214,18 @@ class DemonstrationWrapper(gym.Wrapper):
 
 
     def _augment_obs_and_info(self, obs, info, action):
-        """直接从 obs 提取当前步数据并合并进 obs 和 info 后返回，不经过 list 缓冲区中转。"""
+        """Extract current step data directly from obs and merge into obs and info to return, bypassing list buffer intermediate."""
         language_goal = task_goal.get_language_goal(self.env, self.unwrapped.spec.id)
         base_obs = obs if isinstance(obs, dict) else {}
         env_id = self.unwrapped.spec.id
         dummy_target = {"obj": None, "name": None, "seg_id": None, "click_point": None, "centroid_point": None}
         raw_options = get_vqa_options(self, None, dummy_target, env_id)
         available_options = [
-            {"action": opt.get("label", "未知"), "need_parameter": bool(opt.get("available"))}
+            {"action": opt.get("label", "Unknown"), "need_parameter": bool(opt.get("available"))}
             for opt in raw_options
         ]
 
-        # 直接从 obs 提取帧、状态、速度等（不再从 self.frames 等 list 读取）
+        # Extract frames, state, velocity etc directly from obs (no longer read from self.frames etc list)
         image = obs['sensor_data']['base_camera']['rgb'][0]
         wrist_image = obs['sensor_data']['hand_camera']['rgb'][0]
         state = self.agent.robot.qpos
@@ -242,7 +242,7 @@ class DemonstrationWrapper(gym.Wrapper):
         wrist_camera_extrinsic_opencv = obs["sensor_param"]["hand_camera"]["extrinsic_cv"]
         wrist_camera_intrinsic_opencv = obs["sensor_param"]["hand_camera"]["intrinsic_cv"]
         wrist_camera_cam2world_opengl = obs["sensor_param"]["hand_camera"]["cam2world_gl"]
-        # 末端位姿以字典形式输出，包含 pose/quat/rpy 三个表示；同时更新连续化缓存。
+        # Output end-effector pose as dict, containing pose/quat/rpy representations; also update continuousness cache.
         robot_endeffector_pose, self._prev_ee_quat_wxyz, self._prev_ee_rpy_xyz = \
             build_endeffector_pose_dict(
                 self.agent.tcp.pose.p,
@@ -282,7 +282,7 @@ class DemonstrationWrapper(gym.Wrapper):
         return new_obs, new_info
 
     def _add_red_border(self, frame, border_width=5):
-        """在图像四边绘制红色边框，用于高亮演示帧（当前未用于保存视频）。"""
+        """Draw red border on four sides of image, used to highlight demonstration frames (currently not used for video saving)."""
         frame_with_border = frame.copy()
         frame_with_border[:border_width, :] = [255, 0, 0]
         frame_with_border[-border_width:, :] = [255, 0, 0]
@@ -290,10 +290,10 @@ class DemonstrationWrapper(gym.Wrapper):
         frame_with_border[:, -border_width:] = [255, 0, 0]
         return frame_with_border
 
-    TEXT_AREA_HEIGHT = 80  # 固定字体黑边高度
+    TEXT_AREA_HEIGHT = 80  # Fixed font black border height
 
     def _add_text_to_frame(self, frame, text, position='top_right'):
-        """在帧上方追加黑色文本区域并拼接，支持多行与自动换行。黑边高度固定为 TEXT_AREA_HEIGHT。"""
+        """Append black text area above frame and stitch, supporting multi-line and auto-wrap. Black border height fixed to TEXT_AREA_HEIGHT."""
         if text is None:
             text = ""
         text_area_height = self.TEXT_AREA_HEIGHT
@@ -348,7 +348,7 @@ class DemonstrationWrapper(gym.Wrapper):
 
     def save_frame_as_image(self, output_path: Union[str, Path], frame: np.ndarray, text=None):
         """
-        将单帧与文本叠加并保存为图片。
+        Overlay single frame with text and save as image.
         """
         output_path = Path(output_path)
         output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -365,21 +365,20 @@ class DemonstrationWrapper(gym.Wrapper):
         obs: Dict,
     ) -> Tuple[Optional[str], bool]:
         """
-        从观测中解析基座相机分割，构建当前任务关心的物体 ID 映射，计算目标物体在图像上的
-        像素中心，并将当前子目标文本中的占位符（如 <target>）替换为具体坐标 <y, x>。
-        支持锁存：同一子目标在首次成功填充后会沿用该结果；子目标变化时清空锁存并重新计算。
+        Parse base camera segmentation from observation, build object ID mapping cared by current task, calculate target object pixel center on image, and replace placeholders (like <target>) in current subgoal text with specific coordinates <y, x>.
+        Support latching: Result is reused after successful fill for same subgoal; latch cleared when subgoal changes.
 
-        参数:
-            obs: 环境当前步观测，需包含 sensor_data.base_camera.segmentation（及可选 rgb 等）。
+        Args:
+            obs: Current step observation, must contain sensor_data.base_camera.segmentation (and optional rgb etc).
 
-        返回:
-            filled_text: 占位符替换后的子目标文本；无子目标或未替换时与 current_subgoal_segment 一致。
-            failed_match: 文本中存在占位符但本帧未能得到有效填充且无锁存时为 True（用于保存失败帧等）。
+        Returns:
+            filled_text: Subgoal text after placeholder replacement; consistent with current_subgoal_segment if no subgoal or no replacement.
+            failed_match: True if text has placeholder but no valid fill in this frame and no latch (used for saving failed frames etc).
         """
         current_subgoal_segment = getattr(self.unwrapped, 'current_subgoal_segment', None)
         current_task_name = getattr(self, 'current_task_name', 'Unknown')
 
-        # ---------- 从 obs 解析基座相机分割，并构建 active_segments / segment_ids_by_index / vis_obj_id_list ----------
+        # ---------- Parse base camera segmentation from obs, and build active_segments / segment_ids_by_index / vis_obj_id_list ----------
         segmentation = None
         try:
             segmentation = obs['sensor_data']['base_camera']['segmentation']
@@ -399,7 +398,7 @@ class DemonstrationWrapper(gym.Wrapper):
                 segmentation = segmentation[0]
             segmentation_2d = segmentation.squeeze()
 
-            # 当前任务关心的分割物体（current_segment）与 ID 映射，用于后续中心点计算与占位符填充
+            # Segmentation object (current_segment) and ID mapping cared by current task, used for subsequent center calculation and placeholder filling
             current_segment = getattr(self, "current_segment", None)
             if isinstance(current_segment, (list, tuple)):
                 active_segments = list(current_segment)
@@ -408,7 +407,7 @@ class DemonstrationWrapper(gym.Wrapper):
             else:
                 active_segments = [current_segment]
 
-            # 按 active_segments 索引建立「物体 -> 分割 ID」的映射，供逐段算中心
+            # Establish "Object -> Segmentation ID" mapping by active_segments index, for calculating center segment by segment
             segment_ids_by_index = {idx: [] for idx in range(len(active_segments))}
             segmentation_id_map = getattr(self, "segmentation_id_map", None)
             if isinstance(segmentation_id_map, dict):
@@ -419,19 +418,19 @@ class DemonstrationWrapper(gym.Wrapper):
                                 vis_obj_id_list.append(obj_id)
                                 segment_ids_by_index[idx].append(obj_id)
                                 break
-                    # 桌面在颜色表中置黑，便于分割可视化时区分
+                    # Set workspace table to black in color map, for distinction in segmentation visualization
                     if getattr(obj, "name", None) == 'table-workspace':
                         self.color_map[obj_id] = [0, 0, 0]
 
-        # 无分割数据时不做填充，直接返回原文本与未匹配
+        # No fill when no segmentation data, directly return original text and mismatch
         if segmentation_2d is None:
             return (current_subgoal_segment, False)
 
         def center_from_ids(segmentation_mask: np.ndarray, ids: List):
             """
-            根据分割掩码与物体 ID 列表计算该物体在图像上的像素中心（质心）。
-            返回 (center [y, x] 或 None, no_object_flag_this)。
-            当 ids 非空但掩码中无对应像素时，no_object_flag_this 为 True。
+            Calculate pixel center (centroid) of the object on image based on segmentation mask and object ID list.
+            Return (center [y, x] or None, no_object_flag_this).
+            no_object_flag_this is True when ids is not empty but no corresponding pixels in mask.
             """
             if not ids:
                 return None, False
@@ -445,12 +444,12 @@ class DemonstrationWrapper(gym.Wrapper):
             center_x = int(coords[:, 1].mean())
             return [center_y, center_x], False
 
-        # 子目标变化时清空锁存，后续将用当前帧重新计算并可能重新锁存
+        # Clear latch when subgoal changes, subsequent calculation will use current frame and may re-latch
         if current_subgoal_segment != self.last_subgoal_segment:
             self.last_subgoal_segment = current_subgoal_segment
             self.latched_replacements = None
 
-        # 按当前任务关心的物体逐段计算像素中心（或整张图单一中心）
+        # Calculate pixel center segment by segment (or single center for whole image) according to objects cared by current task
         segment_centers = []
         no_object_flag = False
         if active_segments:
@@ -463,11 +462,11 @@ class DemonstrationWrapper(gym.Wrapper):
             segment_centers.append(center)
             no_object_flag = no_obj
 
-        # 无子目标文本时无需占位符替换，直接返回
+        # No placeholder replacement needed when no subgoal text, return directly
         if not current_subgoal_segment:
             return (current_subgoal_segment, False)
 
-        # 用正则匹配所有占位符（形如 <...>）
+        # Match all placeholders (format <...>) using regex
         placeholder_pattern = re.compile(r'<[^>]*>')
         placeholders = list(placeholder_pattern.finditer(current_subgoal_segment))
         placeholder_count = len(placeholders)
@@ -475,11 +474,11 @@ class DemonstrationWrapper(gym.Wrapper):
         final_replacements = None
         missing_placeholder = False
 
-        # 优先使用已锁存的替换结果；无锁存时用当前帧中心生成替换串
+        # Prioritize latched replacement results; generate replacement string using current frame center when no latch
         if self.latched_replacements is not None:
             final_replacements = self.latched_replacements
         else:
-            # 将每个中心格式化为 "<y, x>" 字符串，未检测到的中心为 None
+            # Format each center as "<y, x>" string, None for undetected center
             normalized_centers = []
             for center in segment_centers:
                 if center is None:
@@ -490,18 +489,18 @@ class DemonstrationWrapper(gym.Wrapper):
 
             if placeholder_count > 0 and normalized_centers:
                 replacements = normalized_centers.copy()
-                # 若仅有一个中心但多个占位符，则重复使用该中心；若中心不足则用 None 补齐
+                # If only one center but multiple placeholders, reuse that center; if insufficient centers, pad with None
                 if len(replacements) == 1 and placeholder_count > 1:
                     replacements = replacements * placeholder_count
                 elif len(replacements) < placeholder_count:
                     replacements.extend([None] * (placeholder_count - len(replacements)))
-                # 仅当所有占位符都能被非 None 替换时才锁存，避免锁存不完整结果
+                # Latch only when all placeholders can be replaced by non-None, to avoid latching incomplete results
                 temp_missing_placeholder = any(r is None for r in replacements)
                 if not temp_missing_placeholder:
                     self.latched_replacements = replacements
                 final_replacements = replacements
 
-        # 应用替换：按占位符顺序拼出最终文本，若有任一占位符缺替换则用 current_task_name 作为整句回退
+        # Apply replacement: Assemble final text by placeholder order, degrade to current_task_name as whole sentence if any placeholder misses replacement
         if final_replacements and placeholder_count > 0:
             new_text_parts = []
             last_idx = 0
@@ -515,11 +514,11 @@ class DemonstrationWrapper(gym.Wrapper):
                 last_idx = match.end()
             new_text_parts.append(current_subgoal_segment[last_idx:])
             filled_text = current_task_name if missing_placeholder else ''.join(new_text_parts)
-            # 无锁存且（本帧未给出有效替换或仍有缺项）时视为匹配失败
+            # Regard as match failure when no latch and (valid replacement not given in this frame or still missing items)
             failed_match = self.latched_replacements is None and (final_replacements is None or missing_placeholder)
             return (filled_text, failed_match)
         else:
-            # 有占位符但无替换结果且无锁存，也记为匹配失败
+            # Also record as match failure when there are placeholders but no replacement result and no latch
             failed_match = placeholder_count > 0 and self.latched_replacements is None
             return (current_subgoal_segment, failed_match)
 
@@ -543,22 +542,22 @@ class DemonstrationWrapper(gym.Wrapper):
         return action_arr[:8]
 
     def step(self, action):
-        """执行一步并返回统一批次（N=1）。"""
+        """Execute one step and return unified batch (N=1)."""
         normalized_action = self._normalize_action_for_env_step(action)
         obs, reward, terminated, truncated, info = super().step(normalized_action)
 
-        # ---------- 子目标分割与占位符填充：内部从 obs 解析分割并计算中心、填充占位符 ----------
+        # ---------- Subgoal segmentation and placeholder filling: Internally parse segmentation from obs, calculate center, fill placeholders ----------
         filled_text, failed_match = self._compute_segmentation_and_fill_subgoal(obs)
         current_subgoal_segment = getattr(self.unwrapped, 'current_subgoal_segment', None)
         self.current_subgoal_segment_filled = filled_text if filled_text is not None else current_subgoal_segment
 
-        # ---------- 非演示步计数：超过上限则 truncate ----------
+        # ---------- Non-demonstration step count: Truncate if exceeding limit ----------
         if self.current_task_demonstration == False:
             self.steps_without_demonstration += 1
             if self.steps_without_demonstration >= self.max_steps_without_demonstration:
                 truncated = torch.tensor([True])
 
-        # ---------- 根据 terminated 与 info["success"] 更新 episode_success ----------
+        # ---------- Update episode_success based on terminated and info["success"] ----------
         if terminated.any():
             if info.get("success") == torch.tensor([True]) or (isinstance(info.get("success"), torch.Tensor) and info.get("success").item()):
                 self.episode_success = True
@@ -567,11 +566,11 @@ class DemonstrationWrapper(gym.Wrapper):
                 self.episode_success = False
                 print("Episode failed, data will be discarded")
 
-        # ---------- 终止时多执行一步，使最后一帧也被记录（动作与上一步相同） ----------
+        # ---------- Execute extra step at termination, so last frame is also recorded (action same as previous step) ----------
         if terminated.any() and not self._doing_extra_step:
-            # 在递归额外 step 前保存 RPY 连续化缓存。
-            # 原因：内层额外 step 不应改变“当前外层返回步”的上一帧基准，
-            # 否则会污染外层时序上的连续化结果。
+            # Save RPY continuousness cache before recursive extra step.
+            # Reason: Inner extra step should not change previous frame baseline of "current outer return step",
+            # otherwise it will pollute continuousness results on outer timeline.
             cached_prev_quat = None if self._prev_ee_quat_wxyz is None else self._prev_ee_quat_wxyz.detach().clone()
             cached_prev_rpy = None if self._prev_ee_rpy_xyz is None else self._prev_ee_rpy_xyz.detach().clone()
             self._doing_extra_step = True
@@ -579,7 +578,7 @@ class DemonstrationWrapper(gym.Wrapper):
                 self.step(normalized_action)
             finally:
                 self._doing_extra_step = False
-                # 恢复外层缓存，保证“额外 step 仅用于记录帧”，不干扰外层连续化状态。
+                # Restore outer cache, ensuring "extra step only used for recording frames", not interfering with outer continuousness state.
                 self._prev_ee_quat_wxyz = cached_prev_quat
                 self._prev_ee_rpy_xyz = cached_prev_rpy
 
@@ -587,23 +586,23 @@ class DemonstrationWrapper(gym.Wrapper):
         return planner_denseStep.to_step_batch([(obs, reward, terminated, truncated, info)])
 
     def close(self):
-        """关闭环境，释放资源（本包装器不再保存视频）。"""
+        """Close environment, release resources (this wrapper no longer saves video)."""
         super().close()
         return None
 
     def get_demonstration_trajectory(self):
         """
-        生成演示轨迹（Demonstration Trajectory）。
+        Generate Demonstration Trajectory.
         
-        流程：
-        1. 根据环境 ID 选择合适的 Motion Planner（PandaArm 或 PandaStick）。
-        2. 遍历任务列表（task_list），找到标记为 demonstration 的任务。
-        3. 对每个演示任务，用 _collect_dense_steps 包裹整个 solve 调用，
-           monkey-patch planner.env.step 以收集所有 env.step 调用
-           （包括 move_to_pose_with_screw、follow_path、直接 env.step 等所有路径）。
-        4. 返回统一批次（obs/info 字典值为 list，reward/terminated/truncated 为一维张量）。
+        Flow:
+        1. Select appropriate Motion Planner (PandaArm or PandaStick) based on environment ID.
+        2. Iterate task list (task_list), find tasks marked as demonstration.
+        3. For each demonstration task, wrap entire solve call with _collect_dense_steps,
+           monkey-patch planner.env.step to collect all env.step calls
+           (including move_to_pose_with_screw, follow_path, direct env.step and all other paths).
+        4. Return unified batch (obs/info dict values as list, reward/terminated/truncated as 1D tensor).
         """
-        # 懒加载 FailAware 规划器；若导入失败，回退到原 planner 实现
+        # Lazy load FailAware planner; fallback to original planner implementation if import fails
         try:
             from ..robomme_env.util.planner_fail_safe import (
                 FailAwarePandaArmMotionPlanningSolver,
@@ -616,7 +615,7 @@ class DemonstrationWrapper(gym.Wrapper):
             FailAwarePandaStickMotionPlanningSolver = PandaStickMotionPlanningSolver
             ScrewPlanFailure = RuntimeError
 
-        # 按环境选择运动规划器：PatternLock/RouteStick 用 stick 规划器，其余用机械臂规划器
+        # Select motion planner by environment: PatternLock/RouteStick use stick planner, others use arm planner
         if self.unwrapped.spec.id == "PatternLock" or self.unwrapped.spec.id == "RouteStick":
             planner = FailAwarePandaStickMotionPlanningSolver(
                 self,
@@ -637,7 +636,7 @@ class DemonstrationWrapper(gym.Wrapper):
                 print_env_info=False,
             )
 
-        # 在 planner 实例层包装 screw 调用：screw 失败后自动切到 RRT* 重试
+        # Wrap screw call at planner instance level: automatic switch to RRT* retry after screw failure
         original_move_to_pose_with_screw = planner.move_to_pose_with_screw
         original_move_to_pose_with_rrt = planner.move_to_pose_with_RRTStar
 
@@ -652,7 +651,7 @@ class DemonstrationWrapper(gym.Wrapper):
                     )
                     continue
 
-                # 兼容非 FailAware 回退场景：原 planner 可能直接返回 -1
+                # Compatible with non-FailAware fallback scenario: Original planner may return -1 directly
                 if isinstance(result, int) and result == -1:
                     print(
                         f"[DemonstrationWrapper] screw planning returned -1 "
@@ -701,9 +700,9 @@ class DemonstrationWrapper(gym.Wrapper):
 
         all_collected_steps = []
 
-        # 依次执行每个演示任务：设 demonstration_record_traj=True，调用任务的 solve(planner)
-        # 用 _collect_dense_steps 包裹整个 solve，monkey-patch planner.env.step，
-        # 以收集所有 env.step 调用（包括 follow_path、直接 env.step 等底层路径）
+        # Iterate and execute each demonstration task: Set demonstration_record_traj=True, call task's solve(planner)
+        # Wrap entire solve with _collect_dense_steps, monkey-patch planner.env.step,
+        # to collect all env.step calls (including follow_path, direct env.step etc underlying paths)
         for idx, task_entry in enumerate(demonstration_tasks):
             self.unwrapped.demonstration_record_traj = True
             self._current_demo_task_screw_failed = False
@@ -717,7 +716,7 @@ class DemonstrationWrapper(gym.Wrapper):
             self.evaluate(solve_complete_eval=True)
 
             def _solve_task_without_hard_fail():
-                # 避免 solve 返回 -1 导致 _collect_dense_steps 丢弃本 task 已收集的 step
+                # Avoid solve returning -1 causing _collect_dense_steps to discard collected steps of this task
                 try:
                     solve_result = solve_callable(self, planner)
                 except ScrewPlanFailure as exc:
@@ -735,7 +734,7 @@ class DemonstrationWrapper(gym.Wrapper):
                 _solve_task_without_hard_fail,
             )
             if task_steps == -1:
-                # 理论上不应命中（_solve_task_without_hard_fail 已吞掉 -1）
+                # Theoretically should not hit (_solve_task_without_hard_fail has swallowed -1)
                 print(f"[DemonstrationWrapper] task '{task_name}' returned -1 from collector; continuing")
             else:
                 all_collected_steps.extend(task_steps)
@@ -744,5 +743,5 @@ class DemonstrationWrapper(gym.Wrapper):
                 print(f"[DemonstrationWrapper] task '{task_name}' marked failed after screw->RRT* retries; continuing")
             self.evaluate(solve_complete_eval=True)
 
-        self.unwrapped.demonstration_record_traj = False  # 演示结束，后续 step 正常做 subgoal 判断
+        self.unwrapped.demonstration_record_traj = False  # Demonstration ends, subsequent steps perform subgoal judgment normally
         return planner_denseStep.to_step_batch(all_collected_steps)

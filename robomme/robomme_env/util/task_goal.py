@@ -45,7 +45,7 @@ num2words_2 = {
 }
 
 def get_language_goal(self,robomme_env):
-        language_goal = ""  # 初始化默认值
+        language_goal = ""  # Initialize default value
         if robomme_env == "BinFill":
             color_counts = {
                 "red": getattr(self.env.unwrapped, "red_cubes_target_number", 0),

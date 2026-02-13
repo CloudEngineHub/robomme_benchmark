@@ -80,7 +80,7 @@ class VideoRepick(BaseEnv):
     }
 
 
-    # 组合成一个字典
+    # Combine into a dictionary
     configs = {
         'hard': config_hard,
         'easy': config_easy,
@@ -134,7 +134,7 @@ class VideoRepick(BaseEnv):
             else:  # seed_mod == 2
                 self.difficulty = "hard"
         #self.difficulty = "hard"
-        # 使用 seed 随机确定需要重复的次数 (1-5)
+        # Use seed to randomly determine number of repetitions (1-5)
         self.generator = torch.Generator()
         self.generator.manual_seed(Robomme_seed)
         self.num_repeats = torch.randint(1, 4, (1,), generator=self.generator).item()
@@ -221,14 +221,14 @@ class VideoRepick(BaseEnv):
                             )
                         except RuntimeError as e:
                             raise SceneGenerationError(
-                                f"生成{group['name']} cube {idx} 失败"
+                                f"Failed to generate {group['name']} cube {idx}"
                             ) from e
 
                         self.spawned_cubes.append(cube)
                         avoid.append(cube)
 
                 if not self.spawned_cubes:
-                    raise SceneGenerationError("未能生成任何cube")
+                    raise SceneGenerationError("Failed to generate any cube")
 
                 target_idx = torch.randint(0, len(self.spawned_cubes), (1,), generator=self.generator).item()
                 print("target index", target_idx)
@@ -273,14 +273,14 @@ class VideoRepick(BaseEnv):
 
                         )
                     except RuntimeError as e:
-                        raise SceneGenerationError(f"生成bin_{i}失败") from e
+                        raise SceneGenerationError(f"Failed to generate bin_{i}") from e
 
                     self.spawned_cubes.append(cube_actor)
                     setattr(self, f"bin_{i}", cube_actor)
                     avoid.append(cube_actor)
 
                 if not self.spawned_cubes:
-                    raise SceneGenerationError("未能生成任何bin")
+                    raise SceneGenerationError("Failed to generate any bin")
 
                 target_indices = torch.randperm(len(self.spawned_cubes), generator=self.generator)[:1].tolist()
                 self.target_cube_1 = self.spawned_cubes[target_indices[0]]
@@ -288,7 +288,7 @@ class VideoRepick(BaseEnv):
                 if self.difficulty != "hard":
                     remaining_indices = [i for i in range(len(self.spawned_cubes)) if i not in target_indices]
                     if len(remaining_indices) < 2:
-                        raise SceneGenerationError("可用于交换的cube数量不足")
+                        raise SceneGenerationError("Not enough cubes for swapping")
 
                     selected_remaining = torch.randperm(len(remaining_indices), generator=self.generator)[:2].tolist()
                     selected_indices = [remaining_indices[i] for i in selected_remaining]
@@ -413,10 +413,10 @@ class VideoRepick(BaseEnv):
 
 
 
-        # 存储任务列表供RecordWrapper使用
+        # Store task list for RecordWrapper use
         self.task_list = tasks
 
-        # 记录用于恢复的 pickup 相关任务索引和条目
+        # Record pickup related task indices and items for recovery
         self.recovery_pickup_indices, self.recovery_pickup_tasks = task4recovery(self.task_list)
         if self.robomme_failure_recovery:
             # Only inject an intentional failed grasp when recovery mode is enabled
@@ -442,25 +442,25 @@ class VideoRepick(BaseEnv):
             self.failureflag = torch.tensor([False])
 
 
-        # 使用封装的序列任务检查函数
-        if(self.use_demonstrationwrapper==False):#record时候planner结束再改变subgoal
+        # Use encapsulated sequence task check function
+        if(self.use_demonstrationwrapper==False):# change subgoal after planner ends during recording
             if solve_complete_eval==True:
                 allow_subgoal_change_this_timestep=True
             else:
                 allow_subgoal_change_this_timestep=False
-        else:#demonstration时候video需要call evaluate(solve_complete_eval) video结束在demonstrationwrapper里面改变flag
+        else:# during demonstration, video needs to call evaluate(solve_complete_eval), video ends and flag changes in demonstrationwrapper
             if solve_complete_eval==True or self.demonstration_record_traj==False:
                 allow_subgoal_change_this_timestep=True
             else:
                 allow_subgoal_change_this_timestep=False
         all_tasks_completed, current_task_name, task_failed,self.current_task_specialflag = sequential_task_check(self, self.task_list,allow_subgoal_change_this_timestep=allow_subgoal_change_this_timestep)
 
-        # 如果任务失败，立即标记失败
+        # If task failed, mark as failed immediately
         if task_failed:
             self.failureflag = torch.tensor([True])
             print(f"Task failed: {current_task_name}")
 
-        # 如果static_check成功或者所有任务完成，则设置成功标志
+        # If static_check succeeds or all tasks completed, set success flag
         if all_tasks_completed and not task_failed:
             self.successflag = torch.tensor([True])
 
@@ -574,12 +574,12 @@ class VideoRepick(BaseEnv):
         if self.swap_times==1:
                     self.swap_schedule = [
                         (self.swap_pair1_idx1, self.swap_pair1_idx2, start_step, start_step + 50),
-                        ]#最后的swap顺序
+                        ]# Final swap order
         elif self.swap_times==2:
             self.swap_schedule = [
                     (self.swap_pair1_idx1, self.swap_pair1_idx2, start_step, start_step + 50),
                     (self.swap_pair2_idx1, self.swap_pair2_idx2, start_step + 50, start_step + 50 * 2),
-                ]#最后的swap顺序
+                ]# Final swap order
         elif self.swap_times==3:
             self.swap_schedule = [
                     (self.swap_pair1_idx1, self.swap_pair1_idx2, start_step, start_step + 50),
@@ -604,7 +604,7 @@ class VideoRepick(BaseEnv):
                 start = self.swap_schedule[i][2]
                 end = self.swap_schedule[i][3]
                 if self.elapsed_steps in range (start,end):
-                    # 根据索引选择对应的swap pair
+                    # Select corresponding swap pair based on index
                     pair_idx1 = getattr(self, f'swap_pair{i+1}_idx1')
                     pair_idx2 = getattr(self, f'swap_pair{i+1}_idx2')
 

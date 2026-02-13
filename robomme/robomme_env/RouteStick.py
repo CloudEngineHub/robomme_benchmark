@@ -49,7 +49,7 @@ capabilities can be simulated and trained properly. Hence there is extra code fo
 """
 
 
-#方向如果反了 修改evaluate和solve
+# If direction is reversed, modify evaluate and solve
 
 @register_env("RouteStick", max_episode_steps=2000)
 class RouteStick(BaseEnv):
@@ -82,7 +82,7 @@ class RouteStick(BaseEnv):
     'backtrack':True,
     }
 
-    # 组合成一个字典
+    # Combine into a dictionary
     configs = {
         'hard': config_hard,
         'easy': config_easy,
@@ -140,15 +140,15 @@ class RouteStick(BaseEnv):
             else:  # seed_mod == 2
                 self.difficulty = "hard"
             self.difficulty = "easy"
-               # 使用 seed 随机确定需要重复的次数 (1-5)
+               # Use seed to randomly determine number of repetitions (1-5)
         generator = torch.Generator()
         generator.manual_seed(Robomme_seed)
 
 
 
 
-        self.highlight_starts = {}  # 使用字典存储每个按钮的高亮开始时间
-        self._first_non_record_step = None  # 延迟高亮的起始timestep
+        self.highlight_starts = {}  # Use dictionary to store highlight start time for each button
+        self._first_non_record_step = None  # Start timestep for delayed highlight
 
         self.z_threshold=0.15
         super().__init__(*args, robot_uids=robot_uids, **kwargs)
@@ -189,9 +189,9 @@ class RouteStick(BaseEnv):
         )
         self.table_scene.build()
 
-        # Generate 3x3 grid of buttons (九宫格按钮)
-        grid_center = [-0.1, 0]  # 九宫格中心位置
-        grid_spacing_x = 0.07 # 按钮之间的间距
+        # Generate 3x3 grid of buttons
+        grid_center = [-0.1, 0]  # Grid center position
+        grid_spacing_x = 0.07 # Spacing between buttons
         grid_spacing_y=0.07
 
         self.buttons_grid = []
@@ -209,7 +209,7 @@ class RouteStick(BaseEnv):
             )
         #theta=0
         for row in range(num_rows):
-            for col in range(num_cols):  # 5列 (y方向)
+            for col in range(num_cols):  # Columns (y direction)
                 x_pos = grid_center[0] + (row - row_center) * grid_spacing_x
                 y_pos = grid_center[1] + (col - col_center) * grid_spacing_y
 
@@ -336,7 +336,7 @@ class RouteStick(BaseEnv):
         steps = int(torch.randint(length_min, length_max + 1, (1,), generator=generator).item())
         allow_backtracking = bool(cfg.get("backtrack", True))
 
-        traj=generate_dynamic_walk(button_indices,steps=steps,allow_backtracking=allow_backtracking,generator=generator)#生成轨迹
+        traj=generate_dynamic_walk(button_indices,steps=steps,allow_backtracking=allow_backtracking,generator=generator)# Generate trajectory
         self.selected_buttons = [self.buttons_grid[i] for i in traj]
 
         def _stick_side(actor, ref_actor=None):
@@ -355,9 +355,9 @@ class RouteStick(BaseEnv):
             if y_val is None or ref_y is None:
                 # Fallback to right to avoid indexing errors; should not happen.
                 return "right"
-            return "left" if y_val > ref_y else "right"#按照机器人视角反向！
+            return "left" if y_val > ref_y else "right"# Reverse according to robot perspective!
 
-        # 随机为每个 solve_swingonto_withDirection 决定顺/逆时针方向并记录
+        # Randomly decide and record clockwise/counterclockwise direction for each solve_swingonto_withDirection
         self.swing_directions = []
         for _ in self.selected_buttons[1:]:
             dir_flag = "clockwise" if torch.rand(1, generator=generator).item() < 0.5 else "counterclockwise"
@@ -380,7 +380,7 @@ class RouteStick(BaseEnv):
             stick_side = _stick_side(current_target, prev_target)
              #task_name=f"rotate around the {stick_side} stick {direction}"
             task_name=f"move to the nearest {stick_side} target by circling around the stick {direction}"
-            tasks.append({#减小threashold 试试看回放有没有出现
+            tasks.append({# Decrease threshold to see if replay appears
             "func":   lambda t=current_target: is_obj_swing_onto(self, obj=self.agent.tcp, target=t, distance_threshold=0.03, z_threshold=self.z_threshold),
             "name": task_name,
             "subgoal_segment":task_name,
@@ -422,7 +422,7 @@ class RouteStick(BaseEnv):
             "expected_dir": direction,
             "solve": lambda env, planner, t=current_target, d=direction: solve_swingonto_withDirection(env, planner, target=t,radius=0.2,direction=d),
         })  
-            # 存储任务列表供RecordWrapper使用
+            # Store task list for RecordWrapper use
         self.task_list = tasks
 
 
@@ -457,18 +457,18 @@ class RouteStick(BaseEnv):
 
 
 
-        # 记录当前步的夹爪xy位置（仅在 demonstration后开启后才记录）
+        # Record gripper xy position of current step (only record after demonstration is enabled)
         if  self.current_task_demonstration == False:
             gripper_xy = torch.as_tensor(self.agent.tcp.pose.p[0][:2]).detach().cpu()
             self._gripper_xy_trace.append((self.elapsed_steps, gripper_xy))
 
-        # 使用封装的序列任务检查函数
-        if(self.use_demonstrationwrapper==False):#record时候planner结束再改变subgoal
+        # Use encapsulated sequence task check function
+        if(self.use_demonstrationwrapper==False):# change subgoal after planner ends during recording
             if solve_complete_eval==True:
                 allow_subgoal_change_this_timestep=True
             else:
                 allow_subgoal_change_this_timestep=False
-        else:#demonstration时候video需要call evaluate(solve_complete_eval) video结束在demonstrationwrapper里面改变flag
+        else:# during demonstration, video needs to call evaluate(solve_complete_eval) video ends and flag changes in demonstrationwrapper
             if solve_complete_eval==True or self.demonstration_record_traj==False:
                 allow_subgoal_change_this_timestep=True
             else:
@@ -477,20 +477,20 @@ class RouteStick(BaseEnv):
      
         
 
-        # 如果任务失败，立即标记失败，并保持之后为 fail
+        # If task failed, mark as failed immediately, and keep fail thereafter
         if task_failed:
             self.failureflag = torch.tensor([True])
             if not had_latched_fail:
                 print(f"Task failed: {current_task_name}")
 
-        # 如果static_check成功或者所有任务完成，则设置成功标志
+        # If static_check succeeds or all tasks completed, set success flag
         if all_tasks_completed and not task_failed:
             self.successflag = torch.tensor([True])
 
 
-        # # 检测是否刚完成一个摆动任务
+        # # Check if a swing task has just been completed
         # if after_demo_active:
-        #     # 如果 current_task_name 发生跳变，按顺序记录相邻两目标
+        #     # If current_task_name jumps, record adjacent two targets in order
         #     last_logged_name = getattr(self, "_last_logged_task_name", None)
         #     if current_task_name != last_logged_name:
         #         change_idx = getattr(self, "_swing_task_change_idx", 0)
@@ -510,14 +510,14 @@ class RouteStick(BaseEnv):
         #             self._swing_task_change_idx = change_idx + 1
         #         self._last_logged_task_name = current_task_name
 
-        #     # 当存在最近两次摆动成功（目标不同）时，判断夹爪轨迹在两目标连线的左右侧并打印
+        #     # When there are two recent successful swings (different targets), judge gripper trajectory on left/right side of line between two targets and print
         #     if len(self._swing_success_history) == 2:
         #         first, second = self._swing_success_history
         #         pair_key = (first["step"], second["step"])
         #         if first["target"] is not second["target"] and self._last_swing_pair_reported_step != pair_key:
         #             start, end = first["step"], second["step"]
         #             segment = [(s, xy) for s, xy in self._gripper_xy_trace if start <= s <= end]
-        #             # 只保留从第一次时间戳开始的轨迹，避免列表无限增长
+        #             # Only keep trajectory from first timestamp, avoid list growing infinitely
         #             self._gripper_xy_trace = [(s, xy) for s, xy in self._gripper_xy_trace if s >= start]
 
         #             t1 = torch.as_tensor(first["target"].pose.p[0][:2]).detach().cpu()
@@ -530,7 +530,7 @@ class RouteStick(BaseEnv):
 
         #             if cross_vals:
         #                 avg_cross = sum(cross_vals) / len(cross_vals)
-        #                 # 根据当前坐标系，正叉积方向应视为顺时针
+        #                 # According to current coordinate system, positive cross product direction should be considered clockwise
         #                 side = "clockwise" if avg_cross > 0 else "counterclockwise" if avg_cross <0 else "on the line"
         #                 expected_dir = second.get("expected_dir")
         #                 if expected_dir and side != "on the line" and side != expected_dir:
@@ -547,22 +547,22 @@ class RouteStick(BaseEnv):
         if judge_direction_list is None:
             return True
 
-        # judge_direction_list 格式为 [current_target, prev_target, expected_dir]
+        # judge_direction_list format is [current_target, prev_target, expected_dir]
         try:
             current_target, prev_target, expected_dir = judge_direction_list
         except Exception:
-            # 参数异常时无法判断方向，保持未完成状态
+            # Unable to judge direction when parameter is abnormal, keep unfinished status
             self.failureflag = torch.tensor([True])
             return False
 
         trace = getattr(self, "_gripper_xy_trace", [])
 
-        # 计算上一目标到当前目标的连线向量
+        # Calculate vector from previous target to current target
         prev_xy = torch.as_tensor(prev_target.pose.p[0][:2]).detach().cpu()
         curr_xy = torch.as_tensor(current_target.pose.p[0][:2]).detach().cpu()
         line_vec = curr_xy - prev_xy
 
-        # 若两目标重合或没有轨迹，无法判定方向
+        # If two targets coincide or no trajectory, unable to judge direction
         if torch.norm(line_vec) < 1e-6 or len(trace) == 0:
             self.failureflag = torch.tensor([True])
             return False
@@ -573,7 +573,7 @@ class RouteStick(BaseEnv):
             rel = xy - prev_xy
             cross_vals.append(float(line_vec[0] * rel[1] - line_vec[1] * rel[0]))
 
-        # 轨迹被消费后立即清空，便于下一段判断
+        # Clear trajectory immediately after consumption, convenient for next segment judgment
         self._gripper_xy_trace = []
 
         if len(cross_vals) == 0:
@@ -581,10 +581,10 @@ class RouteStick(BaseEnv):
             return False
 
         avg_cross = sum(cross_vals) / len(cross_vals)
-        # 当前坐标系下正叉积视为顺时针
+        # Positive cross product in current coordinate system is considered clockwise
         side = "clockwise" if avg_cross > 0 else "counterclockwise" if avg_cross < 0 else "on the line"
 
-        # 沿线无法判断方向；需重新尝试
+        # Unable to judge direction along line; need to retry
         if side == "on the line":
             self.failureflag = torch.tensor([True])
             return False
@@ -630,7 +630,7 @@ class RouteStick(BaseEnv):
 
         for idx, button in enumerate(self.buttons_grid):
             if is_obj_swing_onto(self, obj=self.agent.tcp, target=button,distance_threshold=0.03):
-                # 更新开始时间以便重复触发时刷新高亮效果
+                # Update start time to refresh highlight effect when triggered repeatedly
                 self.highlight_starts[idx] = cur_step
 
         for idx, button in enumerate(self.buttons_grid):
@@ -651,7 +651,7 @@ class RouteStick(BaseEnv):
     
 
     def _wrong_button_touch(self, expected_button, last_button=None):
-        # is_obj_swing_onto 触碰到的按钮既不是当前期望目标，也不是上一个按钮（消抖）时判为错误
+        # Judge as error when touched button is neither current expected target nor previous button (debounce)
         for button in self.buttons_grid:
             if button is expected_button:
                 continue

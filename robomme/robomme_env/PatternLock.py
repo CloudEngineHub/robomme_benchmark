@@ -78,7 +78,7 @@ class PatternLock(BaseEnv):
         "length":[3,5]
     }
 
-    # 组合成一个字典
+    # Combine into a dictionary
     configs = {
         'hard': config_hard,
         'easy': config_easy,
@@ -136,12 +136,12 @@ class PatternLock(BaseEnv):
             else:  # seed_mod == 2
                 self.difficulty = "hard"
         #self.difficulty = "hard"
-               # 使用 seed 随机确定需要重复的次数 (1-5)
+               # Use seed to determine number of repetitions (1-5) arbitrarily
         generator = torch.Generator()
         generator.manual_seed(Robomme_seed)
 
 
-        self.highlight_starts = {}  # 使用字典存储每个按钮的高亮开始时间
+        self.highlight_starts = {}  # Use dictionary to store highlight start time for each button
         super().__init__(*args, robot_uids=robot_uids, **kwargs)
 
     @property
@@ -175,9 +175,9 @@ class PatternLock(BaseEnv):
         )
         self.table_scene.build()
 
-        # Generate 3x3 grid of buttons (九宫格按钮)
-        grid_center = [-0.1, 0]  # 九宫格中心位置
-        grid_spacing = 0.1  # 按钮之间的间距
+        # Generate 3x3 grid of buttons
+        grid_center = [-0.1, 0]  # Grid center position
+        grid_spacing = 0.1  # Spacing between buttons
 
         self.buttons_grid = []
         self.button_joints_grid = []
@@ -192,8 +192,8 @@ class PatternLock(BaseEnv):
 
 
 
-        for row in range(num_rows):  # 3行 (x方向)
-            for col in range(num_cols):  # 5列 (y方向)
+        for row in range(num_rows):  # 3 rows (x direction)
+            for col in range(num_cols):  # 5 columns (y direction)
                 x_pos = grid_center[0] + (row - row_center) * grid_spacing
                 y_pos = grid_center[1] + (col - col_center) * grid_spacing
 
@@ -226,7 +226,7 @@ class PatternLock(BaseEnv):
 
         self.targets_grid = self.buttons_grid
 
-                # 生成依次移动到每个按钮的任务列表
+                # Generate task list to move to each button sequentially
         tasks = []
 
         # start_end_set = [
@@ -337,7 +337,7 @@ class PatternLock(BaseEnv):
             #"segment":current_target,
         })  
 
-        # 存储任务列表供RecordWrapper使用
+        # Store task list for RecordWrapper use
         self.task_list = tasks
 
 
@@ -361,18 +361,18 @@ class PatternLock(BaseEnv):
 
         for idx, button in enumerate(self.buttons_grid):
            
-            if is_obj_swing_onto(self, obj=self.agent.tcp, target=button):#只有close gripper才会执行
-                # 更新开始时间以便重复触发时刷新高亮效果
+            if is_obj_swing_onto(self, obj=self.agent.tcp, target=button):# Only execute when gripper is closed
+                # Update start time to refresh highlight effect when repeatedly triggered
                 self.highlight_starts[idx] =int(self.elapsed_steps[0].item())
-                #只在非record时候记录
+                # Only record when not recording
                 if self.after_demo==True:
                     if not self.achieved_list or self.achieved_list[-1] is not button:
-                        self.achieved_list.append(button) #highlight=reach记录 并不一定是目标
+                        self.achieved_list.append(button) # highlight=reach record, not necessarily target
 
         def _to_label(item):
             name = getattr(item, "name", None)
             return name if name is not None else str(item)
-                # 从已完成的按钮序列末尾回溯，判断是否完全匹配当前目标序列
+                # Backtrack from end of completed button sequence to check if it matches current target sequence exactly
         achieved_labels = [_to_label(item) for item in self.achieved_list]
         selected_labels = [_to_label(item) for item in getattr(self, "selected_buttons", [])]
         remaining = [label for label in selected_labels if label not in achieved_labels]
@@ -389,29 +389,29 @@ class PatternLock(BaseEnv):
 
 
 
-        # 使用封装的序列任务检查函数
-        if(self.use_demonstrationwrapper==False):#record时候planner结束再改变subgoal
+        # Use encapsulated sequence task check function
+        if(self.use_demonstrationwrapper==False):# change subgoal after planner ends during recording
             if solve_complete_eval==True:
                 allow_subgoal_change_this_timestep=True
             else:
                 allow_subgoal_change_this_timestep=False
-        else:#demonstration时候video需要call evaluate(solve_complete_eval) video结束在demonstrationwrapper里面改变flag
+        else:# during demonstration, video needs to call evaluate(solve_complete_eval), video ends and flag changes in demonstrationwrapper
             if solve_complete_eval==True or self.demonstration_record_traj==False:
                 allow_subgoal_change_this_timestep=True
             else:
                 allow_subgoal_change_this_timestep=False
         all_tasks_completed, current_task_name, task_failed,self.current_task_specialflag = sequential_task_check(self, self.task_list,allow_subgoal_change_this_timestep=allow_subgoal_change_this_timestep)
 
-        if all_tasks_completed and self.match==False:#字符串匹配失败则手动设置为fail
+        if all_tasks_completed and self.match==False:# Manually set to fail if string match fails
             print("match failure")
             task_failed=True
 
-        # 如果任务失败，立即标记失败
+        # If task failed, mark as failed immediately
         if task_failed:
             self.failureflag = torch.tensor([True])
             print(f"Task failed: {current_task_name}")
 
-        # 如果static_check成功或者所有任务完成，则设置成功标志
+        # If static_check succeeds or all tasks completed, set success flag
         if all_tasks_completed and not task_failed:
             self.successflag = torch.tensor([True])
 
@@ -435,7 +435,7 @@ class PatternLock(BaseEnv):
         return self.compute_dense_reward(obs=obs, action=action, info=info) / 5
 
     def _wrong_button_touch(self, expected_button, last_button=None):
-        # is_obj_swing_onto 触碰到的按钮既不是当前期望目标，也不是上一个按钮（消抖）时判为错误
+        # If button touched by is_obj_swing_onto is neither current expected target nor previous button (debounce), check as error
         for button in self.buttons_grid:
             if button is expected_button:
                 continue
@@ -453,7 +453,7 @@ class PatternLock(BaseEnv):
         #     name = getattr(item, "name", None)
         #     return name if name is not None else str(item)
 
-        # # 从已完成的按钮序列末尾回溯，判断是否完全匹配当前目标序列
+        # # Backtrack from end of completed button sequence to check if it matches current target sequence exactly
         # achieved_labels = [_to_label(item) for item in self.achieved_list]
         # selected_labels = [_to_label(item) for item in getattr(self, "selected_buttons", [])]
         # remaining = [label for label in selected_labels if label not in achieved_labels]
@@ -468,7 +468,7 @@ class PatternLock(BaseEnv):
 
         
 
-        # 检查每个按钮是否被swing onto，并记录高亮开始时间
+        # Check if each button is swum onto, and record highlight start time
         cur_step = int(self.elapsed_steps[0].item())
         highlight_position(
             self,
@@ -480,14 +480,14 @@ class PatternLock(BaseEnv):
         )
         # for idx, button in enumerate(self.buttons_grid):
         #     if is_obj_swing_onto(self, obj=self.agent.tcp, target=button):
-        #         # 更新开始时间以便重复触发时刷新高亮效果
+        #         # Update start time to refresh highlight effect when repeatedly triggered
         #         self.highlight_starts[idx] = cur_step
-        #         #只在非record时候记录
+        #         # Only record when not recording
         #         if self.after_demo==True:
         #             if not self.achieved_list or self.achieved_list[-1] is not button:
-        #                 self.achieved_list.append(button) #highlight=reach记录 并不一定是目标
+        #                 self.achieved_list.append(button) # highlight=reach record, not necessarily target
 
-        # 为每个已触发的按钮应用高亮效果
+        # Apply highlight effect to each triggered button
         for idx, button in enumerate(self.buttons_grid):
             start_step = self.highlight_starts.get(idx)
             if start_step is not None:

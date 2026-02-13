@@ -77,7 +77,7 @@ class VideoUnmask(BaseEnv):
     "pick":1,
     }
 
-    # 组合成一个字典
+    # Combine into a dictionary
     configs = {
         'hard': config_hard,
         'easy': config_easy,
@@ -167,16 +167,16 @@ class VideoUnmask(BaseEnv):
         avoid=[]
 
 
-         # 生成3个bins
+         # Generate 3 bins
         self.spawned_bins = []
         for i in range(self.configs[self.difficulty]['bin']):
             try:
                 bin_actor = spawn_random_bin(
                     self,
-                    avoid=avoid,  # 使用当前避让清单，包含所有已生成的对象
+                    avoid=avoid,  # Use current avoidance list, containing all spawned objects
                     region_center=[0, 0],
                     region_half_size=0.2,
-                    min_gap=self.cube_half_size*2,  # bins需要更大的间隙，增加到6倍避免碰撞
+                    min_gap=self.cube_half_size*2,  # bins need larger gap, increased to 6x to avoid collision
                     name_prefix=f"bin_{i}",
                     max_trials=256,
                     generator=generator
@@ -186,51 +186,51 @@ class VideoUnmask(BaseEnv):
                 break
 
             self.spawned_bins.append(bin_actor)
-            # 将bin赋值给self.bin_0, self.bin_1等属性
+            # Assign bin to self.bin_0, self.bin_1 etc. attributes
             setattr(self, f"bin_{i}", bin_actor)
-            # 将新生成的bin加入避让清单
+            # Add newly generated bin to avoidance list
             avoid.append(bin_actor)
 
 
-        # 在每个bin下方生成3个动态cube（使用固定位置，颜色为红、绿、蓝）
+        # Generate 3 dynamic cubes under each bin (use fixed position, colors red, green, blue)
         spawned_dynamic_cubes = []
-        cube_colors = [(1, 0, 0, 1), (0, 1, 0, 1), (0, 0, 1, 1)]  # 红、绿、蓝
+        cube_colors = [(1, 0, 0, 1), (0, 1, 0, 1), (0, 0, 1, 1)]  # Red, Green, Blue
         color_names = ["red", "green", "blue"]
 
-        # 使用 seed 随机打乱颜色顺序
+        # Use seed to randomly shuffle color order
 
         shuffle_indices = torch.randperm(len(cube_colors), generator=generator).tolist()
         cube_colors = [cube_colors[i] for i in shuffle_indices]
         color_names = [color_names[i] for i in shuffle_indices]
 
-        # 存储 color_names 以便 RecordWrapper 访问
+        # Store color_names for RecordWrapper access
         self.color_names = color_names
 
-        # 只为前3个bin生成cube
+        # Only generate cubes for first 3 bins
         for i, bin_actor in enumerate(self.spawned_bins[:3]):
-            # 获取bin的位置
+            # Get bin position
             bin_pos = bin_actor.pose.p
             if isinstance(bin_pos, torch.Tensor):
                 bin_pos = bin_pos[0].detach().cpu().numpy()
 
             cube_position = [bin_pos[0], bin_pos[1]]
-            # 使用固定位置生成cube，颜色为红、绿、蓝
+            # Generate cube using fixed position, colors red, green, blue
             cube_actor = spawn_fixed_cube(
                 self,
                 position=cube_position,
                 half_size=self.cube_half_size/1.2,
-                color=cube_colors[i],  # 按顺序使用红、绿、蓝
+                color=cube_colors[i],  # Use red, green, blue in order
                 name_prefix=f"target_cube_{color_names[i]}",
-                yaw=0.0,  # 不旋转
+                yaw=0.0,  # No rotation
                 dynamic=True
             )
 
             spawned_dynamic_cubes.append(cube_actor)
-            # 将cube赋值给self.target_cube_red, self.target_cube_green, self.target_cube_blue等属性
+            # Assign cube to attributes like self.target_cube_red, self.target_cube_green, etc.
             setattr(self, f"target_cube_{color_names[i]}", cube_actor)
-            # 同时也用数字索引存储，方便访问
+            # Also store using numeric index for easy access
             setattr(self, f"target_cube_{i}", cube_actor)
-            # 将新生成的cube加入避让清单
+            # Add newly generated cube to avoidance list
             avoid.append(cube_actor)
 
         tasks = [
@@ -278,10 +278,10 @@ class VideoUnmask(BaseEnv):
 
 
 
-        # 存储任务列表供RecordWrapper使用
+        # Store task list for RecordWrapper use
         self.task_list = tasks
 
-        # 记录用于恢复的 pickup 相关任务索引和条目
+        # Record pickup related task indices and items for recovery
         self.recovery_pickup_indices, self.recovery_pickup_tasks = task4recovery(self.task_list)
         if self.robomme_failure_recovery:
             # Only inject an intentional failed grasp when recovery mode is enabled
@@ -312,25 +312,25 @@ class VideoUnmask(BaseEnv):
         test=[bin for bin in self.spawned_bins if bin != self.bin_0]
        
 
-        # 使用封装的序列任务检查函数
-        if(self.use_demonstrationwrapper==False):#record时候planner结束再改变subgoal
+        # Use encapsulated sequence task check function
+        if(self.use_demonstrationwrapper==False):# change subgoal after planner ends during recording
             if solve_complete_eval==True:
                 allow_subgoal_change_this_timestep=True
             else:
                 allow_subgoal_change_this_timestep=False
-        else:#demonstration时候video需要call evaluate(solve_complete_eval) video结束在demonstrationwrapper里面改变flag
+        else:# during demonstration, video needs to call evaluate(solve_complete_eval), video ends and flag changes in demonstrationwrapper
             if solve_complete_eval==True or self.demonstration_record_traj==False:
                 allow_subgoal_change_this_timestep=True
             else:
                 allow_subgoal_change_this_timestep=False
         all_tasks_completed, current_task_name, task_failed,self.current_task_specialflag = sequential_task_check(self, self.task_list,allow_subgoal_change_this_timestep=allow_subgoal_change_this_timestep)
 
-        # 如果任务失败，立即标记失败
+        # If task failed, mark as failed immediately
         if task_failed:
             self.failureflag = torch.tensor([True])
             print(f"Task failed: {current_task_name}")
 
-        # 如果static_check成功或者所有任务完成，则设置成功标志
+        # If static_check succeeds or all tasks completed, set success flag
         if all_tasks_completed and not task_failed:
             self.successflag = torch.tensor([True])
 

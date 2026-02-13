@@ -1,11 +1,11 @@
 """
-MultiStepDemonstrationWrapper：封装 DemonstrationWrapper，对外提供 keypoint step 接口。
+MultiStepDemonstrationWrapper: Wraps DemonstrationWrapper to provide keypoint step interface.
 
-每次 step(action) 接收 action = keypoint_p(3) + rpy(3) + gripper_action(1)，共 7 维。
-内部将 RPY 转为 quat 后通过 planner_denseStep 调用 move_to_pose_with_screw 与 close_gripper/open_gripper，
-其中 PatternLock/RouteStick 会强制跳过 close_gripper/open_gripper。
-返回统一批次（obs/info 为字典列式列表，reward/terminated/truncated 为一维张量）。
-调用方需保证 scripts/ 在 sys.path 中，以便导入 planner_fail_safe。
+Each step(action) receives action = keypoint_p(3) + rpy(3) + gripper_action(1), total 7 dimensions.
+Internally converts RPY to quat then calls move_to_pose_with_screw and close_gripper/open_gripper via planner_denseStep,
+where PatternLock/RouteStick will force skip close_gripper/open_gripper.
+Returns unified batch (obs/info as dictionary of lists, reward/terminated/truncated as 1D tensors).
+Caller must ensure scripts/ is in sys.path to import planner_fail_safe.
 """
 import numpy as np
 import sapien
@@ -17,14 +17,14 @@ from ..robomme_env.util.rpy_util import rpy_xyz_to_quat_wxyz_torch
 
 
 class RRTPlanFailure(RuntimeError):
-    """当 move_to_pose_with_RRTStar 返回 -1（规划失败）时抛出。"""
+    """Raised when move_to_pose_with_RRTStar returns -1 (planning failed)."""
 
 
 class MultiStepDemonstrationWrapper(gym.Wrapper):
     """
-    封装 DemonstrationWrapper。step(action) 会把 action 解释为
-    (keypoint_p, rpy, gripper_action) 共 7 维，内部将 RPY 转为 quat 后
-    通过 planner_denseStep 执行规划，返回统一批次。
+    Wraps DemonstrationWrapper. step(action) interprets action as
+    (keypoint_p, rpy, gripper_action) total 7 dims, internally converts RPY to quat,
+    executes planning via planner_denseStep, and returns unified batch.
     """
 
     def __init__(self, env, gui_render=True, vis=True, **kwargs):
@@ -92,7 +92,7 @@ class MultiStepDemonstrationWrapper(gym.Wrapper):
         return p
 
     def _no_op_step(self):
-        """使用当前 qpos + gripper 执行一步，不移动机械臂，仅获取观测。"""
+        """Execute one step using current qpos + gripper, without moving arm, only to get observation."""
         robot = self.env.unwrapped.agent.robot
         qpos = robot.get_qpos().cpu().numpy().flatten()
         arm = qpos[:7]
@@ -101,7 +101,7 @@ class MultiStepDemonstrationWrapper(gym.Wrapper):
         return self.env.step(action)
 
     def step(self, action):
-        """执行关键点 step：RRT* 移动 + 可选夹爪动作，返回统一批次。"""
+        """Execute keypoint step: RRT* movement + optional gripper action, return unified batch."""
         action = np.asarray(action, dtype=np.float64).flatten()
         if action.size < 7:
             raise ValueError(f"action must have at least 7 elements, got {action.size}")
@@ -131,7 +131,7 @@ class MultiStepDemonstrationWrapper(gym.Wrapper):
             raise RRTPlanFailure("move_to_pose_with_screw failed (returned -1)")
         collected_steps.extend(move_steps)
 
-        # PatternLock/RouteStick 强制跳过夹爪动作（即使规划器对象存在同名方法）。
+        # PatternLock/RouteStick force skip gripper action (even if planner object has method with same name).
         if not is_stick_env:
             if gripper_action == -1:
                 if hasattr(planner, "close_gripper"):

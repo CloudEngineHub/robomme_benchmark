@@ -1,5 +1,5 @@
 """
-Episode 配置解析：从元数据解析 episode 的 seed、difficulty，并构建包装好的环境。
+Episode configuration resolver: Parse episode seed and difficulty from metadata, and build wrapped environment.
 """
 import json
 import os
@@ -33,8 +33,8 @@ _DEFAULT_TASK_LIST = [
 
 def load_episode_metadata(metadata_path: Union[str, Path, None]) -> Dict[Tuple[str, int], Dict[str, object]]:
     """
-    从 JSON 文件读取每集的元数据（metadata）；如果缺失或无效则返回空字典。
-    用于恢复特定 episode 的配置（如 seed、难度等）。
+    Read episode metadata from JSON file; return empty dictionary if missing or invalid.
+    Used to restore specific episode configuration (e.g., seed, difficulty).
     """
 
     metadata_index: Dict[Tuple[str, int], Dict[str, object]] = {}
@@ -77,7 +77,7 @@ def get_episode_metadata(
     task: str,
     episode: int,
 ) -> Optional[Dict[str, object]]:
-    """查找特定 (task, episode) 配对的元数据条目。"""
+    """Find metadata entry for specific (task, episode) pair."""
 
     if not metadata_index:
         return None
@@ -86,9 +86,9 @@ def get_episode_metadata(
 
 class BenchmarkEnvBuilder:
     """
-    Episode 环境构建器。
+    Episode environment builder.
 
-    根据 dataset 与 env_id 自动解析 metadata，并按 action_space 构建包装好的环境。
+    Automatically parse metadata based on dataset and env_id, and build wrapped environment according to action_space.
     """
 
     def __init__(
@@ -123,8 +123,8 @@ class BenchmarkEnvBuilder:
     @classmethod
     def get_task_list(cls) -> List[str]:
         """
-        返回可评测任务列表。
-        任务列表固定为内置默认顺序，不从 metadata 自动发现。
+        Return list of evaluatable tasks.
+        Task list is fixed to built-in default order, not automatically discovered from metadata.
         """
 
         return list(_DEFAULT_TASK_LIST)
@@ -139,7 +139,7 @@ class BenchmarkEnvBuilder:
         raise ValueError(f"Unsupported dataset '{self.dataset}'.")
 
     def resolve_episode(self, episode: int):
-        """根据 metadata 解析 episode 的配置。"""
+        """Parse episode configuration based on metadata."""
         seed = None
         difficulty_hint = None
 
@@ -157,8 +157,8 @@ class BenchmarkEnvBuilder:
 
     def get_episode_num(self) -> int:
         """
-        返回当前 env_id 在 metadata 中的 episode 数量。
-        注意：按当前约定，该方法名返回数量（int）而非列表。
+        Return number of episodes for current env_id in metadata.
+        Note: By convention, this method returns count (int) instead of list.
         """
         if not self.metadata_index:
             return 0
@@ -166,7 +166,7 @@ class BenchmarkEnvBuilder:
         return len(episode_set)
 
     def make_env_for_episode(self, episode: int):
-        """为特定 episode 创建并配置环境。action_space=ee_pose/ee_quat 时包 EndeffectorDemonstrationWrapper，keypoint 时包 MultiStepDemonstrationWrapper，oracle_planner 时包 OraclePlannerDemonstrationWrapper。"""
+        """Create and configure environment for specific episode. Wrap EndeffectorDemonstrationWrapper for action_space=ee_pose/ee_quat, MultiStepDemonstrationWrapper for keypoint, OraclePlannerDemonstrationWrapper for oracle_planner."""
         from .DemonstrationWrapper import DemonstrationWrapper
 
         seed, difficulty_hint = self.resolve_episode(episode)

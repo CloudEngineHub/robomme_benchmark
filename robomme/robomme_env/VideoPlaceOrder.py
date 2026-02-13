@@ -86,7 +86,7 @@ class VideoPlaceOrder(BaseEnv):
     }
 
 
-    # 组合成一个字典
+    # Combine into a dictionary
     configs = {
         'hard': config_hard,
         'easy': config_easy,
@@ -182,7 +182,7 @@ class VideoPlaceOrder(BaseEnv):
             self.table_scene.build()
 
             yaw = 0
-            rotate = np.array([np.cos(yaw / 2), 0, 0, np.sin(yaw / 2)])  # z轴旋转的四元数
+            rotate = np.array([np.cos(yaw / 2), 0, 0, np.sin(yaw / 2)])  # Quaternion for z-axis rotation
             angles = torch.deg2rad(torch.tensor([0.0, 90.0, 0.0], dtype=torch.float32))  # (3,)
             rotate = matrix_to_quaternion(
                 euler_angles_to_matrix(angles, convention="XYZ")
@@ -190,19 +190,19 @@ class VideoPlaceOrder(BaseEnv):
             try:
                 self.goal_site = spawn_random_target(
                     self,
-                    avoid=None,  # 使用当前避让清单，包含所有已生成的cubes
-                    include_existing=False,  # 手动维护清单
-                    include_goal=False,  # 手动维护清单
+                    avoid=None,  # Use current avoidance list, containing all spawned cubes
+                    include_existing=False,  # Manually maintain list
+                    include_goal=False,  # Manually maintain list
                     region_center=[-0.1, 0],
                     region_half_size=0.1,
-                    radius=self.cube_half_size * 5,  # 使用radius而不是half_size
-                    thickness=0.005,  # target的厚度
-                    min_gap=self.cube_half_size * 1,  # 与cube相同的间隙要求
+                    radius=self.cube_half_size * 5,  # Use radius instead of half_size
+                    thickness=0.005,  # target thickness
+                    min_gap=self.cube_half_size * 1,  # Gap requirement same as cube
                     name_prefix=f"goal_site",
                     generator=self.generator,
                 )
             except RuntimeError as exc:
-                raise SceneGenerationError("goal_site采样失败") from exc
+                raise SceneGenerationError("goal_site sampling failed") from exc
             avoid = []
             avoid.append(self.goal_site)
             button_obb = build_button(
@@ -214,7 +214,7 @@ class VideoPlaceOrder(BaseEnv):
             )
             avoid.append(button_obb)
 
-            self.all_cubes = []  # 保存所有 cube 对象
+            self.all_cubes = []  # Save all cube objects
 
             self.red_cubes = []
             self.red_cube_names = []
@@ -255,7 +255,7 @@ class VideoPlaceOrder(BaseEnv):
                             )
                         except RuntimeError as exc:
                             raise SceneGenerationError(
-                                f"生成{group['name']} cube {cube_idx} 失败：{exc}"
+                                f"Failed to generate {group['name']} cube {cube_idx}: {exc}"
                             ) from exc
 
                         self.all_cubes.append(cube)
@@ -275,19 +275,19 @@ class VideoPlaceOrder(BaseEnv):
                     try:
                         target = spawn_random_target(
                             self,
-                            avoid=avoid,  # 使用当前避让清单，包含所有已生成的cubes
-                            include_existing=False,  # 手动维护清单
-                            include_goal=False,  # 手动维护清单
+                            avoid=avoid,  # Use current avoidance list, containing all spawned cubes
+                            include_existing=False,  # Manually maintain list
+                            include_goal=False,  # Manually maintain list
                             region_center=[0, 0],
                             region_half_size=0.2,
-                            radius=self.cube_half_size*2,  # 使用radius而不是half_size
-                            thickness=0.005,  # target的厚度
-                            min_gap=self.cube_half_size*1,  # 与cube相同的间隙要求
+                            radius=self.cube_half_size*2,  # Use radius instead of half_size
+                            thickness=0.005,  # target thickness
+                            min_gap=self.cube_half_size*1,  # Gap requirement same as cube
                             name_prefix=f"target_{i}",
                             generator=self.generator
                         )
                     except RuntimeError as exc:
-                        raise SceneGenerationError(f"第 {i + 1} 个target采样失败：{exc}") from exc
+                        raise SceneGenerationError(f"Target {i + 1} sampling failed: {exc}") from exc
 
                     self.targets.append(target)
                     setattr(self, f"target_{i}", target)
@@ -393,10 +393,10 @@ class VideoPlaceOrder(BaseEnv):
 
             tasks = []
 
-            # 1) 先生成所有“拾取+放置”的组合到临时列表
+            # 1) Generate all "pick + place" combinations into temporary list first
             pair_tasks = []
             for i in self.which_targets_to_pick:
-                # 1.1 拾取
+                # 1.1 Pick up
                 pair_tasks.append({
                     "func": (lambda: is_obj_pickup(self, obj=self.target_cube)),
                 "name": f"pick up the cube",
@@ -407,7 +407,7 @@ class VideoPlaceOrder(BaseEnv):
                     "segment":self.target_cube, 
                 })
 
-                # 1.2 放置（注意用 i=i 绑定当前目标）
+                # 1.2 Place (note using i=i to bind current target)
                 pair_tasks.append({
                     "func": (lambda i=i: is_obj_dropped_onto(self, obj=self.target_cube, target=i)),
                     "name": "drop the cube onto target",
@@ -418,7 +418,7 @@ class VideoPlaceOrder(BaseEnv):
                     "segment":i,
                 })
 
-            # 2) 定义“按按钮”任务
+            # 2) Define "press button" task
             button_task = {
                 "func": (lambda: is_button_pressed(self, obj=self.button)),
                 "name": "press the button",
@@ -429,7 +429,7 @@ class VideoPlaceOrder(BaseEnv):
                 "segment":self.cap_link 
             }
 
-            # 4) 组装最终 tasks
+            # 4) Assemble final tasks
             tasks = pair_tasks[: self.button_task_index] + [button_task] + pair_tasks[self.button_task_index :]
     ############
             tasks.append({
@@ -505,9 +505,9 @@ class VideoPlaceOrder(BaseEnv):
 
 
 
-            # 存储任务列表供RecordWrapper使用
+            # Store task list for RecordWrapper use
             self.task_list = tasks
-                    # 记录用于恢复的 pickup 相关任务索引和条目
+                    # Record pickup related task indices and items for recovery
             self.recovery_pickup_indices, self.recovery_pickup_tasks = task4recovery(self.task_list)
             if self.robomme_failure_recovery:
                 # Only inject an intentional failed grasp when recovery mode is enabled
@@ -536,26 +536,26 @@ class VideoPlaceOrder(BaseEnv):
         self.failureflag = torch.tensor([False])
 
 
-        # 使用封装的序列任务检查函数
-        if(self.use_demonstrationwrapper==False):#record时候planner结束再改变subgoal
+        # Use encapsulated sequence task check function
+        if(self.use_demonstrationwrapper==False):# change subgoal after planner ends during recording
             if solve_complete_eval==True:
                 allow_subgoal_change_this_timestep=True
             else:
                 allow_subgoal_change_this_timestep=False
-        else:#demonstration时候video需要call evaluate(solve_complete_eval) video结束在demonstrationwrapper里面改变flag
+        else:# during demonstration, video needs to call evaluate(solve_complete_eval), video ends and flag changes in demonstrationwrapper
             if solve_complete_eval==True or self.demonstration_record_traj==False:
                 allow_subgoal_change_this_timestep=True
             else:
                 allow_subgoal_change_this_timestep=False
         all_tasks_completed, current_task_name, task_failed ,self.current_task_specialflags= sequential_task_check(self, self.task_list,allow_subgoal_change_this_timestep=allow_subgoal_change_this_timestep)
 
-        # 如果任务失败，立即标记失败
+        # If task failed, mark as failed immediately
         if task_failed:
             self.failureflag = torch.tensor([True])
             print(f"Task failed: {current_task_name}")
 
 
-        # 如果static_check成功或者所有任务完成，则设置成功标志
+        # If static_check succeeds or all tasks completed, set success flag
         if all_tasks_completed and not task_failed:
             self.successflag = torch.tensor([True])
 

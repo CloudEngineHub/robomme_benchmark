@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
-# 脚本功能：统一评测入口，支持 joint_angle / ee_pose / keypoint / oracle_planner 四种 action_space。
+# Script function: Unified evaluation entry point, supporting 4 action spaces: joint_angle / ee_pose / keypoint / oracle_planner.
 
 import os
 import sys
 
-# 将包根目录、上级目录及 scripts 加入 sys.path，便于作为脚本直接运行（不依赖 PYTHONPATH）
+# Add package root, parent dir, and scripts to sys.path for direct execution (no PYTHONPATH needed)
 _ROOT = os.path.abspath(os.path.dirname(__file__))
 _PARENT = os.path.dirname(_ROOT)
 _SCRIPTS = os.path.join(_PARENT, "scripts")
@@ -15,14 +15,14 @@ for _path in (_PARENT, _ROOT, _SCRIPTS):
 import numpy as np
 import torch
 
-# Robomme 环境及工具（保持与现有评测脚本一致的导入方式）
+# Robomme environment and tools (consistent import with existing evaluation scripts)
 from robomme.robomme_env import *
 from robomme.robomme_env.util import *
 from robomme.env_record_wrapper import (
     BenchmarkEnvBuilder,
 )
 
-# 只启用一个 ACTION_SPACE；其他选项保留在注释中供手动切换
+# Only enable one ACTION_SPACE; others are commented out for manual switching
 ACTION_SPACE = "joint_angle"
 #ACTION_SPACE = "ee_pose"
 #ACTION_SPACE = "keypoint"
@@ -30,27 +30,6 @@ ACTION_SPACE = "joint_angle"
 
 GUI_RENDER = True
 MAX_STEPS = 3000
-
-DEFAULT_ENV_IDS = [
-    "PickXtimes",
-    "StopCube",
-    "SwingXtimes",
-    "BinFill",
-    "VideoUnmaskSwap",
-    "VideoUnmask",
-    "ButtonUnmaskSwap",
-    "ButtonUnmask",
-    "VideoRepick",
-    "VideoPlaceButton",
-    "VideoPlaceOrder",
-    "PickHighlight",
-    "InsertPeg",
-    "MoveCube",
-    "PatternLock",
-    "RouteStick",
-]
-
-
 
 
 
@@ -108,7 +87,7 @@ def main():
             # obs_batch, reward_batch, terminated_batch, truncated_batch, info_batch = env.reset()
             obs_batch, info_batch = env.reset()
 
-            # 保持四个原评测脚本中的调试变量语义
+            # Keep debug variable semantics from original 4 evaluation scripts
             maniskill_obs = obs_batch["maniskill_obs"]
             front_camera = obs_batch["front_camera"]
             wrist_camera = obs_batch["wrist_camera"]
@@ -121,7 +100,6 @@ def main():
             wrist_camera_extrinsic_opencv = obs_batch["wrist_camera_extrinsic_opencv"]
             wrist_camera_intrinsic_opencv = obs_batch["wrist_camera_intrinsic_opencv"]
             wrist_camera_cam2world_opengl = obs_batch["wrist_camera_cam2world_opengl"]
-            end_effector_pose_raw = obs_batch["end_effector_pose_raw"]
             end_effector_pose = obs_batch["end_effector_pose"]
             joint_states = obs_batch["joint_states"]
             velocity = obs_batch["velocity"]
@@ -144,7 +122,7 @@ def main():
                 obs_batch, reward_batch, terminated_batch, truncated_batch, info_batch = env.step(dummy_action)
                 print("dummy_action: ", dummy_action)
 
-                # 保持四个原评测脚本中的调试变量语义
+                # Keep debug variable semantics from original 4 evaluation scripts
                 maniskill_obs = obs_batch["maniskill_obs"]
                 front_camera = obs_batch["front_camera"]
                 wrist_camera = obs_batch["wrist_camera"]
@@ -157,7 +135,6 @@ def main():
                 wrist_camera_extrinsic_opencv = obs_batch["wrist_camera_extrinsic_opencv"]
                 wrist_camera_intrinsic_opencv = obs_batch["wrist_camera_intrinsic_opencv"]
                 wrist_camera_cam2world_opengl = obs_batch["wrist_camera_cam2world_opengl"]
-                end_effector_pose_raw = obs_batch["end_effector_pose_raw"]
                 end_effector_pose = obs_batch["end_effector_pose"]
                 joint_states = obs_batch["joint_states"]
                 velocity = obs_batch["velocity"]
@@ -176,17 +153,17 @@ def main():
                 if GUI_RENDER:
                     env.render()
                 if truncated:
-                    print(f"[{env_id}] episode {episode} 步数超限，步 {step}。")
+                    print(f"[{env_id}] episode {episode} steps exceeded, step {step}.")
                     break
                 if terminated:
                     succ = info.get("success")
                     if succ == torch.tensor([True]) or (
                         isinstance(succ, torch.Tensor) and succ.item()
                     ):
-                        print(f"[{env_id}] episode {episode} 成功。")
+                        print(f"[{env_id}] episode {episode} success.")
                         episode_success = True
                     elif info.get("fail", False):
-                        print(f"[{env_id}] episode {episode} 失败。")
+                        print(f"[{env_id}] episode {episode} failed.")
                     break
 
 

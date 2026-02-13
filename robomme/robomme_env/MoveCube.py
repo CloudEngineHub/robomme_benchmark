@@ -156,11 +156,11 @@ class MoveCube(BaseEnv):
 
         peg_spawn_translation = np.array([0.0, base_y, 0.0], dtype=np.float32)
 
-        # 生成 [-0.05, 0.05] 的随机偏移（使用 torch generator）
+        # Generate [-0.05, 0.05] random offset (using torch generator)
         x_jitter = (torch.rand(1, generator=self._hb_generator).item() - 0.5) * 0.1
         y_jitter = (torch.rand(1, generator=self._hb_generator).item() - 0.5) * 0.1
 
-        # 应用偏移
+        # Apply offset
         peg_spawn_translation[:2] += np.array([x_jitter, y_jitter], dtype=np.float32)
         self.peg1_basex=peg_spawn_translation[0]
         self.peg1_basey=peg_spawn_translation[1]
@@ -219,7 +219,7 @@ class MoveCube(BaseEnv):
         
         self.finish_return_flag=False
 
-                # 定义任务列表，每个任务包含一个带函数、名称、demonstration 标志和可选 failure_func 的字典
+                # Define task list, each task contains a dictionary with function, name, demonstration flag, and optional failure_func
         obj_sample = torch.randint(0, 2, (1,), generator=self._hb_generator)
         self.obj_flag = -1 if obj_sample.item() == 0 else 1
         dir_sample = torch.randint(0, 2, (1,), generator=self._hb_generator)
@@ -228,27 +228,27 @@ class MoveCube(BaseEnv):
 
         self.goal_site = spawn_random_target(
                         self,
-                        avoid=None,  # 使用当前避让清单，包含所有已生成的cubes
-                        include_existing=False,  # 手动维护清单
-                        include_goal=False,  # 手动维护清单
+                        avoid=None,  # Use current avoidance list, containing all spawned cubes
+                        include_existing=False,  # Manually maintain list
+                        include_goal=False,  # Manually maintain list
                         region_center=[0.0, 0.0],
                         region_half_size=0.15,
-                        radius=self.cube_half_size*2,  # 使用radius而不是half_size
-                        thickness=0.005,  # target的厚度
-                        min_gap=self.cube_half_size*1,  # 与cube相同的间隙要求
+                        radius=self.cube_half_size*2,  # Use radius instead of half_size
+                        thickness=0.005,  # target thickness
+                        min_gap=self.cube_half_size*1,  # Gap requirement same as cube
                         name_prefix=f"goal_site",
                         generator=self._hb_generator
                         )
         self.goal_site_2 = spawn_random_target(
                 self,
-                avoid=None,  # 使用当前避让清单，包含所有已生成的cubes
-                include_existing=False,  # 手动维护清单
-                include_goal=False,  # 手动维护清单
+                avoid=None,  # Use current avoidance list, containing all spawned cubes
+                include_existing=False,  # Manually maintain list
+                include_goal=False,  # Manually maintain list
                 region_center=[0.0, 0.0],
                 region_half_size=0.1,
-                radius=self.cube_half_size*2,  # 使用radius而不是half_size
-                thickness=0.005,  # target的厚度
-                min_gap=self.cube_half_size*1,  # 与cube相同的间隙要求
+                radius=self.cube_half_size*2,  # Use radius instead of half_size
+                thickness=0.005,  # target thickness
+                min_gap=self.cube_half_size*1,  # Gap requirement same as cube
                 name_prefix=f"goal_site_2",
                 generator=self._hb_generator
                 )
@@ -387,10 +387,10 @@ class MoveCube(BaseEnv):
             self.grasp_target=self.peg_head
             self.grasp_target_false=self.peg_tail
 
-        self.direction1 = 1 if self.cube_init_pose.p[0][1]-self.goal_site_1_pose_p[0][1] > 0 else -1#相对位置
+        self.direction1 = 1 if self.cube_init_pose.p[0][1]-self.goal_site_1_pose_p[0][1] > 0 else -1# relative position
         self.direction2 = 1 if self.cube_init_pose_2.p[0][1]-self.goal_site_2_pose_p[0][1]  > 0 else -1
-        #direction -1 从左侧推动 
-        #direction 1 从右侧推动 +y 侧/桌子从摄像机看右侧 → 被当成右侧推
+        # direction -1 push from left 
+        # direction 1 push from right +y side / table right side from camera view -> treated as push from right
 
 
         if self.way=="peg_push":
@@ -568,16 +568,16 @@ class MoveCube(BaseEnv):
                             
 
 
-        # 存储任务列表供RecordWrapper使用
+        # Store task list for RecordWrapper use
         self.task_list = tasks
 
-        # 使用封装的序列任务检查函数
-        if(self.use_demonstrationwrapper==False):#record时候planner结束再改变subgoal
+        # Use encapsulated sequence task check function
+        if(self.use_demonstrationwrapper==False):# change subgoal after planner ends during recording
             if solve_complete_eval==True:
                 allow_subgoal_change_this_timestep=True
             else:
                 allow_subgoal_change_this_timestep=False
-        else:#demonstration时候video需要call evaluate(solve_complete_eval) video结束在demonstrationwrapper里面改变flag
+        else:# during demonstration, video needs to call evaluate(solve_complete_eval), video ends and flag changes in demonstrationwrapper
             if solve_complete_eval==True or self.demonstration_record_traj==False:
                 allow_subgoal_change_this_timestep=True
             else:
@@ -590,7 +590,7 @@ class MoveCube(BaseEnv):
             self.failureflag = torch.tensor([True])
             print(f"Task failed: {current_task_name}")
 
-        # 如果static_check成功或者所有任务完成，则设置成功标志
+        # If static_check succeeds or all tasks completed, set success flag
         if all_tasks_completed and not task_failed:
             self.successflag = torch.tensor([True])
 

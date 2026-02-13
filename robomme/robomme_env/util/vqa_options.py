@@ -4,11 +4,11 @@ import sys
 import os
 import inspect
 
-# 如果是作为脚本直接运行，添加项目根目录到 sys.path
+# If run as script directly, add project root to sys.path
 if __name__ == "__main__":
-    # 获取当前文件的目录
+    # Get current file directory
     current_file = os.path.abspath(__file__)
-    # 项目根目录应该是 robomme-v5.7.2-sam2act-update
+    # Project root should be robomme-v5.7.2-sam2act-update
     project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(current_file))))
     if project_root not in sys.path:
         sys.path.insert(0, project_root)
@@ -198,7 +198,7 @@ def _options_insertpeg(env, planner, require_target, base) -> List[dict]:
     )
     options.append(
         {
-            "label": "insert the peg from the left side",#和subgoal保持一致
+            "label": "insert the peg from the left side",# Keep consistent with subgoal
             "solve": lambda direction=-1: insert_peg(
                 env,
                 planner,
@@ -400,7 +400,7 @@ def _options_patternlock(env, planner, require_target, base) -> List[dict]:
             if dist < eps:
                 continue
             if dist>0.2:
-                continue  # max distance threshold 不会选太远的点
+                continue  # max distance threshold, won't select points too far
             align = float(np.dot(delta / dist, vec))
             score = (-align*0.5, dist)  # prioritize alignment, then closeness
             if best_score is None or score < best_score:
@@ -748,11 +748,11 @@ def _options_stopcube(env, planner, require_target, base) -> List[dict]:
         def solve_with_incremental_steps():
             current_step = int(getattr(env, "elapsed_steps", 0))
             
-            # 获取或初始化调用计数器
+            # Get or initialize call counter
             call_count_key = "_hold_obj_incremental_call_count"
             call_count = getattr(base, call_count_key, 0)
             
-            # 获取保存的配置
+            # Get saved config
             num_calls_key = "_hold_obj_incremental_num_calls"
             increment_step_key = "_hold_obj_incremental_step"
             last_target_key = "_hold_obj_incremental_last_target"
@@ -763,16 +763,16 @@ def _options_stopcube(env, planner, require_target, base) -> List[dict]:
             last_target = getattr(base, last_target_key, None)
             initial_step = getattr(base, initial_step_key, None)
             
-            # 如果是第一次调用，初始化配置
+            # Initialize config on first call
             if num_calls is None:
-                num_calls = np.random.randint(2, 5)  # 总共2-3次调用 (randint(2,4) 生成 2 或 3)
+                num_calls = np.random.randint(2, 5)  # Total 2-4 calls (randint(2,5) generates 2, 3, or 4)
                 
-                # 生成固定的递增步长：剩余步数 / num_calls
-                # 保持恒定，不管是否超过、等于或小于最终目标，都使用相同的递增步长
+                # Generate fixed increment step: remaining steps / num_calls
+                # Keep constant, regardless of whether it exceeds, equals, or is less than final target, use same increment step
                 remaining_steps = max(0, final_target - current_step)
                 increment_step = int(remaining_steps / num_calls)
 
-                # 确保步长至少为1
+                # Ensure step size at least 1
                 if increment_step < 1:
                     increment_step = 1
                 
@@ -784,21 +784,21 @@ def _options_stopcube(env, planner, require_target, base) -> List[dict]:
                 call_count = 0
                 last_target = current_step
             
-            # 确定本次调用的目标值
-            # 确保 increment_step 和 last_target 不为 None（第一次调用后它们都会被设置）
+            # Determine target value for this call
+            # Ensure increment_step and last_target are not None (they will be set after first call)
             if increment_step is None or last_target is None:
-                # 这种情况理论上不应该发生，但为了安全起见
+                # This should theoretically not happen, but for safety
                 increment_step = 10
                 last_target = current_step
             
             if call_count < num_calls - 1:
-                # 小于 num_calls 次数：按照递增步长递增（但不允许超过 final_target）
+                # Less than num_calls: increment by step size (but do not exceed final_target)
                 target = min(last_target + increment_step, final_target)
             elif call_count == num_calls - 1:
-                # 等于 num_calls 次：必须精确达到 final_target
+                # Equal to num_calls: must strictly reach final_target
                 target = final_target
             else:
-                # 大于 num_calls 之后：允许溢出，继续按步长递增
+                # After num_calls: allow overflow, continue incrementing by step size
                 target = last_target + increment_step
                
 
@@ -806,10 +806,10 @@ def _options_stopcube(env, planner, require_target, base) -> List[dict]:
                pass
 
 
-            # 调用原有的 solve_hold_obj_absTimestep 函数
+            # Call original solve_hold_obj_absTimestep function
             solve_hold_obj_absTimestep(env, planner, absTimestep=target)
             
-            # 更新调用计数和最后的目标值
+            # Update call count and last target value
             setattr(base, call_count_key, call_count + 1)
             setattr(base, last_target_key, target)
             
@@ -891,13 +891,13 @@ OPTION_BUILDERS: Dict[str, Callable] = {
 
 def get_vqa_options(env, planner, selected_target, env_id: str) -> List[dict]:
     """
-    根据 env_id 返回固定的一组 options（label + solve）。
-    目标对象由 GUI 点击后在 selected_target 中提供。
+    Return a fixed set of options (label + solve) based on env_id.
+    Target object provided in selected_target after GUI click.
     """
     def _require_target():
         obj = selected_target.get("obj")
         if obj is None:
-            raise ValueError("未找到可用的 target cube，请先在分割图中点击目标。")
+            raise ValueError("No available target cube found, please click target in segmentation map first.")
         return obj
 
     base = env.unwrapped
@@ -906,7 +906,7 @@ def get_vqa_options(env, planner, selected_target, env_id: str) -> List[dict]:
 
 
 if __name__ == "__main__":
-    """打印所有任务的 options label"""
+    """Print options label for all tasks"""
     class MockEnv:
         def __init__(self):
             self.spawned_cubes = ["cube1"]
@@ -969,18 +969,18 @@ if __name__ == "__main__":
         return None
     
     print("=" * 80)
-    print("所有任务的 Options Labels:")
+    print("Options Labels for all tasks:")
     print("=" * 80)
     
     for task_name, builder_func in OPTION_BUILDERS.items():
         try:
             options = builder_func(env, planner, _require_target, base)
-            print(f"\n任务: {task_name}")
+            print(f"\nTask: {task_name}")
             valid_options = [opt for opt in options if isinstance(opt, dict)]
-            print(f"  Options Labels ({len(valid_options)} 个):")
+            print(f"  Options Labels ({len(valid_options)} items):")
             
             for i, opt in enumerate(valid_options, 1):
-                label = opt.get("label", "无label")
+                label = opt.get("label", "No label")
                 solve_func = opt.get("solve")
                 needs_target = False
                 if solve_func:
@@ -991,16 +991,16 @@ if __name__ == "__main__":
                     except ValueError:
                         pass
                 
-                target_str = " [需点击目标]" if needs_target else ""
+                target_str = " [Need click target]" if needs_target else ""
                 print(f"    {i}. {label}{target_str}")
         except Exception as e:
-            print(f"\n任务: {task_name}")
-            print(f"  错误: 无法获取 options - {type(e).__name__}: {e}")
+            print(f"\nTask: {task_name}")
+            print(f"  Error: Failed to get options - {type(e).__name__}: {e}")
     
     print("\n" + "=" * 80)
 
 
-# 你需要将环境的库路径添加到 LD_LIBRARY_PATH 环境变量中，强制程序优先加载环境内的库。
-# 你可以通过以下命令运行你的脚本：
+# You need to add the environment library path to LD_LIBRARY_PATH environment variable to force program to load libraries within environment first.
+# You can run your script with the following command:
 # export LD_LIBRARY_PATH=/home/hongzefu/micromamba/envs/maniskillenv1228/lib:$LD_LIBRARY_PATH
 # /home/hongzefu/micromamba/envs/maniskillenv1228/bin/python /home/hongzefu/robomme-v5.7.2-sam2act-update/robomme/robomme_env/util/vqa_options.py

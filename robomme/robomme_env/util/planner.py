@@ -183,12 +183,12 @@ def return_to_original_pose(env,planner,current_grasp_pose):
 #     else:
 #         bias=0
 #     dx = -0.2 - bias
-#     # 先仅沿 insert_pose 的局部 x 移动（不改 z）
+#     # First move along insert_pose local x only (without changing z)
 #     rel = insert_pose * sapien.Pose([dx, 0, 0])
 #     rel_p = np.asarray(rel.p, dtype=np.float32).reshape(-1)
 #     rel_q = np.asarray(rel.q, dtype=np.float32).reshape(-1)
 
-#     # 然后把世界坐标的 z 设为绝对 0.2，朝向保持不变
+#     # Then set world z to absolute 0.2, orientation remains unchanged
 #     ready = sapien.Pose(p=[rel_p[0], rel_p[1], 0.2], q=rel_q)
 
 #     planner.move_to_pose_with_screw(ready)
@@ -239,7 +239,7 @@ def return_to_original_pose(env,planner,current_grasp_pose):
 #             p=[0, 0, 0.2],
 #             q=insert_pose_q
 #         )
-#         # 先移动到0 0 0.2
+#         # First move to 0 0 0.2
 #         planner.move_to_pose_with_screw(pre_pose)
 
 #         _move_with_offset([0.2 , 0, 0])
@@ -252,13 +252,13 @@ def return_to_original_pose(env,planner,current_grasp_pose):
 
 #     else:#obj=1
 
-#         # 统一计算插入姿态，方便后续使用笛卡尔偏移
+#         # Compute insertion pose uniformly, to facilitate subsequent Cartesian offset
 #         _, insert_pose_p, insert_pose_q = _pose_components()
 #         pre_pose = sapien.Pose(
 #             p=[0,0, 0.2],
 #             q=insert_pose_q
 #         )
-#         # 先抬高一点距离再逐步沿局部 x 方向推进，避免干涉
+#         # First lift a bit distance then push progressively along local x direction to avoid interference
 #         planner.move_to_pose_with_screw(pre_pose)
 
 #         _move_with_offset([-0.2 , 0, 0])
@@ -301,15 +301,15 @@ def insert_peg(env, planner,direction,obj,insert_obj=None,cut_retreat=False):
         planner.move_to_pose_with_screw(current_pose * sapien.Pose(offset_vec.tolist()))
 
     def _move_with_offset_with_break(offset):
-        """带中断检查的移动函数，当 elapsed_steps > end_steps + 3 时中断，end_steps为None时直接执行"""
+        """Move function with interrupt check, interrupt when elapsed_steps > end_steps + 3, execute directly when end_steps is None"""
         end_steps = getattr(env, "end_steps", None)
         while end_steps is None or int(getattr(env, "elapsed_steps", 0)) <= end_steps + 3:
-            # 内联 follow_path 逻辑，支持在运动过程中中断
+            # Inline follow_path logic, support interrupt during motion
             current_pose = _compute_insert_pose()
             offset_vec = np.asarray(offset, dtype=np.float32)
             target_pose = current_pose * sapien.Pose(offset_vec.tolist())
 
-            # 规划路径
+            # Plan path
             pose_for_plan = planner._transform_pose_for_planning(target_pose)
             pose_p = np.asarray(pose_for_plan.p, dtype=np.float32).reshape(-1)
             pose_q = np.asarray(pose_for_plan.q, dtype=np.float32).reshape(-1)
@@ -322,12 +322,12 @@ def insert_peg(env, planner,direction,obj,insert_obj=None,cut_retreat=False):
             if result["status"] != "Success":
                 return False
 
-            # 执行路径，每步检查是否需要中断
+            # Execute path, check for interrupt at each step
             n_step = result["position"].shape[0]
             for i in range(n_step):
                 if end_steps is not None and int(getattr(env, "elapsed_steps", 0)) > end_steps + 3:
                     print("break early")
-                    return True  # 被中断
+                    return True  # Interrupted
                 qpos = result["position"][i]
                 if planner.control_mode == "pd_joint_pos_vel":
                     qvel = result["velocity"][i]
@@ -336,8 +336,8 @@ def insert_peg(env, planner,direction,obj,insert_obj=None,cut_retreat=False):
                     action = np.hstack([qpos, planner.gripper_state])
                 planner.env.step(action)
                 planner.elapsed_steps += 1
-            return True  # 正常完成
-        return True  # 已超过步数限制
+            return True  # Completed normally
+        return True  # Exceeded step limit
 ##########################
     if obj==-1:
 
@@ -489,45 +489,45 @@ def solve_liftup_Xdistance(env,planner,distance):
 #     FINGER_LENGTH = 0.025
 #     env = env.unwrapped
 
-#     # 获取物体和目标的位置
+#     # Get object and target positions
 #     obj_pos = obj.pose.sp.p if hasattr(obj.pose.sp.p, '__iter__') else np.array(obj.pose.sp.p)
 #     target_pos = target.pose.sp.p if hasattr(target.pose.sp.p, '__iter__') else np.array(target.pose.sp.p)
     
-#     # 计算xy平面上从obj指向target的方向向量
-#     push_direction_xy = target_pos[:2] - obj_pos[:2]  # 只取xy分量
-#     push_direction_xy = push_direction_xy / np.linalg.norm(push_direction_xy)  # 归一化
+#     # Calculate push direction on xy plane: from obj to target
+#     push_direction_xy = target_pos[:2] - obj_pos[:2]  # Only take xy components
+#     push_direction_xy = push_direction_xy / np.linalg.norm(push_direction_xy)  # Normalize
 
-#     # 构建3D方向向量，z方向保持不变（设为0或保持原值）
+#     # Construct 3D direction vector, z direction remains unchanged (set to 0 or keep original)
 #     push_direction_3d = np.array([push_direction_xy[0], push_direction_xy[1], 0])
 
-#     # 构建gripper的推动姿态：gripper的x轴指向推动方向（从obj到target）
-#     # gripper坐标系：
-#     # x轴：gripper的前进方向，应该指向推动方向（从obj到target）
-#     # y轴：gripper手指闭合的方向，垂直于推动方向
-#     # z轴：向上（与世界坐标系的z轴相反，因为gripper通常朝下）
+#     # Construct gripper push pose: gripper x-axis points to push direction (from obj to target)
+#     # gripper coordinate system:
+#     # x-axis: gripper forward direction, should point to push direction (from obj to target)
+#     # y-axis: gripper finger closing direction, perpendicular to push direction
+#     # z-axis: upward (opposite to world z-axis, as gripper usually points down)
 
-#     # x轴：推动方向
+#     # x-axis: push direction
 #     x_axis = np.array([push_direction_xy[0], push_direction_xy[1], 0])
 
-#     # z轴：向下（gripper朝下）
+#     # z-axis: downward (gripper points down)
 #     z_axis = np.array([0, 0, -1])
 
-#     # y轴：由右手系约束决定，保持旋转矩阵正交
+#     # y-axis: determined by right-hand rule, keep rotation matrix orthogonal
 #     y_axis = np.cross(z_axis, x_axis)
 #     y_norm = np.linalg.norm(y_axis)
 #     if y_norm < 1e-6:
 #         raise ValueError("Push direction invalid; cannot construct gripper frame.")
 #     y_axis = y_axis / y_norm
 
-#     # 构建旋转矩阵（列向量形式）
+#     # Construct rotation matrix (column vectors)
 #     rotation_matrix = np.column_stack([x_axis, y_axis, z_axis])
 
-#     # 转换为四元数
+#     # Convert to quaternion
 #     rotation_matrix_torch = torch.from_numpy(rotation_matrix).float().unsqueeze(0)
 #     push_quat = matrix_to_quaternion(rotation_matrix_torch)[0]
 
 #     # -------------------------------------------------------------------------- #
-#     # 额外绕世界坐标系 Z 轴旋转（180°），用于处理物体在target前面的情况
+#     # Extra rotation around world Z axis (180 deg), to handle case where object is in front of target
 #     # -------------------------------------------------------------------------- #
 #     if  target_pos[0] < obj_pos[0] :
 #         z_rotation_angles = torch.deg2rad(
@@ -536,87 +536,87 @@ def solve_liftup_Xdistance(env,planner,distance):
 #         z_rotation_matrix = euler_angles_to_matrix(z_rotation_angles, convention="XYZ")
 #         z_rotation_quat = matrix_to_quaternion(z_rotation_matrix.unsqueeze(0))[0]
 
-#         # 合成最终 gripper 姿态
+#         # Synthesize final gripper pose
 #         push_quat = quaternion_multiply(
 #             push_quat.unsqueeze(0), z_rotation_quat.unsqueeze(0)
 #         )[0]
 
 
-#     # 推动姿态的位置设为物体位置
+#     # Set push pose position to object position
 #     push_pose = sapien.Pose(p=obj_pos, q=push_quat.detach().cpu().numpy())
     
 #     # -------------------------------------------------------------------------- #
-#     # 移动到推动起始位置（物体后方）
+#     # Move to push start position (behind object)
 #     # -------------------------------------------------------------------------- #
-#     offset_distance = 0.05  # 距离物体5cm
+#     offset_distance = 0.05  # 5cm from object
 #     start_pos = obj_pos - push_direction_3d * offset_distance
-#     start_pos[2] = push_pose.p[2]  # 保持z轴高度不变
+#     start_pos[2] = push_pose.p[2]  # Keep z height unchanged
     
 #     reach_pose_q = push_pose.q.tolist() if hasattr(push_pose.q, 'tolist') else list(push_pose.q)
     
-#     # 移动到起始位置
+#     # Move to start position
 #     #planner.move_to_pose_with_screw(sapien.Pose(p=[0,0,0.1], q=reach_pose_q))
 #     planner.move_to_pose_with_screw(sapien.Pose(p=start_pos.tolist(), q=reach_pose_q))
     
-#     # 闭合gripper准备推动
+#     # Close gripper to prepare for push
 #     planner.close_gripper()
     
 #     # -------------------------------------------------------------------------- #
-#     # 推动到目标位置
+#     # Push to target position
 #     # -------------------------------------------------------------------------- #
-#     # 推动终点：目标位置（保持相同的z高度）
+#     # Push end point: target position (keep same z height)
 #     end_pos = target_pos.copy()
-#     end_pos[2] = start_pos[2]  # 保持z轴高度不变
+#     end_pos[2] = start_pos[2]  # Keep z height unchanged
     
         
 #     planner.move_to_pose_with_screw(sapien.Pose(p=end_pos.tolist(), q=reach_pose_q))
     
-#     # 推动完成后打开gripper
+#     # Open gripper after push completion
 #     planner.open_gripper()
 def solve_push_to_target(env, planner, obj=None, target=None):
     planner.open_gripper()
     FINGER_LENGTH = 0.025
     env = env.unwrapped
 
-    # 获取物体和目标的位置
+    # Get object and target positions
     obj_pos = obj.pose.sp.p if hasattr(obj.pose.sp.p, '__iter__') else np.array(obj.pose.sp.p)
     target_pos = target.pose.sp.p if hasattr(target.pose.sp.p, '__iter__') else np.array(target.pose.sp.p)
     
-    # 计算xy平面上从obj指向target的方向向量
-    push_direction_xy = target_pos[:2] - obj_pos[:2]  # 只取xy分量
-    push_direction_xy = push_direction_xy / np.linalg.norm(push_direction_xy)  # 归一化
+    # Calculate push direction on xy plane: from obj to target
+    push_direction_xy = target_pos[:2] - obj_pos[:2]  # Only take xy components
+    push_direction_xy = push_direction_xy / np.linalg.norm(push_direction_xy)  # Normalize
 
-    # 构建3D方向向量，z方向保持不变（设为0或保持原值）
+    # Construct 3D direction vector, z direction remains unchanged (set to 0 or keep original)
     push_direction_3d = np.array([push_direction_xy[0], push_direction_xy[1], 0])
 
-    # 构建gripper的推动姿态：gripper的x轴指向推动方向（从obj到target）
-    # gripper坐标系：
-    # x轴：gripper的前进方向，应该指向推动方向（从obj到target）
-    # y轴：gripper手指闭合的方向，垂直于推动方向
-    # z轴：向上（与世界坐标系的z轴相反，因为gripper通常朝下）
+    # Construct gripper push pose: gripper x-axis points to push direction (from obj to target)
+    # Gripper coordinate system:
+    # x-axis: gripper forward direction, should point to push direction (from obj to target)
+    # y-axis: gripper finger closing direction, perpendicular to push direction
+    # z-axis: upward (opposite to world z-axis, as gripper usually points down)
 
-    # x轴：推动方向
+    # x-axis: push direction
     x_axis = np.array([push_direction_xy[0], push_direction_xy[1], 0])
 
-    # z轴：向下（gripper朝下）
+    # z-axis: downward (gripper points down)
     z_axis = np.array([0, 0, -1])
 
-    # y轴：由右手系约束决定，保持旋转矩阵正交
+    # y-axis: determined by right-hand rule, keep rotation matrix orthogonal
     y_axis = np.cross(z_axis, x_axis)
     y_norm = np.linalg.norm(y_axis)
     if y_norm < 1e-6:
         raise ValueError("Push direction invalid; cannot construct gripper frame.")
     y_axis = y_axis / y_norm
 
-    # 构建旋转矩阵（列向量形式）
+    # Construct rotation matrix (column vectors)
     rotation_matrix = np.column_stack([x_axis, y_axis, z_axis])
 
-    # 转换为四元数
+    # Convert to quaternion
     rotation_matrix_torch = torch.from_numpy(rotation_matrix).float().unsqueeze(0)
     push_quat = matrix_to_quaternion(rotation_matrix_torch)[0]
 
     # -------------------------------------------------------------------------- #
-    # 额外绕世界坐标系 Z 轴旋转（180°），用于处理物体在target前面的情况
+    # Extra rotation around world Z axis (180 deg), to handle case where object is in front of target
     # -------------------------------------------------------------------------- #
     if  target_pos[0] < obj_pos[0] :
         z_rotation_angles = torch.deg2rad(
@@ -625,29 +625,29 @@ def solve_push_to_target(env, planner, obj=None, target=None):
         z_rotation_matrix = euler_angles_to_matrix(z_rotation_angles, convention="XYZ")
         z_rotation_quat = matrix_to_quaternion(z_rotation_matrix.unsqueeze(0))[0]
 
-        # 合成最终 gripper 姿态
+        # Synthesize final gripper pose
         push_quat = quaternion_multiply(
             push_quat.unsqueeze(0), z_rotation_quat.unsqueeze(0)
         )[0]
 
 
-    # 推动姿态的位置设为物体位置
+    # Set push pose position to object position
     push_pose = sapien.Pose(p=obj_pos, q=push_quat.detach().cpu().numpy())
     
     # -------------------------------------------------------------------------- #
-    # 移动到推动起始位置（物体后方）
+    # Move to push start position (behind object)
     # -------------------------------------------------------------------------- #
-    offset_distance = 0.05  # 距离物体5cm
+    offset_distance = 0.05  # 5cm from object
     start_pos = obj_pos - push_direction_3d * offset_distance
-    start_pos[2] = push_pose.p[2]  # 保持z轴高度不变
+    start_pos[2] = push_pose.p[2]  # Keep z height unchanged
     
     reach_pose_q = push_pose.q.tolist() if hasattr(push_pose.q, 'tolist') else list(push_pose.q)
     
-    # 移动到起始位置
+    # Move to start position
     #planner.move_to_pose_with_screw(sapien.Pose(p=[0,0,0.1], q=reach_pose_q))
     planner.move_to_pose_with_screw(sapien.Pose(p=start_pos.tolist(), q=reach_pose_q))
     
-    # 闭合gripper准备推动
+    # Close gripper to prepare for push
     planner.close_gripper()
     _record_keypoint(
         env,
@@ -657,11 +657,11 @@ def solve_push_to_target(env, planner, obj=None, target=None):
         keypoint_q=reach_pose_q,
     )
     # -------------------------------------------------------------------------- #
-    # 推动到目标位置
+    # Push to target position
     # -------------------------------------------------------------------------- #
-    # 推动终点：目标位置（保持相同的z高度），稍微向后偏移一截手指长度
+    # Push end point: target position (keep same z height), slightly offset backwards by one finger length
     end_pos = target_pos.copy() - push_direction_3d * env.cube_half_size
-    end_pos[2] = start_pos[2]  # 保持z轴高度不变，确保cube停在目标正上方
+    end_pos[2] = start_pos[2]  # Keep z height unchanged, ensuring cube stays directly above target
     
         
     planner.move_to_pose_with_screw(sapien.Pose(p=end_pos.tolist(), q=reach_pose_q))
@@ -673,7 +673,7 @@ def solve_push_to_target(env, planner, obj=None, target=None):
         keypoint_q=reach_pose_q,
     )
 
-    # 推动完成后打开gripper
+    # Open gripper after push completion
     planner.open_gripper()
 
 
@@ -684,87 +684,87 @@ def solve_push_to_target(env, planner, obj=None, target=None):
 #     FINGER_LENGTH = 0.025
 #     env = env.unwrapped
 
-#     # 获取物体和目标的位置
+#     # Get object and target positions
 #     obj_pos = obj.pose.sp.p if hasattr(obj.pose.sp.p, '__iter__') else np.array(obj.pose.sp.p)
 #     target_pos = target.pose.sp.p if hasattr(target.pose.sp.p, '__iter__') else np.array(target.pose.sp.p)
 
     
     
-#     # 计算xy平面上从obj指向target的方向向量
-#     push_direction_xy = target_pos[:2] - obj_pos[:2]  # 只取xy分量
-#     push_direction_xy = push_direction_xy / np.linalg.norm(push_direction_xy)  # 归一化
+#     # Calculate push direction on xy plane: from obj to target
+#     push_direction_xy = target_pos[:2] - obj_pos[:2]  # Only take xy components
+#     push_direction_xy = push_direction_xy / np.linalg.norm(push_direction_xy)  # Normalize
 
-#     # 构建3D方向向量，z方向保持不变（设为0或保持原值）
+#     # Construct 3D direction vector, z direction remains unchanged (set to 0 or keep original)
 #     push_direction_3d = np.array([push_direction_xy[0], push_direction_xy[1], 0])
 
-#     # 构建gripper的推动姿态：gripper的x轴指向推动方向（从obj到target）
-#     # gripper坐标系：
-#     # x轴：gripper的前进方向，应该指向推动方向（从obj到target）
-#     # y轴：gripper手指闭合的方向，垂直于推动方向
-#     # z轴：向上（与世界坐标系的z轴相反，因为gripper通常朝下）
+#     # Construct gripper push pose: gripper x-axis points to push direction (from obj to target)
+#     # gripper coordinate system:
+#     # x-axis: gripper forward direction, should point to push direction (from obj to target)
+#     # y-axis: gripper finger closing direction, perpendicular to push direction
+#     # z-axis: upward (opposite to world z-axis, as gripper usually points down)
 
-#     # x轴：推动方向
+#     # x-axis: push direction
 #     x_axis = np.array([push_direction_xy[0], push_direction_xy[1], 0])
 
-#     # z轴：向下（gripper朝下）
+#     # z-axis: downward (gripper points down)
 #     z_axis = np.array([0, 0, -1])
 
-#     # y轴：由右手系约束决定，保持旋转矩阵正交
+#     # y-axis: determined by right-hand rule, keep rotation matrix orthogonal
 #     y_axis = np.cross(z_axis, x_axis)
 #     y_norm = np.linalg.norm(y_axis)
 #     if y_norm < 1e-6:
 #         raise ValueError("Push direction invalid; cannot construct gripper frame.")
 #     y_axis = y_axis / y_norm
 
-#     # 构建旋转矩阵（列向量形式）
+#     # Construct rotation matrix (column vectors)
 #     rotation_matrix = np.column_stack([x_axis, y_axis, z_axis])
 
-#     # 转换为四元数
+#     # Convert to quaternion
 #     rotation_matrix_torch = torch.from_numpy(rotation_matrix).float().unsqueeze(0)
 #     base_quat = matrix_to_quaternion(rotation_matrix_torch)[0]
 
-#     # 绕z轴旋转180度（世界坐标系）
+#     # Rotate 180 degrees around z axis (world frame)
 #     z_rotation_angles = torch.deg2rad(torch.tensor([0.0, 0.0, 90.0*direction*obj_flag], dtype=torch.float32))
 #     z_rotation_matrix = euler_angles_to_matrix(z_rotation_angles, convention="XYZ")
 #     z_rotation_quat = matrix_to_quaternion(z_rotation_matrix.unsqueeze(0))[0]
 
-#     # 组合旋转：先基础旋转，再绕z轴旋转180度
+#     # Combine rotation: base rotation first, then 180 degrees around z axis
 #     push_quat = quaternion_multiply(base_quat.unsqueeze(0), z_rotation_quat.unsqueeze(0))[0].cpu().numpy()
 
-#     # 推动姿态的位置设为物体位置
+#     # Set push pose position to object position
 #     push_pose = sapien.Pose(p=obj_pos, q=push_quat)
 
 #     # -------------------------------------------------------------------------- #
-#     # 移动到推动起始位置（物体后方）
+#     # Move to push start position (behind object)
 #     # -------------------------------------------------------------------------- #
-#     offset_distance = 0.1  # 距离物体10cm
+#     offset_distance = 0.1  # 10cm from object
 #     start_pos = obj_pos - push_direction_3d * offset_distance
-#     start_pos[2] = obj_pos[2]  # 与cube的z轴高度一致
+#     start_pos[2] = obj_pos[2]  # Same z height as cube
 
 #     reach_pose_q = push_pose.q.tolist() if hasattr(push_pose.q, 'tolist') else list(push_pose.q)
 
-#     # 移动到起始位置
+#     # Move to start position
 #     planner.move_to_pose_with_screw(sapien.Pose(p=[0, 0, 0.1], q=reach_pose_q))
 #     start_pos=start_pos.tolist()
 #     start_pos[1]-=0.1*direction
-#     start_ready_pos=start_pos.copy()  # 使用copy()避免引用赋值
+#     start_ready_pos=start_pos.copy()  # Use copy() to avoid reference assignment
 #     start_ready_pos[2]=0.1
 #     planner.move_to_pose_with_screw(sapien.Pose(p=start_ready_pos, q=reach_pose_q))
 #     planner.move_to_pose_with_screw(sapien.Pose(p=start_pos, q=reach_pose_q))
 
-#     # 闭合gripper准备推动
+#     # Close gripper to prepare for push
 #     planner.close_gripper()
 
 #     # -------------------------------------------------------------------------- #
-#     # 推动到目标位置
+#     # Push to target position
 #     # -------------------------------------------------------------------------- #
-#     # 推动终点：目标位置（保持相同的z高度）
+#     # Push end point: target position (keep same z height)
 #     end_pos = target_pos.copy()
-#     end_pos[2] = start_pos[2]  # 保持z轴高度不变
+#     end_pos[2] = start_pos[2]  # Keep z height unchanged
 #     end_pos[1]-=0.1*direction
 #     planner.move_to_pose_with_screw(sapien.Pose(p=end_pos.tolist(), q=reach_pose_q))
 
-#     # 推动完成后打开gripper
+#     # Open gripper after push completion
 #     planner.open_gripper()
 def solve_push_to_target_with_peg(env, planner, obj=None, target=None, direction=None, obj_flag=None):
 
@@ -772,47 +772,47 @@ def solve_push_to_target_with_peg(env, planner, obj=None, target=None, direction
     env = env.unwrapped
 
     # -------------------------------------------------------------------------- #
-    # 1. 获取物体与目标的三维位置（全部转换为 np.array）
+    # 1. Get 3D positions of object and target (convert all to np.array)
     # -------------------------------------------------------------------------- #
     obj_pos = obj.pose.sp.p if hasattr(obj.pose.sp.p, '__iter__') else np.array(obj.pose.sp.p)
     target_pos = target.pose.sp.p if hasattr(target.pose.sp.p, '__iter__') else np.array(target.pose.sp.p)
 
     # -------------------------------------------------------------------------- #
-    # 2. 计算平面（XY）上的推动方向：从物体指向目标
+    # 2. Calculate push direction on plane (XY): from object to target
     # -------------------------------------------------------------------------- #
     push_direction_xy = target_pos[:2] - obj_pos[:2]
     push_direction_xy = push_direction_xy / np.linalg.norm(push_direction_xy)
 
-    # 扩展为 3D 推动方向（Z 保持为 0，仅在平面推）
+    # Expand to 3D push direction (Z remains 0, push only on plane)
     push_direction_3d = np.array([push_direction_xy[0], push_direction_xy[1], 0])
 
     # -------------------------------------------------------------------------- #
-    # 3. 构造 gripper 局部坐标系，使：
-    #    - x 轴：指向推动方向（朝向 target）
-    #    - z 轴：保持向下（机械臂末端通常朝下）
-    #    - y 轴：由右手系确定（垂直于推方向）
+    # 3. Construct gripper local coordinate system, such that:
+    #    - x axis: points to push direction (towards target)
+    #    - z axis: points downward (end-effector usually points down)
+    #    - y axis: determined by right-hand rule (perpendicular to push direction)
     # -------------------------------------------------------------------------- #
-    x_axis = np.array([push_direction_xy[0], push_direction_xy[1], 0])   # 前向（推向目标）
-    z_axis = np.array([0, 0, -1])                                        # 朝下
-    y_axis = np.cross(z_axis, x_axis)                                    # 垂直方向
+    x_axis = np.array([push_direction_xy[0], push_direction_xy[1], 0])   # Forward (push towards target)
+    z_axis = np.array([0, 0, -1])                                        # Downward
+    y_axis = np.cross(z_axis, x_axis)                                    # Perpendicular direction
 
-    # 若 y_axis 太小说明 x_axis 与 z_axis 共线（推方向异常）
+    # If y_axis is too small, x_axis and z_axis are collinear (push direction anomaly)
     y_norm = np.linalg.norm(y_axis)
     if y_norm < 1e-6:
         raise ValueError("Invalid push direction; failed to construct gripper frame.")
     y_axis = y_axis / y_norm
 
-    # 旋转矩阵列向量：[x y z]
+    # Rotation matrix column vectors: [x y z]
     rotation_matrix = np.column_stack([x_axis, y_axis, z_axis])
 
     # -------------------------------------------------------------------------- #
-    # 4. 将旋转矩阵转换为四元数作为基本姿态
+    # 4. Convert rotation matrix to quaternion as base pose
     # -------------------------------------------------------------------------- #
     rotation_matrix_torch = torch.from_numpy(rotation_matrix).float().unsqueeze(0)
     base_quat = matrix_to_quaternion(rotation_matrix_torch)[0]
 
     # -------------------------------------------------------------------------- #
-    # 5. 额外绕世界坐标系 Z 轴旋转（±90°），用于处理左右偏向或物体的特殊情况
+    # 5. Extra rotation around world Z axis (±90 deg), to handle left/right bias or special object cases
     # -------------------------------------------------------------------------- #
     z_rotation_angles = torch.deg2rad(
         torch.tensor([0.0, 0.0, 90.0 * direction * obj_flag], dtype=torch.float32)
@@ -820,52 +820,52 @@ def solve_push_to_target_with_peg(env, planner, obj=None, target=None, direction
     z_rotation_matrix = euler_angles_to_matrix(z_rotation_angles, convention="XYZ")
     z_rotation_quat = matrix_to_quaternion(z_rotation_matrix.unsqueeze(0))[0]
 
-    # 合成最终 gripper 姿态
+    # Synthesize final gripper pose
     push_quat = quaternion_multiply(
         base_quat.unsqueeze(0), z_rotation_quat.unsqueeze(0)
     )[0].cpu().numpy()
 
-    # 组合成完整的推动姿态（位置在物体中心）
+    # Combine into complete push pose (position at object center)
     push_pose = sapien.Pose(p=obj_pos, q=push_quat)
 
     # -------------------------------------------------------------------------- #
-    # 6. 计算推前准备点：在物体后方 + 侧向偏移，用于避免直接撞上物体
+    # 6. Calculate pre-push preparation point: behind object + lateral offset, to avoid direct collision
     # -------------------------------------------------------------------------- #
-    offset_distance = 0.1                                            # 后退 10cm
+    offset_distance = 0.1                                            # Move back 10cm
     start_pos = obj_pos - push_direction_3d * offset_distance
-    start_pos[2] = obj_pos[2]                                        # 高度与物体一致
+    start_pos[2] = obj_pos[2]                                        # Height same as object
 
-    # 在平面上构造侧向方向（与推方向正交）
+    # Construct lateral direction on plane (orthogonal to push direction)
     lateral_unit = np.array([-push_direction_xy[1], push_direction_xy[0], 0], dtype=np.float32)
     lateral_norm = np.linalg.norm(lateral_unit[:2])
 
-    # 若推方向异常，使用默认侧向方向
+    # If push direction anomaly, use default lateral direction
     if lateral_norm < 1e-6:
         lateral_unit = np.array([0.0, 1.0, 0.0], dtype=np.float32)
     else:
         lateral_unit /= lateral_norm
 
-    # 按 direction（+1/-1）进行左右偏移
+    # Apply lateral offset according to direction (+1/-1)
     lateral_distance = 0.1 * direction
     start_pos = start_pos - lateral_unit * lateral_distance
 
-    # 获取四元数列表格式
+    # Get quaternion list format
     reach_pose_q = push_pose.q.tolist() if hasattr(push_pose.q, "tolist") else list(push_pose.q)
 
     # -------------------------------------------------------------------------- #
-    # 7. 执行移动规划：
+    # 7. Execute motion planning:
     #    
-    #    (1) 下降到实际的推动起点
+    #    (1) Descend to actual push start point
     # -------------------------------------------------------------------------- #
     start_ready_pos = start_pos.copy()
   
-    # 先到达上方预备位置，再下降到真正的起点
+    # First reach upper preparation position, then descend to real start point
     planner.move_to_pose_with_screw(sapien.Pose(p=start_ready_pos.tolist(), q=reach_pose_q))
     planner.move_to_pose_with_screw(sapien.Pose(p=start_pos.tolist(), q=reach_pose_q))
    
 
     # -------------------------------------------------------------------------- #
-    # 8. 闭合 gripper 使 peg/手指贴紧物体，准备执行真正的 pushing
+    # 8. Close gripper to make peg/finger tight against object, ready for real pushing
     # -------------------------------------------------------------------------- #
     planner.close_gripper()
 
@@ -878,11 +878,11 @@ def solve_push_to_target_with_peg(env, planner, obj=None, target=None, direction
     )
 
         # -------------------------------------------------------------------------- #
-    # 推动到目标位置
+    # Push to target position
     # -------------------------------------------------------------------------- #
-    # 推动终点：目标位置（保持相同的z高度）
-    end_pos = target_pos - push_direction_3d * 0.03 # 往后退 保证cube在上方
-    end_pos[2] = start_pos[2]  # 保持z轴高度不变
+    # Push end point: target position (keep same z height)
+    end_pos = target_pos - push_direction_3d * 0.03 # Move back to ensure cube is above
+    end_pos[2] = start_pos[2]  # Keep z axis height unchanged
     end_pos = end_pos -  lateral_unit * lateral_distance
     planner.move_to_pose_with_screw(sapien.Pose(p=end_pos.tolist(), q=reach_pose_q))
     _record_keypoint(
@@ -893,7 +893,7 @@ def solve_push_to_target_with_peg(env, planner, obj=None, target=None, direction
         keypoint_q=reach_pose_q,
     )
 
-    # 推动完成后打开gripper
+    # Open gripper after push completion
     planner.open_gripper()
 
 def move_to_avoid(env, planner):
@@ -1002,14 +1002,14 @@ def solve_pickup_fail(env, planner, obj=None,z_offset=None,xy_offset=None,obj_ty
 
 def _record_keypoint(env, solve_function, keypoint_type, *, keypoint_p, keypoint_q):
     """
-    记录keypoint信息到env属性中，用于后续写入hdf5文件。
+    Record keypoint info to env attribute, for subsequent writing to hdf5 file.
     
     Args:
-        env: 环境对象
-        solve_function: solve函数名称字符串（如'solve_pickup'）
-        keypoint_type: keypoint类型字符串（如'reach_pose', 'grasp_pose'）
-        keypoint_p: 关键点位置（3维）
-        keypoint_q: 关键点四元数（4维）
+        env: Environment object
+        solve_function: solve function name string (e.g., 'solve_pickup')
+        keypoint_type: keypoint type string (e.g., 'reach_pose', 'grasp_pose')
+        keypoint_p: Keypoint position (3D)
+        keypoint_q: Keypoint quaternion (4D)
     """
     if keypoint_type not in ["open", "close"]:
         raise ValueError(f"keypoint_type must be 'open' or 'close', but got '{keypoint_type}'")
@@ -1027,7 +1027,7 @@ def _record_keypoint(env, solve_function, keypoint_type, *, keypoint_p, keypoint
 
     env = getattr(env, "unwrapped", env)
     
-    # 记录keypoint信息到待记录变量（只保存一个，step中记录后会被清除）
+    # Record keypoint info to pending variable (save only one, cleared after recording in step)
     keypoint_info = {
         'solve_function': solve_function,
         'keypoint_type': keypoint_type,
@@ -1356,7 +1356,7 @@ def solve_swingonto_whenhold(env, planner,target=None,height=0.05):
 def solve_swingonto_withDirection(env, planner, target=None, radius=0.1, direction="counterclockwise"):
     """Planar arc motion at z=0.07 from current TCP to target.
 
-    direction: "counterclockwise" 表示沿 t_start->t_end 的左侧（正叉乘）；"clockwise" 表示右侧。"""
+    direction: "counterclockwise" means left side of t_start->t_end (positive cross product); "clockwise" means right side."""
     if target is None:
         raise ValueError("target must be provided for swing onto motion.")
 
@@ -1369,7 +1369,7 @@ def solve_swingonto_withDirection(env, planner, target=None, radius=0.1, directi
     chord_len = np.linalg.norm(chord_vec)
     current_qpos = env.agent.tcp.pose.q.reshape(-1, 4)[0].tolist()
 
-    # 起始关节姿态，用于按顺序 dry run 规划每一段，再拼成一条轨迹一起执行
+    # Initial joint pose, used for dry run planning each segment sequentially, then stitched into one trajectory
     init_qpos_tensor = planner.robot.get_qpos()
     qpos_device = init_qpos_tensor.device if hasattr(init_qpos_tensor, "device") else None
     qpos_dtype = init_qpos_tensor.dtype if hasattr(init_qpos_tensor, "dtype") else torch.float32
@@ -1395,7 +1395,7 @@ def solve_swingonto_withDirection(env, planner, target=None, radius=0.1, directi
         elif direction_l == "clockwise":
             sign = 1.0
         else:
-            # 兼容旧的 left/right 写法
+            # Compatible with old left/right notation
             sign = 1.0 if direction_l == "left" else -1.0
         control_xy = (start_xy + end_xy) / 2.0 + sign * lateral_offset * perp
 
@@ -1417,10 +1417,10 @@ def solve_swingonto_withDirection(env, planner, target=None, radius=0.1, directi
         for _ in range(5):
             waypoints.append(sapien.Pose(last_p, last_q))
     print(" get waypoint")
-    # 直接用每个 waypoint 的 IK 解连成一条离散路径，不经过额外插值/规划
+    # Use IK solution of each waypoint directly to connect into a discrete path, without extra interpolation/planning
     positions = []
     last_res = None
-    # keep a full-length qpos for IK/规划，确保坐标已转换到 base
+    # keep a full-length qpos for IK/planning, ensure coordinates converted to base
     plan_start_qpos_full = planner.planner.pad_qpos(plan_start_qpos.copy())
     for idx, wp in enumerate(waypoints):
         pose_for_plan = planner._transform_pose_for_planning(wp)
@@ -1437,12 +1437,12 @@ def solve_swingonto_withDirection(env, planner, target=None, radius=0.1, directi
             print(f"IK failed at waypoint {idx}: {ik_status}")
             continue
 
-        # 取第一个 IK 解，直接拼成路径，不再调用 plan_qpos_to_qpos 做插值
+        # Take first IK solution, stitch directly into path, no longer call plan_qpos_to_qpos for interpolation
         qpos_sol = ik_solutions[0]
         padded_qpos = plan_start_qpos_full.copy()
         padded_qpos[: qpos_sol.shape[0]] = qpos_sol
         positions.append(padded_qpos)
-        # 更新完整 qpos 作为下一段的起点，避免段间基坐标/关节状态漂移
+        # Update full qpos as start point for next segment, to avoid inter-segment base coordinate/joint state drift
         plan_start_qpos_full = padded_qpos
 
     if len(positions) == 0:
@@ -1494,10 +1494,10 @@ def solve_swingonto_withDirection(env, planner, target=None, radius=0.1, directi
         keypoint_q=np.asarray(end_pose.q, dtype=np.float32).reshape(-1),
     )
 
-    # 在最后一个点上停留一段时间
+    # Stay for a while at the last point
     if len(traj_res_2["position"]) > 0:
         last_position = traj_res_2["position"][-1]
-        # 创建停留轨迹：重复最后一个位置点 20 次以停留一段时间
+        # Create dwell trajectory: repeat last position point 20 times to stay for a while
         stay_duration = 20
         stay_positions = np.tile(last_position, (stay_duration, 1))
         
@@ -1517,7 +1517,7 @@ def solve_swingonto(env, planner,target=None,record_swing_qpos=False):
 
 
     # if horizontal==True:
-    #     # 使用当前 gripper 姿态并绕 Z 轴旋转 90°
+    #     # Use current gripper pose and rotate 90 degrees around Z axis
     #     current_qpos = torch.tensor([-7.3356e-08,  1.0000e+00, -2.0862e-07, -1.8728e-09])
     #     z_rot = torch.tensor([[0.0, 0.0, np.pi / 2]], dtype=torch.float32, device=current_qpos.device)
     #     z_rot = matrix_to_quaternion(euler_angles_to_matrix(z_rot, convention="XYZ"))[0]

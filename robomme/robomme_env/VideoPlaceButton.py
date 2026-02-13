@@ -85,7 +85,7 @@ class VideoPlaceButton(BaseEnv):
     }
 
 
-    # 组合成一个字典
+    # Combine into a dictionary
     configs = {
         'hard': config_hard,
         'easy': config_easy,
@@ -141,7 +141,7 @@ class VideoPlaceButton(BaseEnv):
             else:  # seed_mod == 2
                 self.difficulty = "hard"
 
-        # 使用 seed 随机确定需要重复的次数 (1-5)
+        # Use seed to randomly determine number of repetitions (1-5)
         generator = torch.Generator()
         generator.manual_seed(Robomme_seed)
 
@@ -185,19 +185,19 @@ class VideoPlaceButton(BaseEnv):
             try:
                 self.goal_site = spawn_random_target(
                     self,
-                    avoid=None,  # 使用当前避让清单，包含所有已生成的cubes
-                    include_existing=False,  # 手动维护清单
-                    include_goal=False,  # 手动维护清单
+                    avoid=None,  # Use current avoidance list, containing all spawned cubes
+                    include_existing=False,  # Manually maintain list
+                    include_goal=False,  # Manually maintain list
                     region_center=[-0.1, 0],
                     region_half_size=0.1,
-                    radius=self.cube_half_size * 3,  # 使用radius而不是half_size
-                    thickness=0.005,  # target的厚度
-                    min_gap=self.cube_half_size * 1,  # 与cube相同的间隙要求
+                    radius=self.cube_half_size * 3,  # Use radius instead of half_size
+                    thickness=0.005,  # target thickness
+                    min_gap=self.cube_half_size * 1,  # Gap requirement same as cube
                     name_prefix=f"goal_site",
                     generator=generator,
                 )
             except RuntimeError as exc:
-                raise SceneGenerationError("goal_site采样失败") from exc
+                raise SceneGenerationError("goal_site sampling failed") from exc
             avoid = [self.goal_site]
 
             button_obb = build_button(
@@ -209,7 +209,7 @@ class VideoPlaceButton(BaseEnv):
             )
             avoid.append(button_obb)
 
-            self.all_cubes = []  # 保存所有 cube 对象
+            self.all_cubes = []  # Save all cube objects
 
             # Initialize storage for each color group
             self.red_cubes = []
@@ -252,7 +252,7 @@ class VideoPlaceButton(BaseEnv):
                             )
                         except RuntimeError as exc:
                             raise SceneGenerationError(
-                                f"生成{group['name']} cube {cube_idx} 失败：{exc}"
+                                f"Failed to generate {group['name']} cube {cube_idx}: {exc}"
                             ) from exc
 
                         self.all_cubes.append(cube)
@@ -274,19 +274,19 @@ class VideoPlaceButton(BaseEnv):
                     try:
                         target = spawn_random_target(
                             self,
-                            avoid=avoid,  # 使用当前避让清单，包含所有已生成的cubes
-                            include_existing=False,  # 手动维护清单
-                            include_goal=False,  # 手动维护清单
+                            avoid=avoid,  # Use current avoidance list, containing all spawned cubes
+                            include_existing=False,  # Manually maintain list
+                            include_goal=False,  # Manually maintain list
                             region_center=[0, 0],
                             region_half_size=0.2,
-                            radius=self.cube_half_size * 2,  # 使用radius而不是half_size
-                            thickness=0.005,  # target的厚度
-                            min_gap=self.cube_half_size * 1,  # 与cube相同的间隙要求
+                            radius=self.cube_half_size * 2,  # Use radius instead of half_size
+                            thickness=0.005,  # target thickness
+                            min_gap=self.cube_half_size * 1,  # Gap requirement same as cube
                             name_prefix=f"target_{i}",
                             generator=generator,
                         )
                     except RuntimeError as exc:
-                        raise SceneGenerationError(f"第 {i + 1} 个target采样失败：{exc}") from exc
+                        raise SceneGenerationError(f"Target {i + 1} sampling failed: {exc}") from exc
 
                     self.targets.append(target)
                     setattr(self, f"target_{i}", target)
@@ -643,25 +643,25 @@ class VideoPlaceButton(BaseEnv):
         self.failureflag = torch.tensor([False])
 
       
-        # 使用封装的序列任务检查函数
-        if(self.use_demonstrationwrapper==False):#record时候planner结束再改变subgoal
+        # Use encapsulated sequence task check function
+        if(self.use_demonstrationwrapper==False):# change subgoal after planner ends during recording
             if solve_complete_eval==True:
                 allow_subgoal_change_this_timestep=True
             else:
                 allow_subgoal_change_this_timestep=False
-        else:#demonstration时候video需要call evaluate(solve_complete_eval) video结束在demonstrationwrapper里面改变flag
+        else:# during demonstration, video needs to call evaluate(solve_complete_eval), video ends and flag changes in demonstrationwrapper
             if solve_complete_eval==True or self.demonstration_record_traj==False:
                 allow_subgoal_change_this_timestep=True
             else:
                 allow_subgoal_change_this_timestep=False
         all_tasks_completed, current_task_name, task_failed,self.current_task_specialflag = sequential_task_check(self, self.task_list,allow_subgoal_change_this_timestep=allow_subgoal_change_this_timestep)
 
-        # 如果任务失败，立即标记失败
+        # If task failed, mark as failed immediately
         if task_failed:
             self.failureflag = torch.tensor([True])
             print(f"Task failed: {current_task_name}")
 
-        # 如果static_check成功或者所有任务完成，则设置成功标志
+        # If static_check succeeds or all tasks completed, set success flag
         if all_tasks_completed and not task_failed:
             self.successflag = torch.tensor([True])
 

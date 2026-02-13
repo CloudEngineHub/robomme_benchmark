@@ -30,20 +30,20 @@ from robomme.robomme_env.util import *
 
 def sequential_task_check(self, tasks,allow_subgoal_change_this_timestep):
     """
-    带任务名称和demonstration标志的序列任务检查函数
+    Sequential task check function with task name and demonstration flag.
 
     Args:
-        tasks: 任务列表，每个元素是包含 "func"、"name"、"demonstration"、可选
-               "failure_func"、"solve" 键的字典，或旧格式的元组
+        tasks: List of tasks, where each element is a dictionary containing "func", "name", "demonstration",
+               optional "failure_func", "solve" keys, or a tuple in the old format:
                (task_func, task_name[, demonstration[, failure_func[, solve]]])
 
     Returns:
         tuple: (all_completed: bool, current_task_name: str, task_failed: bool)
-            - all_completed: 如果所有任务都完成返回True，否则返回False
-            - current_task_name: 当前任务的名称
-            - task_failed: 当前任务是否触发失败条件
+            - all_completed: True if all tasks are completed, otherwise False
+            - current_task_name: Name of the current task
+            - task_failed: Whether the current task triggered a failure condition
 
-    使用示例:
+    Example:
         tasks = [
             {
                 "func": lambda: is_obj_pickup(self, obj=self.cube_0),
@@ -66,14 +66,14 @@ def sequential_task_check(self, tasks,allow_subgoal_change_this_timestep):
         ]
         all_completed, current_task, task_failed = sequential_task_check(self, tasks)
     """
-    # 将任务条目标准化为字典格式，兼容旧的二元组/三元组定义
+    # Normalize task entries to dictionary format, compatible with old 2-tuple/3-tuple definitions
     if not hasattr(self, '_timelimit_deadlines'):
         self._timelimit_deadlines = {}
 
     normalized_tasks = []
     for task in tasks:
         if isinstance(task, dict):
-            # 拷贝以避免在原始数据上产生副作用
+            # Copy to avoid side effects on original data
             task_entry = dict(task)
             func = task_entry.get("func") or task_entry.get("task_func")
             if func is None:
@@ -123,12 +123,12 @@ def sequential_task_check(self, tasks,allow_subgoal_change_this_timestep):
         #         "solve": solve_callable,
         #     })
 
-    # 获取任务数量
+    # Get number of tasks
     num_tasks = len(normalized_tasks)
 
-    # 如果没有任务，直接返回True
+    # If no tasks, return True directly
     if num_tasks == 0:
-        # 设置当前任务信息为空
+        # Set current task info to empty
         self.current_task_index = -1
         self.current_task_name = "No tasks"
         self.current_task_demonstration = False
@@ -136,13 +136,13 @@ def sequential_task_check(self, tasks,allow_subgoal_change_this_timestep):
         self.current_task_solve = None
         return True, "No tasks", False,None
 
-    # 初始化timestep（如果不存在）
+    # Initialize timestep (if not exists)
     if not hasattr(self, 'timestep'):
         self.timestep = 0
 
-    # 确保timestep不超过任务数量
+    # Ensure timestep does not exceed number of tasks
     if self.timestep >= num_tasks:
-        # 所有任务已完成
+        # All tasks completed
         self.current_task_index = num_tasks
         self.current_task_name = "All tasks completed"
         self.current_task_demonstration = False
@@ -150,7 +150,7 @@ def sequential_task_check(self, tasks,allow_subgoal_change_this_timestep):
         self.current_task_solve = None
         return True, "All tasks completed", False,None
 
-    # 获取当前任务
+    # Get current task
     task_entry = normalized_tasks[self.timestep]
     current_task_func = task_entry["func"]
     current_task_name = task_entry.get("name", "Unknown")
@@ -159,7 +159,7 @@ def sequential_task_check(self, tasks,allow_subgoal_change_this_timestep):
     current_task_specialflag=task_entry.get("specialflag", None)
     current_segment=task_entry.get("segment",None)
     current_subgoal_segment=task_entry.get("subgoal_segment",None)
-    # 设置当前任务信息，供RecordWrapper使用
+    # Set current task info for RecordWrapper to use
     if allow_subgoal_change_this_timestep==True:
         self.current_task_index = self.timestep
         self.current_task_name = current_task_name
@@ -168,13 +168,13 @@ def sequential_task_check(self, tasks,allow_subgoal_change_this_timestep):
         self.current_task_solve = task_entry.get("solve")
         self.current_segment=current_segment
         self.current_subgoal_segment=current_subgoal_segment
-    self.current_task_name_online = current_task_name#实时subgoal
-    self.current_subgoal_segment_online=current_subgoal_segment#实时subgoalsegment
-    self.current_segment_online=current_segment#实时segmentonline
+    self.current_task_name_online = current_task_name # Real-time subgoal
+    self.current_subgoal_segment_online=current_subgoal_segment # Real-time subgoal segment
+    self.current_segment_online=current_segment # Real-time segment online
 
     self.current_task_specialflag=current_task_specialflag
 
-    # 如果切换到了新的任务，重置静态检查相关状态
+    # If switched to a new task, reset static check related state
     last_task_index = getattr(self, "_last_task_index", None)
     if last_task_index != self.timestep:
         if hasattr(self, "first_timestep"):
@@ -182,14 +182,14 @@ def sequential_task_check(self, tasks,allow_subgoal_change_this_timestep):
         _clear_timelimit_deadline(self, last_task_index)
     self._last_task_index = self.timestep
 
-    # 先检查失败条件
+    # Check failure conditions first
     failure_triggered = False
     task_idx = self.timestep
     if current_failure_func is not None:
         if callable(current_failure_func):
             try:
                 failure_result = current_failure_func()
-            except Exception as exc:  # pragma: no cover - 防御性
+            except Exception as exc:  # pragma: no cover - defensive
                 display_index = self.timestep + 1
                 print(f"Task {display_index} failure check raised exception: {exc}")
                 failure_triggered = True
@@ -205,15 +205,15 @@ def sequential_task_check(self, tasks,allow_subgoal_change_this_timestep):
         print(f"Task {display_index} failed: {current_task_name}")
         return False, current_task_name, True,current_task_specialflag
 
-    # 执行当前任务检查
+    # Execute current task check
     if current_task_func():
         display_index = self.timestep + 1
         print(f"Task {display_index} completed: {current_task_name}")
         _clear_timelimit_deadline(self, task_idx)
 
-        # 检查是否是最后一个任务
+        # Check if it is the last task
         if self.timestep == num_tasks - 1:
-            # 所有任务完成，确保timestep超出范围以避免重复检查
+            # All tasks completed, ensure timestep is out of range to avoid repeated checks
             self.timestep = num_tasks
             self.current_task_index = num_tasks
             self.current_task_name = "All tasks completed"
@@ -221,13 +221,13 @@ def sequential_task_check(self, tasks,allow_subgoal_change_this_timestep):
             print(f"All {num_tasks} tasks completed successfully!")
             return True, "All tasks completed", False,None
         else:
-            # 进入下一个timestep
+            # Enter next timestep
             self.timestep += 1
-            # 获取下一个任务的名称
+            # Get next task name
             next_task_name = normalized_tasks[self.timestep].get("name", "Unknown")
-            return False, next_task_name, False,None  # 还有后续任务
+            return False, next_task_name, False,None  # Has subsequent tasks
 
-    return False, current_task_name, False,current_task_specialflag  # 当前任务未完成
+    return False, current_task_name, False,current_task_specialflag  # Current task not completed
 
 def _coerce_failure_result(value):
     """Normalize various failure_func return types into a boolean."""
@@ -261,41 +261,41 @@ def _clear_timelimit_deadline(self, task_index):
 
 def timewindow(self, func, timewindow_timer,min_steps=300, max_steps=500):
     """
-    包装任意函数，使其只在指定的时间窗口内（min_steps到max_steps之间）才能返回True
-    从第一次调用时开始计数
+    Wrap arbitrary function to return True only within specified time window (between min_steps and max_steps).
+    Counting starts from the first call.
 
     Args:
-        func: 要包装的函数（例如 lambda: is_button_pressed(self, obj=self.button)）
-        min_steps: 时间窗口起始步数（默认300）
-        max_steps: 时间窗口结束步数（默认500）
-        timewindow_timer: 计时器编号，用于区分不同的时间窗口（默认0）
+        func: Function to wrap (e.g., lambda: is_button_pressed(self, obj=self.button))
+        min_steps: Start step of time window (default 300)
+        max_steps: End step of time window (default 500)
+        timewindow_timer: Timer ID to distinguish different time windows (default 0)
 
     Returns:
-        bool: 如果在时间窗口内且func返回True则返回True，否则返回False
+        bool: True if within time window and func returns True, otherwise False
     """
     if not hasattr(self, '_timewindow_timers'):
         self._timewindow_timers = {}
 
     current_step = int(getattr(self, "elapsed_steps", 0))
 
-    # 如果计时器不存在，则开始计数
+    # If timer does not exist, start counting
     if timewindow_timer not in self._timewindow_timers:
         self._timewindow_timers[timewindow_timer] = current_step
         print(f"Timewindow timer {timewindow_timer} started at step {current_step}")
 
-    # 获取起始步数（继续之前的计数）
+    # Get start step (continue previous count)
     start_step = self._timewindow_timers[timewindow_timer]
     elapsed = current_step - start_step
 
-    # 如果还没到时间窗口，返回False
+    # If not reached time window, return False
     if elapsed < min_steps:
         return False
 
-    # 如果超过时间窗口，返回False（任务失败）
+    # If exceeded time window, return False (task failed)
     if elapsed > max_steps:
         return False
 
-    # 在时间窗口内，调用被包装的函数
+    # Within time window, call wrapped function
     return func()
 
 
@@ -335,10 +335,10 @@ def is_obj_pickup(self, obj, goal_pos=None):
 
     # else:
 
-        # 检查物体的z坐标是否大于0.05
+        # Check if object z coordinate is greater than 0.05
         obj_lifted = obj.pose.p[:, 2] > 0.05
 
-        # 检查robot是否真正抓住了物体
+        # Check if robot has truly grasped the object
         is_grasping = self.agent.is_grasping(obj)
 
         result = obj_lifted & is_grasping
@@ -346,7 +346,7 @@ def is_obj_pickup(self, obj, goal_pos=None):
         return result    
 
 def is_any_obj_pickup_flag_currentpickup(self, objects):
-    # 仅记录当前被抓起的方块引用，不在此处更新计数；计数统一在环境 step 中处理
+    # Only record current picked up block reference, do not update count here; count is handled in environment step
     for obj in objects:
         if is_obj_pickup(self,obj):
             self.currentpickup=obj
@@ -356,17 +356,17 @@ def is_any_obj_pickup_flag_currentpickup(self, objects):
 
 
 def is_obj_dropped(self, obj):
-    # 获取物体和目标的位置
+    # Get object and target positions
     obj_pos = obj.pose.p[0]  # [x, y, z]
 
-    # 检查物体是否未被抓取
+    # Check if object is not grasped
     is_grasping = self.agent.is_grasping(obj)
 
     gripper_pos = self.agent.tcp.pose.p.tolist()[0]
 
 
     if in_demonstration(self):
-        # 只有当物体在目标位置附近且未被抓取时才返回True
+        # Return True only when object is near target and not grasped
         if obj_pos[2] <=0.035 and not is_grasping:
             return True
     else:
@@ -382,12 +382,12 @@ def is_obj_dropped_currentpickup(self,list):
     if not is_obj_dropped(self, current_obj):
         return False
 
-    # 这里只负责清空 currentpickup，真正的放下计数在环境 step 中完成
+    # Only responsible for clearing currentpickup here, actual drop count is done in environment step
     self.currentpickup = None
     return True
 
 def is_bin_putdown(self, obj, goal_pos=None):
-    # 检查物体的z坐标是否大于0.3
+    # Check if object z coordinate is greater than 0.3
 
     is_grasping = self.agent.is_grasping(obj)
     gripper_pos = self.agent.tcp.pose.p.tolist()[0]
@@ -410,9 +410,9 @@ def is_reset(self):
     return float(distance) < 0.1
 
 def is_bin_pickup(self, obj,):
-    # 检查物体的z坐标是否大于0.3
+    # Check if object z coordinate is greater than 0.3
     is_bin_pickup = obj.pose.p[:, 2] > 0.15
-     # 检查robot是否真正抓住了物体
+     # Check if robot has truly grasped the object
     return is_bin_pickup 
 
 def is_any_bin_pickup(self, objects):
@@ -424,22 +424,22 @@ def is_any_bin_pickup(self, objects):
 
 
 def is_A_pickup_notB(self, A, B):
-    # 检查物体A的z坐标是否大于0.1
+    # Check if object A z coordinate is greater than 0.1
     is_obj_pickup = A.pose.p[:, 2] > 0.1
     
-    # 获取gripper位置
+    # Get gripper position
     gripper_pos = self.agent.tcp.pose.p
     
-    # 计算A和gripper的距离
+    # Calculate distance between A and gripper
     dist_A_gripper = np.linalg.norm(A.pose.p - gripper_pos, axis=-1)
     
-    # 计算B和gripper的距离
+    # Calculate distance between B and gripper
     dist_B_gripper = np.linalg.norm(B.pose.p - gripper_pos, axis=-1)
     
-    # A距离gripper更近
+    # A is closer to gripper
     is_A_closer = dist_A_gripper < dist_B_gripper
     
-    # 两个条件都满足
+    # Both conditions met
 
     return is_obj_pickup & is_A_closer
 def is_A_insert_notB(self, A, B,box,direction=None,mark_end_flag=False,threashold=0.05):
@@ -513,23 +513,23 @@ def correct_timestep(self, time_range=None, stop_timestep=None):
 
 
 def is_obj_stopped_onto(self, obj, target, stop):
-    # 获取物体和目标的位置
+    # Get object and target positions
     obj_pos = obj.pose.p[0]  # [x, y, z]
     target_pos = target.pose.p[0]  # [x, y, z]
 
-    # 计算水平距离（忽略z轴）
+    # Calculate horizontal distance (ignoring z-axis)
     horizontal_distance = torch.sqrt(
         (obj_pos[0] - target_pos[0])**2 +
         (obj_pos[1] - target_pos[1])**2
     )
 
-    # 设置距离阈值
+    # Set distance threshold
     distance_threshold = self.cube_half_size*(2.5)
 
     distance_threshold = self.cube_half_size*(3)
     ########for oracle eval only
 
-    # 只有当物体在目标位置附近且已经停止移动时才返回True
+    # Return True only when object is near target and has stopped moving
     stop_ok = stop 
     #print("stop_ok",stop_ok,"horizontal_distance",horizontal_distance <= distance_threshold)
     if horizontal_distance <= distance_threshold and stop_ok:
@@ -544,18 +544,18 @@ def is_all_obj_dropped(self, objects):
 
 def is_obj_swing_onto(self, obj, target, achieved_list=None,distance_threshold=0.01,z_threshold=0.1,judge_direction_list=None):
     
-    # 获取物体和目标的位置
+    # Get object and target positions
     obj_pos = obj.pose.p[0]  # [x, y, z]
     target_pos = target.pose.p[0]  # [x, y, z]
 
-    # 计算水平距离（忽略z轴）
+    # Calculate horizontal distance (ignoring z-axis)
     horizontal_distance = torch.sqrt(
         (obj_pos[0] - target_pos[0])**2 +
         (obj_pos[1] - target_pos[1])**2
     )
 
-    # 设置距离阈值0.01
-         #再小会检测不到第一个摆动目标
+    # Set distance threshold 0.01
+         # Smaller value might fail to detect first swing target
 
     z_flag=obj_pos[2]<z_threshold
 
@@ -569,19 +569,19 @@ def is_obj_swing_onto(self, obj, target, achieved_list=None,distance_threshold=0
 
 
 def is_obj_dropped_onto(self, obj, target):
-    # 获取物体和目标的位置
+    # Get object and target positions
     obj_pos = obj.pose.p[0]  # [x, y, z]
     target_pos = target.pose.p[0]  # [x, y, z]
 
-    # 计算水平距离（忽略z轴）
+    # Calculate horizontal distance (ignoring z-axis)
     horizontal_distance = torch.sqrt(
         (obj_pos[0] - target_pos[0])**2 +
         (obj_pos[1] - target_pos[1])**2
     )
 
-    # 设置距离阈值
+    # Set distance threshold
     distance_threshold = 0.05
-    # 只有当物体在目标位置附近且未被抓取时才返回True
+    # Return True only when object is near target and not grasped
     if horizontal_distance <= distance_threshold and is_obj_dropped(self,obj):
         return True
 
@@ -598,21 +598,21 @@ def is_obj_pushed_onto(self, obj, target,distance_threshold=None,must_gripper_op
         if  not(all(x > 0.02 for x in last_two)):
             return False
 
-    # 获取物体和目标的位置
+    # Get object and target positions
     obj_pos = obj.pose.p[0]  # [x, y, z]
     target_pos = target.pose.p[0]  # [x, y, z]
 
-    # 计算水平距离（忽略z轴）
+    # Calculate horizontal distance (ignoring z-axis)
     horizontal_distance = torch.sqrt(
         (obj_pos[0] - target_pos[0])**2 +
         (obj_pos[1] - target_pos[1])**2
     )
 
-    # 设置距离阈值
+    # Set distance threshold
     if distance_threshold is None:
         distance_threshold = self.cube_half_size * 2 * 1.2
 
-    # 只有当物体在目标位置附近且未被抓取时才返回True
+    # Return True only when object is near target and not grasped
     if horizontal_distance <= distance_threshold:
         return True
 
@@ -647,30 +647,30 @@ def is_obj_pushed_onto_byAnotB_wDirection(self, obj, target, A, B,direction=None
     Returns:
         bool: True if obj is at target and A is closer to obj than B
     """
-    # 首先检查物体是否在目标位置
+    # First check if object is at target position
     if not is_obj_pushed_onto(self, obj, target,distance_threshold=self.cube_half_size * 2 * 1.2):
         return False
 
-    # 获取位置
+    # Get positions
     obj_pos = obj.pose.p[0]  # [x, y, z]
     A_pos = A.pose.p[0]  # [x, y, z]
     B_pos = B.pose.p[0]  # [x, y, z]
 
-    # 计算A到obj的距离
+    # Calculate distance from A to obj
     distance_A_to_obj = torch.sqrt(
         (obj_pos[0] - A_pos[0])**2 +
         (obj_pos[1] - A_pos[1])**2 +
         (obj_pos[2] - A_pos[2])**2
     )
 
-    # 计算B到obj的距离
+    # Calculate distance from B to obj
     distance_B_to_obj = torch.sqrt(
         (obj_pos[0] - B_pos[0])**2 +
         (obj_pos[1] - B_pos[1])**2 +
         (obj_pos[2] - B_pos[2])**2
     )
 
-    # A必须比B更靠近obj
+    # A must be closer to obj than B
     if distance_A_to_obj < distance_B_to_obj:
         #if gripper_direction_correct(self,target,direction):
             return True
@@ -686,7 +686,7 @@ def is_obj_swing_onto_any(self, obj, targets):
     return False
 
 def too_many_swings(self):
-    # 读取环境里设置的 swing_over_limit 标志；True 表示摆动次数超出允许上限
+    # Read swing_over_limit flag from environment; True indicates swing count exceeded limit
     return getattr(self, "swing_over_limit", False)
 
 def is_any_obj_dropped_onto_delete(self, objects, target):
@@ -705,12 +705,12 @@ def is_any_obj_dropped_onto_delete(self, objects, target):
     return False
 
 def is_obj_dropped_onto_delete(self, obj, target):
-    # 如果物体在目标附近且高度足够低，删除物体
+    # If object is near target and low enough, delete object
 
     if is_obj_dropped_onto(self,obj,target) and check_block_away_gripper(self,obj):
-        # 删除物体：将其移动到远离场景的位置
+        # Delete object: move it away from scene
         with torch.no_grad():
-            # 移动到场景外的位置
+            # Move to location outside scene
             obj.set_pose(sapien.Pose(p=[10.0, 10.0, 0.0]))
         return True
     return False
@@ -736,17 +736,17 @@ def reset_check(self,gripper=None,target_qpos=None):
     return False
 
 def button_hover(self,button,distance_threshold=0.03,z_threshold=0.2):
-     # 获取物体和目标的位置
+     # Get object and target positions
     obj_pos =self.agent.tcp.pose.p[0]
     target_pos = button.pose.p[0]
 
-    # 计算水平距离（忽略z轴）
+    # Calculate horizontal distance (ignoring z-axis)
     horizontal_distance = torch.sqrt(
         (obj_pos[0] - target_pos[0])**2 +
         (obj_pos[1] - target_pos[1])**2
     )
 
-    # 设置距离阈值0.01
+    # Set distance threshold 0.01
 
     z_flag=obj_pos[2]<z_threshold
 
@@ -763,29 +763,29 @@ def before_absTimestep(self,absTimestep):
 
 def static_check(self, timestep, static_steps=10):
     """
-    静态检查函数，记录第一次调用的timestep，当达到指定静止步数后返回成功
-    如果is_static返回False，则重新开始计数
+    Static check function, records timestep of first call, returns success after maintaining static for specified steps.
+    If is_static returns False, restarts counting.
 
     Args:
-        timestep: 当前timestep
-        static_steps: 需要保持静止的步数，默认为10
+        timestep: Current timestep
+        static_steps: Steps required to stay static, default is 10
 
     Returns:
-        bool: 如果timestep达到初始记录的timestep+static_steps则返回True，否则返回False
+        bool: Returns True if timestep reaches recorded start timestep + static_steps, otherwise False
     """
-    # 检查机器人是否静止
+    # Check if robot is static
     if not is_static(self):
-        # 如果不静止，重新开始计数
+        # If not static, restart counting
         self.first_timestep = timestep
         #print(f"Robot not static, restarting count at timestep: {timestep}")
         return False
 
-    # 初始化first_timestep（如果不存在）
+    # Initialize first_timestep (if not exists)
     if not hasattr(self, 'first_timestep'):
         self.first_timestep = timestep
         print(f"Static check initialized at timestep: {timestep}")
 
-    # 检查是否达到目标timestep（初始timestep + static_steps）
+    # Check if target timestep reached (start timestep + static_steps)
     target_timestep = self.first_timestep + static_steps
     current_progress = timestep - self.first_timestep
 
@@ -797,10 +797,10 @@ def static_check(self, timestep, static_steps=10):
 
 
 def get_button_depth(self,obj):
-    """返回按钮按下深度（米），0=未按，越大表示按得越深。支持向量化并行环境。"""
-    assert hasattr(self, "button"), "还没有创建按钮 (_build_button)"
-    qpos = obj.get_qpos()  # 形状通常是 (B, 1) 或 (1,)
-    depth = -(qpos[..., 0])  # 我们把 [-travel, 0] 取负号变成 [0, travel]
+    """Returns button press depth (meters), 0=not pressed, larger means pressed deeper. Supports vectorized parallel envs."""
+    assert hasattr(self, "button"), "Button not created yet (_build_button)"
+    qpos = obj.get_qpos()  # Shape usually (B, 1) or (1,)
+    depth = -(qpos[..., 0])  # Negate [-travel, 0] to become [0, travel]
     return depth
 
 def is_button_pressed(self, obj):
@@ -837,20 +837,20 @@ def is_any_button_pressed_removelist(self, button_list):
 
 def check_in_bin_number(self, in_bin_list, total_number_list):
     """
-    检查两个列表中的元素是否一一对应相等
+    Check if elements in two lists correspond and are equal.
 
     Args:
-        in_bin_list: 包含当前bin中的数量列表，例如 [self.red_cubes_in_bin, self.blue_cubes_in_bin, self.green_cubes_in_bin]
-        total_number_list: 包含目标数量列表，例如 [self.red_cubes_target_number, self.blue_cubes_target_number, self.green_cubes_target_number]
+        in_bin_list: List containing counts in current bin, e.g. [self.red_cubes_in_bin, self.blue_cubes_in_bin, self.green_cubes_in_bin]
+        total_number_list: List containing target counts, e.g. [self.red_cubes_target_number, self.blue_cubes_target_number, self.green_cubes_target_number]
 
     Returns:
-        bool: 如果所有元素一一对应相等返回True，否则返回False
+        bool: True if all elements correspond and are equal, otherwise False
     """
-    # 检查列表长度是否相同
+    # Check if list lengths are the same
     if len(in_bin_list) != len(total_number_list):
         return False
 
-    # 检查每个元素是否一一对应相等
+    # Check if each element corresponds and is equal
     for in_bin, target in zip(in_bin_list, total_number_list):
         if in_bin != target:
             print(f"in_bin={in_bin},target={target}")

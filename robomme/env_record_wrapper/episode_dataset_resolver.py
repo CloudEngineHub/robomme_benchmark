@@ -155,14 +155,14 @@ class EpisodeDatasetResolver:
         return timestep_group
 
     def _is_video_demo_group(self, timestep_group: h5py.Group) -> bool:
-        # 新结构: info/is_video_demo
+        # New structure: info/is_video_demo
         info_grp = timestep_group.get("info")
         if info_grp is None or "is_video_demo" not in info_grp:
             return False
         return _as_bool(info_grp["is_video_demo"][()])
 
     def _extract_joint_action(self, timestep_group: h5py.Group) -> Optional[np.ndarray]:
-        # 新结构: action/joint_action；兼容旧结构: action（直接 dataset）
+        # New structure: action/joint_action; compatible with old structure: action (direct dataset)
         action_grp = timestep_group.get("action")
         if action_grp is not None and isinstance(action_grp, h5py.Group) and "joint_action" in action_grp:
             raw_action = action_grp["joint_action"][()]
@@ -173,7 +173,7 @@ class EpisodeDatasetResolver:
         return _action_to_8d(raw_action)
 
     def _extract_ee_pose_gripper(self, timestep_group: h5py.Group) -> Optional[np.ndarray]:
-        # 直接读取 action/eef_action 7 维 dataset [pose(3), rpy(3), gripper(1)]
+        # Directly read action/eef_action 7-dim dataset [pose(3), rpy(3), gripper(1)]
         action_grp = timestep_group.get("action")
         if action_grp is None or not isinstance(action_grp, h5py.Group):
             return None
@@ -182,7 +182,7 @@ class EpisodeDatasetResolver:
         return np.asarray(action_grp["eef_action"][()]).flatten()
 
     def _extract_ee_quat_gripper(self, timestep_group: h5py.Group) -> Optional[np.ndarray]:
-        # 读取 action/eef_action_raw/{pose,quat} + action/eef_action[-1] => 8D [pose(3), quat(4), gripper(1)]
+        # Read action/eef_action_raw/{pose,quat} + action/eef_action[-1] => 8D [pose(3), quat(4), gripper(1)]
         action_grp = timestep_group.get("action")
         if action_grp is None or not isinstance(action_grp, h5py.Group):
             return None
@@ -210,7 +210,7 @@ class EpisodeDatasetResolver:
         return np.concatenate([pose, quat, [gripper]])
 
     def _extract_keypoint_action(self, timestep_group: h5py.Group) -> Optional[np.ndarray]:
-        # 新结构: action/keypoint_action (7D: pos(3)+rpy(3)+gripper(1))
+        # New structure: action/keypoint_action (7D: pos(3)+rpy(3)+gripper(1))
         action_grp = timestep_group.get("action")
         if action_grp is not None and isinstance(action_grp, h5py.Group):
             src = action_grp
@@ -222,7 +222,7 @@ class EpisodeDatasetResolver:
 
     def _extract_subgoal_text(self, timestep_group: h5py.Group) -> Optional[str]:
         val = None
-        # 新结构: info/grounded_subgoal；兼容旧结构
+        # New structure: info/grounded_subgoal; compatible with old structure
         info_grp = timestep_group.get("info")
         if info_grp is not None and isinstance(info_grp, h5py.Group):
             if "grounded_subgoal" in info_grp:
@@ -246,7 +246,7 @@ class EpisodeDatasetResolver:
                 continue
 
             self._non_demo_steps.append(record_step)
-            # is_keyframe: 通过 info/is_keyframe 标记判断是否为 keypoint 刷新帧
+            # is_keyframe: Determine if it is a keypoint refresh frame via info/is_keyframe flag
             info_grp = timestep_group.get("info")
             if info_grp is not None and "is_keyframe" in info_grp:
                 if _as_bool(info_grp["is_keyframe"][()]):

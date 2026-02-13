@@ -114,7 +114,7 @@ class StopCube(BaseEnv):
 
 
 
-        self.highlight_starts = {}  # 使用字典存储每个按钮的高亮开始时间
+        self.highlight_starts = {}  # Use dictionary to store highlight start time for each button
         super().__init__(*args, robot_uids=robot_uids, **kwargs)
 
     @property
@@ -183,7 +183,7 @@ class StopCube(BaseEnv):
                 half_size=self.cube_half_size,
                 color=cube_color,
                 name_prefix=f"target_cube",
-                yaw=0.0,  # 不旋转
+                yaw=0.0,  # No rotation
             )
 
 
@@ -200,7 +200,7 @@ class StopCube(BaseEnv):
             self.stop_timestep = None
             self._task_failed_persistent = False
 
-            # 使用 generator 生成 interval 值，在 20 的基础上上下浮动 5（范围 15-25）
+            # Use generator to generate interval value, floating 5 around 20 (range 15-25)
             generator = torch.Generator()
             generator.manual_seed(self.Robomme_seed)
             interval = torch.randint(27, 33, (1,), generator=generator).item()
@@ -221,7 +221,7 @@ class StopCube(BaseEnv):
                 self.move_interval * (stop_time ),
             )
             self.stop_time=stop_time
-            # 获取 target 的 xy 坐标（在 _load_scene 中已经随机化）
+            # Get target xy coordinates (already randomized in _load_scene)
             target_pose = self.target.pose
             if isinstance(target_pose.p, torch.Tensor):
                 target_x = target_pose.p[0, 0].item()
@@ -231,15 +231,15 @@ class StopCube(BaseEnv):
                 target_y = target_pose.p[1]
             target_center = np.array([target_x, target_y])
 
-            # 生成随机旋转角度（-30度到+30度）
+            # Generate random rotation angle (-30 to +30 degrees)
             rotation_angle = torch.FloatTensor(1).uniform_(-30, 30, generator=generator).item()
             rotation_rad = np.deg2rad(rotation_angle)
 
-            # 定义原始的起点和终点坐标（绕原点 (0,0)）
+            # Define original start and end coordinates (around origin (0,0))
             original_start = np.array([0, -0.3])
             original_end = np.array([0, 0.3])
 
-            # 旋转矩阵
+            # Rotation matrix
             cos_theta = np.cos(rotation_rad)
             sin_theta = np.sin(rotation_rad)
             rotation_matrix = np.array([
@@ -247,14 +247,14 @@ class StopCube(BaseEnv):
                 [sin_theta, cos_theta]
             ])
 
-            # 应用旋转（绕原点旋转），然后加上 target 的 xy 坐标
+            # Apply rotation (around origin), then add target xy coordinates
             self.start_pos_xy = rotation_matrix @ original_start + target_center
             self.end_pos_xy = rotation_matrix @ original_end + target_center
 
-            # 设置 cube 的初始位置为旋转后的起点
+            # Set cube initial position to rotated start point
             self.cube.set_pose(sapien.Pose(p=[self.start_pos_xy[0], self.start_pos_xy[1], self.cube_half_size/2]))
 
-            # 生成依次移动到每个按钮的任务列表
+            # Generate task list to move to each button sequentially
             tasks = []
 
             tasks.append(             {
@@ -291,7 +291,7 @@ class StopCube(BaseEnv):
             )
 
 
-            # 存储任务列表供RecordWrapper使用
+            # Store task list for RecordWrapper use
             self.task_list = tasks
 
     def _get_obs_extra(self, info: Dict):
@@ -309,35 +309,35 @@ class StopCube(BaseEnv):
 
 
 
-        # 使用封装的序列任务检查函数
-        if(self.use_demonstrationwrapper==False):#record时候planner结束再改变subgoal
+        # Use encapsulated sequence task check function
+        if(self.use_demonstrationwrapper==False):# change subgoal after planner ends during recording
             if solve_complete_eval==True:
                 allow_subgoal_change_this_timestep=True
             else:
                 allow_subgoal_change_this_timestep=False
-        else:#demonstration时候video需要call evaluate(solve_complete_eval) video结束在demonstrationwrapper里面改变flag
+        else:# during demonstration, video needs to call evaluate(solve_complete_eval), video ends and flag changes in demonstrationwrapper
             if solve_complete_eval==True or self.demonstration_record_traj==False:
                 allow_subgoal_change_this_timestep=True
             else:
                 allow_subgoal_change_this_timestep=False
         all_tasks_completed, current_task_name, task_failed,self.current_task_specialflag = sequential_task_check(self, self.task_list,allow_subgoal_change_this_timestep=allow_subgoal_change_this_timestep)
-        task_failed = task_failed or self._task_failed_persistent#保证过冲会被覆盖
+        task_failed = task_failed or self._task_failed_persistent# Ensure overshoot is covered
 
 ###################################################
         if all_tasks_completed:
-            correct=correct_timestep(self,time_range=self.stop_time_range,stop_timestep=self.stop_timestep)#识别第几次经过 按下了，停上去，次数错误
+            correct=correct_timestep(self,time_range=self.stop_time_range,stop_timestep=self.stop_timestep)# identify which pass pressed, stopped on, count error
             if correct!= True:
                 task_failed=True
 
-        current_stop = self.stop or is_button_pressed(self, obj=self.button)#时间顺序问题额外检查！
+        current_stop = self.stop or is_button_pressed(self, obj=self.button)# Extra check for timing issue!
         press_before = (not is_obj_stopped_onto(self, obj=self.cube, target=self.target, stop=current_stop)) and is_button_pressed(self, obj=self.button)
         #print(f"press_before",press_before)
-        #没有stop在target上手动设置为fail
+        # Manually set to fail if not stopped on target
         if press_before== True:
             #import pdb; pdb.set_trace()
             task_failed=True
 ##################################################
-        #超过没按直接错误
+        # Fail immediately if exceeded without press
         current_step = int(getattr(self, "elapsed_steps", 0))
         if current_step > self.move_interval * self.stop_time:
             if not all_tasks_completed:
@@ -348,13 +348,13 @@ class StopCube(BaseEnv):
 
 #################################################
 
-        # 如果任务失败，立即标记失败
+        # If task failed, mark as failed immediately
         if task_failed:
             self._task_failed_persistent = True
             self.failureflag = torch.tensor([True])
             print(f"Task failed: {current_task_name}")
 
-        # 如果static_check成功或者所有任务完成，则设置成功标志
+        # If static_check succeeds or all tasks completed, set success flag
         if all_tasks_completed and not task_failed:
             self.successflag = torch.tensor([True])
         return {
@@ -380,7 +380,7 @@ class StopCube(BaseEnv):
     def step(self, action: Union[None, np.ndarray, torch.Tensor, Dict]):
         
 
-        if is_button_pressed(self, obj=self.button):#时序问题 必须放在super之前！！！
+        if is_button_pressed(self, obj=self.button):# Chronological issue, MUST be placed before super!!!
             self.stop=True
 
             

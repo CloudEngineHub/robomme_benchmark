@@ -1,10 +1,10 @@
 """
-EndeffectorDemonstrationWrapper：外层包装器，接收 ee_pose/ee_quat 动作并经 IK 转成关节动作。
+EndeffectorDemonstrationWrapper: Outer wrapper, receiving ee_pose/ee_quat action and converting to joint action via IK.
 
-- 支持两种外部接口：
-  1) rpy 模式：action = [ee_p(3), rpy(3), gripper(1)]，共 7 维
-  2) quat 模式：action = [ee_p(3), quat(4), gripper(1)]，共 8 维
-- PatternLock/RouteStick：内部忽略 gripper，并下传 7 维 joint action
+- Supports two external interfaces:
+  1) rpy mode: action = [ee_p(3), rpy(3), gripper(1)], total 7 dimensions
+  2) quat mode: action = [ee_p(3), quat(4), gripper(1)], total 8 dimensions
+- PatternLock/RouteStick: Internal ignores gripper, passes down 7-dimensional joint action
 """
 import numpy as np
 import torch
@@ -17,16 +17,16 @@ from ..robomme_env.util.rpy_util import rpy_xyz_to_quat_wxyz_torch
 
 class EndeffectorDemonstrationWrapper(gym.Wrapper):
     """
-    封装一个期望关节动作的环境。step(action) 接收 ee pose：
-    - rpy 模式：action = [ee_p(3), rpy(3), gripper(1)]（7 维）
-    - quat 模式：action = [ee_p(3), quat(4), gripper(1)]（8 维）
-    - rpy 模式内部将 RPY 转换为 quat（wxyz）；quat 模式直接使用输入 quat
-    - PatternLock/RouteStick 兼容不带 gripper 输入，并在内部忽略 gripper
-    内部先做 IK 得到 joint_action，再调用内层 env.step(joint_action)，并返回：
-    (obs_batch, reward_batch, terminated_batch, truncated_batch, info_batch)。
+    Wrap an environment expecting joint actions. step(action) receives ee pose:
+    - rpy mode: action = [ee_p(3), rpy(3), gripper(1)] (7 dim)
+    - quat mode: action = [ee_p(3), quat(4), gripper(1)] (8 dim)
+    - rpy mode internally converts RPY to quat (wxyz); quat mode directly uses input quat
+    - PatternLock/RouteStick compatible with no-gripper input, and ignores gripper internally
+    Internally performs IK to get joint_action, then calls inner env.step(joint_action), returning:
+    (obs_batch, reward_batch, terminated_batch, truncated_batch, info_batch).
     """
 
-    # stick 环境内部忽略 gripper 并下传 7 维 joint action。
+    # stick environment internally ignores gripper and passes down 7-dimensional joint action.
     _EE_POSE_7D_ENV_IDS = ("PatternLock", "RouteStick")
 
     def __init__(self, env, action_repr: Literal["rpy", "quat"] = "rpy"):

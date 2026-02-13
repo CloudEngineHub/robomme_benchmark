@@ -283,7 +283,7 @@ class InsertPeg(BaseEnv):
             self.peg_init_pose = sapien.Pose(p=pose_p, q=pose_q)
 
 
-                    # 定义任务列表，每个任务包含一个带函数、名称、demonstration 标志和可选 failure_func 的字典
+                    # Define task list, each task contains a dictionary with function, name, demonstration flag, and optional failure_func
             obj_sample = torch.randint(0, 2, (1,), generator=self._hb_generator)
             dir_sample = torch.randint(0, 2, (1,), generator=self._hb_generator)
             self.obj_flag = -1 if obj_sample.item() == 0 else 1
@@ -409,7 +409,7 @@ class InsertPeg(BaseEnv):
                 },
             ]
 
-            # 存储任务列表供RecordWrapper使用
+            # Store task list for RecordWrapper use
             self.task_list = tasks
 
     def evaluate(self,solve_complete_eval=False):
@@ -421,13 +421,13 @@ class InsertPeg(BaseEnv):
         
 
 
-        # 使用封装的序列任务检查函数
-        if(self.use_demonstrationwrapper==False):#record时候planner结束再改变subgoal
+        # Use encapsulated sequence task check function
+        if(self.use_demonstrationwrapper==False):# change subgoal after planner ends during recording
             if solve_complete_eval==True:
                 allow_subgoal_change_this_timestep=True
             else:
                 allow_subgoal_change_this_timestep=False
-        else:#demonstration时候video需要call evaluate(solve_complete_eval) video结束在demonstrationwrapper里面改变flag
+        else:# during demonstration, video needs to call evaluate(solve_complete_eval), video ends and flag changes in demonstrationwrapper
             if solve_complete_eval==True or self.demonstration_record_traj==False:
                 allow_subgoal_change_this_timestep=True
             else:
@@ -436,7 +436,7 @@ class InsertPeg(BaseEnv):
         all_tasks_completed, current_task_name, task_failed,_ = sequential_task_check(self, self.task_list,allow_subgoal_change_this_timestep=allow_subgoal_change_this_timestep)
 
 
-        if self.end_steps!=None:#截断尾部 在planner中也截断尾部
+        if self.end_steps!=None:# truncate tail, also truncate tail in planner
             print(self.elapsed_steps,self.end_steps)
             if int(getattr(self, "elapsed_steps", 0))>=self.end_steps+3:
                  self.successflag = torch.tensor([True])
@@ -445,7 +445,7 @@ class InsertPeg(BaseEnv):
             self.failureflag = torch.tensor([True])
             print(f"Task failed: {current_task_name}")
 
-        # 如果static_check成功或者所有任务完成，则设置成功标志
+        # If static_check succeeds or all tasks completed, set success flag
         if all_tasks_completed and not task_failed:
             self.successflag = torch.tensor([True])
 

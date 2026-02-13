@@ -92,11 +92,11 @@ def _solve_refs_pickup(solve_callable: Any) -> bool:
 
 def task4recovery(task_list: Iterable[TaskEntry]) -> Tuple[List[int], List[TaskEntry]]:
     """
-    传入 task_list，返回其中 solve 使用 solve_pickup 或 solve_pickup_bin
-    且 demonstration=False 的索引和任务条目。
+    Pass task_list, return indices and task entries where solve uses solve_pickup or solve_pickup_bin
+    and demonstration=False.
 
     Args:
-        task_list: 序列任务列表（dict 或旧格式 tuple/list）。
+        task_list: Sequential task list (dict or old format tuple/list).
 
     Returns:
         (pickup_indices, pickup_tasks)
@@ -148,14 +148,14 @@ def _make_fail_grasp_solve(solve_callable: Any, obj: Any, mode: str):
 
 def inject_fail_grasp(task_list: Iterable[TaskEntry], generator: torch.Generator = None, mode: str = None):
     """
-    随机挑选一个 pickup 任务，将其 solve 替换为 fail_grasp=True 的版本。
+    Randomly select a pickup task, replace its solve with a version where fail_grasp=True.
 
     Args:
-        task_list: 任务列表
-        generator: torch.Generator，用于可复现随机选择
+        task_list: Task list
+        generator: torch.Generator, for reproducible random selection
 
     Returns:
-        被修改任务的索引；如果不存在pickup任务则返回None。
+        Index of modified task; return None if no pickup task exists.
     """
     pickup_indices, _ = task4recovery(task_list)
     if not pickup_indices:

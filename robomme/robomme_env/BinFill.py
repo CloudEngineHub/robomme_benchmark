@@ -90,7 +90,7 @@ class BinFill(BaseEnv):
 
 
 
-    # 组合成一个字典
+    # Combine into a dictionary
     configs = {
         'hard': config_hard,
         'easy': config_easy,
@@ -185,7 +185,7 @@ class BinFill(BaseEnv):
         )
         self.table_scene.build()
 
-        # 创建generator用于所有随机化
+        # Create generator for all randomization
         generator = self.generator
 
         button_obb = build_button(
@@ -196,7 +196,7 @@ class BinFill(BaseEnv):
         )
         avoid = [button_obb]
 
-        # 创建带正方形洞的正方形板子
+        # Create square board with square hole
         x_var = torch.rand(1, generator=generator).item() * 0.2 - 0.2  # [-0.25, 0.25]
         y_var = torch.rand(1, generator=generator).item() * 0.4 - 0.2  # [-0.25, 0.25]
         z_rot_deg = (torch.rand(1, generator=generator).item() * 40.0 - 20.0)  # [-20, 20] degrees
@@ -206,11 +206,11 @@ class BinFill(BaseEnv):
         rot_quat = matrix_to_quaternion(rot_mat)[0]  # [w, x, y, z]
         self.board_with_hole = build_board_with_hole(
             self,
-            board_side=0.1,  # 正方形板子的边长
-            hole_side=0.08,   # 正方形洞的边长，稍大于cube尺寸以便cube能通过
-            thickness=0.05,   # 板子厚度
-            position=[0.15 + x_var, 0.0 + y_var, 0.0],  # 板子位置
-            rotation_quat=rot_quat.tolist(),  # z轴旋转
+            board_side=0.1,  # Side length of square board
+            hole_side=0.08,   # Side length of square hole, slightly larger than cube for passing
+            thickness=0.05,   # Board thickness
+            position=[0.15 + x_var, 0.0 + y_var, 0.0],  # Board position
+            rotation_quat=rot_quat.tolist(),  # z-axis rotation
             name="board_with_hole"
         )
         avoid += [self.board_with_hole]
@@ -220,21 +220,21 @@ class BinFill(BaseEnv):
         ###
         ###
         ###
-        # 先生成target_number (put_in):
-        # 如果put_in_color == 1：随机选一个颜色，给它分配[put_in_range[0], put_in_range[1]]范围内的target数量
-        # 如果put_in_color == 3：
-            # 先从put_in_range生成总的target数量total_target
-            # 从[0, 0, 0]开始，随机分配到三个颜色（不要求每个颜色至少1个）
+        # First generate target_number (put_in):
+        # If put_in_color == 1: Randomly select a color, assign target count in range [put_in_range[0], put_in_range[1]]
+        # If put_in_color == 3:
+            # First generate total target count total_target from put_in_range
+            # Start from [0, 0, 0], randomly distribute to three colors (no requirement for min 1 per color)
 
-        # 再生成spawn_number:
-        # 如果num_colors == 1：只有有target的那个颜色会spawn cube，spawn数量 = max(total_spawn, target数量)
-        # 如果num_colors == 3：每个颜色的spawn至少等于target，剩余的spawn随机分配
-        # 这样确保了 spawn >= target 对于每个颜色都成立。
+        # Then generate spawn_number:
+        # If num_colors == 1: Only the color with target will spawn cube, spawn count = max(total_spawn, target count)
+        # If num_colors == 3: Spawn count for each color at least equals target, remaining spawn count distributed randomly
+        # This ensures spawn >= target for each color.
 
 
-        # 获取当前难度的配置
+        # Get configuration for current difficulty
         config = self.configs[self.difficulty]
-        num_colors = config['color']  # 1 或 3
+        num_colors = config['color']  # 1 or 3
         spawn_range = config['spawn_cubes']  # [min, max]
         put_in_color_range = config['put_in_color']
         color_pool = torch.randperm(3, generator=generator).tolist()[:num_colors]
@@ -246,16 +246,16 @@ class BinFill(BaseEnv):
         active_color_indices = color_pool[:put_in_color]
         put_in_range = config['put_in_numbers']  # [min, max]
 
-        # 先生成target_number (put_in)
+        # First generate target_number (put_in)
         target_numbers = [0, 0, 0]
         if put_in_color == 1:
-            # 只有一个颜色需要放入bin
+            # Only one color needs to be put in bin
             selected_idx = active_color_indices[0]
             target_numbers[selected_idx] = torch.randint(put_in_range[0], put_in_range[1] + 1, (1,), generator=generator).item()
         else:
-            # 3个颜色都需要放入bin，先生成总数再分配
+            # All 3 colors need to be put in bin, generate total number first then distribute
             total_target = torch.randint(put_in_range[0], put_in_range[1] + 1, (1,), generator=generator).item()
-            # 随机分配target数量到三个颜色
+            # Randomly distribute target number to three colors
             for _ in range(total_target):
                 idx = torch.randint(0, len(active_color_indices), (1,), generator=generator).item()
                 target_numbers[active_color_indices[idx]] += 1
@@ -264,23 +264,23 @@ class BinFill(BaseEnv):
         self.blue_cubes_target_number = target_numbers[1]
         self.green_cubes_target_number = target_numbers[2]
 
-        # 再生成spawn_number，确保spawn >= target
+        # Then generate spawn_number, ensure spawn >= target
         total_spawn = torch.randint(spawn_range[0], spawn_range[1] + 1, (1,), generator=generator).item()
 
         if num_colors == 1:
-            # 只有一个颜色有cube，选择有target的那个颜色（如果都没有则用color_pool的第一个颜色）
+            # Only one color has cube, choose the one with target (if none, use first color in color_pool)
             spawn_numbers = [0, 0, 0]
             active_idx = next((i for i in color_pool if target_numbers[i] > 0), color_pool[0])
-            # spawn数量至少等于target数量
+            # Spawn number at least equals target number
             spawn_numbers[active_idx] = max(total_spawn, target_numbers[active_idx])
         else:
-            # num_colors 控制 1/2/3 种颜色：确保每个被选中的颜色至少有1个spawn，且spawn >= target
+            # num_colors controls 1/2/3 colors: ensure each selected color has at least 1 spawn, and spawn >= target
             spawn_numbers = [0, 0, 0]
             for i in color_pool:
                 spawn_numbers[i] = max(target_numbers[i], 1)
             used_spawn = sum(spawn_numbers[i] for i in color_pool)
             remaining = total_spawn - used_spawn
-            # 随机分配剩余的spawn数量
+            # Randomly distribute remaining spawn count
             for _ in range(max(0, remaining)):
                 idx = torch.randint(0, len(color_pool), (1,), generator=generator).item()
                 spawn_numbers[color_pool[idx]] += 1
@@ -307,17 +307,17 @@ class BinFill(BaseEnv):
             {"color": (0, 1, 0, 1), "name": "green", "list": self.green_cubes, "spawn_num": self.green_cubes_spawn_number}
         ]
 
-        # 生成所有cube的任务列表并打乱顺序
+        # Generate task list for all cubes and shuffle order
         cube_tasks = []
         for info in color_info:
             for idx in range(info["spawn_num"]):
                 cube_tasks.append({"color": info["color"], "name": info["name"], "list": info["list"], "idx": idx})
 
-        # 打乱生成顺序
+        # Shuffle generation order
         shuffle_order = torch.randperm(len(cube_tasks), generator=generator).tolist()
         cube_tasks = [cube_tasks[i] for i in shuffle_order]
 
-        # 按打乱后的顺序生成cube
+        # Spawn cubes in shuffled order
         for task in cube_tasks:
             try:
                 cube = spawn_random_cube(
@@ -332,7 +332,7 @@ class BinFill(BaseEnv):
                 task["list"].append(cube)
                 avoid.append(cube)
             except RuntimeError as e:
-                print(f"生成{task['name']} cube {task['idx']} 失败：{e}")
+                print(f"Failed to spawn {task['name']} cube {task['idx']}: {e}")
 
         print(f"Generated {len(self.all_cubes)} cubes total (red: {len(self.red_cubes)}, blue: {len(self.blue_cubes)}, green: {len(self.green_cubes)})")
 
@@ -397,7 +397,7 @@ class BinFill(BaseEnv):
                   "segment":self.cap_link 
             })
             self.task_list=tasks
-            # 记录用于恢复的 pickup 相关任务索引和条目
+            # Record pickup related task indices and items for recovery
             self.recovery_pickup_indices, self.recovery_pickup_tasks = task4recovery(self.task_list)
             if self.robomme_failure_recovery:
                 # Only inject an intentional failed grasp when recovery mode is enabled
@@ -417,39 +417,39 @@ class BinFill(BaseEnv):
 
     def evaluate(self,solve_complete_eval=False):
         self.successflag=torch.tensor([False])
-        # 在调用sequential_task_check之前，先保存current_task_failure的状态
-        # 这是因为失败可能在step()过程中被检测到，但sequential_task_check可能会重置它
+        # Save current_task_failure state before calling sequential_task_check
+        # This is because failure might be detected during step(), but sequential_task_check might reset it
         previous_failure = getattr(self, "current_task_failure", False)
         self.failureflag = torch.tensor([False])
 
 
 
-        if(self.use_demonstrationwrapper==False):#record时候planner结束再改变subgoal
+        if(self.use_demonstrationwrapper==False):# change subgoal after planner ends during recording
             if solve_complete_eval==True:
                 allow_subgoal_change_this_timestep=True
             else:
                 allow_subgoal_change_this_timestep=False
-        else:#demonstration时候video需要call evaluate(solve_complete_eval) video结束在demonstrationwrapper里面改变flag
+        else:# during demonstration, video needs to call evaluate(solve_complete_eval), video ends and flag changes in demonstrationwrapper
             if solve_complete_eval==True or self.demonstration_record_traj==False:
                 allow_subgoal_change_this_timestep=True
             else:
                 allow_subgoal_change_this_timestep=False
 
             
-        # 使用封装的序列任务检查函数
+        # Use encapsulated sequence task check function
         all_tasks_completed, current_task_name, task_failed ,self.current_task_specialflag= sequential_task_check(self, self.task_list,allow_subgoal_change_this_timestep=allow_subgoal_change_this_timestep)
 
-        # 如果任务失败，立即标记失败
-        # 或者如果之前已经检测到失败（previous_failure），也标记为失败
+        # If task failed, mark as failed immediately
+        # Or if failure was detected previously (previous_failure), also mark as failed
         if task_failed or previous_failure:
             self.failureflag = torch.tensor([True])
             if task_failed:
                 print(f"Task failed: {current_task_name}")
             elif previous_failure:
-                # 如果是因为previous_failure而标记失败，确保current_task_failure也被设置
+                # If marked failed due to previous_failure, ensure current_task_failure is also set
                 self.current_task_failure = True
 
-        # 如果static_check成功或者所有任务完成，则设置成功标志
+        # If static_check succeeds or all tasks completed, set success flag
         if all_tasks_completed and not task_failed:
             self.successflag = torch.tensor([True])
         
@@ -477,7 +477,7 @@ class BinFill(BaseEnv):
         
         timestep = self.elapsed_steps
         if self.dynamic:
-            # 对每个颜色的cube进行动态lift操作（从第2个cube开始）
+            # Dynamically lift cubes for each color (starting from 2nd cube)
             for cube_list in [self.red_cubes, self.blue_cubes, self.green_cubes]:
                 for idx in range(1, len(cube_list)):
                     lift_and_drop_objects_back_to_original(
