@@ -258,14 +258,10 @@ class DemonstrationWrapper(gym.Wrapper):
             'joint_states': state,
             'velocity': end_effector_velocity,
             'front_camera_depth': base_camera_depth,
-            'front_camera_segmentation': base_camera_segmentation,
+            # 'front_camera_segmentation': base_camera_segmentation,
             'wrist_camera_depth': wrist_camera_depth,
-            'front_camera_extrinsic_opencv': base_camera_extrinsic_opencv,
-            'front_camera_intrinsic_opencv': base_camera_intrinsic_opencv,
-            'front_camera_cam2world_opengl': base_camera_cam2world_opengl,
-            'wrist_camera_extrinsic_opencv': wrist_camera_extrinsic_opencv,
-            'wrist_camera_intrinsic_opencv': wrist_camera_intrinsic_opencv,
-            'wrist_camera_cam2world_opengl': wrist_camera_cam2world_opengl,
+            # 'front_camera_cam2world_opengl': base_camera_cam2world_opengl,
+            # 'wrist_camera_cam2world_opengl': wrist_camera_cam2world_opengl,
             'end_effector_pose_raw': robot_endeffector_pose,
             'end_effector_pose': (
                 robot_endeffector_pose['pose'].detach().cpu().flatten().tolist()[:3]
@@ -278,6 +274,10 @@ class DemonstrationWrapper(gym.Wrapper):
             'subgoal_grounded': grounded_subgoal,
             'available_options': available_options,
             'language_goal': language_goal,
+            'front_camera_extrinsic_opencv': base_camera_extrinsic_opencv,
+            'front_camera_intrinsic_opencv': base_camera_intrinsic_opencv,
+            'wrist_camera_extrinsic_opencv': wrist_camera_extrinsic_opencv,
+            'wrist_camera_intrinsic_opencv': wrist_camera_intrinsic_opencv,
         }
         return new_obs, new_info
 

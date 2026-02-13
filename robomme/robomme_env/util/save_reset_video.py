@@ -11,6 +11,17 @@ import torch
 
 TEXT_AREA_HEIGHT = 60
 
+# 无 subgoal demonstration 的任务：保存视频时不加红框（无 demonstration 阶段需高亮）
+NO_HIGHLIGHT_BORDER_ENV_IDS = frozenset({
+    "SwingXtimes",
+    "PickXtimes",
+    "ButtonUnmaskSwap",
+    "StopCube",
+    "PickHighlight",
+    "ButtonUnmask",
+    "BinFill",
+})
+
 
 def _frame_to_numpy(frame: Any) -> np.ndarray:
     """Convert frame-like input to CPU numpy array for OpenCV/imageio writing."""
@@ -141,6 +152,7 @@ def save_robomme_video(
 ) -> bool:
     """
     Unified method to save replay videos (including reset prefix highlighting, naming, and output path concatenation).
+    Whether to draw the red border on reset-phase frames is determined by env_id: tasks in NO_HIGHLIGHT_BORDER_ENV_IDS (no subgoal demonstration) do not get the border.
 
     Args:
         reset_base_frames/reset_wrist_frames: List of dual camera frames from reset phase.
@@ -148,7 +160,7 @@ def save_robomme_video(
         reset_subgoal_grounded/rollout_subgoal_grounded: List of captions for corresponding phases.
         out_video_dir: Output directory.
         action_space: Current action space, used for filename prefix.
-        env_id: Environment ID.
+        env_id: Environment ID (used to decide if highlight border is drawn; see NO_HIGHLIGHT_BORDER_ENV_IDS).
         episode: Current episode index.
         episode_success: Whether the current episode was successful.
         fps: Output frame rate.
@@ -180,12 +192,16 @@ def save_robomme_video(
         print(f"Skipped video (no frames): {out_video_path}")
         return False
 
-    if reset_base_frames and reset_wrist_frames:
-        highlight_prefix_count = min(len(reset_base_frames), len(reset_wrist_frames))
-    elif reset_base_frames:
-        highlight_prefix_count = len(reset_base_frames)
+    draw_highlight_border = env_id not in NO_HIGHLIGHT_BORDER_ENV_IDS
+    if draw_highlight_border:
+        if reset_base_frames and reset_wrist_frames:
+            highlight_prefix_count = min(len(reset_base_frames), len(reset_wrist_frames))
+        elif reset_base_frames:
+            highlight_prefix_count = len(reset_base_frames)
+        else:
+            highlight_prefix_count = len(reset_wrist_frames)
     else:
-        highlight_prefix_count = len(reset_wrist_frames)
+        highlight_prefix_count = 0
 
     base_camera = [_frame_to_numpy(f) for f in merged_base_frames if f is not None]
     wrist_camera = [_frame_to_numpy(f) for f in merged_wrist_frames if f is not None]

@@ -116,14 +116,7 @@ def main():
                 front_camera = obs_batch["front_camera"]
                 wrist_camera = obs_batch["wrist_camera"]
                 front_camera_depth = obs_batch["front_camera_depth"]
-                front_camera_segmentation = obs_batch["front_camera_segmentation"]
                 wrist_camera_depth = obs_batch["wrist_camera_depth"]
-                front_camera_extrinsic_opencv = obs_batch["front_camera_extrinsic_opencv"]
-                front_camera_intrinsic_opencv = obs_batch["front_camera_intrinsic_opencv"]
-                front_camera_cam2world_opengl = obs_batch["front_camera_cam2world_opengl"]
-                wrist_camera_extrinsic_opencv = obs_batch["wrist_camera_extrinsic_opencv"]
-                wrist_camera_intrinsic_opencv = obs_batch["wrist_camera_intrinsic_opencv"]
-                wrist_camera_cam2world_opengl = obs_batch["wrist_camera_cam2world_opengl"]
                 end_effector_pose = obs_batch["end_effector_pose"]
                 joint_states = obs_batch["joint_states"]
                 velocity = obs_batch["velocity"]
@@ -133,6 +126,10 @@ def main():
                 subgoal = info_batch["subgoal"]
                 subgoal_grounded = info_batch["subgoal_grounded"]
                 available_options = info_batch["available_options"]
+                front_camera_extrinsic_opencv = info_batch["front_camera_extrinsic_opencv"]
+                front_camera_intrinsic_opencv = info_batch["front_camera_intrinsic_opencv"]
+                wrist_camera_extrinsic_opencv = info_batch["wrist_camera_extrinsic_opencv"]
+                wrist_camera_intrinsic_opencv = info_batch["wrist_camera_intrinsic_opencv"]
 
                 info = {k: v[-1] for k, v in info_batch.items()}
                 # terminated = bool(terminated_batch[-1].item())
@@ -234,14 +231,7 @@ def main():
                     front_camera = obs_batch["front_camera"]
                     wrist_camera = obs_batch["wrist_camera"]
                     front_camera_depth = obs_batch["front_camera_depth"]
-                    front_camera_segmentation = obs_batch["front_camera_segmentation"]
                     wrist_camera_depth = obs_batch["wrist_camera_depth"]
-                    front_camera_extrinsic_opencv = obs_batch["front_camera_extrinsic_opencv"]
-                    front_camera_intrinsic_opencv = obs_batch["front_camera_intrinsic_opencv"]
-                    front_camera_cam2world_opengl = obs_batch["front_camera_cam2world_opengl"]
-                    wrist_camera_extrinsic_opencv = obs_batch["wrist_camera_extrinsic_opencv"]
-                    wrist_camera_intrinsic_opencv = obs_batch["wrist_camera_intrinsic_opencv"]
-                    wrist_camera_cam2world_opengl = obs_batch["wrist_camera_cam2world_opengl"]
                     end_effector_pose = obs_batch["end_effector_pose"]
                     joint_states = obs_batch["joint_states"]
                     velocity = obs_batch["velocity"]
@@ -252,6 +242,10 @@ def main():
                     subgoal = info_batch["subgoal"]
                     subgoal_grounded = info_batch["subgoal_grounded"]
                     available_options = info_batch["available_options"]
+                    front_camera_extrinsic_opencv = info_batch["front_camera_extrinsic_opencv"]
+                    front_camera_intrinsic_opencv = info_batch["front_camera_intrinsic_opencv"]
+                    wrist_camera_extrinsic_opencv = info_batch["wrist_camera_extrinsic_opencv"]
+                    wrist_camera_intrinsic_opencv = info_batch["wrist_camera_intrinsic_opencv"]
 
                     # ######## Video saving variable preparation (replay phase) start ########
                     rollout_base_frames.extend(torch.as_tensor(f).detach().cpu().numpy().copy() for f in front_camera)
