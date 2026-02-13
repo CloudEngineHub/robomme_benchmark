@@ -239,7 +239,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--max_workers",
         type=int,
-        default=26,
+        default=20,
         help="Total max workers across 2 GPUs.",
     )
     return parser.parse_args()

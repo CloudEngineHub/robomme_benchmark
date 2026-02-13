@@ -680,8 +680,8 @@ def parse_args() -> argparse.Namespace:
         "--episodes",
         "-n",
         type=int,
-        default=2,
-        help="Number of episodes generated per environment (Default: 50)",
+        default=100,
+        help="Number of episodes generated per environment (Default: 100)",
     )
     parser.add_argument(
         "--save-video",
@@ -708,8 +708,6 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
-    # Generate only first 50 entries
-    args.episodes = min(50, args.episodes)
     env_inputs = args.env or DEFAULT_ENVS
     env_ids: List[str] = []
     # Parse environment list arguments, support comma separation

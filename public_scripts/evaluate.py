@@ -28,7 +28,7 @@ ACTION_SPACE = "joint_angle"
 #ACTION_SPACE = "keypoint"
 #ACTION_SPACE = "oracle_planner"
 
-GUI_RENDER = True
+GUI_RENDER = False
 MAX_STEPS = 3000
 
 
