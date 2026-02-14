@@ -1,0 +1,1538 @@
+======================================================================
+EnvID: BinFill
+======================================================================
+
+  episode_5:
+  ------------------------------------------------------------
+    [data_1206]  seed=4500, difficulty=easy, total_timesteps=389
+      'pick up the first red cube': 211 steps
+      'put it into the bin': 67 steps
+      'press the button': 71 steps
+      'All tasks completed': 40 steps
+    [dataset_generate-b4]  seed=4500, difficulty=easy, total_timesteps=378
+      'pick up the first red cube': 204 steps
+      'put it into the bin': 61 steps
+      'press the button': 72 steps
+      'All tasks completed': 41 steps
+  ------------------------------------------------------------
+
+  episode_6:
+  ------------------------------------------------------------
+    [data_1206]  seed=4600, difficulty=medium, total_timesteps=622
+      'pick up the first blue cube': 109 steps
+      'put it into the bin': 58 steps
+      'pick up the second blue cube': 120 steps
+      'put it into the bin': 67 steps
+      'pick up the third blue cube': 103 steps
+      'put it into the bin': 59 steps
+      'press the button': 63 steps
+      'All tasks completed': 43 steps
+    [dataset_generate-b4]  seed=4600, difficulty=medium, total_timesteps=622
+      'pick up the first blue cube': 109 steps
+      'put it into the bin': 58 steps
+      'pick up the second blue cube': 120 steps
+      'put it into the bin': 67 steps
+      'pick up the third blue cube': 103 steps
+      'put it into the bin': 59 steps
+      'press the button': 63 steps
+      'All tasks completed': 43 steps
+  ------------------------------------------------------------
+
+  episode_7:
+  ------------------------------------------------------------
+    [data_1206]  seed=4701, difficulty=hard, total_timesteps=785
+      'pick up the first red cube': 127 steps
+      'put it into the bin': 67 steps
+      'pick up the second red cube': 102 steps
+      'put it into the bin': 58 steps
+      'pick up the first blue cube': 94 steps
+      'put it into the bin': 68 steps
+      'pick up the second blue cube': 90 steps
+      'put it into the bin': 69 steps
+      'press the button': 75 steps
+      'All tasks completed': 35 steps
+    [dataset_generate-b4]  seed=4701, difficulty=hard, total_timesteps=785
+      'pick up the first red cube': 127 steps
+      'put it into the bin': 67 steps
+      'pick up the second red cube': 102 steps
+      'put it into the bin': 58 steps
+      'pick up the first blue cube': 94 steps
+      'put it into the bin': 68 steps
+      'pick up the second blue cube': 90 steps
+      'put it into the bin': 69 steps
+      'press the button': 75 steps
+      'All tasks completed': 35 steps
+  ------------------------------------------------------------
+
+  episode_8:
+  ------------------------------------------------------------
+    [data_1206]  seed=4800, difficulty=easy, total_timesteps=462
+      'pick up the first blue cube': 119 steps
+      'put it into the bin': 73 steps
+      'pick up the second blue cube': 104 steps
+      'put it into the bin': 70 steps
+      'press the button': 61 steps
+      'All tasks completed': 35 steps
+    [dataset_generate-b4]  seed=4800, difficulty=easy, total_timesteps=462
+      'pick up the first blue cube': 119 steps
+      'put it into the bin': 73 steps
+      'pick up the second blue cube': 104 steps
+      'put it into the bin': 70 steps
+      'press the button': 61 steps
+      'All tasks completed': 35 steps
+  ------------------------------------------------------------
+
+  episode_9:
+  ------------------------------------------------------------
+    [data_1206]  seed=4900, difficulty=easy, total_timesteps=629
+      'pick up the first blue cube': 122 steps
+      'put it into the bin': 68 steps
+      'pick up the second blue cube': 86 steps
+      'put it into the bin': 55 steps
+      'pick up the third blue cube': 120 steps
+      'put it into the bin': 78 steps
+      'press the button': 62 steps
+      'All tasks completed': 38 steps
+    [dataset_generate-b4]  seed=4900, difficulty=easy, total_timesteps=629
+      'pick up the first blue cube': 122 steps
+      'put it into the bin': 68 steps
+      'pick up the second blue cube': 86 steps
+      'put it into the bin': 55 steps
+      'pick up the third blue cube': 120 steps
+      'put it into the bin': 78 steps
+      'press the button': 62 steps
+      'All tasks completed': 38 steps
+  ------------------------------------------------------------
+======================================================================
+EnvID: ButtonUnmask
+======================================================================
+
+  episode_5:
+  ------------------------------------------------------------
+    [data_1206]  seed=8501, difficulty=easy, total_timesteps=312
+      'press the button': 115 steps
+      'pick up the container that hides the blue cube': 187 steps
+      'All tasks completed': 10 steps
+    [dataset_generate-b4]  seed=8501, difficulty=easy, total_timesteps=299
+      'press the button': 115 steps
+      'pick up the container that hides the blue cube': 175 steps
+      'All tasks completed': 9 steps
+  ------------------------------------------------------------
+
+  episode_6:
+  ------------------------------------------------------------
+    [data_1206]  seed=8600, difficulty=medium, total_timesteps=220
+      'press the button': 117 steps
+      'pick up the container that hides the red cube': 95 steps
+      'All tasks completed': 8 steps
+    [dataset_generate-b4]  seed=8600, difficulty=medium, total_timesteps=220
+      'press the button': 117 steps
+      'pick up the container that hides the red cube': 95 steps
+      'All tasks completed': 8 steps
+  ------------------------------------------------------------
+
+  episode_7:
+  ------------------------------------------------------------
+    [data_1206]  seed=8700, difficulty=hard, total_timesteps=377
+      'press the button': 115 steps
+      'pick up the container that hides the blue cube': 112 steps
+      'put down the container': 50 steps
+      'pick up the container that hides the red cube': 93 steps
+      'All tasks completed': 7 steps
+    [dataset_generate-b4]  seed=8700, difficulty=hard, total_timesteps=377
+      'press the button': 115 steps
+      'pick up the container that hides the blue cube': 112 steps
+      'put down the container': 50 steps
+      'pick up the container that hides the red cube': 93 steps
+      'All tasks completed': 7 steps
+  ------------------------------------------------------------
+
+  episode_8:
+  ------------------------------------------------------------
+    [data_1206]  seed=8800, difficulty=easy, total_timesteps=207
+      'press the button': 111 steps
+      'pick up the container that hides the blue cube': 89 steps
+      'All tasks completed': 7 steps
+    [dataset_generate-b4]  seed=8800, difficulty=easy, total_timesteps=207
+      'press the button': 111 steps
+      'pick up the container that hides the blue cube': 89 steps
+      'All tasks completed': 7 steps
+  ------------------------------------------------------------
+
+  episode_9:
+  ------------------------------------------------------------
+    [data_1206]  seed=8900, difficulty=easy, total_timesteps=219
+      'press the button': 112 steps
+      'pick up the container that hides the red cube': 101 steps
+      'All tasks completed': 6 steps
+    [dataset_generate-b4]  seed=8900, difficulty=easy, total_timesteps=219
+      'press the button': 112 steps
+      'pick up the container that hides the red cube': 101 steps
+      'All tasks completed': 6 steps
+  ------------------------------------------------------------
+======================================================================
+EnvID: ButtonUnmaskSwap
+======================================================================
+
+  episode_5:
+  ------------------------------------------------------------
+    [data_1206]  seed=7500, difficulty=easy, total_timesteps=387
+      'press the first button': 109 steps
+      'press the second button': 100 steps
+      'pick up the container that hides the red cube': 170 steps
+      'All tasks completed': 8 steps
+    [dataset_generate-b4]  seed=7500, difficulty=easy, total_timesteps=387
+      'press the first button': 109 steps
+      'press the second button': 100 steps
+      'pick up the container that hides the red cube': 170 steps
+      'All tasks completed': 8 steps
+  ------------------------------------------------------------
+
+  episode_6:
+  ------------------------------------------------------------
+    [data_1206]  seed=7600, difficulty=medium, total_timesteps=303
+      'press the first button': 109 steps
+      'press the second button': 97 steps
+      'pick up the container that hides the red cube': 90 steps
+      'All tasks completed': 7 steps
+    [dataset_generate-b4]  seed=7600, difficulty=medium, total_timesteps=303
+      'press the first button': 109 steps
+      'press the second button': 97 steps
+      'pick up the container that hides the red cube': 90 steps
+      'All tasks completed': 7 steps
+  ------------------------------------------------------------
+
+  episode_7:
+  ------------------------------------------------------------
+    [data_1206]  seed=7700, difficulty=hard, total_timesteps=451
+      'press the first button': 116 steps
+      'press the second button': 93 steps
+      'pick up the container that hides the green cube': 100 steps
+      'put down the container': 51 steps
+      'pick up the container that hides the red cube': 85 steps
+      'All tasks completed': 6 steps
+    [dataset_generate-b4]  seed=7700, difficulty=hard, total_timesteps=451
+      'press the first button': 116 steps
+      'press the second button': 93 steps
+      'pick up the container that hides the green cube': 100 steps
+      'put down the container': 51 steps
+      'pick up the container that hides the red cube': 85 steps
+      'All tasks completed': 6 steps
+  ------------------------------------------------------------
+
+  episode_8:
+  ------------------------------------------------------------
+    [data_1206]  seed=7800, difficulty=easy, total_timesteps=470
+      'press the first button': 110 steps
+      'press the second button': 98 steps
+      'pick up the container that hides the green cube': 106 steps
+      'put down the container': 52 steps
+      'pick up the container that hides the red cube': 94 steps
+      'All tasks completed': 10 steps
+    [dataset_generate-b4]  seed=7800, difficulty=easy, total_timesteps=470
+      'press the first button': 110 steps
+      'press the second button': 98 steps
+      'pick up the container that hides the green cube': 106 steps
+      'put down the container': 52 steps
+      'pick up the container that hides the red cube': 94 steps
+      'All tasks completed': 10 steps
+  ------------------------------------------------------------
+
+  episode_9:
+  ------------------------------------------------------------
+    [data_1206]  seed=7900, difficulty=easy, total_timesteps=440
+      'press the first button': 109 steps
+      'press the second button': 91 steps
+      'pick up the container that hides the green cube': 110 steps
+      'put down the container': 41 steps
+      'pick up the container that hides the red cube': 82 steps
+      'All tasks completed': 7 steps
+    [dataset_generate-b4]  seed=7900, difficulty=easy, total_timesteps=440
+      'press the first button': 109 steps
+      'press the second button': 91 steps
+      'pick up the container that hides the green cube': 110 steps
+      'put down the container': 41 steps
+      'pick up the container that hides the red cube': 82 steps
+      'All tasks completed': 7 steps
+  ------------------------------------------------------------
+======================================================================
+EnvID: InsertPeg
+======================================================================
+
+  episode_5:
+  ------------------------------------------------------------
+    [data_1206]  seed=13500, difficulty=easy, total_timesteps=492
+      'Pick up the peg by grasping the far end': 117 steps
+      'Insert the peg from the right side of the box': 130 steps
+      'Pick up the peg by grasping the far end': 117 steps
+      'Insert the peg from the right side': 108 steps
+      'All tasks completed': 20 steps
+    [dataset_generate-b4]  seed=13500, difficulty=easy, total_timesteps=492
+      'Pick up the peg by grasping the far end': 117 steps
+      'Insert the peg from the right side of the box': 130 steps
+      'Pick up the peg by grasping the far end': 117 steps
+      'Insert the peg from the right side': 108 steps
+      'All tasks completed': 20 steps
+  ------------------------------------------------------------
+
+  episode_6:
+  ------------------------------------------------------------
+    [data_1206]  seed=13602, difficulty=medium, total_timesteps=514
+      'Pick up the peg by grasping the far end': 129 steps
+      'Insert the peg from the left side of the box': 124 steps
+      'Pick up the peg by grasping the far end': 129 steps
+      'Insert the peg from the left side': 118 steps
+      'All tasks completed': 14 steps
+    [dataset_generate-b4]  seed=13602, difficulty=medium, total_timesteps=514
+      'Pick up the peg by grasping the far end': 129 steps
+      'Insert the peg from the left side of the box': 124 steps
+      'Pick up the peg by grasping the far end': 129 steps
+      'Insert the peg from the left side': 118 steps
+      'All tasks completed': 14 steps
+  ------------------------------------------------------------
+
+  episode_7:
+  ------------------------------------------------------------
+    [data_1206]  seed=13700, difficulty=hard, total_timesteps=486
+      'Pick up the peg by grasping the far end': 110 steps
+      'Insert the peg from the left side of the box': 132 steps
+      'Pick up the peg by grasping the far end': 110 steps
+      'Insert the peg from the left side': 123 steps
+      'All tasks completed': 11 steps
+    [dataset_generate-b4]  seed=13700, difficulty=hard, total_timesteps=486
+      'Pick up the peg by grasping the far end': 110 steps
+      'Insert the peg from the left side of the box': 132 steps
+      'Pick up the peg by grasping the far end': 110 steps
+      'Insert the peg from the left side': 123 steps
+      'All tasks completed': 11 steps
+  ------------------------------------------------------------
+
+  episode_8:
+  ------------------------------------------------------------
+    [data_1206]  seed=13800, difficulty=easy, total_timesteps=465
+      'Pick up the peg by grasping the near end': 113 steps
+      'Insert the peg from the left side of the box': 116 steps
+      'Pick up the peg by grasping the near end': 113 steps
+      'Insert the peg from the left side': 108 steps
+      'All tasks completed': 15 steps
+    [dataset_generate-b4]  seed=13800, difficulty=easy, total_timesteps=465
+      'Pick up the peg by grasping the near end': 113 steps
+      'Insert the peg from the left side of the box': 116 steps
+      'Pick up the peg by grasping the near end': 113 steps
+      'Insert the peg from the left side': 108 steps
+      'All tasks completed': 15 steps
+  ------------------------------------------------------------
+
+  episode_9:
+  ------------------------------------------------------------
+    [data_1206]  seed=13902, difficulty=easy, total_timesteps=508
+      'Pick up the peg by grasping the near end': 143 steps
+      'Insert the peg from the left side of the box': 107 steps
+      'Pick up the peg by grasping the near end': 143 steps
+      'Insert the peg from the left side': 100 steps
+      'All tasks completed': 15 steps
+    [dataset_generate-b4]  seed=13902, difficulty=easy, total_timesteps=508
+      'Pick up the peg by grasping the near end': 143 steps
+      'Insert the peg from the left side of the box': 107 steps
+      'Pick up the peg by grasping the near end': 143 steps
+      'Insert the peg from the left side': 100 steps
+      'All tasks completed': 15 steps
+  ------------------------------------------------------------
+======================================================================
+EnvID: MoveCube
+======================================================================
+
+  episode_5:
+  ------------------------------------------------------------
+    [data_1206]  seed=14500, difficulty=easy, total_timesteps=429
+      'Pick up the cube': 112 steps
+      'place the cube onto the target': 74 steps
+      'static': 60 steps
+      'Pick up the cube': 103 steps
+      'place the cube onto the target': 63 steps
+      'All tasks completed': 17 steps
+    [dataset_generate-b4]  seed=14500, difficulty=easy, total_timesteps=429
+      'Pick up the cube': 112 steps
+      'place the cube onto the target': 74 steps
+      'static': 60 steps
+      'Pick up the cube': 103 steps
+      'place the cube onto the target': 63 steps
+      'All tasks completed': 17 steps
+  ------------------------------------------------------------
+
+  episode_6:
+  ------------------------------------------------------------
+    [data_1206]  seed=14602, difficulty=medium, total_timesteps=443
+      'Pick up the cube': 106 steps
+      'place the cube onto the target': 74 steps
+      'static': 60 steps
+      'Pick up the cube': 109 steps
+      'place the cube onto the target': 78 steps
+      'All tasks completed': 16 steps
+    [dataset_generate-b4]  seed=14602, difficulty=medium, total_timesteps=443
+      'Pick up the cube': 106 steps
+      'place the cube onto the target': 74 steps
+      'static': 60 steps
+      'Pick up the cube': 109 steps
+      'place the cube onto the target': 78 steps
+      'All tasks completed': 16 steps
+  ------------------------------------------------------------
+
+  episode_7:
+  ------------------------------------------------------------
+    [data_1206]  seed=14700, difficulty=hard, total_timesteps=512
+      'Pick up the peg': 115 steps
+      'Hook the cube to the target with the peg': 122 steps
+      'static': 30 steps
+      'Pick up the peg': 118 steps
+      'Hook the cube to the target with the peg': 121 steps
+      'All tasks completed': 6 steps
+    [dataset_generate-b4]  seed=14700, difficulty=hard, total_timesteps=512
+      'Pick up the peg': 115 steps
+      'Hook the cube to the target with the peg': 122 steps
+      'static': 30 steps
+      'Pick up the peg': 118 steps
+      'Hook the cube to the target with the peg': 121 steps
+      'All tasks completed': 6 steps
+  ------------------------------------------------------------
+
+  episode_8:
+  ------------------------------------------------------------
+    [data_1206]  seed=14800, difficulty=easy, total_timesteps=279
+      'Close the gripper and push the cube to the target': 100 steps
+      'static': 60 steps
+      'Close the gripper and push the cube to the target': 114 steps
+      'All tasks completed': 5 steps
+    [dataset_generate-b4]  seed=14800, difficulty=easy, total_timesteps=279
+      'Close the gripper and push the cube to the target': 100 steps
+      'static': 60 steps
+      'Close the gripper and push the cube to the target': 114 steps
+      'All tasks completed': 5 steps
+  ------------------------------------------------------------
+
+  episode_9:
+  ------------------------------------------------------------
+    [data_1206]  seed=14900, difficulty=easy, total_timesteps=279
+      'Close the gripper and push the cube to the target': 113 steps
+      'static': 60 steps
+      'Close the gripper and push the cube to the target': 101 steps
+      'All tasks completed': 5 steps
+    [dataset_generate-b4]  seed=14900, difficulty=easy, total_timesteps=279
+      'Close the gripper and push the cube to the target': 113 steps
+      'static': 60 steps
+      'Close the gripper and push the cube to the target': 101 steps
+      'All tasks completed': 5 steps
+  ------------------------------------------------------------
+======================================================================
+EnvID: PatternLock
+======================================================================
+
+  episode_5:
+  ------------------------------------------------------------
+    [data_1206]  seed=15500, difficulty=easy, total_timesteps=112
+      'move backward': 32 steps
+      'move left': 24 steps
+      'move backward': 32 steps
+      'move left': 17 steps
+      'All tasks completed': 7 steps
+    [dataset_generate-b4]  seed=15500, difficulty=easy, total_timesteps=112
+      'move backward': 32 steps
+      'move left': 24 steps
+      'move backward': 32 steps
+      'move left': 17 steps
+      'All tasks completed': 7 steps
+  ------------------------------------------------------------
+
+  episode_6:
+  ------------------------------------------------------------
+    [data_1206]  seed=15600, difficulty=medium, total_timesteps=164
+      'move forward-left': 39 steps
+      'move forward': 43 steps
+      'move forward-left': 39 steps
+      'move forward': 30 steps
+      'All tasks completed': 13 steps
+    [dataset_generate-b4]  seed=15600, difficulty=medium, total_timesteps=164
+      'move forward-left': 39 steps
+      'move forward': 43 steps
+      'move forward-left': 39 steps
+      'move forward': 30 steps
+      'All tasks completed': 13 steps
+  ------------------------------------------------------------
+
+  episode_7:
+  ------------------------------------------------------------
+    [data_1206]  seed=15700, difficulty=hard, total_timesteps=358
+      'move right': 30 steps
+      'move forward-right': 31 steps
+      'move forward': 78 steps
+      'move backward-left': 40 steps
+      'move right': 30 steps
+      'move forward-right': 31 steps
+      'move forward': 78 steps
+      'move backward-left': 33 steps
+      'All tasks completed': 7 steps
+    [dataset_generate-b4]  seed=15700, difficulty=hard, total_timesteps=358
+      'move right': 30 steps
+      'move forward-right': 31 steps
+      'move forward': 78 steps
+      'move backward-left': 40 steps
+      'move right': 30 steps
+      'move forward-right': 31 steps
+      'move forward': 78 steps
+      'move backward-left': 33 steps
+      'All tasks completed': 7 steps
+  ------------------------------------------------------------
+
+  episode_8:
+  ------------------------------------------------------------
+    [data_1206]  seed=15800, difficulty=easy, total_timesteps=148
+      'move forward': 36 steps
+      'move backward-right': 38 steps
+      'move forward': 36 steps
+      'move backward-right': 31 steps
+      'All tasks completed': 7 steps
+    [dataset_generate-b4]  seed=15800, difficulty=easy, total_timesteps=148
+      'move forward': 36 steps
+      'move backward-right': 38 steps
+      'move forward': 36 steps
+      'move backward-right': 31 steps
+      'All tasks completed': 7 steps
+  ------------------------------------------------------------
+
+  episode_9:
+  ------------------------------------------------------------
+    [data_1206]  seed=15900, difficulty=easy, total_timesteps=48
+      'move left': 41 steps
+      'All tasks completed': 7 steps
+    [dataset_generate-b4]  seed=15900, difficulty=easy, total_timesteps=48
+      'move left': 41 steps
+      'All tasks completed': 7 steps
+  ------------------------------------------------------------
+======================================================================
+EnvID: PickHighlight
+======================================================================
+
+  episode_5:
+  ------------------------------------------------------------
+    [data_1206]  seed=12500, difficulty=easy, total_timesteps=282
+      'press the button': 110 steps
+      'pick up the highlighted cube, which is green': 159 steps
+      'All tasks completed': 13 steps
+    [dataset_generate-b4]  seed=12500, difficulty=easy, total_timesteps=282
+      'press the button': 110 steps
+      'pick up the highlighted cube, which is green': 159 steps
+      'All tasks completed': 13 steps
+  ------------------------------------------------------------
+
+  episode_6:
+  ------------------------------------------------------------
+    [data_1206]  seed=12600, difficulty=medium, total_timesteps=387
+      'press the button': 117 steps
+      'pick up the first highlighted cube, which is blue': 110 steps
+      'place the cube onto the table': 60 steps
+      'pick up the second highlighted cube, which is red': 84 steps
+      'All tasks completed': 16 steps
+    [dataset_generate-b4]  seed=12600, difficulty=medium, total_timesteps=387
+      'press the button': 117 steps
+      'pick up the first highlighted cube, which is blue': 110 steps
+      'place the cube onto the table': 60 steps
+      'pick up the second highlighted cube, which is red': 84 steps
+      'All tasks completed': 16 steps
+  ------------------------------------------------------------
+
+  episode_7:
+  ------------------------------------------------------------
+    [data_1206]  seed=12700, difficulty=hard, total_timesteps=530
+      'press the button': 121 steps
+      'pick up the first highlighted cube, which is green': 96 steps
+      'place the cube onto the table': 59 steps
+      'pick up the second highlighted cube, which is blue': 97 steps
+      'place the cube onto the table': 50 steps
+      'pick up the third highlighted cube, which is blue': 92 steps
+      'All tasks completed': 15 steps
+    [dataset_generate-b4]  seed=12700, difficulty=hard, total_timesteps=530
+      'press the button': 121 steps
+      'pick up the first highlighted cube, which is green': 96 steps
+      'place the cube onto the table': 59 steps
+      'pick up the second highlighted cube, which is blue': 97 steps
+      'place the cube onto the table': 50 steps
+      'pick up the third highlighted cube, which is blue': 92 steps
+      'All tasks completed': 15 steps
+  ------------------------------------------------------------
+
+  episode_8:
+  ------------------------------------------------------------
+    [data_1206]  seed=12800, difficulty=easy, total_timesteps=212
+      'press the button': 110 steps
+      'pick up the highlighted cube, which is red': 89 steps
+      'All tasks completed': 13 steps
+    [dataset_generate-b4]  seed=12800, difficulty=easy, total_timesteps=212
+      'press the button': 110 steps
+      'pick up the highlighted cube, which is red': 89 steps
+      'All tasks completed': 13 steps
+  ------------------------------------------------------------
+
+  episode_9:
+  ------------------------------------------------------------
+    [data_1206]  seed=12900, difficulty=easy, total_timesteps=225
+      'press the button': 121 steps
+      'pick up the highlighted cube, which is red': 89 steps
+      'All tasks completed': 15 steps
+    [dataset_generate-b4]  seed=12900, difficulty=easy, total_timesteps=225
+      'press the button': 121 steps
+      'pick up the highlighted cube, which is red': 89 steps
+      'All tasks completed': 15 steps
+  ------------------------------------------------------------
+======================================================================
+EnvID: PickXtimes
+======================================================================
+
+  episode_5:
+  ------------------------------------------------------------
+    [data_1206]  seed=1500, difficulty=easy, total_timesteps=577
+      'pick up the red cube for the first time': 130 steps
+      'place the red cube onto the target': 90 steps
+      'pick up the red cube for the second time': 175 steps
+      'place the red cube onto the target': 87 steps
+      'press the button to stop': 57 steps
+      'All tasks completed': 38 steps
+    [dataset_generate-b4]  seed=1500, difficulty=easy, total_timesteps=576
+      'pick up the red cube for the first time': 130 steps
+      'place the red cube onto the target': 90 steps
+      'pick up the red cube for the second time': 186 steps
+      'place the red cube onto the target': 75 steps
+      'press the button to stop': 57 steps
+      'All tasks completed': 38 steps
+  ------------------------------------------------------------
+
+  episode_6:
+  ------------------------------------------------------------
+    [data_1206]  seed=1600, difficulty=medium, total_timesteps=470
+      'pick up the green cube for the first time': 135 steps
+      'place the green cube onto the target': 95 steps
+      'pick up the green cube for the second time': 70 steps
+      'place the green cube onto the target': 64 steps
+      'press the button to stop': 65 steps
+      'All tasks completed': 41 steps
+    [dataset_generate-b4]  seed=1600, difficulty=medium, total_timesteps=470
+      'pick up the green cube for the first time': 135 steps
+      'place the green cube onto the target': 95 steps
+      'pick up the green cube for the second time': 70 steps
+      'place the green cube onto the target': 64 steps
+      'press the button to stop': 65 steps
+      'All tasks completed': 41 steps
+  ------------------------------------------------------------
+
+  episode_7:
+  ------------------------------------------------------------
+    [data_1206]  seed=1700, difficulty=hard, total_timesteps=897
+      'pick up the green cube for the first time': 119 steps
+      'place the green cube onto the target': 103 steps
+      'pick up the green cube for the second time': 76 steps
+      'place the green cube onto the target': 71 steps
+      'pick up the green cube for the third time': 77 steps
+      'place the green cube onto the target': 66 steps
+      'pick up the green cube for the fourth time': 76 steps
+      'place the green cube onto the target': 66 steps
+      'pick up the green cube for the fifth time': 80 steps
+      'place the green cube onto the target': 67 steps
+      'press the button to stop': 59 steps
+      'All tasks completed': 37 steps
+    [dataset_generate-b4]  seed=1700, difficulty=hard, total_timesteps=897
+      'pick up the green cube for the first time': 119 steps
+      'place the green cube onto the target': 103 steps
+      'pick up the green cube for the second time': 76 steps
+      'place the green cube onto the target': 71 steps
+      'pick up the green cube for the third time': 77 steps
+      'place the green cube onto the target': 66 steps
+      'pick up the green cube for the fourth time': 76 steps
+      'place the green cube onto the target': 66 steps
+      'pick up the green cube for the fifth time': 80 steps
+      'place the green cube onto the target': 67 steps
+      'press the button to stop': 59 steps
+      'All tasks completed': 37 steps
+  ------------------------------------------------------------
+
+  episode_8:
+  ------------------------------------------------------------
+    [data_1206]  seed=1800, difficulty=easy, total_timesteps=332
+      'pick up the red cube for the first time': 144 steps
+      'place the red cube onto the target': 94 steps
+      'press the button to stop': 54 steps
+      'All tasks completed': 40 steps
+    [dataset_generate-b4]  seed=1800, difficulty=easy, total_timesteps=332
+      'pick up the red cube for the first time': 144 steps
+      'place the red cube onto the target': 94 steps
+      'press the button to stop': 54 steps
+      'All tasks completed': 40 steps
+  ------------------------------------------------------------
+
+  episode_9:
+  ------------------------------------------------------------
+    [data_1206]  seed=1900, difficulty=easy, total_timesteps=574
+      'pick up the green cube for the first time': 113 steps
+      'place the green cube onto the target': 86 steps
+      'pick up the green cube for the second time': 70 steps
+      'place the green cube onto the target': 64 steps
+      'pick up the green cube for the third time': 70 steps
+      'place the green cube onto the target': 63 steps
+      'press the button to stop': 67 steps
+      'All tasks completed': 41 steps
+    [dataset_generate-b4]  seed=1900, difficulty=easy, total_timesteps=574
+      'pick up the green cube for the first time': 113 steps
+      'place the green cube onto the target': 86 steps
+      'pick up the green cube for the second time': 70 steps
+      'place the green cube onto the target': 64 steps
+      'pick up the green cube for the third time': 70 steps
+      'place the green cube onto the target': 63 steps
+      'press the button to stop': 67 steps
+      'All tasks completed': 41 steps
+  ------------------------------------------------------------
+======================================================================
+EnvID: RouteStick
+======================================================================
+
+  episode_5:
+  ------------------------------------------------------------
+    [data_1206]  seed=16500, difficulty=easy, total_timesteps=300
+      'move to the nearest right target by circling around the stick counterclockwise': 50 steps
+      'move to the nearest left target by circling around the stick clockwise': 100 steps
+      'move to the nearest right target by circling around the stick counterclockwise': 50 steps
+      'move to the nearest left target by circling around the stick clockwise': 93 steps
+      'All tasks completed': 7 steps
+    [dataset_generate-b4]  seed=16500, difficulty=easy, total_timesteps=300
+      'move to the nearest right target by circling around the stick counterclockwise': 50 steps
+      'move to the nearest left target by circling around the stick clockwise': 100 steps
+      'move to the nearest right target by circling around the stick counterclockwise': 50 steps
+      'move to the nearest left target by circling around the stick clockwise': 93 steps
+      'All tasks completed': 7 steps
+  ------------------------------------------------------------
+
+  episode_6:
+  ------------------------------------------------------------
+    [data_1206]  seed=16600, difficulty=medium, total_timesteps=400
+      'move to the nearest left target by circling around the stick counterclockwise': 50 steps
+      'move to the nearest left target by circling around the stick clockwise': 50 steps
+      'move to the nearest right target by circling around the stick counterclockwise': 50 steps
+      'move to the nearest right target by circling around the stick clockwise': 50 steps
+      'move to the nearest left target by circling around the stick counterclockwise': 50 steps
+      'move to the nearest left target by circling around the stick clockwise': 50 steps
+      'move to the nearest right target by circling around the stick counterclockwise': 50 steps
+      'move to the nearest right target by circling around the stick clockwise': 43 steps
+      'All tasks completed': 7 steps
+    [dataset_generate-b4]  seed=16600, difficulty=medium, total_timesteps=400
+      'move to the nearest left target by circling around the stick counterclockwise': 50 steps
+      'move to the nearest left target by circling around the stick clockwise': 50 steps
+      'move to the nearest right target by circling around the stick counterclockwise': 50 steps
+      'move to the nearest right target by circling around the stick clockwise': 50 steps
+      'move to the nearest left target by circling around the stick counterclockwise': 50 steps
+      'move to the nearest left target by circling around the stick clockwise': 50 steps
+      'move to the nearest right target by circling around the stick counterclockwise': 50 steps
+      'move to the nearest right target by circling around the stick clockwise': 43 steps
+      'All tasks completed': 7 steps
+  ------------------------------------------------------------
+
+  episode_7:
+  ------------------------------------------------------------
+    [data_1206]  seed=16700, difficulty=hard, total_timesteps=500
+      'move to the nearest left target by circling around the stick clockwise': 50 steps
+      'move to the nearest right target by circling around the stick clockwise': 50 steps
+      'move to the nearest right target by circling around the stick counterclockwise': 50 steps
+      'move to the nearest right target by circling around the stick clockwise': 50 steps
+      'move to the nearest left target by circling around the stick clockwise': 100 steps
+      'move to the nearest right target by circling around the stick clockwise': 50 steps
+      'move to the nearest right target by circling around the stick counterclockwise': 50 steps
+      'move to the nearest right target by circling around the stick clockwise': 50 steps
+      'move to the nearest left target by circling around the stick clockwise': 43 steps
+      'All tasks completed': 7 steps
+    [dataset_generate-b4]  seed=16700, difficulty=hard, total_timesteps=500
+      'move to the nearest left target by circling around the stick clockwise': 50 steps
+      'move to the nearest right target by circling around the stick clockwise': 50 steps
+      'move to the nearest right target by circling around the stick counterclockwise': 50 steps
+      'move to the nearest right target by circling around the stick clockwise': 50 steps
+      'move to the nearest left target by circling around the stick clockwise': 100 steps
+      'move to the nearest right target by circling around the stick clockwise': 50 steps
+      'move to the nearest right target by circling around the stick counterclockwise': 50 steps
+      'move to the nearest right target by circling around the stick clockwise': 50 steps
+      'move to the nearest left target by circling around the stick clockwise': 43 steps
+      'All tasks completed': 7 steps
+  ------------------------------------------------------------
+
+  episode_8:
+  ------------------------------------------------------------
+    [data_1206]  seed=16800, difficulty=easy, total_timesteps=300
+      'move to the nearest right target by circling around the stick clockwise': 50 steps
+      'move to the nearest right target by circling around the stick counterclockwise': 50 steps
+      'move to the nearest left target by circling around the stick counterclockwise': 50 steps
+      'move to the nearest right target by circling around the stick clockwise': 50 steps
+      'move to the nearest right target by circling around the stick counterclockwise': 50 steps
+      'move to the nearest left target by circling around the stick counterclockwise': 43 steps
+      'All tasks completed': 7 steps
+    [dataset_generate-b4]  seed=16800, difficulty=easy, total_timesteps=300
+      'move to the nearest right target by circling around the stick clockwise': 50 steps
+      'move to the nearest right target by circling around the stick counterclockwise': 50 steps
+      'move to the nearest left target by circling around the stick counterclockwise': 50 steps
+      'move to the nearest right target by circling around the stick clockwise': 50 steps
+      'move to the nearest right target by circling around the stick counterclockwise': 50 steps
+      'move to the nearest left target by circling around the stick counterclockwise': 43 steps
+      'All tasks completed': 7 steps
+  ------------------------------------------------------------
+
+  episode_9:
+  ------------------------------------------------------------
+    [data_1206]  seed=16900, difficulty=easy, total_timesteps=200
+      'move to the nearest left target by circling around the stick counterclockwise': 193 steps
+      'All tasks completed': 7 steps
+    [dataset_generate-b4]  seed=16900, difficulty=easy, total_timesteps=200
+      'move to the nearest left target by circling around the stick counterclockwise': 193 steps
+      'All tasks completed': 7 steps
+  ------------------------------------------------------------
+======================================================================
+EnvID: StopCube
+======================================================================
+
+  episode_5:
+  ------------------------------------------------------------
+    [data_1206]  seed=2500, difficulty=easy, total_timesteps=131
+      'move to the top of the button to prepare': 61 steps
+      'press the button to stop the cube on the target': 29 steps
+      'All tasks completed': 41 steps
+    [dataset_generate-b4]  seed=2500, difficulty=easy, total_timesteps=131
+      'move to the top of the button to prepare': 61 steps
+      'press the button to stop the cube on the target': 29 steps
+      'All tasks completed': 41 steps
+  ------------------------------------------------------------
+
+  episode_6:
+  ------------------------------------------------------------
+    [data_1206]  seed=2600, difficulty=medium, total_timesteps=247
+      'move to the top of the button to prepare': 53 steps
+      'remain static': 132 steps
+      'press the button to stop the cube on the target': 27 steps
+      'All tasks completed': 35 steps
+    [dataset_generate-b4]  seed=2600, difficulty=medium, total_timesteps=247
+      'move to the top of the button to prepare': 53 steps
+      'remain static': 132 steps
+      'press the button to stop the cube on the target': 27 steps
+      'All tasks completed': 35 steps
+  ------------------------------------------------------------
+
+  episode_7:
+  ------------------------------------------------------------
+    [data_1206]  seed=2700, difficulty=hard, total_timesteps=406
+      'move to the top of the button to prepare': 57 steps
+      'remain static': 276 steps
+      'press the button to stop the cube on the target': 30 steps
+      'All tasks completed': 43 steps
+    [dataset_generate-b4]  seed=2700, difficulty=hard, total_timesteps=406
+      'move to the top of the button to prepare': 57 steps
+      'remain static': 276 steps
+      'press the button to stop the cube on the target': 30 steps
+      'All tasks completed': 43 steps
+  ------------------------------------------------------------
+
+  episode_8:
+  ------------------------------------------------------------
+    [data_1206]  seed=2800, difficulty=easy, total_timesteps=574
+      'move to the top of the button to prepare': 54 steps
+      'remain static': 456 steps
+      'press the button to stop the cube on the target': 27 steps
+      'All tasks completed': 37 steps
+    [dataset_generate-b4]  seed=2800, difficulty=easy, total_timesteps=574
+      'move to the top of the button to prepare': 54 steps
+      'remain static': 456 steps
+      'press the button to stop the cube on the target': 27 steps
+      'All tasks completed': 37 steps
+  ------------------------------------------------------------
+
+  episode_9:
+  ------------------------------------------------------------
+    [data_1206]  seed=2900, difficulty=easy, total_timesteps=212
+      'move to the top of the button to prepare': 60 steps
+      'remain static': 90 steps
+      'press the button to stop the cube on the target': 28 steps
+      'All tasks completed': 34 steps
+    [dataset_generate-b4]  seed=2900, difficulty=easy, total_timesteps=212
+      'move to the top of the button to prepare': 60 steps
+      'remain static': 90 steps
+      'press the button to stop the cube on the target': 28 steps
+      'All tasks completed': 34 steps
+  ------------------------------------------------------------
+======================================================================
+EnvID: SwingXtimes
+======================================================================
+
+  episode_5:
+  ------------------------------------------------------------
+    [data_1206]  seed=3500, difficulty=easy, total_timesteps=474
+      'pick up the green cube': 191 steps
+      'move to the top of the right-side target for the first time': 17 steps
+      'move to the top of the left-side target for the first time': 44 steps
+      'move to the top of the right-side target for the second time': 43 steps
+      'move to the top of the left-side target for the second time': 43 steps
+      'put the green cube on the table': 40 steps
+      'press the button': 53 steps
+      'All tasks completed': 43 steps
+    [dataset_generate-b4]  seed=3500, difficulty=easy, total_timesteps=490
+      'pick up the green cube': 201 steps
+      'move to the top of the right-side target for the first time': 22 steps
+      'move to the top of the left-side target for the first time': 43 steps
+      'move to the top of the right-side target for the second time': 43 steps
+      'move to the top of the left-side target for the second time': 43 steps
+      'put the green cube on the table': 40 steps
+      'press the button': 56 steps
+      'All tasks completed': 42 steps
+  ------------------------------------------------------------
+
+  episode_6:
+  ------------------------------------------------------------
+    [data_1206]  seed=3600, difficulty=medium, total_timesteps=392
+      'pick up the red cube': 109 steps
+      'move to the top of the right-side target for the first time': 46 steps
+      'move to the top of the left-side target for the first time': 36 steps
+      'move to the top of the right-side target for the second time': 34 steps
+      'move to the top of the left-side target for the second time': 35 steps
+      'put the red cube on the table': 35 steps
+      'press the button': 60 steps
+      'All tasks completed': 37 steps
+    [dataset_generate-b4]  seed=3600, difficulty=medium, total_timesteps=392
+      'pick up the red cube': 109 steps
+      'move to the top of the right-side target for the first time': 46 steps
+      'move to the top of the left-side target for the first time': 36 steps
+      'move to the top of the right-side target for the second time': 34 steps
+      'move to the top of the left-side target for the second time': 35 steps
+      'put the red cube on the table': 35 steps
+      'press the button': 60 steps
+      'All tasks completed': 37 steps
+  ------------------------------------------------------------
+
+  episode_7:
+  ------------------------------------------------------------
+    [data_1206]  seed=3700, difficulty=hard, total_timesteps=504
+      'pick up the blue cube': 106 steps
+      'move to the top of the right-side target for the first time': 33 steps
+      'move to the top of the left-side target for the first time': 38 steps
+      'move to the top of the right-side target for the second time': 43 steps
+      'move to the top of the left-side target for the second time': 42 steps
+      'move to the top of the right-side target for the third time': 42 steps
+      'move to the top of the left-side target for the third time': 42 steps
+      'put the blue cube on the table': 35 steps
+      'press the button': 81 steps
+      'All tasks completed': 42 steps
+    [dataset_generate-b4]  seed=3700, difficulty=hard, total_timesteps=504
+      'pick up the blue cube': 106 steps
+      'move to the top of the right-side target for the first time': 33 steps
+      'move to the top of the left-side target for the first time': 38 steps
+      'move to the top of the right-side target for the second time': 43 steps
+      'move to the top of the left-side target for the second time': 42 steps
+      'move to the top of the right-side target for the third time': 42 steps
+      'move to the top of the left-side target for the third time': 42 steps
+      'put the blue cube on the table': 35 steps
+      'press the button': 81 steps
+      'All tasks completed': 42 steps
+  ------------------------------------------------------------
+
+  episode_8:
+  ------------------------------------------------------------
+    [data_1206]  seed=3800, difficulty=easy, total_timesteps=538
+      'pick up the blue cube': 149 steps
+      'move to the top of the right-side target for the first time': 41 steps
+      'move to the top of the left-side target for the first time': 40 steps
+      'move to the top of the right-side target for the second time': 39 steps
+      'move to the top of the left-side target for the second time': 39 steps
+      'move to the top of the right-side target for the third time': 39 steps
+      'move to the top of the left-side target for the third time': 39 steps
+      'put the blue cube on the table': 34 steps
+      'press the button': 77 steps
+      'All tasks completed': 41 steps
+    [dataset_generate-b4]  seed=3800, difficulty=easy, total_timesteps=538
+      'pick up the blue cube': 149 steps
+      'move to the top of the right-side target for the first time': 41 steps
+      'move to the top of the left-side target for the first time': 40 steps
+      'move to the top of the right-side target for the second time': 39 steps
+      'move to the top of the left-side target for the second time': 39 steps
+      'move to the top of the right-side target for the third time': 39 steps
+      'move to the top of the left-side target for the third time': 39 steps
+      'put the blue cube on the table': 34 steps
+      'press the button': 77 steps
+      'All tasks completed': 41 steps
+  ------------------------------------------------------------
+
+  episode_9:
+  ------------------------------------------------------------
+    [data_1206]  seed=3900, difficulty=easy, total_timesteps=343
+      'pick up the red cube': 123 steps
+      'move to the top of the right-side target for the first time': 39 steps
+      'move to the top of the left-side target for the first time': 41 steps
+      'put the red cube on the table': 36 steps
+      'press the button': 67 steps
+      'All tasks completed': 37 steps
+    [dataset_generate-b4]  seed=3900, difficulty=easy, total_timesteps=343
+      'pick up the red cube': 123 steps
+      'move to the top of the right-side target for the first time': 39 steps
+      'move to the top of the left-side target for the first time': 41 steps
+      'put the red cube on the table': 36 steps
+      'press the button': 67 steps
+      'All tasks completed': 37 steps
+  ------------------------------------------------------------
+======================================================================
+EnvID: VideoPlaceButton
+======================================================================
+
+  episode_5:
+  ------------------------------------------------------------
+    [data_1206]  seed=10500, difficulty=easy, total_timesteps=1070
+      'pick up the cube': 116 steps
+      'drop the cube onto target': 101 steps
+      'press the button': 85 steps
+      'pick up the cube': 100 steps
+      'drop the cube onto target': 105 steps
+      'pick up the cube': 70 steps
+      'drop the cube onto table': 87 steps
+      'static': 118 steps
+      'pick up the cube': 208 steps
+      'place the cube onto the correct target': 64 steps
+      'All tasks completed': 16 steps
+    [dataset_generate-b4]  seed=10500, difficulty=easy, total_timesteps=1056
+      'pick up the cube': 116 steps
+      'drop the cube onto target': 101 steps
+      'press the button': 85 steps
+      'pick up the cube': 100 steps
+      'drop the cube onto target': 105 steps
+      'pick up the cube': 70 steps
+      'drop the cube onto table': 77 steps
+      'static': 118 steps
+      'pick up the cube': 208 steps
+      'place the cube onto the correct target': 61 steps
+      'All tasks completed': 15 steps
+  ------------------------------------------------------------
+
+  episode_6:
+  ------------------------------------------------------------
+    [data_1206]  seed=10600, difficulty=medium, total_timesteps=945
+      'pick up the cube': 112 steps
+      'drop the cube onto target': 88 steps
+      'press the button': 75 steps
+      'pick up the cube': 92 steps
+      'drop the cube onto target': 93 steps
+      'pick up the cube': 70 steps
+      'drop the cube onto table': 91 steps
+      'static': 125 steps
+      'pick up the cube': 119 steps
+      'place the cube onto the correct target': 64 steps
+      'All tasks completed': 16 steps
+    [dataset_generate-b4]  seed=10600, difficulty=medium, total_timesteps=921
+      'pick up the cube': 112 steps
+      'drop the cube onto target': 88 steps
+      'press the button': 75 steps
+      'pick up the cube': 92 steps
+      'drop the cube onto target': 93 steps
+      'pick up the cube': 70 steps
+      'drop the cube onto table': 79 steps
+      'static': 119 steps
+      'pick up the cube': 113 steps
+      'place the cube onto the correct target': 64 steps
+      'All tasks completed': 16 steps
+  ------------------------------------------------------------
+
+  episode_7:
+  ------------------------------------------------------------
+    [data_1206]  seed=10701, difficulty=hard, total_timesteps=963
+      'pick up the cube': 118 steps
+      'drop the cube onto target': 98 steps
+      'press the button': 74 steps
+      'pick up the cube': 79 steps
+      'drop the cube onto target': 109 steps
+      'pick up the cube': 75 steps
+      'drop the cube onto table': 92 steps
+      'static': 116 steps
+      'pick up the cube': 114 steps
+      'place the cube onto the correct target': 74 steps
+      'All tasks completed': 14 steps
+    [dataset_generate-b4]  seed=10701, difficulty=hard, total_timesteps=958
+      'pick up the cube': 118 steps
+      'drop the cube onto target': 98 steps
+      'press the button': 74 steps
+      'pick up the cube': 79 steps
+      'drop the cube onto target': 109 steps
+      'pick up the cube': 75 steps
+      'drop the cube onto table': 82 steps
+      'static': 115 steps
+      'pick up the cube': 114 steps
+      'place the cube onto the correct target': 80 steps
+      'All tasks completed': 14 steps
+  ------------------------------------------------------------
+
+  episode_8:
+  ------------------------------------------------------------
+    [data_1206]  seed=10800, difficulty=easy, total_timesteps=1012
+      'pick up the cube': 112 steps
+      'drop the cube onto target': 93 steps
+      'press the button': 96 steps
+      'pick up the cube': 109 steps
+      'drop the cube onto target': 88 steps
+      'pick up the cube': 78 steps
+      'drop the cube onto table': 108 steps
+      'static': 121 steps
+      'pick up the cube': 119 steps
+      'place the cube onto the correct target': 69 steps
+      'All tasks completed': 19 steps
+    [dataset_generate-b4]  seed=10800, difficulty=easy, total_timesteps=1013
+      'pick up the cube': 112 steps
+      'drop the cube onto target': 93 steps
+      'press the button': 96 steps
+      'pick up the cube': 109 steps
+      'drop the cube onto target': 88 steps
+      'pick up the cube': 78 steps
+      'drop the cube onto table': 108 steps
+      'static': 121 steps
+      'pick up the cube': 120 steps
+      'place the cube onto the correct target': 69 steps
+      'All tasks completed': 19 steps
+  ------------------------------------------------------------
+
+  episode_9:
+  ------------------------------------------------------------
+    [data_1206]  seed=10900, difficulty=easy, total_timesteps=968
+      'pick up the cube': 110 steps
+      'drop the cube onto target': 81 steps
+      'press the button': 89 steps
+      'pick up the cube': 106 steps
+      'drop the cube onto target': 97 steps
+      'pick up the cube': 70 steps
+      'drop the cube onto table': 90 steps
+      'static': 116 steps
+      'pick up the cube': 119 steps
+      'place the cube onto the correct target': 76 steps
+      'All tasks completed': 14 steps
+    [dataset_generate-b4]  seed=10900, difficulty=easy, total_timesteps=954
+      'pick up the cube': 110 steps
+      'drop the cube onto target': 81 steps
+      'press the button': 89 steps
+      'pick up the cube': 106 steps
+      'drop the cube onto target': 97 steps
+      'pick up the cube': 70 steps
+      'drop the cube onto table': 82 steps
+      'static': 116 steps
+      'pick up the cube': 113 steps
+      'place the cube onto the correct target': 76 steps
+      'All tasks completed': 14 steps
+  ------------------------------------------------------------
+======================================================================
+EnvID: VideoPlaceOrder
+======================================================================
+
+  episode_5:
+  ------------------------------------------------------------
+    [data_1206]  seed=11500, difficulty=easy, total_timesteps=1068
+      'pick up the cube': 106 steps
+      'drop the cube onto target': 70 steps
+      'pick up the cube': 75 steps
+      'drop the cube onto target': 103 steps
+      'press the button': 98 steps
+      'pick up the cube': 112 steps
+      'drop the cube onto table': 92 steps
+      'static': 116 steps
+      'pick up the cube': 212 steps
+      'place the cube onto the correct target': 69 steps
+      'All tasks completed': 15 steps
+    [dataset_generate-b4]  seed=11500, difficulty=easy, total_timesteps=1058
+      'pick up the cube': 106 steps
+      'drop the cube onto target': 70 steps
+      'pick up the cube': 75 steps
+      'drop the cube onto target': 103 steps
+      'press the button': 98 steps
+      'pick up the cube': 112 steps
+      'drop the cube onto table': 82 steps
+      'static': 116 steps
+      'pick up the cube': 210 steps
+      'place the cube onto the correct target': 69 steps
+      'All tasks completed': 17 steps
+  ------------------------------------------------------------
+
+  episode_6:
+  ------------------------------------------------------------
+    [data_1206]  seed=11603, difficulty=medium, total_timesteps=924
+      'pick up the cube': 106 steps
+      'drop the cube onto target': 71 steps
+      'press the button': 87 steps
+      'pick up the cube': 91 steps
+      'drop the cube onto target': 77 steps
+      'pick up the cube': 76 steps
+      'drop the cube onto table': 101 steps
+      'static': 116 steps
+      'pick up the cube': 116 steps
+      'place the cube onto the correct target': 70 steps
+      'All tasks completed': 13 steps
+    [dataset_generate-b4]  seed=11603, difficulty=medium, total_timesteps=917
+      'pick up the cube': 106 steps
+      'drop the cube onto target': 71 steps
+      'press the button': 87 steps
+      'pick up the cube': 91 steps
+      'drop the cube onto target': 77 steps
+      'pick up the cube': 76 steps
+      'drop the cube onto table': 91 steps
+      'static': 116 steps
+      'pick up the cube': 114 steps
+      'place the cube onto the correct target': 75 steps
+      'All tasks completed': 13 steps
+  ------------------------------------------------------------
+
+  episode_7:
+  ------------------------------------------------------------
+    [data_1206]  seed=11705, difficulty=hard, total_timesteps=1146
+      'pick up the cube': 115 steps
+      'drop the cube onto target': 80 steps
+      'pick up the cube': 73 steps
+      'drop the cube onto target': 99 steps
+      'press the button': 88 steps
+      'pick up the cube': 95 steps
+      'drop the cube onto target': 91 steps
+      'pick up the cube': 73 steps
+      'drop the cube onto table': 110 steps
+      'static': 116 steps
+      'pick up the cube': 118 steps
+      'place the cube onto the correct target': 70 steps
+      'All tasks completed': 18 steps
+    [dataset_generate-b4]  seed=11705, difficulty=hard, total_timesteps=1131
+      'pick up the cube': 115 steps
+      'drop the cube onto target': 80 steps
+      'pick up the cube': 73 steps
+      'drop the cube onto target': 99 steps
+      'press the button': 88 steps
+      'pick up the cube': 95 steps
+      'drop the cube onto target': 91 steps
+      'pick up the cube': 73 steps
+      'drop the cube onto table': 100 steps
+      'static': 116 steps
+      'pick up the cube': 113 steps
+      'place the cube onto the correct target': 70 steps
+      'All tasks completed': 18 steps
+  ------------------------------------------------------------
+
+  episode_8:
+  ------------------------------------------------------------
+    [data_1206]  seed=11800, difficulty=easy, total_timesteps=1144
+      'pick up the cube': 118 steps
+      'drop the cube onto target': 118 steps
+      'pick up the cube': 75 steps
+      'drop the cube onto target': 84 steps
+      'pick up the cube': 72 steps
+      'drop the cube onto target': 67 steps
+      'press the button': 92 steps
+      'pick up the cube': 105 steps
+      'drop the cube onto table': 102 steps
+      'static': 116 steps
+      'pick up the cube': 115 steps
+      'place the cube onto the correct target': 67 steps
+      'All tasks completed': 13 steps
+    [dataset_generate-b4]  seed=11800, difficulty=easy, total_timesteps=1140
+      'pick up the cube': 118 steps
+      'drop the cube onto target': 118 steps
+      'pick up the cube': 75 steps
+      'drop the cube onto target': 84 steps
+      'pick up the cube': 72 steps
+      'drop the cube onto target': 67 steps
+      'press the button': 92 steps
+      'pick up the cube': 105 steps
+      'drop the cube onto table': 95 steps
+      'static': 116 steps
+      'pick up the cube': 117 steps
+      'place the cube onto the correct target': 68 steps
+      'All tasks completed': 13 steps
+  ------------------------------------------------------------
+
+  episode_9:
+  ------------------------------------------------------------
+    [data_1206]  seed=11901, difficulty=easy, total_timesteps=1182
+      'pick up the cube': 108 steps
+      'drop the cube onto target': 83 steps
+      'pick up the cube': 67 steps
+      'drop the cube onto target': 113 steps
+      'pick up the cube': 75 steps
+      'drop the cube onto target': 101 steps
+      'press the button': 96 steps
+      'pick up the cube': 113 steps
+      'drop the cube onto table': 92 steps
+      'static': 122 steps
+      'pick up the cube': 118 steps
+      'place the cube onto the correct target': 79 steps
+      'All tasks completed': 15 steps
+    [dataset_generate-b4]  seed=11901, difficulty=easy, total_timesteps=1165
+      'pick up the cube': 108 steps
+      'drop the cube onto target': 83 steps
+      'pick up the cube': 67 steps
+      'drop the cube onto target': 113 steps
+      'pick up the cube': 75 steps
+      'drop the cube onto target': 101 steps
+      'press the button': 96 steps
+      'pick up the cube': 113 steps
+      'drop the cube onto table': 81 steps
+      'static': 116 steps
+      'pick up the cube': 118 steps
+      'place the cube onto the correct target': 79 steps
+      'All tasks completed': 15 steps
+  ------------------------------------------------------------
+======================================================================
+EnvID: VideoRepick
+======================================================================
+
+  episode_5:
+  ------------------------------------------------------------
+    [data_1206]  seed=9501, difficulty=easy, total_timesteps=646
+      'pick up the cube': 107 steps
+      'drop the cube on the table': 46 steps
+      'static': 159 steps
+      'pick up the correct cube for the first time': 186 steps
+      'put it down': 50 steps
+      'press the button to finish': 61 steps
+      'All tasks completed': 37 steps
+    [dataset_generate-b4]  seed=9501, difficulty=easy, total_timesteps=648
+      'pick up the cube': 107 steps
+      'drop the cube on the table': 46 steps
+      'static': 159 steps
+      'pick up the correct cube for the first time': 189 steps
+      'put it down': 50 steps
+      'press the button to finish': 61 steps
+      'All tasks completed': 36 steps
+  ------------------------------------------------------------
+
+  episode_6:
+  ------------------------------------------------------------
+    [data_1206]  seed=9600, difficulty=medium, total_timesteps=581
+      'pick up the cube': 107 steps
+      'drop the cube on the table': 51 steps
+      'static': 159 steps
+      'pick up the correct cube for the first time': 107 steps
+      'put it down': 57 steps
+      'press the button to finish': 62 steps
+      'All tasks completed': 38 steps
+    [dataset_generate-b4]  seed=9600, difficulty=medium, total_timesteps=581
+      'pick up the cube': 107 steps
+      'drop the cube on the table': 51 steps
+      'static': 159 steps
+      'pick up the correct cube for the first time': 107 steps
+      'put it down': 57 steps
+      'press the button to finish': 62 steps
+      'All tasks completed': 38 steps
+  ------------------------------------------------------------
+
+  episode_7:
+  ------------------------------------------------------------
+    [data_1206]  seed=9700, difficulty=hard, total_timesteps=657
+      'pick up the cube': 104 steps
+      'drop the cube on the table': 55 steps
+      'pick up the correct cube for the first time': 104 steps
+      'put it down': 50 steps
+      'pick up the correct cube for the second time': 70 steps
+      'put it down': 50 steps
+      'pick up the correct cube for the third time': 71 steps
+      'put it down': 50 steps
+      'press the button to finish': 63 steps
+      'All tasks completed': 40 steps
+    [dataset_generate-b4]  seed=9700, difficulty=hard, total_timesteps=657
+      'pick up the cube': 104 steps
+      'drop the cube on the table': 55 steps
+      'pick up the correct cube for the first time': 104 steps
+      'put it down': 50 steps
+      'pick up the correct cube for the second time': 70 steps
+      'put it down': 50 steps
+      'pick up the correct cube for the third time': 71 steps
+      'put it down': 50 steps
+      'press the button to finish': 63 steps
+      'All tasks completed': 40 steps
+  ------------------------------------------------------------
+
+  episode_8:
+  ------------------------------------------------------------
+    [data_1206]  seed=9800, difficulty=easy, total_timesteps=798
+      'pick up the cube': 111 steps
+      'drop the cube on the table': 45 steps
+      'static': 114 steps
+      'pick up the correct cube for the first time': 110 steps
+      'put it down': 61 steps
+      'pick up the correct cube for the second time': 69 steps
+      'put it down': 60 steps
+      'pick up the correct cube for the third time': 71 steps
+      'put it down': 61 steps
+      'press the button to finish': 58 steps
+      'All tasks completed': 38 steps
+    [dataset_generate-b4]  seed=9800, difficulty=easy, total_timesteps=798
+      'pick up the cube': 111 steps
+      'drop the cube on the table': 45 steps
+      'static': 114 steps
+      'pick up the correct cube for the first time': 110 steps
+      'put it down': 61 steps
+      'pick up the correct cube for the second time': 69 steps
+      'put it down': 60 steps
+      'pick up the correct cube for the third time': 71 steps
+      'put it down': 61 steps
+      'press the button to finish': 58 steps
+      'All tasks completed': 38 steps
+  ------------------------------------------------------------
+
+  episode_9:
+  ------------------------------------------------------------
+    [data_1206]  seed=9900, difficulty=easy, total_timesteps=553
+      'pick up the cube': 105 steps
+      'drop the cube on the table': 54 steps
+      'static': 97 steps
+      'pick up the correct cube for the first time': 116 steps
+      'put it down': 55 steps
+      'press the button to finish': 83 steps
+      'All tasks completed': 43 steps
+    [dataset_generate-b4]  seed=9900, difficulty=easy, total_timesteps=553
+      'pick up the cube': 105 steps
+      'drop the cube on the table': 54 steps
+      'static': 97 steps
+      'pick up the correct cube for the first time': 116 steps
+      'put it down': 55 steps
+      'press the button to finish': 83 steps
+      'All tasks completed': 43 steps
+  ------------------------------------------------------------
+======================================================================
+EnvID: VideoUnmask
+======================================================================
+
+  episode_5:
+  ------------------------------------------------------------
+    [data_1206]  seed=6500, difficulty=easy, total_timesteps=249
+      'static': 66 steps
+      'pick up the container that hides the blue cube': 177 steps
+      'All tasks completed': 6 steps
+    [dataset_generate-b4]  seed=6500, difficulty=easy, total_timesteps=252
+      'static': 66 steps
+      'pick up the container that hides the blue cube': 180 steps
+      'All tasks completed': 6 steps
+  ------------------------------------------------------------
+
+  episode_6:
+  ------------------------------------------------------------
+    [data_1206]  seed=6600, difficulty=medium, total_timesteps=173
+      'static': 66 steps
+      'pick up the container that hides the green cube': 100 steps
+      'All tasks completed': 7 steps
+    [dataset_generate-b4]  seed=6600, difficulty=medium, total_timesteps=173
+      'static': 66 steps
+      'pick up the container that hides the green cube': 100 steps
+      'All tasks completed': 7 steps
+  ------------------------------------------------------------
+
+  episode_7:
+  ------------------------------------------------------------
+    [data_1206]  seed=6700, difficulty=hard, total_timesteps=338
+      'static': 66 steps
+      'pick up the container that hides the blue cube': 112 steps
+      'put down the container': 52 steps
+      'pick up the container that hides the red cube': 98 steps
+      'All tasks completed': 10 steps
+    [dataset_generate-b4]  seed=6700, difficulty=hard, total_timesteps=338
+      'static': 66 steps
+      'pick up the container that hides the blue cube': 112 steps
+      'put down the container': 52 steps
+      'pick up the container that hides the red cube': 98 steps
+      'All tasks completed': 10 steps
+  ------------------------------------------------------------
+
+  episode_8:
+  ------------------------------------------------------------
+    [data_1206]  seed=6800, difficulty=easy, total_timesteps=165
+      'static': 66 steps
+      'pick up the container that hides the red cube': 92 steps
+      'All tasks completed': 7 steps
+    [dataset_generate-b4]  seed=6800, difficulty=easy, total_timesteps=165
+      'static': 66 steps
+      'pick up the container that hides the red cube': 92 steps
+      'All tasks completed': 7 steps
+  ------------------------------------------------------------
+
+  episode_9:
+  ------------------------------------------------------------
+    [data_1206]  seed=6900, difficulty=easy, total_timesteps=183
+      'static': 66 steps
+      'pick up the container that hides the green cube': 104 steps
+      'All tasks completed': 13 steps
+    [dataset_generate-b4]  seed=6900, difficulty=easy, total_timesteps=183
+      'static': 66 steps
+      'pick up the container that hides the green cube': 104 steps
+      'All tasks completed': 13 steps
+  ------------------------------------------------------------
+======================================================================
+EnvID: VideoUnmaskSwap
+======================================================================
+
+  episode_5:
+  ------------------------------------------------------------
+    [data_1206]  seed=5500, difficulty=easy, total_timesteps=447
+      'static': 114 steps
+      'pick up the container that hides the green cube': 185 steps
+      'put down the container': 47 steps
+      'pick up the container that hides the red cube': 94 steps
+      'All tasks completed': 7 steps
+    [dataset_generate-b4]  seed=5500, difficulty=easy, total_timesteps=446
+      'static': 114 steps
+      'pick up the container that hides the green cube': 184 steps
+      'put down the container': 47 steps
+      'pick up the container that hides the red cube': 94 steps
+      'All tasks completed': 7 steps
+  ------------------------------------------------------------
+
+  episode_6:
+  ------------------------------------------------------------
+    [data_1206]  seed=5600, difficulty=medium, total_timesteps=278
+      'static': 168 steps
+      'pick up the container that hides the green cube': 99 steps
+      'All tasks completed': 11 steps
+    [dataset_generate-b4]  seed=5600, difficulty=medium, total_timesteps=278
+      'static': 168 steps
+      'pick up the container that hides the green cube': 99 steps
+      'All tasks completed': 11 steps
+  ------------------------------------------------------------
+
+  episode_7:
+  ------------------------------------------------------------
+    [data_1206]  seed=5700, difficulty=hard, total_timesteps=421
+      'static': 168 steps
+      'pick up the container that hides the blue cube': 105 steps
+      'put down the container': 48 steps
+      'pick up the container that hides the green cube': 93 steps
+      'All tasks completed': 7 steps
+    [dataset_generate-b4]  seed=5700, difficulty=hard, total_timesteps=421
+      'static': 168 steps
+      'pick up the container that hides the blue cube': 105 steps
+      'put down the container': 48 steps
+      'pick up the container that hides the green cube': 93 steps
+      'All tasks completed': 7 steps
+  ------------------------------------------------------------
+
+  episode_8:
+  ------------------------------------------------------------
+    [data_1206]  seed=5800, difficulty=easy, total_timesteps=370
+      'static': 114 steps
+      'pick up the container that hides the green cube': 102 steps
+      'put down the container': 52 steps
+      'pick up the container that hides the blue cube': 94 steps
+      'All tasks completed': 8 steps
+    [dataset_generate-b4]  seed=5800, difficulty=easy, total_timesteps=370
+      'static': 114 steps
+      'pick up the container that hides the green cube': 102 steps
+      'put down the container': 52 steps
+      'pick up the container that hides the blue cube': 94 steps
+      'All tasks completed': 8 steps
+  ------------------------------------------------------------
+
+  episode_9:
+  ------------------------------------------------------------
+    [data_1206]  seed=5900, difficulty=easy, total_timesteps=420
+      'static': 168 steps
+      'pick up the container that hides the red cube': 106 steps
+      'put down the container': 47 steps
+      'pick up the container that hides the green cube': 92 steps
+      'All tasks completed': 7 steps
+    [dataset_generate-b4]  seed=5900, difficulty=easy, total_timesteps=420
+      'static': 168 steps
+      'pick up the container that hides the red cube': 106 steps
+      'put down the container': 47 steps
+      'pick up the container that hides the green cube': 92 steps
+      'All tasks completed': 7 steps
+  ------------------------------------------------------------

@@ -442,9 +442,57 @@ class RobommeRecordWrapper(gym.Wrapper):
         self._failsafe_triggered = False
         return super().reset(**kwargs)
 
+    def _consume_pending_keypoint(self) -> bool:
+        """
+        Check and consume env._pending_keypoint if it exists.
+        Converts keypoint_p/keypoint_q into a 7D keypoint_action
+        [position(3), rpy(3), gripper(1)] and stores it in
+        self._current_keypoint_action.
+
+        Returns True if a keypoint was consumed (i.e. this step is a keyframe).
+        """
+        env_unwrapped = getattr(self.env, 'unwrapped', self.env)
+        if not (hasattr(env_unwrapped, '_pending_keypoint') and env_unwrapped._pending_keypoint is not None):
+            return False
+
+        current_keypoint = env_unwrapped._pending_keypoint
+
+        if 'keypoint_p' not in current_keypoint or 'keypoint_q' not in current_keypoint:
+            raise ValueError(
+                f"_pending_keypoint missing keypoint_p/keypoint_q: {current_keypoint}"
+            )
+
+        keypoint_p_np = np.asarray(current_keypoint['keypoint_p']).reshape(-1)
+        keypoint_q_np = np.asarray(current_keypoint['keypoint_q']).reshape(-1)
+        if keypoint_p_np.size != 3 or keypoint_q_np.size != 4:
+            raise ValueError(
+                f"_pending_keypoint keypoint shape invalid: p={keypoint_p_np.shape}, q={keypoint_q_np.shape}"
+            )
+
+        # Reuse prev_quat/prev_rpy of current frame to convert keypoint quat to continuous RPY
+        kp_pose_dict, _, _ = build_endeffector_pose_dict(
+            torch.as_tensor(keypoint_p_np),
+            torch.as_tensor(keypoint_q_np),
+            self._prev_ee_quat_wxyz,
+            self._prev_ee_rpy_xyz,
+        )
+        kp_type = current_keypoint.get('keypoint_type', 'unknown')
+        gripper_val = 1.0 if kp_type == 'open' else -1.0
+        self._current_keypoint_action = np.concatenate([
+            kp_pose_dict['pose'].detach().cpu().numpy().flatten()[:3],
+            kp_pose_dict['rpy'].detach().cpu().numpy().flatten()[:3],
+            [gripper_val],
+        ])
+
+        env_unwrapped._pending_keypoint = None
+        return True
+
     def _backfill_keypoint_actions_in_buffer(self) -> None:
-        # Backfill keypoint in buffer before close():
-        # For adjacent keyframe (k_prev, k_curr) interval, set (k_prev, k_curr] all to k_curr's keypoint_action.
+        # Backfill keypoint_action in buffer before close():
+        # 1. Steps [0, k0]: filled with k0's keypoint_action (first keyframe)
+        # 2. Steps (k_prev, k_curr]: filled with k_curr's keypoint_action (between adjacent keyframes)
+        # 3. Steps (k_last, end]: filled with k_last's keypoint_action (after last keyframe)
+        # Also handles the single-keyframe case (len == 1) by filling the entire buffer.
         if not self.buffer:
             return
 
@@ -459,42 +507,73 @@ class RobommeRecordWrapper(gym.Wrapper):
                 return bool(np.asarray(value).astype(bool).any())
             return bool(value)
 
+        def _validate_keypoint_action(kf_idx):
+            """Validate and return the 7D keypoint_action for a keyframe index, or None."""
+            kf_action = self.buffer[kf_idx].get("action", {})
+            kp = kf_action.get("keypoint_action", None)
+            if kp is None:
+                print(
+                    f"Warning: keyframe {kf_idx} has None keypoint_action, skip backfill"
+                )
+                return None
+            target_kp = np.asarray(kp).flatten()
+            if target_kp.size != 7:
+                print(
+                    f"Warning: keyframe {kf_idx} keypoint_action shape invalid {target_kp.shape}, "
+                    f"skip backfill"
+                )
+                return None
+            if not np.isfinite(target_kp).all():
+                print(
+                    f"Warning: keyframe {kf_idx} keypoint_action has non-finite values, "
+                    f"skip backfill"
+                )
+                return None
+            return target_kp
+
+        def _fill_range(start, end_exclusive, target_kp):
+            """Fill buffer[start:end_exclusive] with target_kp."""
+            for fill_idx in range(start, end_exclusive):
+                fill_action = self.buffer[fill_idx].setdefault("action", {})
+                fill_action["keypoint_action"] = target_kp.copy()
+
         keyframe_indices = []
         for idx, record_data in enumerate(self.buffer):
             info_data = record_data.get("info", {})
             if _as_bool_flag(info_data.get("is_keyframe", False)):
                 keyframe_indices.append(idx)
 
-        if len(keyframe_indices) < 2:
+        if len(keyframe_indices) == 0:
             return
 
+        # --- Handle single keyframe: fill entire buffer with its action ---
+        if len(keyframe_indices) == 1:
+            kf_idx = keyframe_indices[0]
+            target_kp = _validate_keypoint_action(kf_idx)
+            if target_kp is not None:
+                _fill_range(0, len(self.buffer), target_kp)
+            return
+
+        # --- Multiple keyframes ---
+
+        # 1. Fill [0, k0] with k0's keypoint_action (leading steps before/including first keyframe)
+        first_kf = keyframe_indices[0]
+        first_kp = _validate_keypoint_action(first_kf)
+        if first_kp is not None:
+            _fill_range(0, first_kf + 1, first_kp)
+
+        # 2. Fill (k_prev, k_curr] intervals between adjacent keyframes
         for prev_idx, curr_idx in zip(keyframe_indices, keyframe_indices[1:]):
-            curr_action = self.buffer[curr_idx].get("action", {})
-            curr_keypoint_action = curr_action.get("keypoint_action", None)
-            if curr_keypoint_action is None:
-                print(
-                    f"Warning: keyframe {curr_idx} has None keypoint_action, skip backfill "
-                    f"for interval ({prev_idx}, {curr_idx}]"
-                )
+            target_kp = _validate_keypoint_action(curr_idx)
+            if target_kp is None:
                 continue
+            _fill_range(prev_idx + 1, curr_idx + 1, target_kp)
 
-            target_kp = np.asarray(curr_keypoint_action).flatten()
-            if target_kp.size != 7:
-                print(
-                    f"Warning: keyframe {curr_idx} keypoint_action shape invalid {target_kp.shape}, "
-                    f"skip backfill for interval ({prev_idx}, {curr_idx}]"
-                )
-                continue
-            if not np.isfinite(target_kp).all():
-                print(
-                    f"Warning: keyframe {curr_idx} keypoint_action has non-finite values, "
-                    f"skip backfill for interval ({prev_idx}, {curr_idx}]"
-                )
-                continue
-
-            for fill_idx in range(prev_idx + 1, curr_idx + 1):
-                fill_action = self.buffer[fill_idx].setdefault("action", {})
-                fill_action["keypoint_action"] = target_kp.copy()
+        # 3. Fill (k_last, end] with last keyframe's keypoint_action (trailing steps)
+        last_kf = keyframe_indices[-1]
+        last_kp = _validate_keypoint_action(last_kf)
+        if last_kp is not None and last_kf + 1 < len(self.buffer):
+            _fill_range(last_kf + 1, len(self.buffer), last_kp)
 
     def step(self, action):
         self.no_object_flag=False
@@ -613,40 +692,7 @@ class RobommeRecordWrapper(gym.Wrapper):
             # Process keypoint info: Read pending keypoint from env (refresh cache if exists)
             # Convert to 7D keypoint_action: [position(3), rpy(3), gripper(1)]
             # Cache by "current latest keypoint" here; finally do backward fill post-processing before close().
-            is_keyframe = False
-            env_unwrapped = getattr(self.env, 'unwrapped', self.env)
-            if hasattr(env_unwrapped, '_pending_keypoint') and env_unwrapped._pending_keypoint is not None:
-                current_keypoint = env_unwrapped._pending_keypoint
-
-                if 'keypoint_p' not in current_keypoint or 'keypoint_q' not in current_keypoint:
-                    raise ValueError(
-                        f"_pending_keypoint missing keypoint_p/keypoint_q: {current_keypoint}"
-                    )
-
-                keypoint_p_np = np.asarray(current_keypoint['keypoint_p']).reshape(-1)
-                keypoint_q_np = np.asarray(current_keypoint['keypoint_q']).reshape(-1)
-                if keypoint_p_np.size != 3 or keypoint_q_np.size != 4:
-                    raise ValueError(
-                        f"_pending_keypoint keypoint shape invalid: p={keypoint_p_np.shape}, q={keypoint_q_np.shape}"
-                    )
-
-                # Reuse prev_quat/prev_rpy of current frame to convert keypoint quat to continuous RPY
-                kp_pose_dict, _, _ = build_endeffector_pose_dict(
-                    torch.as_tensor(keypoint_p_np),
-                    torch.as_tensor(keypoint_q_np),
-                    self._prev_ee_quat_wxyz,
-                    self._prev_ee_rpy_xyz,
-                )
-                kp_type = current_keypoint.get('keypoint_type', 'unknown')
-                gripper_val = 1.0 if kp_type == 'open' else -1.0
-                self._current_keypoint_action = np.concatenate([
-                    kp_pose_dict['pose'].detach().cpu().numpy().flatten()[:3],
-                    kp_pose_dict['rpy'].detach().cpu().numpy().flatten()[:3],
-                    [gripper_val],
-                ])
-                is_keyframe = True
-
-                env_unwrapped._pending_keypoint = None
+            is_keyframe = self._consume_pending_keypoint()
 
             eef_pose_dict, self._prev_ee_quat_wxyz, self._prev_ee_rpy_xyz = build_endeffector_pose_dict(
                 self.agent.tcp.pose.p,
@@ -787,6 +833,19 @@ class RobommeRecordWrapper(gym.Wrapper):
         # Write data to HDF5 only when episode successful
         if self.episode_success:
             print(f"Writing {len(self.buffer)} records to HDF5...")
+
+            # Consume any unconsumed _pending_keypoint left by the last planner action.
+            # This fixes the case where _record_keypoint() is the final action in a planner
+            # function with no subsequent step() call to consume it.
+            if self.buffer and self._consume_pending_keypoint():
+                last_record = self.buffer[-1]
+                last_record.setdefault("action", {})["keypoint_action"] = (
+                    self._current_keypoint_action.copy()
+                )
+                last_record.setdefault("info", {})["is_keyframe"] = True
+                print("Consumed trailing _pending_keypoint in close(), "
+                      f"marked buffer[-1] (timestep {len(self.buffer) - 1}) as keyframe.")
+
             # keypoint_action backfill handled uniformly before writing to disk, avoiding changing real-time logic during step().
             self._backfill_keypoint_actions_in_buffer()
 
