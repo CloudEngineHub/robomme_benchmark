@@ -2,20 +2,6 @@
 EnvID: BinFill
 ======================================================================
 
-  episode_5:
-  ------------------------------------------------------------
-    [data_1206]  seed=4500, difficulty=easy, total_timesteps=389
-      'pick up the first red cube': 211 steps
-      'put it into the bin': 67 steps
-      'press the button': 71 steps
-      'All tasks completed': 40 steps
-    [dataset_generate-b4]  seed=4500, difficulty=easy, total_timesteps=378
-      'pick up the first red cube': 204 steps
-      'put it into the bin': 61 steps
-      'press the button': 72 steps
-      'All tasks completed': 41 steps
-  ------------------------------------------------------------
-
   episode_6:
   ------------------------------------------------------------
     [data_1206]  seed=4600, difficulty=medium, total_timesteps=622
@@ -315,18 +301,6 @@ EnvID: BinFill
 EnvID: ButtonUnmask
 ======================================================================
 
-  episode_5:
-  ------------------------------------------------------------
-    [data_1206]  seed=8501, difficulty=easy, total_timesteps=312
-      'press the button': 115 steps
-      'pick up the container that hides the blue cube': 187 steps
-      'All tasks completed': 10 steps
-    [dataset_generate-b4]  seed=8501, difficulty=easy, total_timesteps=299
-      'press the button': 115 steps
-      'pick up the container that hides the blue cube': 175 steps
-      'All tasks completed': 9 steps
-  ------------------------------------------------------------
-
   episode_6:
   ------------------------------------------------------------
     [data_1206]  seed=8600, difficulty=medium, total_timesteps=220
@@ -513,20 +487,6 @@ EnvID: ButtonUnmask
 ======================================================================
 EnvID: ButtonUnmaskSwap
 ======================================================================
-
-  episode_5:
-  ------------------------------------------------------------
-    [data_1206]  seed=7500, difficulty=easy, total_timesteps=387
-      'press the first button': 109 steps
-      'press the second button': 100 steps
-      'pick up the container that hides the red cube': 170 steps
-      'All tasks completed': 8 steps
-    [dataset_generate-b4]  seed=7500, difficulty=easy, total_timesteps=387
-      'press the first button': 109 steps
-      'press the second button': 100 steps
-      'pick up the container that hides the red cube': 170 steps
-      'All tasks completed': 8 steps
-  ------------------------------------------------------------
 
   episode_6:
   ------------------------------------------------------------
@@ -759,22 +719,6 @@ EnvID: ButtonUnmaskSwap
 EnvID: InsertPeg
 ======================================================================
 
-  episode_5:
-  ------------------------------------------------------------
-    [data_1206]  seed=13500, difficulty=easy, total_timesteps=492
-      'Pick up the peg by grasping the far end': 117 steps
-      'Insert the peg from the right side of the box': 130 steps
-      'Pick up the peg by grasping the far end': 117 steps
-      'Insert the peg from the right side': 108 steps
-      'All tasks completed': 20 steps
-    [dataset_generate-b4]  seed=13500, difficulty=easy, total_timesteps=492
-      'Pick up the peg by grasping the far end': 117 steps
-      'Insert the peg from the right side of the box': 130 steps
-      'Pick up the peg by grasping the far end': 117 steps
-      'Insert the peg from the right side': 108 steps
-      'All tasks completed': 20 steps
-  ------------------------------------------------------------
-
   episode_6:
   ------------------------------------------------------------
     [data_1206]  seed=13602, difficulty=medium, total_timesteps=514
@@ -1001,24 +945,6 @@ EnvID: InsertPeg
 ======================================================================
 EnvID: MoveCube
 ======================================================================
-
-  episode_5:
-  ------------------------------------------------------------
-    [data_1206]  seed=14500, difficulty=easy, total_timesteps=429
-      'Pick up the cube': 112 steps
-      'place the cube onto the target': 74 steps
-      'static': 60 steps
-      'Pick up the cube': 103 steps
-      'place the cube onto the target': 63 steps
-      'All tasks completed': 17 steps
-    [dataset_generate-b4]  seed=14500, difficulty=easy, total_timesteps=429
-      'Pick up the cube': 112 steps
-      'place the cube onto the target': 74 steps
-      'static': 60 steps
-      'Pick up the cube': 103 steps
-      'place the cube onto the target': 63 steps
-      'All tasks completed': 17 steps
-  ------------------------------------------------------------
 
   episode_6:
   ------------------------------------------------------------
@@ -1254,22 +1180,6 @@ EnvID: MoveCube
 ======================================================================
 EnvID: PatternLock
 ======================================================================
-
-  episode_5:
-  ------------------------------------------------------------
-    [data_1206]  seed=15500, difficulty=easy, total_timesteps=112
-      'move backward': 32 steps
-      'move left': 24 steps
-      'move backward': 32 steps
-      'move left': 17 steps
-      'All tasks completed': 7 steps
-    [dataset_generate-b4]  seed=15500, difficulty=easy, total_timesteps=112
-      'move backward': 32 steps
-      'move left': 24 steps
-      'move backward': 32 steps
-      'move left': 17 steps
-      'All tasks completed': 7 steps
-  ------------------------------------------------------------
 
   episode_6:
   ------------------------------------------------------------
@@ -1554,18 +1464,6 @@ EnvID: PatternLock
 EnvID: PickHighlight
 ======================================================================
 
-  episode_5:
-  ------------------------------------------------------------
-    [data_1206]  seed=12500, difficulty=easy, total_timesteps=282
-      'press the button': 110 steps
-      'pick up the highlighted cube, which is green': 159 steps
-      'All tasks completed': 13 steps
-    [dataset_generate-b4]  seed=12500, difficulty=easy, total_timesteps=282
-      'press the button': 110 steps
-      'pick up the highlighted cube, which is green': 159 steps
-      'All tasks completed': 13 steps
-  ------------------------------------------------------------
-
   episode_6:
   ------------------------------------------------------------
     [data_1206]  seed=12600, difficulty=medium, total_timesteps=387
@@ -1784,24 +1682,6 @@ EnvID: PickHighlight
 ======================================================================
 EnvID: PickXtimes
 ======================================================================
-
-  episode_5:
-  ------------------------------------------------------------
-    [data_1206]  seed=1500, difficulty=easy, total_timesteps=577
-      'pick up the red cube for the first time': 130 steps
-      'place the red cube onto the target': 90 steps
-      'pick up the red cube for the second time': 175 steps
-      'place the red cube onto the target': 87 steps
-      'press the button to stop': 57 steps
-      'All tasks completed': 38 steps
-    [dataset_generate-b4]  seed=1500, difficulty=easy, total_timesteps=576
-      'pick up the red cube for the first time': 130 steps
-      'place the red cube onto the target': 90 steps
-      'pick up the red cube for the second time': 186 steps
-      'place the red cube onto the target': 75 steps
-      'press the button to stop': 57 steps
-      'All tasks completed': 38 steps
-  ------------------------------------------------------------
 
   episode_6:
   ------------------------------------------------------------
@@ -2098,22 +1978,6 @@ EnvID: PickXtimes
 EnvID: RouteStick
 ======================================================================
 
-  episode_5:
-  ------------------------------------------------------------
-    [data_1206]  seed=16500, difficulty=easy, total_timesteps=300
-      'move to the nearest right target by circling around the stick counterclockwise': 50 steps
-      'move to the nearest left target by circling around the stick clockwise': 100 steps
-      'move to the nearest right target by circling around the stick counterclockwise': 50 steps
-      'move to the nearest left target by circling around the stick clockwise': 93 steps
-      'All tasks completed': 7 steps
-    [dataset_generate-b4]  seed=16500, difficulty=easy, total_timesteps=300
-      'move to the nearest right target by circling around the stick counterclockwise': 50 steps
-      'move to the nearest left target by circling around the stick clockwise': 100 steps
-      'move to the nearest right target by circling around the stick counterclockwise': 50 steps
-      'move to the nearest left target by circling around the stick clockwise': 93 steps
-      'All tasks completed': 7 steps
-  ------------------------------------------------------------
-
   episode_6:
   ------------------------------------------------------------
     [data_1206]  seed=16600, difficulty=medium, total_timesteps=400
@@ -2397,18 +2261,6 @@ EnvID: RouteStick
 EnvID: StopCube
 ======================================================================
 
-  episode_5:
-  ------------------------------------------------------------
-    [data_1206]  seed=2500, difficulty=easy, total_timesteps=131
-      'move to the top of the button to prepare': 61 steps
-      'press the button to stop the cube on the target': 29 steps
-      'All tasks completed': 41 steps
-    [dataset_generate-b4]  seed=2500, difficulty=easy, total_timesteps=131
-      'move to the top of the button to prepare': 61 steps
-      'press the button to stop the cube on the target': 29 steps
-      'All tasks completed': 41 steps
-  ------------------------------------------------------------
-
   episode_6:
   ------------------------------------------------------------
     [data_1206]  seed=2600, difficulty=medium, total_timesteps=247
@@ -2607,28 +2459,6 @@ EnvID: StopCube
 ======================================================================
 EnvID: SwingXtimes
 ======================================================================
-
-  episode_5:
-  ------------------------------------------------------------
-    [data_1206]  seed=3500, difficulty=easy, total_timesteps=474
-      'pick up the green cube': 191 steps
-      'move to the top of the right-side target for the first time': 17 steps
-      'move to the top of the left-side target for the first time': 44 steps
-      'move to the top of the right-side target for the second time': 43 steps
-      'move to the top of the left-side target for the second time': 43 steps
-      'put the green cube on the table': 40 steps
-      'press the button': 53 steps
-      'All tasks completed': 43 steps
-    [dataset_generate-b4]  seed=3500, difficulty=easy, total_timesteps=490
-      'pick up the green cube': 201 steps
-      'move to the top of the right-side target for the first time': 22 steps
-      'move to the top of the left-side target for the first time': 43 steps
-      'move to the top of the right-side target for the second time': 43 steps
-      'move to the top of the left-side target for the second time': 43 steps
-      'put the green cube on the table': 40 steps
-      'press the button': 56 steps
-      'All tasks completed': 42 steps
-  ------------------------------------------------------------
 
   episode_6:
   ------------------------------------------------------------
@@ -2960,34 +2790,6 @@ EnvID: SwingXtimes
 ======================================================================
 EnvID: VideoPlaceButton
 ======================================================================
-
-  episode_5:
-  ------------------------------------------------------------
-    [data_1206]  seed=10500, difficulty=easy, total_timesteps=1070
-      'pick up the cube': 116 steps
-      'drop the cube onto target': 101 steps
-      'press the button': 85 steps
-      'pick up the cube': 100 steps
-      'drop the cube onto target': 105 steps
-      'pick up the cube': 70 steps
-      'drop the cube onto table': 87 steps
-      'static': 118 steps
-      'pick up the cube': 208 steps
-      'place the cube onto the correct target': 64 steps
-      'All tasks completed': 16 steps
-    [dataset_generate-b4]  seed=10500, difficulty=easy, total_timesteps=1056
-      'pick up the cube': 116 steps
-      'drop the cube onto target': 101 steps
-      'press the button': 85 steps
-      'pick up the cube': 100 steps
-      'drop the cube onto target': 105 steps
-      'pick up the cube': 70 steps
-      'drop the cube onto table': 77 steps
-      'static': 118 steps
-      'pick up the cube': 208 steps
-      'place the cube onto the correct target': 61 steps
-      'All tasks completed': 15 steps
-  ------------------------------------------------------------
 
   episode_6:
   ------------------------------------------------------------
@@ -3383,34 +3185,6 @@ EnvID: VideoPlaceButton
 ======================================================================
 EnvID: VideoPlaceOrder
 ======================================================================
-
-  episode_5:
-  ------------------------------------------------------------
-    [data_1206]  seed=11500, difficulty=easy, total_timesteps=1068
-      'pick up the cube': 106 steps
-      'drop the cube onto target': 70 steps
-      'pick up the cube': 75 steps
-      'drop the cube onto target': 103 steps
-      'press the button': 98 steps
-      'pick up the cube': 112 steps
-      'drop the cube onto table': 92 steps
-      'static': 116 steps
-      'pick up the cube': 212 steps
-      'place the cube onto the correct target': 69 steps
-      'All tasks completed': 15 steps
-    [dataset_generate-b4]  seed=11500, difficulty=easy, total_timesteps=1058
-      'pick up the cube': 106 steps
-      'drop the cube onto target': 70 steps
-      'pick up the cube': 75 steps
-      'drop the cube onto target': 103 steps
-      'press the button': 98 steps
-      'pick up the cube': 112 steps
-      'drop the cube onto table': 82 steps
-      'static': 116 steps
-      'pick up the cube': 210 steps
-      'place the cube onto the correct target': 69 steps
-      'All tasks completed': 17 steps
-  ------------------------------------------------------------
 
   episode_6:
   ------------------------------------------------------------
@@ -3863,26 +3637,6 @@ EnvID: VideoPlaceOrder
 EnvID: VideoRepick
 ======================================================================
 
-  episode_5:
-  ------------------------------------------------------------
-    [data_1206]  seed=9501, difficulty=easy, total_timesteps=646
-      'pick up the cube': 107 steps
-      'drop the cube on the table': 46 steps
-      'static': 159 steps
-      'pick up the correct cube for the first time': 186 steps
-      'put it down': 50 steps
-      'press the button to finish': 61 steps
-      'All tasks completed': 37 steps
-    [dataset_generate-b4]  seed=9501, difficulty=easy, total_timesteps=648
-      'pick up the cube': 107 steps
-      'drop the cube on the table': 46 steps
-      'static': 159 steps
-      'pick up the correct cube for the first time': 189 steps
-      'put it down': 50 steps
-      'press the button to finish': 61 steps
-      'All tasks completed': 36 steps
-  ------------------------------------------------------------
-
   episode_6:
   ------------------------------------------------------------
     [data_1206]  seed=9600, difficulty=medium, total_timesteps=581
@@ -4214,18 +3968,6 @@ EnvID: VideoRepick
 EnvID: VideoUnmask
 ======================================================================
 
-  episode_5:
-  ------------------------------------------------------------
-    [data_1206]  seed=6500, difficulty=easy, total_timesteps=249
-      'static': 66 steps
-      'pick up the container that hides the blue cube': 177 steps
-      'All tasks completed': 6 steps
-    [dataset_generate-b4]  seed=6500, difficulty=easy, total_timesteps=252
-      'static': 66 steps
-      'pick up the container that hides the blue cube': 180 steps
-      'All tasks completed': 6 steps
-  ------------------------------------------------------------
-
   episode_6:
   ------------------------------------------------------------
     [data_1206]  seed=6600, difficulty=medium, total_timesteps=173
@@ -4412,22 +4154,6 @@ EnvID: VideoUnmask
 ======================================================================
 EnvID: VideoUnmaskSwap
 ======================================================================
-
-  episode_5:
-  ------------------------------------------------------------
-    [data_1206]  seed=5500, difficulty=easy, total_timesteps=447
-      'static': 114 steps
-      'pick up the container that hides the green cube': 185 steps
-      'put down the container': 47 steps
-      'pick up the container that hides the red cube': 94 steps
-      'All tasks completed': 7 steps
-    [dataset_generate-b4]  seed=5500, difficulty=easy, total_timesteps=446
-      'static': 114 steps
-      'pick up the container that hides the green cube': 184 steps
-      'put down the container': 47 steps
-      'pick up the container that hides the red cube': 94 steps
-      'All tasks completed': 7 steps
-  ------------------------------------------------------------
 
   episode_6:
   ------------------------------------------------------------

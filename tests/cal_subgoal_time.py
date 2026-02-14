@@ -83,7 +83,11 @@ def extract_episode_data(file_path, env_id):
 
             # Sort episodes numerically
             episode_keys.sort(key=lambda x: int(x.split('_')[-1]))
-            episode_keys = episode_keys[5:20]  # episode 6-10
+            # Keep episodes 0-19, but exclude FAILRECOVER_EPISODES
+            episode_keys = [
+                k for k in episode_keys[:20]
+                if int(k.split('_')[-1]) not in FAILRECOVER_EPISODES
+            ]
 
             for ep_key in episode_keys:
                 ep_num = int(ep_key.split('_')[-1])
