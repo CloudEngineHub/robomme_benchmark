@@ -10,6 +10,10 @@ DIRS = [
     '/data/hongzefu/dataset_generate-b4'
 ]
 
+# Episodes with failure recovery in generate-dataset-control-seed-readJson-advanceV2.py (episode <= 5)
+# Do not compare these episodes across datasets (data_1206 vs dataset_generate-b4).
+FAILRECOVER_EPISODES = {0, 1, 2, 3, 4, 5}
+
 # EnvIDs to specifically analyze (leave empty to analyze all)
 TARGET_ENVIDS = [
     "PickXtimes",
@@ -245,9 +249,13 @@ def main():
             # Add to all-results
             lines.extend(ep_lines)
 
-            # Check if total_timesteps differ across datasets
+            # Check if total_timesteps differ across datasets (skip failrecover episodes)
             unique_timesteps = set(timesteps_per_ds.values())
-            if len(timesteps_per_ds) >= 2 and len(unique_timesteps) > 1:
+            if (
+                ep_num not in FAILRECOVER_EPISODES
+                and len(timesteps_per_ds) >= 2
+                and len(unique_timesteps) > 1
+            ):
                 env_has_diff = True
 
                 # Build diff lines showing only differing subgoals
