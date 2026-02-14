@@ -95,10 +95,11 @@ class BenchmarkEnvBuilder:
     def __init__(
         self,
         env_id: str,
-        dataset: str,
-        action_space: str,
-        gui_render: bool,
+        dataset: str = "test",
+        action_space: str = "joint_angle",
+        gui_render: bool = False,
         override_metadata_path: Optional[Union[str, Path]] = None,
+        max_steps: int = 1000,
     ):
         if dataset not in _ALLOWED_DATASETS:
             raise ValueError(f"Unsupported dataset '{dataset}'. Allowed datasets: {sorted(_ALLOWED_DATASETS)}")
@@ -116,7 +117,7 @@ class BenchmarkEnvBuilder:
             Path(override_metadata_path) if override_metadata_path is not None else None
         )
         self.render_mode = "human" if gui_render else "rgb_array"
-        self.max_steps_without_demonstration = 10000
+        self.max_steps_without_demonstration = max_steps+2
 
         metadata_path = self._resolve_metadata_path()
         self.metadata_index = load_episode_metadata(metadata_path)

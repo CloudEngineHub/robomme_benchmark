@@ -78,7 +78,6 @@ def process_episode(env_data: h5py.File, episode_idx: int, env_id: str) -> None:
                 dtype=np.float32,
             )
             obs, _, terminated, _, info = env.step(action)
-            import pdb; pdb.set_trace()
             frames.append(_frame_from_obs(obs))
 
             if GUI_RENDER:
