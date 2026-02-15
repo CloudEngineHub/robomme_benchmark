@@ -17,12 +17,14 @@ episode_<N>/
 
 | Field | Type | Description |
 |-------|------|-------------|
+| `env_id`|  `str`  | Environment name |
 | `seed` | `int` | Environment seed |
 | `difficulty` | `str` | Difficulty level |
 | `task_goal` | `str` | Natural-language task description |
 | `front_camera_intrinsic` | `float (3, 3)` | Front camera intrinsic matrix |
 | `wrist_camera_intrinsic` | `float (3, 3)` | Wrist camera intrinsic matrix |
 | `available_multi_choices` | `str` | Current available options for multi-choice action | 
+| `length` | `int` | Total trajectory length | 
 
 ## `obs/` fields (observations)
 
