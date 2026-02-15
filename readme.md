@@ -38,13 +38,15 @@ uv run scripts/run_example.py --action-space-type joint_angle --dataset test
 
 We provide four action types: `joint_action`, `ee_pose`, `keypoint`, and `multi_choice`, e.g. predict continuous actions with `joint_action` or `ee_pose`, discrete waypoint actions with `keypoint`, or use `multi_choice` for VideoQA-style data.
 
+> **Note:** Currenetly, only `joint_action` is verified. please use it rather than other types.
+
 ## Datasets
 
 ### Training data
 
-Training data can be downloaded [here](). There are 1,600 demonstrations in total (100 per task). The HDF5 format is described in [doc/h5_data_format.md](doc/h5_data_format.md).
+Training data can be downloaded [here](https://huggingface.co/Yinpei/data_0214). There are 1,600 demonstrations in total (100 per task). The HDF5 format is described in [doc/h5_data_format.md](doc/h5_data_format.md).
 
-> **Note:** Currenetly, the robomme is still under development, the training data format is not finalized yet.
+> **Note:** Currenetly, the training data is not finalized, and has difference from the doc.
 
 After downloading, replay the dataset for a sanity check:
 
