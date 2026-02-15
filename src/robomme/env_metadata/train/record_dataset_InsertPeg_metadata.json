@@ -29,7 +29,7 @@
     {
       "task": "InsertPeg",
       "episode": 4,
-      "seed": 13404,
+      "seed": 13403,
       "difficulty": "easy"
     },
     {
@@ -53,7 +53,7 @@
     {
       "task": "InsertPeg",
       "episode": 8,
-      "seed": 13801,
+      "seed": 13800,
       "difficulty": "easy"
     },
     {
