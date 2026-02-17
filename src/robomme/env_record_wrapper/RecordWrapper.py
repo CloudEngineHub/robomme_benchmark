@@ -738,16 +738,21 @@ class RobommeRecordWrapper(gym.Wrapper):
                     'front_camera_segmentation_result': segmentation_result,
                     'front_camera_extrinsic': base_camera_extrinsic,
                     'wrist_camera_extrinsic': wrist_camera_extrinsic,
+                    'eef_state_raw': {
+                        'pose': _to_numpy(eef_pose_dict['pose']).flatten(),
+                        'quat': _to_numpy(eef_pose_dict['quat']).flatten(),
+                        'rpy': _to_numpy(eef_pose_dict['rpy']).flatten(),
+                    },
                 },
                 'action': {
                     'joint_action': action,
                     'keypoint_action': self._current_keypoint_action,  # 7D ndarray or None (backward fill done before close())
                     'eef_action_raw': {
-                        'pose': _to_numpy(eef_pose_dict['pose']).flatten(),
-                        'quat': _to_numpy(eef_pose_dict['quat']).flatten(),
-                        'rpy': _to_numpy(eef_pose_dict['rpy']).flatten(),
+                        'pose': np.zeros(3),
+                        'quat': np.zeros(4),
+                        'rpy': np.zeros(3),
                     },
-                    'eef_action': eef_action,
+                    'eef_action': np.zeros(7),
                 },
                 'info': {
                     'record_timestep': record_timestep,
@@ -905,6 +910,10 @@ class RobommeRecordWrapper(gym.Wrapper):
                 obs_group.create_dataset("front_camera_extrinsic", data=obs_data['front_camera_extrinsic'])
                 obs_group.create_dataset("wrist_camera_extrinsic", data=obs_data['wrist_camera_extrinsic'])
 
+                eef_state_raw_group = obs_group.create_group("eef_state_raw")
+                eef_state_raw_group.create_dataset("pose", data=obs_data['eef_state_raw']['pose'])
+                eef_state_raw_group.create_dataset("quat", data=obs_data['eef_state_raw']['quat'])
+                eef_state_raw_group.create_dataset("rpy", data=obs_data['eef_state_raw']['rpy'])
 
                 # ── action sub group ──
                 action_group = ts_group.create_group("action")
