@@ -3,7 +3,6 @@
 Structure inside each `record_dataset_<EnvID>.h5` file:
 
 ```text
-env_id/
 episode_<N>/
   timestep_<K>/
     obs/
@@ -11,7 +10,6 @@ episode_<N>/
     info/
   setup/
 ```
-- `env_id`: Task name, e.g., 'RouteStick'.
 - `timestep_<K>/`: per-timestep data.
 - `setup/`: episode-level configuration.
 
@@ -25,7 +23,6 @@ episode_<N>/
 | `front_camera_intrinsic` | `float (3, 3)` | Front camera intrinsic matrix |
 | `wrist_camera_intrinsic` | `float (3, 3)` | Wrist camera intrinsic matrix |
 | `available_multi_choices` | `str` | Current available options for multi-choice action | 
-| `length` | `int` | Total trajectory length | 
 
 ## `obs/` fields (observations)
 
@@ -60,5 +57,4 @@ episode_<N>/
 | `grounded_subgoal` | `bytes (UTF-8)` | Grounded subgoal text |
 | `grounded_subgoal_online` | `bytes (UTF-8)` | Online grounded subgoal text |
 | `is_video_demo` | `bool` | Whether this frame is from the conditioning video input before execution |
-| `is_keyframe` | `bool` | Whether this is a keyframe (i.e. predefined waypoints for trajectory generation)|
-| `is_completed` | `bool` | Whether the task is finished |
+| `is_keyframe` | `bool` | Whether this is a keyframe (i.e. a boundary between subtasks) |

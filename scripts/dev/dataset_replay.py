@@ -25,7 +25,7 @@ ACTION_SPACE = "joint_angle"
 #ACTION_SPACE = "oracle_planner"
 
 GUI_RENDER = True
-MAX_STEPS = 3000
+
 DATASET_ROOT = "/data/hongzefu/data_1206"
 
 DEFAULT_ENV_IDS = [
@@ -128,7 +128,7 @@ def main():
             rollout_subgoal_grounded: list[Any] = []
 
             # ======== Step loop ========
-            while step < MAX_STEPS:
+            while True:
                 replay_key = ACTION_SPACE
                 action = dataset_resolver.get_step(replay_key, step)
                 if ACTION_SPACE == "oracle_planner":

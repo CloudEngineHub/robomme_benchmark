@@ -34,7 +34,7 @@ ACTION_SPACE = "ee_pose"
 #ACTION_SPACE = "oracle_planner"
 
 GUI_RENDER = False
-MAX_STEPS = 3000
+
 DATASET_ROOT = "/data/hongzefu/dataset_generate-rpy4-v2"
 OVERRIDE_METADATA_PATH = "/data/hongzefu/dataset_generate-rpy4-v2"
 
@@ -144,7 +144,7 @@ def main():
             rollout_subgoal_grounded: list[Any] = []
             # ######## Video saving variable initialization end ########
 
-            while step < MAX_STEPS:
+            while True:
                 replay_key = ACTION_SPACE
                 action = dataset_resolver.get_step(replay_key, step)
                 if ACTION_SPACE == "oracle_planner":

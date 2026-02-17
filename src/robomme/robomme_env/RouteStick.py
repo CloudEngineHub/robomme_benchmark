@@ -51,7 +51,7 @@ capabilities can be simulated and trained properly. Hence there is extra code fo
 
 # If direction is reversed, modify evaluate and solve
 
-@register_env("RouteStick", max_episode_steps=2000)
+@register_env("RouteStick")
 class RouteStick(BaseEnv):
 
     _sample_video_link = "https://github.com/haosulab/ManiSkill/raw/main/figures/environment_demos/PickCube-v1_rt.mp4"

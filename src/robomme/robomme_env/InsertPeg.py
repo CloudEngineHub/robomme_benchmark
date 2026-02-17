@@ -46,7 +46,7 @@ capabilities can be simulated and trained properly. Hence there is extra code fo
 """
 
 
-@register_env("InsertPeg", max_episode_steps=200)
+@register_env("InsertPeg")
 class InsertPeg(BaseEnv):
 
     _sample_video_link = "https://github.com/haosulab/ManiSkill/raw/main/figures/environment_demos/PickCube-v1_rt.mp4"

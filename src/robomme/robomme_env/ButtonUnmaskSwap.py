@@ -46,7 +46,7 @@ capabilities can be simulated and trained properly. Hence there is extra code fo
 """
 
 
-@register_env("ButtonUnmaskSwap", max_episode_steps=2000)
+@register_env("ButtonUnmaskSwap")
 class ButtonUnmaskSwap(BaseEnv):
 
 

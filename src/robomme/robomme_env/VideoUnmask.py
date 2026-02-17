@@ -46,7 +46,7 @@ capabilities can be simulated and trained properly. Hence there is extra code fo
 """
 
 
-@register_env("VideoUnmask", max_episode_steps=2000)
+@register_env("VideoUnmask")
 class VideoUnmask(BaseEnv):
 
     _sample_video_link = "https://github.com/haosulab/ManiSkill/raw/main/figures/environment_demos/PickCube-v1_rt.mp4"

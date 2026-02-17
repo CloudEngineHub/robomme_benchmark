@@ -114,6 +114,8 @@ class DemonstrationWrapper(gym.Wrapper):
         self.last_subgoal_segment = None
         self.latched_replacements = None
         self._failed_match_save_count = 0
+        # Reset non-demonstration step counter to avoid cross-episode accumulation
+        self.steps_without_demonstration = 0
         # Start each episode with clean cache to avoid cross-episode pollution:
         # Do not allow "previous frame pose" from last game to affect current game's first frame unwrapping result.
         self._prev_ee_quat_wxyz = None

@@ -177,7 +177,6 @@ class BenchmarkEnvBuilder:
             control_mode="pd_joint_pos",
             render_mode=self.render_mode,
             reward_mode="dense",
-            max_episode_steps=99999,
         )
         if seed is not None:
             env_kwargs["Robomme_seed"] = seed

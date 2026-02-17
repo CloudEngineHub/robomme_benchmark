@@ -27,7 +27,7 @@ from robomme.robomme_env.utils import (
 
 
 GUI_RENDER = False
-MAX_STEPS = 200
+
 VIDEO_FPS = 30
 VIDEO_OUTPUT_DIR = "sample_run_videos"
 
@@ -132,7 +132,7 @@ def main(
 
     step = 0
     action_gen = generate_sample_actions(action_space_type)
-    while step < MAX_STEPS:
+    while True:
         action = next(action_gen)
         obs, _, terminated, _, info = env.step(action)
 
@@ -142,9 +142,6 @@ def main(
         if GUI_RENDER:
             env.render()
         
-        if step == MAX_STEPS:
-            print(f"Step {step} exceeded, terminating episode {episode_idx}.")
-            break
         if terminated:
             if info.get("status") == "success":
                 print(f"[{env_id}] episode {episode_idx} success.")

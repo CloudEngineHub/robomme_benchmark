@@ -31,7 +31,7 @@ from .utils.difficulty import normalize_robomme_difficulty
 
 
 
-@register_env("BinFill", max_episode_steps=2000)
+@register_env("BinFill")
 class BinFill(BaseEnv):
 
     _sample_video_link = "https://github.com/haosulab/ManiSkill/raw/main/figures/environment_demos/PickCube-v1_rt.mp4"

@@ -188,7 +188,6 @@ def _run_episode_attempt(
             render_mode="rgb_array",            # Render mode
             reward_mode="dense",                # Reward mode
             Robomme_seed=seed,             # Random seed
-            max_episode_steps=200,              # Max steps
             Robomme_difficulty=difficulty, # Difficulty setting
         )
         

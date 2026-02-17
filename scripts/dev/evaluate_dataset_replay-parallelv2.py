@@ -38,7 +38,7 @@ ACTION_SPACE = "joint_angle"
 #ACTION_SPACE = "oracle_planner"
 
 GUI_RENDER = False
-MAX_STEPS = 3000
+
 DATASET_ROOT = "/data/hongzefu/dataset_generate-b4"
 OVERRIDE_METADATA_PATH = "/data/hongzefu/dataset_generate-b4"
 
@@ -91,7 +91,6 @@ def evaluate_episode(
     dataset_root: str,
     override_metadata_path: str,
     action_space: str,
-    max_steps: int,
     out_video_dir: str,
     gui_render: bool
 ) -> str:
@@ -149,7 +148,7 @@ def evaluate_episode(
         rollout_subgoal_grounded: list[Any] = []
         # ######## Video saving variable initialization end ########
 
-        while step < max_steps:
+        while True:
             replay_key = action_space
             action = dataset_resolver.get_step(replay_key, step)
             if action_space == "oracle_planner":
@@ -300,7 +299,6 @@ def process_env_id(env_id: str, max_workers_total: int):
                 dataset_root=DATASET_ROOT,
                 override_metadata_path=OVERRIDE_METADATA_PATH,
                 action_space=ACTION_SPACE,
-                max_steps=MAX_STEPS,
                 out_video_dir=OUT_VIDEO_DIR,
                 gui_render=GUI_RENDER
             )
