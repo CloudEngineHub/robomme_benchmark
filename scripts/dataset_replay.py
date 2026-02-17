@@ -67,7 +67,6 @@ def process_episode(env_data: h5py.File, episode_idx: int, env_id: str) -> None:
             "seed",
             "difficulty",
             "task_goal",
-            "subgoal_list",
             "front_camera_intrinsic",
             "wrist_camera_intrinsic",
         }

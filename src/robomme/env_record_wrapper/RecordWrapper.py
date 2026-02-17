@@ -836,14 +836,14 @@ class RobommeRecordWrapper(gym.Wrapper):
 
             record_data = {
                 'obs': {
-                    'front_camera_rgb': base_camera_frame,
-                    'wrist_camera_rgb': wrist_camera_frame,
-                    'front_camera_depth': base_camera_depth,
-                    'wrist_camera_depth': wrist_camera_depth,
+                    'front_rgb': base_camera_frame,
+                    'wrist_rgb': wrist_camera_frame,
+                    'front_depth': base_camera_depth,
+                    'wrist_depth': wrist_camera_depth,
                     'joint_state': joint_state,
                     'eef_state': eef_state,
                     'gripper_state': gripper_state,
-                    'gripper_close': gripper_close,
+                    'is_gripper_close': gripper_close,
                     'eef_velocity': end_effector_velocity,
                     'front_camera_segmentation': segmentation,
                     'front_camera_segmentation_result': segmentation_result,
@@ -864,6 +864,7 @@ class RobommeRecordWrapper(gym.Wrapper):
                         'rpy': fk_rpy,
                     },
                     'eef_action': fk_eef_action,
+                    'choice_action': "{}",
                 },
                 'info': {
                     'record_timestep': record_timestep,
@@ -996,10 +997,10 @@ class RobommeRecordWrapper(gym.Wrapper):
                 # ── obs sub group ──
                 obs_group = ts_group.create_group("obs")
                 obs_data = record_data['obs']
-                obs_group.create_dataset("front_camera_rgb", data=obs_data['front_camera_rgb'])
-                obs_group.create_dataset("wrist_camera_rgb", data=obs_data['wrist_camera_rgb'])
-                obs_group.create_dataset("front_camera_depth", data=obs_data['front_camera_depth'])
-                obs_group.create_dataset("wrist_camera_depth", data=obs_data['wrist_camera_depth'])
+                obs_group.create_dataset("front_rgb", data=obs_data['front_rgb'])
+                obs_group.create_dataset("wrist_rgb", data=obs_data['wrist_rgb'])
+                obs_group.create_dataset("front_depth", data=obs_data['front_depth'])
+                obs_group.create_dataset("wrist_depth", data=obs_data['wrist_depth'])
 
                 # joint_state ensure 9 dims, fill two 0s if 7 dims
                 state_data = obs_data['joint_state']
@@ -1013,7 +1014,7 @@ class RobommeRecordWrapper(gym.Wrapper):
                 obs_group.create_dataset("joint_state", data=state_data)
                 obs_group.create_dataset("eef_state", data=obs_data['eef_state'])
                 obs_group.create_dataset("gripper_state", data=obs_data['gripper_state'])
-                obs_group.create_dataset("gripper_close", data=obs_data['gripper_close'])
+                obs_group.create_dataset("is_gripper_close", data=obs_data['is_gripper_close'])
 
                 obs_group.create_dataset("eef_velocity", data=obs_data['eef_velocity'])
                 # obs_group.create_dataset("front_camera_segmentation", data=obs_data['front_camera_segmentation'])
@@ -1065,6 +1066,9 @@ class RobommeRecordWrapper(gym.Wrapper):
                     kp_action = np.zeros(7)
                     
                 action_group.create_dataset("keypoint_action", data=kp_action)
+
+                # choice_action: empty dict string placeholder
+                action_group.create_dataset("choice_action", data=action_data_dict.get('choice_action', '{}'), dtype=h5py.special_dtype(vlen=str))
 
                 # ── info sub group ──
                 info_group = ts_group.create_group("info")
@@ -1155,24 +1159,6 @@ class RobommeRecordWrapper(gym.Wrapper):
                     setup_group.create_dataset("front_camera_intrinsic", data=intrinsics['front_camera_intrinsic'].reshape(3, 3))
                 if 'wrist_camera_intrinsic' in intrinsics:
                     setup_group.create_dataset("wrist_camera_intrinsic", data=intrinsics['wrist_camera_intrinsic'].reshape(3, 3))
-
-            # Record task list (if exists), for offline reproduction of each simple_subgoal semantics
-            if hasattr(self, 'subgoal_list'):
-                tasks_group = setup_group.create_group("subgoal_list")
-                for i, task_entry in enumerate(self.subgoal_list):
-                    if isinstance(task_entry, dict):
-                        task_name = task_entry.get("name", "Unknown")
-                        demonstration = bool(task_entry.get("demonstration", False))
-                    else:
-                        if len(task_entry) == 2:
-                            _, task_name = task_entry
-                            demonstration = False
-                        else:
-                            _, task_name, demonstration = task_entry
-
-                    task_name_encoded = task_name.encode('utf-8')
-                    tasks_group.create_dataset(f"subgoal_{i}_name", data=task_name_encoded)
-                    tasks_group.create_dataset(f"subgoal_{i}_demonstration", data=demonstration)
 
             if language_goal:
                 setup_group.create_dataset("task_goal", data=language_goal)
