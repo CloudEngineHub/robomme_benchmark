@@ -35,11 +35,10 @@ episode_<N>/
 | `front_depth` | `int16 (H, W, 1)` | Front camera depth |
 | `wrist_depth` | `int16 (H, W, 1)` | Wrist camera depth |
 | `joint_state` | `float32 (7,)` | Joint state (7 joints) |
-| `eef_state` | `float64 (6,)` | End-effector state `[x, y, z, roll, pitch, yaw]` |
+
 | `eef_state_raw/pose` | `float32 (3,)` | End-effector raw position `[x, y, z]` |
 | `eef_state_raw/quat` | `float32 (4,)` | End-effector raw orientation (quaternion) |
 | `eef_state_raw/rpy` | `float32 (3,)` | End-effector raw orientation `[roll, pitch, yaw]` |
-| `eef_velocity` | `float64 (6,)` | End-effector velocity `[vx, vy, vz, wx, wy, wz]` |
 | `gripper_state` | `float32 (2,)` | Gripper state |
 | `is_gripper_close` | `bool` | Whether gripper is closed |
 | `front_camera_extrinsic` | `float32 (3, 4)` | Front camera extrinsic matrix |

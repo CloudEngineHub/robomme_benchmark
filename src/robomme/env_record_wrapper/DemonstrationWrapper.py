@@ -232,7 +232,7 @@ class DemonstrationWrapper(gym.Wrapper):
         image = obs['sensor_data']['base_camera']['rgb'][0]
         wrist_image = obs['sensor_data']['hand_camera']['rgb'][0]
         state = self.agent.robot.qpos
-        end_effector_velocity = self.agent.robot.links[9].get_linear_velocity()[0], self.agent.robot.links[9].get_angular_velocity()[0]
+        # end_effector_velocity = self.agent.robot.links[9].get_linear_velocity()[0], self.agent.robot.links[9].get_angular_velocity()[0]
         subgoal_text = getattr(self, 'current_task_name', 'Unknown')
         grounded_subgoal = self.current_subgoal_segment_filled
 
@@ -257,13 +257,15 @@ class DemonstrationWrapper(gym.Wrapper):
         # Extract gripper state from the last 2 dims of joint positions
         state_flat = state.cpu().numpy().flatten() if hasattr(state, 'cpu') else np.asarray(state).flatten()
         gripper_state = state_flat[-2:]
+        # Only keep first 7 joint dims for joint_state_list
+        joint_state = state_flat[:7]
 
         new_obs = {
             'maniskill_obs': base_obs,
             'front_rgb_list': image,
             'wrist_rgb_list': wrist_image,
-            'joint_state_list': state,
-            'velocity': end_effector_velocity,
+            'joint_state_list': joint_state,
+            # 'velocity': end_effector_velocity,
             'front_depth_list': base_camera_depth,
             # 'front_camera_segmentation': base_camera_segmentation,
             'wrist_depth_list': wrist_camera_depth,

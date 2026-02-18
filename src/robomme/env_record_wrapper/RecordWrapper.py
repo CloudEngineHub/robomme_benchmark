@@ -778,7 +778,7 @@ class RobommeRecordWrapper(gym.Wrapper):
 
             # Buffer data instead of writing directly to HDF5 (using raw frames, no border)
             #print(f"End-effector linear velocity: {self.agent.robot.links[9].get_linear_velocity().tolist()[0]}, angular velocity: {self.agent.robot.links[9].get_angular_velocity().tolist()[0]}")
-            end_effector_velocity = self.agent.robot.links[9].get_linear_velocity().tolist()[0] + self.agent.robot.links[9].get_angular_velocity().tolist()[0]
+            # end_effector_velocity = self.agent.robot.links[9].get_linear_velocity().tolist()[0] + self.agent.robot.links[9].get_angular_velocity().tolist()[0]
 
             # Process keypoint info: Read pending keypoint from env (refresh cache if exists)
             # Convert to 7D keypoint_action: [position(3), rpy(3), gripper(1)]
@@ -809,7 +809,7 @@ class RobommeRecordWrapper(gym.Wrapper):
                 _to_numpy(eef_pose_dict['rpy']).flatten()[:3],
                 _to_numpy(action).flatten()[-1:] if action is not None else np.array([-1.0]),
             ])
-            eef_state = eef_action[:6]
+
 
             # FK from joint_action -> eef_action_raw (pose/quat/rpy) and eef_action (7D)
             action_pose_dict = self._joint_action_to_ee_pose_dict(action)
@@ -836,10 +836,10 @@ class RobommeRecordWrapper(gym.Wrapper):
                     'front_depth': base_camera_depth,
                     'wrist_depth': wrist_camera_depth,
                     'joint_state': joint_state,
-                    'eef_state': eef_state,
+
                     'gripper_state': gripper_state,
                     'is_gripper_close': gripper_close,
-                    'eef_velocity': end_effector_velocity,
+                    # 'eef_velocity': end_effector_velocity,
                     'front_camera_segmentation': segmentation,
                     'front_camera_segmentation_result': segmentation_result,
                     'front_camera_extrinsic': base_camera_extrinsic,
@@ -991,11 +991,11 @@ class RobommeRecordWrapper(gym.Wrapper):
                 obs_group.create_dataset("wrist_depth", data=obs_data['wrist_depth'])
 
                 obs_group.create_dataset("joint_state", data=obs_data['joint_state'])
-                obs_group.create_dataset("eef_state", data=obs_data['eef_state'])
+
                 obs_group.create_dataset("gripper_state", data=obs_data['gripper_state'])
                 obs_group.create_dataset("is_gripper_close", data=obs_data['is_gripper_close'])
 
-                obs_group.create_dataset("eef_velocity", data=obs_data['eef_velocity'])
+                # obs_group.create_dataset("eef_velocity", data=obs_data['eef_velocity'])
                 # obs_group.create_dataset("front_camera_segmentation", data=obs_data['front_camera_segmentation'])
                 # obs_group.create_dataset("front_camera_segmentation_result", data=obs_data['front_camera_segmentation_result'])
                 obs_group.create_dataset("front_camera_extrinsic", data=obs_data['front_camera_extrinsic'])

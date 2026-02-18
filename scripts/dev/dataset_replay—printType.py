@@ -32,7 +32,7 @@ DEFAULT_ENV_IDS = [
     # "StopCube",
     # "SwingXtimes",
     #"BinFill",
-     "VideoUnmaskSwap",
+    "VideoUnmaskSwap",
     # "VideoUnmask",
     # "ButtonUnmaskSwap",
     # "ButtonUnmask",

@@ -39,8 +39,8 @@ ACTION_SPACE = "joint_angle"
 
 GUI_RENDER = False
 
-DATASET_ROOT = "/data/hongzefu/dataset_generate-b4"
-OVERRIDE_METADATA_PATH = "/data/hongzefu/dataset_generate-b4"
+DATASET_ROOT = "/data/hongzefu/data_0217"
+OVERRIDE_METADATA_PATH = "/data/hongzefu/data_0217"
 
 # ######## Video saving variables (output directory) start ########
 # Video output directory: Independently hardcoded, not aligned with h5 path or env_id
@@ -49,11 +49,11 @@ OUT_VIDEO_DIR = "/data/hongzefu/dataset_replay-b4"
 MAX_STEPS = 1000
 
 DEFAULT_ENV_IDS = [
-    "PickXtimes",
+    #"PickXtimes",
     # "StopCube",
     # "SwingXtimes",
     # "BinFill",
-    # "VideoUnmaskSwap",
+    "VideoUnmaskSwap",
     # "VideoUnmask",
     # "ButtonUnmaskSwap",
     # "ButtonUnmask",
