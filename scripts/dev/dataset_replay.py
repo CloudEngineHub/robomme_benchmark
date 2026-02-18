@@ -48,6 +48,7 @@ DEFAULT_ENV_IDS = [
 ]
 
 OUT_VIDEO_DIR = "/data/hongzefu/dataset_replay"
+MAX_STEPS = 1000
 
 
 def _parse_oracle_command(subgoal_text: Optional[str]) -> Optional[dict[str, Any]]:
@@ -82,7 +83,7 @@ def main():
         env = None
         for episode in range(episode_count):
 
-            env = env_builder.make_env_for_episode(episode)
+            env = env_builder.make_env_for_episode(episode, max_steps=MAX_STEPS)
             dataset_resolver = EpisodeDatasetResolver(
                 env_id=env_id,
                 episode=episode,

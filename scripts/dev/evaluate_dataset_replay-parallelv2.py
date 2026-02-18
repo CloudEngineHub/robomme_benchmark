@@ -46,6 +46,7 @@ OVERRIDE_METADATA_PATH = "/data/hongzefu/dataset_generate-b4"
 # Video output directory: Independently hardcoded, not aligned with h5 path or env_id
 OUT_VIDEO_DIR = "/data/hongzefu/dataset_replay-b4"
 # ######## Video saving variables (output directory) end ########
+MAX_STEPS = 1000
 
 DEFAULT_ENV_IDS = [
     "PickXtimes",
@@ -110,7 +111,7 @@ def evaluate_episode(
     dataset_resolver = None
     
     try:
-        env = env_builder.make_env_for_episode(episode)
+        env = env_builder.make_env_for_episode(episode, max_steps=MAX_STEPS)
         dataset_resolver = EpisodeDatasetResolver(
             env_id=env_id,
             episode=episode,

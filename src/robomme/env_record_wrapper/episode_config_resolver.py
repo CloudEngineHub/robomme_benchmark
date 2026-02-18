@@ -167,9 +167,13 @@ class BenchmarkEnvBuilder:
         episode_set = {episode for (task, episode) in self.metadata_index if task == self.env_id}
         return len(episode_set)
 
-    def make_env_for_episode(self, episode: int):
+    def make_env_for_episode(self, episode: int, max_steps: Optional[int] = None):
         """Create and configure environment for specific episode. Wrap EndeffectorDemonstrationWrapper for action_space=ee_pose/ee_quat, MultiStepDemonstrationWrapper for keypoint, OraclePlannerDemonstrationWrapper for oracle_planner."""
         from .DemonstrationWrapper import DemonstrationWrapper
+
+        max_steps_without_demo = (
+            max_steps + 2 if max_steps is not None else self.max_steps_without_demonstration
+        )
 
         seed, difficulty_hint = self.resolve_episode(episode)
         env_kwargs = dict(
@@ -189,7 +193,7 @@ class BenchmarkEnvBuilder:
         env = gym.make(self.env_id, **env_kwargs)
         env = DemonstrationWrapper(
             env,
-            max_steps_without_demonstration=self.max_steps_without_demonstration,
+            max_steps_without_demonstration=max_steps_without_demo,
             gui_render=self.gui_render,
         )
         if self.action_space == "joint_angle":

@@ -777,8 +777,6 @@ class RobommeRecordWrapper(gym.Wrapper):
             #print(self.current_task_name)
 
             # Buffer data instead of writing directly to HDF5 (using raw frames, no border)
-            record_timestep = len(self.buffer)
-            # record_data saves observation, action, language info simultaneously, restored by record_timestep when writing
             #print(f"End-effector linear velocity: {self.agent.robot.links[9].get_linear_velocity().tolist()[0]}, angular velocity: {self.agent.robot.links[9].get_angular_velocity().tolist()[0]}")
             end_effector_velocity = self.agent.robot.links[9].get_linear_velocity().tolist()[0] + self.agent.robot.links[9].get_angular_velocity().tolist()[0]
 
@@ -864,7 +862,6 @@ class RobommeRecordWrapper(gym.Wrapper):
                     'choice_action': "{}",
                 },
                 'info': {
-                    'record_timestep': record_timestep,
                     'simple_subgoal': subgoal_text,
                     'simple_subgoal_online': subgoal_online_text,
                     'grounded_subgoal': self.current_subgoal_segment_filled,
@@ -974,13 +971,7 @@ class RobommeRecordWrapper(gym.Wrapper):
             episode_group = self.h5_file.create_group(episode_group_name)
 
             # Write all buffered data
-            for record_data in self.buffer:
-                record_timestep = record_data['info']['record_timestep']
-                if isinstance(record_timestep, (torch.Tensor, np.ndarray)):
-                    record_timestep = int(record_timestep.item())
-                else:
-                    record_timestep = int(record_timestep)
-
+            for record_timestep, record_data in enumerate(self.buffer):
                 base_group_name = f"timestep_{record_timestep}"
                 group_name = base_group_name
                 duplicate_index = 1
@@ -1061,7 +1052,6 @@ class RobommeRecordWrapper(gym.Wrapper):
                 # ── info sub group ──
                 info_group = ts_group.create_group("info")
                 info_data = record_data['info']
-                info_group.create_dataset("record_timestep", data=record_timestep)
 
                 # Process string task name, ensure correct encoding
                 task_name = info_data['simple_subgoal']

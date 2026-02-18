@@ -26,10 +26,11 @@ from robomme.robomme_env.utils import (
 )
 
 
-GUI_RENDER = False
+GUI_RENDER = True
 
 VIDEO_FPS = 30
 VIDEO_OUTPUT_DIR = "sample_run_videos"
+MAX_STEPS = 10
 
 
 def _add_small_noise(
@@ -111,7 +112,7 @@ def main(
         print(f"No episodes in {dataset} for {env_id}. Exiting.")
         return
 
-    env = env_builder.make_env_for_episode(episode_idx) # TODO: hongze put the maxsteps as input here
+    env = env_builder.make_env_for_episode(episode_idx, max_steps=MAX_STEPS)
     print(f"seed={env.unwrapped.Robomme_seed}, difficulty={env.unwrapped.Robomme_difficulty}")
     obs, info = env.reset()
 

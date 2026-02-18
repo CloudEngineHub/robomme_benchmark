@@ -21,6 +21,7 @@ from robomme.robomme_env.utils import JOINT_ACTION_SPACE
 GUI_RENDER = False
 REPLAY_VIDEO_DIR = "replay_videos"
 VIDEO_FPS = 30
+MAX_STEPS = 1000
 
 
 def _frame_from_obs(obs: dict, is_video_frame: bool = False) -> np.ndarray:
@@ -58,7 +59,7 @@ def process_episode(env_data: h5py.File, episode_idx: int, env_id: str) -> None:
         action_space=JOINT_ACTION_SPACE,
         gui_render=GUI_RENDER,
     )
-    env = env_builder.make_env_for_episode(episode_idx)
+    env = env_builder.make_env_for_episode(episode_idx, max_steps=MAX_STEPS)
     print(f"seed={env.unwrapped.Robomme_seed}, difficulty={env.unwrapped.Robomme_difficulty}")
     setup_group = episode_data.get("setup")
     if setup_group is not None:

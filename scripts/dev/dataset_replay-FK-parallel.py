@@ -31,6 +31,7 @@ from robomme.robomme_env.utils.rpy_util import build_endeffector_pose_dict
 GUI_RENDER = False
 REPLAY_VIDEO_DIR = "replay_videos"
 VIDEO_FPS = 30
+MAX_STEPS = 1000
 
 
 def _init_fk_planner(env) -> Tuple:
@@ -166,7 +167,7 @@ def process_episode(
             action_space=EE_POSE_ACTION_SPACE,
             gui_render=gui_render,
         )
-        env = env_builder.make_env_for_episode(episode_idx)
+        env = env_builder.make_env_for_episode(episode_idx, max_steps=MAX_STEPS)
         print(f"[ep{episode_idx}] 任务: {env_id}, 目标: {task_goal}")
 
         obs, info = env.reset()

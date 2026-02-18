@@ -22,7 +22,6 @@ def _make_buffer_entry(timestep, is_keyframe=False, keypoint_action=None):
         "obs": {},
         "action": {},
         "info": {
-            "record_timestep": timestep,
             "is_keyframe": is_keyframe,
         },
     }
