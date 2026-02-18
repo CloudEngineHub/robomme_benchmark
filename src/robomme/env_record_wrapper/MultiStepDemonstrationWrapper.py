@@ -4,7 +4,7 @@ MultiStepDemonstrationWrapper: Wraps DemonstrationWrapper to provide keypoint st
 Each step(action) receives action = keypoint_p(3) + rpy(3) + gripper_action(1), total 7 dimensions.
 Internally converts RPY to quat then calls move_to_pose_with_screw and close_gripper/open_gripper via planner_denseStep,
 where PatternLock/RouteStick will force skip close_gripper/open_gripper.
-Returns unified batch (obs/info as dictionary of lists, reward/terminated/truncated as 1D tensors).
+Returns obs as dictionary-of-lists, and reward/terminated/truncated as the last step value.
 Caller must ensure scripts/ is in sys.path to import planner_fail_safe.
 """
 import numpy as np
@@ -24,7 +24,7 @@ class MultiStepDemonstrationWrapper(gym.Wrapper):
     """
     Wraps DemonstrationWrapper. step(action) interprets action as
     (keypoint_p, rpy, gripper_action) total 7 dims, internally converts RPY to quat,
-    executes planning via planner_denseStep, and returns unified batch.
+    executes planning via planner_denseStep, and returns last-step signals.
     """
 
     def __init__(self, env, gui_render=True, vis=True, **kwargs):
@@ -51,6 +51,24 @@ class MultiStepDemonstrationWrapper(gym.Wrapper):
             truncated = truncated_batch[idx]
             steps.append((obs, reward, terminated, truncated, info))
         return steps
+
+    @staticmethod
+    def _flatten_info_batch(info_batch):
+        return {k: v[-1] if isinstance(v, list) and v else v for k, v in info_batch.items()}
+
+    @staticmethod
+    def _take_last_step_value(value):
+        if isinstance(value, torch.Tensor):
+            if value.numel() == 0 or value.ndim == 0:
+                return value
+            return value.reshape(-1)[-1]
+        if isinstance(value, np.ndarray):
+            if value.size == 0 or value.ndim == 0:
+                return value
+            return value.reshape(-1)[-1]
+        if isinstance(value, (list, tuple)):
+            return value[-1] if value else value
+        return value
 
     def _get_planner(self):
         if self._planner is not None:
@@ -101,7 +119,7 @@ class MultiStepDemonstrationWrapper(gym.Wrapper):
         return self.env.step(action)
 
     def step(self, action):
-        """Execute keypoint step: RRT* movement + optional gripper action, return unified batch."""
+        """Execute keypoint step and return last-step signals for reward/terminated/truncated."""
         action = np.asarray(action, dtype=np.float64).flatten()
         if action.size < 7:
             raise ValueError(f"action must have at least 7 elements, got {action.size}")
@@ -144,7 +162,17 @@ class MultiStepDemonstrationWrapper(gym.Wrapper):
                     if result != -1:
                         collected_steps.extend(self._batch_to_steps(result))
 
-        return planner_denseStep.to_step_batch(collected_steps)
+        obs_batch, reward_batch, terminated_batch, truncated_batch, info_batch = planner_denseStep.to_step_batch(
+            collected_steps
+        )
+        info_flat = self._flatten_info_batch(info_batch)
+        return (
+            obs_batch,
+            self._take_last_step_value(reward_batch),
+            self._take_last_step_value(terminated_batch),
+            self._take_last_step_value(truncated_batch),
+            info_flat,
+        )
 
     def reset(self, **kwargs):
         self._planner = None

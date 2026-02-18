@@ -147,7 +147,8 @@ def step_after(env, planner, env_id, seg_raw, command_dict):
 class OraclePlannerDemonstrationWrapper(gym.Wrapper):
     """
     Wrap Robomme environment with Oracle planning logic into Gym Wrapper for demonstration/evaluation;
-    Input to step is command_dict (containing action and optional point), output is unified dense batch.
+    Input to step is command_dict (containing action and optional point).
+    step returns obs as dict-of-lists and reward/terminated/truncated as last-step values.
     """
     def __init__(self, env, env_id, gui_render=True):
         super().__init__(env)
@@ -192,10 +193,28 @@ class OraclePlannerDemonstrationWrapper(gym.Wrapper):
             )
         return self.env.reset(**kwargs)
 
+    @staticmethod
+    def _flatten_info_batch(info_batch: dict) -> dict:
+        return {k: v[-1] if isinstance(v, list) and v else v for k, v in info_batch.items()}
+
+    @staticmethod
+    def _take_last_step_value(value):
+        if isinstance(value, torch.Tensor):
+            if value.numel() == 0 or value.ndim == 0:
+                return value
+            return value.reshape(-1)[-1]
+        if isinstance(value, np.ndarray):
+            if value.size == 0 or value.ndim == 0:
+                return value
+            return value.reshape(-1)[-1]
+        if isinstance(value, (list, tuple)):
+            return value[-1] if value else value
+        return value
+
     def step(self, action):
         """
         Execute one step: action is command_dict, must contain "action", optional "point".
-        Return unified dense batch, corresponding to data of each frame during planner execution.
+        Return last-step signals for reward/terminated/truncated while keeping obs as dict-of-lists.
         """
         command_dict = action
 
@@ -216,4 +235,11 @@ class OraclePlannerDemonstrationWrapper(gym.Wrapper):
         obs_batch, reward_batch, terminated_batch, truncated_batch, info_batch = step_after(
             self.env, self.planner, self.env_id, self.seg_raw, command_dict
         )
-        return obs_batch, reward_batch, terminated_batch, truncated_batch, info_batch
+        info_flat = self._flatten_info_batch(info_batch)
+        return (
+            obs_batch,
+            self._take_last_step_value(reward_batch),
+            self._take_last_step_value(terminated_batch),
+            self._take_last_step_value(truncated_batch),
+            info_flat,
+        )
