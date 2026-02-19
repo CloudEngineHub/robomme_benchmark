@@ -136,8 +136,9 @@ class EpisodeDatasetResolver:
         self._timestep_group_cache: Dict[int, h5py.Group] = {}
         self._non_demo_steps: List[int] = []
         self._keypoint_steps: List[int] = []
-        self._oracle_steps: List[int] = []
-        self._oracle_step_commands: Dict[int, Dict[str, Any]] = {}
+        # oracle_planner: indexed by serial_number and request order (step = 第几次请求)
+        self._oracle_serials: List[int] = []
+        self._oracle_commands_by_serial: Dict[int, Dict[str, Any]] = {}
         self._build_indexes()
 
     def _get_timestep_group(self, record_step: int) -> Optional[h5py.Group]:
@@ -287,16 +288,9 @@ class EpisodeDatasetResolver:
                 pass
         return command
 
-    @staticmethod
-    def _oracle_command_key(command: Dict[str, Any]) -> Tuple[Any, ...]:
-        if "serial_number" in command:
-            return ("serial", int(command["serial_number"]))
-        point = command.get("point")
-        point_key = tuple(point) if isinstance(point, list) and len(point) >= 2 else None
-        return ("action_point", command["action"], point_key)
-
     def _build_indexes(self) -> None:
-        prev_oracle_key: Optional[Tuple[Any, ...]] = None
+        # Collect oracle commands by serial_number (only timesteps with serial_number count)
+        oracle_by_serial: Dict[int, Dict[str, Any]] = {}
         for record_step in self._timestep_indexes:
             timestep_group = self._get_timestep_group(record_step)
             if timestep_group is None or self._is_video_demo_group(timestep_group):
@@ -311,14 +305,16 @@ class EpisodeDatasetResolver:
 
             command = self._extract_choice_action(timestep_group)
             if command is None:
-                prev_oracle_key = None
                 continue
+            serial = command.get("serial_number")
+            if serial is None:
+                continue
+            # First occurrence of this serial_number wins (deterministic order by timestep)
+            if serial not in oracle_by_serial:
+                oracle_by_serial[serial] = command
 
-            current_oracle_key = self._oracle_command_key(command)
-            if prev_oracle_key is None or current_oracle_key != prev_oracle_key:
-                self._oracle_steps.append(record_step)
-                self._oracle_step_commands[record_step] = command
-            prev_oracle_key = current_oracle_key
+        self._oracle_serials = sorted(oracle_by_serial.keys())
+        self._oracle_commands_by_serial = oracle_by_serial
 
     def get_step(
         self,
@@ -329,16 +325,11 @@ class EpisodeDatasetResolver:
             return None
 
         if mode == "oracle_planner":
-            if step >= len(self._oracle_steps):
+            # step = 第几次请求 (0-based); 每次请求对应一个递增的 serial_number
+            if step >= len(self._oracle_serials):
                 return None
-            record_step = self._oracle_steps[step]
-            command = self._oracle_step_commands.get(record_step)
-            if command is not None:
-                return dict(command)
-            timestep_group = self._get_timestep_group(record_step)
-            if timestep_group is None:
-                return None
-            command = self._extract_choice_action(timestep_group)
+            serial = self._oracle_serials[step]
+            command = self._oracle_commands_by_serial.get(serial)
             return dict(command) if command is not None else None
 
         if mode == "joint_angle":

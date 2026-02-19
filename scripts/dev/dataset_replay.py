@@ -52,15 +52,6 @@ MAX_STEPS = 1000
 
 
 
-def _parse_oracle_command(choice_action: Optional[Any]) -> Optional[dict[str, Any]]:
-    if not isinstance(choice_action, dict):
-        return None
-    action = choice_action.get("action")
-    if not isinstance(action, str) or not action:
-        return None
-    return choice_action
-
-
 def main():
     env_id_list = BenchmarkEnvBuilder.get_task_list()
     print(f"Running envs: {env_id_list}")
@@ -131,8 +122,6 @@ def main():
             while True:
                 replay_key = ACTION_SPACE
                 action = dataset_resolver.get_step(replay_key, step)
-                if ACTION_SPACE == "oracle_planner":
-                    action = _parse_oracle_command(action)
                 if action is None:
                     break
 
