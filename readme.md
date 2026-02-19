@@ -2,16 +2,6 @@
 
 ![Robomme bench](assets/robomme_bench.jpg)
 
-- [Announcements](#announcements)
-- [Installation](#installation)
-- [Running Examples](#running-examples)
-- [Tasks](#tasks)
-- [Benchmark](#benchmark)
-- [Model Training](#model-training)
-- [Troubleshooting](#troubleshooting)
-- [Acknowledgements](#acknowledgements)
-- [Citation](#citation)
-
 ## 📢 Announcements
 
 [02/2026] We release RoboMME! It's a cognitive-motivated large-scale robotic benchmark for memory-augmented manipulation, spanning 4 task suites with a total of 16 carefully designed tasks.
@@ -25,19 +15,30 @@ uv sync
 uv pip install -e .
 ```
 
-## 🚀 Running Examples
+## 🚀 Quick Start
 
 Start an environment with a specified setup:
 
 ```bash
-uv run scripts/run_example.py --action-space-type joint_angle --dataset test --env-id PickXtimes --episode-idx 0
+uv run scripts/run_example.py --action-space-type joint_angle --task-id PickXtimes
 ```
 
 This generates a rollout video in the `sample_run_videos` directory.
 
 We provide four action types: `joint_action`, `ee_pose`, `keypoint`, and `multi_choice`. Use `joint_action` or `ee_pose` for continuous action prediction, `keypoint` for discrete waypoint actions, and `multi_choice` for VideoQA-style evaluation.
 
-> **Note:** Currently, only `joint_action` is verified. Please use it rather than other types.
+## 🎯 Tasks
+
+We have four task suites, each with 4 tasks:
+
+| Suite      | Focus             | Task ID                                                                 |
+| ---------- | ----------------- | --------------------------------------------------------------------- |
+| Counting   | Temporal memory   | BinFill, PickXtimes, SwingXtimes, StopCube                            |
+| Permanence | Spatial memory    | VideoUnmask, VideoUnmaskSwap, ButtonUnmask, ButtonUnmaskSwap         |
+| Reference  | Object memory     | PickHighlight, VideoRepick, VideoPlaceButton, VideoPlaceOrder         |
+| Imitation  | Procedural memory | MoveCube, InsertPeg, PatternLock, RouteStick                          |
+
+All tasks are defined in `src/robomme/robomme_env`. You can play those tasks via an online interactive demo [here](). (@hongze)
 
 ## 📁 Benchmark
 
@@ -45,12 +46,10 @@ We provide four action types: `joint_action`, `ee_pose`, `keypoint`, and `multi_
 
 Training data can be downloaded [here](https://huggingface.co/Yinpei/data_0214). There are 1,600 demonstrations in total (100 per task). The HDF5 format is described in [doc/h5_data_format.md](doc/h5_data_format.md).
 
-> **Note:** Currently, the training data is not finalized and may differ from the documentation.
-
 After downloading, replay the dataset for a sanity check:
 
 ```bash
-uv run scripts/dataset_replay.py --h5-data-dir <your_downloaded_data_dir> --action-space-type joint_angle
+uv run scripts/dataset_replay.py --h5-data-dir <your_downloaded_data_dir>
 ```
 
 ### 📊 Evaluation
@@ -64,8 +63,7 @@ env_builder = BenchmarkEnvBuilder(
     ...
 )
 ```
-
-Each split has 50 episodes. 
+Each split has 50 episodes.  The environment input/output format is provided in [doc/env_format.md](doc/env_format.md)
 
 ### 🔧 Data Generation
 
@@ -75,29 +73,12 @@ You can also re-generate your own HDF5 data using scripts in `scripts/dev/`. Det
 uv run scripts/dev/xxxx
 ```
 
-### 🎮 Play with Online Demo
-
-Start the Gradio GUI to try the demo (@hongze). (Command TBD.)
-
 
 ## 🧠 Model Training
 
-The [MME-VLA-Suite](https://github.com/RoboMME/MME-VLA-Suite) repo provides VLA model training and evaluation. Please check it out.
+The [MME Policy Learning](https://github.com/RoboMME/robomme_policy_learning) repo provides MME-VLA-Suite model training and evaluation. Please check it out.
 
-> **Note:** Currently, environment spawning is set up for imitation learning. We are working on extending it to support more general parallel environments for reinforcement learning.
-
-## 🎯 Tasks
-
-We have four task suites, each with 4 tasks:
-
-| Suite      | Focus             | Task ID                                                                 |
-| ---------- | ----------------- | --------------------------------------------------------------------- |
-| Counting   | Temporal memory   | BinFill, PickXtimes, SwingXtimes, StopCube                            |
-| Permanence | Spatial memory    | VideoUnmask, VideoUnmaskSwap, ButtonUnmask, ButtonUnmaskSwap         |
-| Reference  | Object memory     | PickHighlight, VideoRepick, VideoPlaceButton, VideoPlaceOrder         |
-| Imitation  | Procedural memory | MoveCube, InsertPeg, PatternLock, RouteStick                          |
-
-All tasks are defined in `src/robomme/robomme_env`.
+> **Note:** Currently, environment spawning is set up only for imitation learning. We are working on extending it to support more general parallel environments for reinforcement learning in the future.
 
 ## 🔧 Troubleshooting
 
