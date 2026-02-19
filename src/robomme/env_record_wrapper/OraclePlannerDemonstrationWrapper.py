@@ -73,8 +73,11 @@ def step_after(env, planner, env_id, seg_raw, command_dict):
     )
 
     if result == -1:
-        print("Warning: solve() failed (returned -1)")
-        return planner_denseStep.empty_step_batch()
+        action_label = solve_options[found_idx].get("label", "Unknown")
+        raise RuntimeError(
+            f"Oracle solve failed after screw->RRT* retries for env '{env_id}', "
+            f"action '{action_label}' (index {found_idx + 1})."
+        )
 
     env.unwrapped.evaluate()
     evaluation = env.unwrapped.evaluate(solve_complete_eval=True)
@@ -104,16 +107,91 @@ class OraclePlannerDemonstrationWrapper(gym.Wrapper):
         self.base_frames = []
         self.wrist_frames = []
         self.available_options = []
+        self._oracle_screw_max_attempts = 3
+        self._oracle_rrt_max_attempts = 3
 
         # Action/Observation space (Empty Dict here, agreed externally)
         self.action_space = gym.spaces.Dict({})
         self.observation_space = gym.spaces.Dict({})
 
+    def _wrap_planner_with_screw_then_rrt_retry(self, planner, screw_failure_exc):
+        original_move_to_pose_with_screw = planner.move_to_pose_with_screw
+        original_move_to_pose_with_rrt = planner.move_to_pose_with_RRTStar
+
+        def _move_to_pose_with_screw_then_rrt_retry(*args, **kwargs):
+            for attempt in range(1, self._oracle_screw_max_attempts + 1):
+                try:
+                    result = original_move_to_pose_with_screw(*args, **kwargs)
+                except screw_failure_exc as exc:
+                    print(
+                        f"[OraclePlannerWrapper] screw planning failed "
+                        f"(attempt {attempt}/{self._oracle_screw_max_attempts}): {exc}"
+                    )
+                    continue
+
+                if isinstance(result, int) and result == -1:
+                    print(
+                        f"[OraclePlannerWrapper] screw planning returned -1 "
+                        f"(attempt {attempt}/{self._oracle_screw_max_attempts})"
+                    )
+                    continue
+
+                return result
+
+            print(
+                "[OraclePlannerWrapper] screw planning exhausted; "
+                f"fallback to RRT* (max {self._oracle_rrt_max_attempts} attempts)"
+            )
+            for attempt in range(1, self._oracle_rrt_max_attempts + 1):
+                try:
+                    result = original_move_to_pose_with_rrt(*args, **kwargs)
+                except Exception as exc:
+                    print(
+                        f"[OraclePlannerWrapper] RRT* planning failed "
+                        f"(attempt {attempt}/{self._oracle_rrt_max_attempts}): {exc}"
+                    )
+                    continue
+
+                if isinstance(result, int) and result == -1:
+                    print(
+                        f"[OraclePlannerWrapper] RRT* planning returned -1 "
+                        f"(attempt {attempt}/{self._oracle_rrt_max_attempts})"
+                    )
+                    continue
+
+                return result
+
+            raise RuntimeError(
+                "[OraclePlannerWrapper] screw->RRT* planning exhausted; "
+                f"screw_attempts={self._oracle_screw_max_attempts}, "
+                f"rrt_attempts={self._oracle_rrt_max_attempts}"
+            )
+
+        planner.move_to_pose_with_screw = _move_to_pose_with_screw_then_rrt_retry
+        return planner
 
     def reset(self, **kwargs):
-        # Select stick or arm planner based on env_id and initialize
+        # Prefer fail-aware planners; fallback to base planners if import fails.
+        try:
+            from ..robomme_env.utils.planner_fail_safe import (
+                FailAwarePandaArmMotionPlanningSolver,
+                FailAwarePandaStickMotionPlanningSolver,
+                ScrewPlanFailure,
+            )
+        except Exception as exc:
+            print(
+                "[OraclePlannerWrapper] Warning: failed to import planner_fail_safe, "
+                f"fallback to base planners: {exc}"
+            )
+            FailAwarePandaArmMotionPlanningSolver = PandaArmMotionPlanningSolver
+            FailAwarePandaStickMotionPlanningSolver = PandaStickMotionPlanningSolver
+
+            class ScrewPlanFailure(RuntimeError):
+                """Placeholder exception type when fail-aware planner import is unavailable."""
+
+        # Select stick or arm planner based on env_id and initialize.
         if self.env_id in ("PatternLock", "RouteStick"):
-            self.planner = PandaStickMotionPlanningSolver(
+            self.planner = FailAwarePandaStickMotionPlanningSolver(
                 self.env,
                 debug=False,
                 vis=self.gui_render,
@@ -123,7 +201,7 @@ class OraclePlannerDemonstrationWrapper(gym.Wrapper):
                 joint_vel_limits=0.3,
             )
         else:
-            self.planner = PandaArmMotionPlanningSolver(
+            self.planner = FailAwarePandaArmMotionPlanningSolver(
                 self.env,
                 debug=False,
                 vis=self.gui_render,
@@ -131,6 +209,10 @@ class OraclePlannerDemonstrationWrapper(gym.Wrapper):
                 visualize_target_grasp_pose=False,
                 print_env_info=False,
             )
+        self._wrap_planner_with_screw_then_rrt_retry(
+            self.planner,
+            screw_failure_exc=ScrewPlanFailure,
+        )
         return self.env.reset(**kwargs)
 
     @staticmethod

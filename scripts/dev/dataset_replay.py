@@ -28,9 +28,9 @@ GUI_RENDER = False
 DATASET_ROOT = "/data/hongzefu/data_0219"
 
 DEFAULT_ENV_IDS = [
-"PickXtimes",
+#"PickXtimes",
 # "StopCube",
-# "SwingXtimes",
+ "SwingXtimes",
 # "BinFill",
 # "VideoUnmaskSwap",
 # "VideoUnmask",
@@ -70,7 +70,7 @@ def main():
 
         env = None
         for episode in range(episode_count):
-            if episode != 5:
+            if episode != 7:
                 continue
 
             env = env_builder.make_env_for_episode(episode, max_steps=MAX_STEPS)
