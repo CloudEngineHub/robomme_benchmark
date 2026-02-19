@@ -1,7 +1,6 @@
 import gymnasium as gym
 import numpy as np
 import torch
-import cv2
 
 from robomme.robomme_env.utils.vqa_options import get_vqa_options
 from mani_skill.examples.motionplanning.panda.motionplanner import (
@@ -11,6 +10,11 @@ from mani_skill.examples.motionplanning.panda.motionplanner_stick import (
     PandaStickMotionPlanningSolver,
 )
 from ..robomme_env.utils import planner_denseStep
+from .oracle_action_matcher import (
+    find_exact_option_index,
+    normalize_and_clip_point_xy,
+    select_target_with_point,
+)
 
 
 # -----------------------------------------------------------------------------
@@ -20,32 +24,6 @@ from ..robomme_env.utils import planner_denseStep
 # planner_denseStep, aggregating multiple internal env.step calls into a unified batch return.
 # -----------------------------------------------------------------------------
 
-
-def _find_best_semantic_match(user_query, options):
-    """
-    Use rapidfuzz edit distance to find the best match for user_query in options labels;
-    Used for semantic fallback when exact action name is not found.
-    Return (best_idx, best_score), if no match or exception, best_idx=-1, score=0.0.
-    """
-    from rapidfuzz import process, fuzz
-    if not options:
-        return -1, 0.0
-    labels = [opt.get("label", "") for opt in options]
-    query_text = str(user_query or "").strip()
-    try:
-        result = process.extractOne(query_text, labels, scorer=fuzz.ratio)
-        if result:
-            match_text, score, best_idx = result
-            best_score = score / 100.0
-        else:
-            return -1, 0.0
-    except Exception as exc:
-        print(f"  [NLP] Edit distance match failed ({exc}), fallback to option 1.")
-        return 0, 0.0
-    print(f"  [NLP] Nearest semantic match (edit distance): '{query_text}' -> '{labels[best_idx]}' (Score: {best_score:.4f})")
-    return best_idx, best_score
-
-
 def step_after(env, planner, env_id, seg_raw, command_dict):
     """
     Execute one Oracle action based on command_dict (containing action and optional point),
@@ -53,6 +31,8 @@ def step_after(env, planner, env_id, seg_raw, command_dict):
     """
     selected_target = {"obj": None, "name": None, "seg_id": None, "click_point": None, "centroid_point": None}
     solve_options = get_vqa_options(env, planner, selected_target, env_id)
+    if not isinstance(command_dict, dict):
+        return planner_denseStep.empty_step_batch()
     target_action = command_dict.get("action")
     target_param = command_dict.get("point")
     # Return empty batch if no action
@@ -60,70 +40,30 @@ def step_after(env, planner, env_id, seg_raw, command_dict):
         return planner_denseStep.empty_step_batch()
     if target_action is None:
         return planner_denseStep.empty_step_batch()
-    found_idx = -1
-    # Find action index in solution options by label or index
-    for i, opt in enumerate(solve_options):
-        if opt.get("label") == target_action or str(i + 1) == str(target_action):
-            found_idx = i
-            break
-    # If not hit and is string and not digit, try semantic match
-    if found_idx == -1 and isinstance(target_action, str) and not target_action.isdigit():
-        print(f"Attempting semantic match for '{target_action}'...")
-        found_idx, score = _find_best_semantic_match(target_action, solve_options)
+    # Strict exact label matching only.
+    found_idx = find_exact_option_index(target_action, solve_options)
     if found_idx == -1:
-        print(f"Error: Action '{target_action}' not found in current options.")
+        print(
+            f"Error: Action '{target_action}' not found in current options by exact label match."
+        )
         return planner_denseStep.empty_step_batch()
     # If click coordinates provided and segmentation map exists, parse nearest object and fill selected_target
     if target_param is not None and seg_raw is not None:
-        cx, cy = target_param
         h, w = seg_raw.shape[:2]
-        cx = max(0, min(cx, w - 1))
-        cy = max(0, min(cy, h - 1))
         seg_id_map = getattr(env.unwrapped, "segmentation_id_map", {}) or {}
-        candidates = []
-
-        def _collect(item):
-            """Recursively collect actionable objects in available."""
-            if isinstance(item, (list, tuple)):
-                for x in item:
-                    _collect(x)
-            elif isinstance(item, dict):
-                for x in item.values():
-                    _collect(x)
-            else:
-                if item:
-                    candidates.append(item)
-
         avail = solve_options[found_idx].get("available")
-        if avail:
-            _collect(avail)
-            best_cand = None
-            min_dist = float("inf")
-            # Find object nearest to click point in segmentation map
-            for actor in candidates:
-                target_ids = [sid for sid, obj in seg_id_map.items() if obj is actor]
-                for tid in target_ids:
-                    tid = int(tid)
-                    mask = seg_raw == tid
-                    if np.any(mask):
-                        ys, xs = np.nonzero(mask)
-                        center_x, center_y = xs.mean(), ys.mean()
-                        dist = (center_x - cx) ** 2 + (center_y - cy) ** 2
-                        if dist < min_dist:
-                            min_dist = dist
-                            best_cand = {
-                                "obj": actor,
-                                "name": getattr(actor, "name", f"id_{tid}"),
-                                "seg_id": tid,
-                                "click_point": (int(cx), int(cy)),
-                                "centroid_point": (int(center_x), int(center_y)),
-                            }
-            if best_cand:
-                selected_target.update(best_cand)
-            else:
-                selected_target["click_point"] = (int(cx), int(cy))
+        best_cand = select_target_with_point(
+            seg_raw=seg_raw,
+            seg_id_map=seg_id_map,
+            available=avail,
+            point_like=target_param,
+        )
+        if best_cand is not None:
+            selected_target.update(best_cand)
         else:
-            selected_target["click_point"] = (int(cx), int(cy))
+            click_point = normalize_and_clip_point_xy(target_param, width=w, height=h)
+            if click_point is not None:
+                selected_target["click_point"] = click_point
     print(f"Executing option: {found_idx + 1} - {solve_options[found_idx].get('label')}")
 
     # Wrap solve() with dense collection, collecting results of all intermediate env.step calls

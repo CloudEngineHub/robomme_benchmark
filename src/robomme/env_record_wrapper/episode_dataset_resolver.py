@@ -2,9 +2,10 @@
 Episode dataset resolver: read h5 per-episode timestep data (actions, demonstration flag).
 Similar to EpisodeConfigResolver for metadata; this class reads dataset content from h5.
 """
+import json
 import re
 from pathlib import Path
-from typing import Dict, List, Literal, Optional, Union
+from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
 import h5py
 import numpy as np
@@ -83,7 +84,7 @@ def _action_to_8d(raw_action) -> Optional[np.ndarray]:
 class EpisodeDatasetResolver:
     """
     Resolves per-timestep dataset content for one (env_id, episode) from h5.
-    Build non-demo / keypoint / distinct-subgoal indexes at initialization and
+    Build non-demo / keypoint / oracle-command indexes at initialization and
     query via get_step(mode, step).
     """
 
@@ -135,7 +136,8 @@ class EpisodeDatasetResolver:
         self._timestep_group_cache: Dict[int, h5py.Group] = {}
         self._non_demo_steps: List[int] = []
         self._keypoint_steps: List[int] = []
-        self._distinct_subgoal_steps: List[int] = []
+        self._oracle_steps: List[int] = []
+        self._oracle_step_commands: Dict[int, Dict[str, Any]] = {}
         self._build_indexes()
 
     def _get_timestep_group(self, record_step: int) -> Optional[h5py.Group]:
@@ -220,26 +222,81 @@ class EpisodeDatasetResolver:
             return None
         return np.asarray(src["keypoint_action"][()]).flatten()
 
-    def _extract_subgoal_text(self, timestep_group: h5py.Group) -> Optional[str]:
-        val = None
-        # New structure: info/grounded_subgoal; compatible with old structure
-        info_grp = timestep_group.get("info")
-        if info_grp is not None and isinstance(info_grp, h5py.Group):
-            if "grounded_subgoal" in info_grp:
-                val = info_grp["grounded_subgoal"][()]
-            elif "simple_subgoal" in info_grp:
-                val = info_grp["simple_subgoal"][()]
-        if val is None and "grounded_subgoal" in timestep_group:
-            val = timestep_group["grounded_subgoal"][()]
-        if val is None and "subgoal" in timestep_group:
-            val = timestep_group["subgoal"][()]
-        if val is None:
+    @staticmethod
+    def _decode_h5_string(value: Any) -> Optional[str]:
+        if value is None:
             return None
-        text = val.decode("utf-8") if hasattr(val, "decode") else str(val)
-        return text if text else None
+        if isinstance(value, np.ndarray):
+            if value.size == 0:
+                return None
+            value = np.reshape(value, -1)[0]
+        if isinstance(value, (bytes, np.bytes_)):
+            try:
+                return value.decode("utf-8")
+            except Exception:
+                return None
+        if isinstance(value, str):
+            return value
+        return str(value)
+
+    @staticmethod
+    def _normalize_choice_point(point_like: Any) -> Optional[List[int]]:
+        if not isinstance(point_like, (list, tuple, np.ndarray)) or len(point_like) < 2:
+            return None
+        try:
+            y = float(point_like[0])
+            x = float(point_like[1])
+        except (TypeError, ValueError):
+            return None
+        if not np.isfinite(y) or not np.isfinite(x):
+            return None
+        # Stored format is [y, x]; normalize to execution format [x, y].
+        return [int(x), int(y)]
+
+    def _extract_choice_action(self, timestep_group: h5py.Group) -> Optional[Dict[str, Any]]:
+        action_grp = timestep_group.get("action")
+        if action_grp is None or not isinstance(action_grp, h5py.Group):
+            return None
+        if "choice_action" not in action_grp:
+            return None
+
+        payload_raw = self._decode_h5_string(action_grp["choice_action"][()])
+        if not payload_raw:
+            return None
+        try:
+            payload = json.loads(payload_raw)
+        except (TypeError, ValueError, json.JSONDecodeError):
+            return None
+        if not isinstance(payload, dict):
+            return None
+
+        action = payload.get("action")
+        if not isinstance(action, str) or not action:
+            return None
+
+        command: Dict[str, Any] = {"action": action}
+        point = self._normalize_choice_point(payload.get("point"))
+        if point is not None:
+            command["point"] = point
+
+        serial_number = payload.get("serial_number")
+        if serial_number is not None:
+            try:
+                command["serial_number"] = int(serial_number)
+            except (TypeError, ValueError):
+                pass
+        return command
+
+    @staticmethod
+    def _oracle_command_key(command: Dict[str, Any]) -> Tuple[Any, ...]:
+        if "serial_number" in command:
+            return ("serial", int(command["serial_number"]))
+        point = command.get("point")
+        point_key = tuple(point) if isinstance(point, list) and len(point) >= 2 else None
+        return ("action_point", command["action"], point_key)
 
     def _build_indexes(self) -> None:
-        prev_subgoal: Optional[str] = None
+        prev_oracle_key: Optional[Tuple[Any, ...]] = None
         for record_step in self._timestep_indexes:
             timestep_group = self._get_timestep_group(record_step)
             if timestep_group is None or self._is_video_demo_group(timestep_group):
@@ -252,26 +309,37 @@ class EpisodeDatasetResolver:
                 if _as_bool(info_grp["is_keyframe"][()]):
                     self._keypoint_steps.append(record_step)
 
-            current_subgoal = self._extract_subgoal_text(timestep_group)
-            if prev_subgoal is None or current_subgoal != prev_subgoal:
-                self._distinct_subgoal_steps.append(record_step)
-            prev_subgoal = current_subgoal
+            command = self._extract_choice_action(timestep_group)
+            if command is None:
+                prev_oracle_key = None
+                continue
+
+            current_oracle_key = self._oracle_command_key(command)
+            if prev_oracle_key is None or current_oracle_key != prev_oracle_key:
+                self._oracle_steps.append(record_step)
+                self._oracle_step_commands[record_step] = command
+            prev_oracle_key = current_oracle_key
 
     def get_step(
         self,
         mode: Literal["joint_angle", "ee_pose", "ee_quat", "keypoint", "oracle_planner"],
         step: int,
-    ) -> Optional[Union[np.ndarray, str]]:
+    ) -> Optional[Union[np.ndarray, Dict[str, Any]]]:
         if step < 0:
             return None
 
         if mode == "oracle_planner":
-            if step >= len(self._distinct_subgoal_steps):
+            if step >= len(self._oracle_steps):
                 return None
-            timestep_group = self._get_timestep_group(self._distinct_subgoal_steps[step])
+            record_step = self._oracle_steps[step]
+            command = self._oracle_step_commands.get(record_step)
+            if command is not None:
+                return dict(command)
+            timestep_group = self._get_timestep_group(record_step)
             if timestep_group is None:
                 return None
-            return self._extract_subgoal_text(timestep_group)
+            command = self._extract_choice_action(timestep_group)
+            return dict(command) if command is not None else None
 
         if mode == "joint_angle":
             selected_steps = self._non_demo_steps

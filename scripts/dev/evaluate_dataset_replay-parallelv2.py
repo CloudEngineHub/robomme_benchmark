@@ -4,7 +4,6 @@
 # [New] Support parallel multi-process replay and alternate task assignment between two GPUs.
 
 import os
-import re
 import sys
 import argparse
 import concurrent.futures
@@ -67,17 +66,13 @@ DEFAULT_ENV_IDS = [
      "RouteStick",
 ]
 
-def _parse_oracle_command(subgoal_text: Optional[str]) -> Optional[dict[str, Any]]:
-    if not subgoal_text:
+def _parse_oracle_command(choice_action: Optional[Any]) -> Optional[dict[str, Any]]:
+    if not isinstance(choice_action, dict):
         return None
-    point = None
-    match = re.search(r"<\s*(-?\d+)\s*,\s*(-?\d+)\s*>", subgoal_text)
-    if match:
-        x = int(match.group(1))
-        y = int(match.group(2))
-        # Dataset text is usually <x, y>, Oracle wrapper expects [row, col], i.e., [y, x]
-        point = [y, x]
-    return {"action": subgoal_text, "point": point}
+    action = choice_action.get("action")
+    if not isinstance(action, str) or not action:
+        return None
+    return choice_action
 
 def init_worker(gpu_id: int):
     """

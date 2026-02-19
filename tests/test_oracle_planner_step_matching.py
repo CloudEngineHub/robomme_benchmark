@@ -94,7 +94,7 @@ class TestOraclePlannerStepMatching(unittest.TestCase):
             seg_raw=self.seg_raw,
             seg_id_map=self.seg_id_map,
             available=[self.obj_a, self.obj_b],
-            point_like=[-10, 100],  # clip to [0, 3] -> direct hit on seg id 2
+            point_like=[100, -10],  # clip to [3, 0] -> direct hit on seg id 2
         )
         self.assertIsNotNone(selected)
         self.assertIs(selected["obj"], self.obj_b)

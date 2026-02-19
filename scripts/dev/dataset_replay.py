@@ -3,7 +3,6 @@
 # Consistent with evaluate.py main loop; difference is actions come from EpisodeDatasetResolver.
 
 import os
-import re
 from typing import Any, Optional
 
 import numpy as np
@@ -19,22 +18,22 @@ from robomme.robomme_env.utils.save_reset_video import save_robomme_video
 
 # Only enable one ACTION_SPACE; others are commented out for manual switching
 #ACTION_SPACE = "joint_angle"
-ACTION_SPACE = "ee_pose"
+#ACTION_SPACE = "ee_pose"
 
 #ACTION_SPACE = "keypoint"
-#ACTION_SPACE = "oracle_planner"
+ACTION_SPACE = "oracle_planner"
 
-GUI_RENDER = False
+GUI_RENDER = True
 
-DATASET_ROOT = "/data/hongzefu/data_0217"
+DATASET_ROOT = "/data/hongzefu/data_0219"
 
 DEFAULT_ENV_IDS = [
     # "PickXtimes",
     # "StopCube",
     # "SwingXtimes",
-    #"BinFill",
+    "BinFill",
      #"VideoUnmaskSwap",
-     "VideoUnmask",
+     #"VideoUnmask",
     # "ButtonUnmaskSwap",
     # "ButtonUnmask",
      #"VideoRepick",
@@ -53,17 +52,13 @@ MAX_STEPS = 1000
 
 
 
-def _parse_oracle_command(subgoal_text: Optional[str]) -> Optional[dict[str, Any]]:
-    if not subgoal_text:
+def _parse_oracle_command(choice_action: Optional[Any]) -> Optional[dict[str, Any]]:
+    if not isinstance(choice_action, dict):
         return None
-    point = None
-    match = re.search(r"<\s*(-?\d+)\s*,\s*(-?\d+)\s*>", subgoal_text)
-    if match:
-        x = int(match.group(1))
-        y = int(match.group(2))
-        # Dataset text is usually <x, y>, Oracle wrapper expects [row, col], i.e., [y, x]
-        point = [y, x]
-    return {"action": subgoal_text, "point": point}
+    action = choice_action.get("action")
+    if not isinstance(action, str) or not action:
+        return None
+    return choice_action
 
 
 def main():

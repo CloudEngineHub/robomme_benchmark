@@ -3,7 +3,6 @@
 # Consistent with evaluate.py main loop; difference is actions come from EpisodeDatasetResolver.
 
 import os
-import re
 from typing import Any, Optional
 
 import numpy as np
@@ -153,17 +152,13 @@ def _print_step_extras(reward, terminated, truncated, tag: str):
     print(f"  truncated:  {_describe(truncated, 0)}")
 
 
-def _parse_oracle_command(subgoal_text: Optional[str]) -> Optional[dict[str, Any]]:
-    if not subgoal_text:
+def _parse_oracle_command(choice_action: Optional[Any]) -> Optional[dict[str, Any]]:
+    if not isinstance(choice_action, dict):
         return None
-    point = None
-    match = re.search(r"<\s*(-?\d+)\s*,\s*(-?\d+)\s*>", subgoal_text)
-    if match:
-        x = int(match.group(1))
-        y = int(match.group(2))
-        # Dataset text is usually <x, y>, Oracle wrapper expects [row, col], i.e., [y, x]
-        point = [y, x]
-    return {"action": subgoal_text, "point": point}
+    action = choice_action.get("action")
+    if not isinstance(action, str) or not action:
+        return None
+    return choice_action
 
 
 def main():
