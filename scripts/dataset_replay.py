@@ -111,31 +111,6 @@ def _load_action_from_timestep(
     return np.asarray(action_data, dtype=np.float32)
 
 
-def _apply_setup_to_env(
-    env, setup_group: h5py.Group, reserved_keys: set[str]
-) -> None:
-    """
-    Apply setup parameters from HDF5 data to the environment.
-
-    Args:
-        env: Environment instance to configure.
-        setup_group: HDF5 group containing setup parameters.
-        reserved_keys: Set of keys that should not be applied.
-    """
-    env_unwrapped = getattr(env, "unwrapped", env)
-
-    for key, value in setup_group.items():
-        if key in reserved_keys or isinstance(value, h5py.Group):
-            continue
-
-        merged_value = value[()]
-        if isinstance(merged_value, (bytes, np.bytes_)):
-            merged_value = merged_value.decode("utf-8")
-        elif isinstance(merged_value, np.ndarray) and merged_value.dtype.kind == "S":
-            merged_value = np.char.decode(merged_value, "utf-8")
-
-        setattr(env_unwrapped, key, merged_value)
-
 
 def _determine_outcome(info: dict) -> str:
     status = info.get("status", "")
@@ -310,7 +285,7 @@ def replay(
                 f"replaying {num_to_replay}"
             )
 
-            for episode_idx in episode_indices[:replay_number]:
+            for episode_idx in episode_indices[:num_to_replay]:
                 process_episode(data, episode_idx, current_task_id, action_space_type)
                 import pdb; pdb.set_trace()
 
