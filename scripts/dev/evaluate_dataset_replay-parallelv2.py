@@ -49,22 +49,22 @@ OUT_VIDEO_DIR = "/data/hongzefu/dataset_replay-0220"
 MAX_STEPS = 1000
 
 DEFAULT_ENV_IDS = [
-     "PickXtimes",
-    "StopCube",
-    "SwingXtimes",
-    "BinFill",
-    "VideoUnmaskSwap",
-    "VideoUnmask",
-  "ButtonUnmaskSwap",
-    "ButtonUnmask",
-    "VideoRepick",
-    "VideoPlaceButton",
-    "VideoPlaceOrder",
-    "PickHighlight",
-    "InsertPeg",
-    "MoveCube",
-     "PatternLock",
-     "RouteStick",
+#      "PickXtimes",
+#     "StopCube",
+#     "SwingXtimes",
+#     "BinFill",
+#     "VideoUnmaskSwap",
+#     "VideoUnmask",
+ "ButtonUnmaskSwap",
+#     "ButtonUnmask",
+#     "VideoRepick",
+#     "VideoPlaceButton",
+#     "VideoPlaceOrder",
+#     "PickHighlight",
+#     "InsertPeg",
+#     "MoveCube",
+#      "PatternLock",
+#      "RouteStick",
  ]
 
 def _parse_oracle_command(choice_action: Optional[Any]) -> Optional[dict[str, Any]]:
@@ -74,6 +74,19 @@ def _parse_oracle_command(choice_action: Optional[Any]) -> Optional[dict[str, An
     if not isinstance(action, str) or not action:
         return None
     return choice_action
+
+
+def _align_blue_box_mask(mask_like: Any, target_len: int) -> list[bool]:
+    n = max(0, int(target_len))
+    if n == 0:
+        return []
+    if not isinstance(mask_like, (list, tuple)):
+        return [False] * n
+    mask = [bool(x) for x in mask_like[:n]]
+    if len(mask) < n:
+        mask.extend([False] * (n - len(mask)))
+    return mask
+
 
 def init_worker(gpu_id: int):
     """
@@ -127,7 +140,7 @@ def evaluate_episode(
         task_goal_list = info_batch["task_goal"]
         # task_goal = task_goal_list[0] if task_goal_list else None
         
-        info = {k: v[-1] for k, v in info_batch.items()}
+        info = {k: v[-1] if isinstance(v, list) and v else v for k, v in info_batch.items()}
         # terminated = bool(terminated_batch[-1].item())
         # truncated = bool(truncated_batch[-1].item())
 
@@ -144,6 +157,7 @@ def evaluate_episode(
         rollout_base_frames: list[np.ndarray] = []
         rollout_wrist_frames: list[np.ndarray] = []
         rollout_subgoal_grounded: list[Any] = []
+        rollout_oracle_fallback_blue_box_mask: list[bool] = []
         # ######## Video saving variable initialization end ########
 
         while True:
@@ -169,9 +183,16 @@ def evaluate_episode(
                 rollout_subgoal_grounded.extend(subgoal_grounded)
             else:
                 rollout_subgoal_grounded.extend([subgoal_grounded] * len(front_camera))
+            if action_space == "oracle_planner":
+                raw_mask = info_batch.get("oracle_random_fallback_blue_box_mask", [])
+            else:
+                raw_mask = []
+            rollout_oracle_fallback_blue_box_mask.extend(
+                _align_blue_box_mask(raw_mask, target_len=len(front_camera))
+            )
             # ######## Video saving variable preparation (replay phase) end ########
 
-            info = {k: v[-1] for k, v in info_batch.items()}
+            info = {k: v[-1] if isinstance(v, list) and v else v for k, v in info_batch.items()}
             terminated = bool(terminated_batch.item())
             truncated = bool(truncated_batch.item())
 
@@ -207,6 +228,11 @@ def evaluate_episode(
             env_id=env_id,
             episode=episode,
             episode_success=episode_success,
+            rollout_blue_box_mask=(
+                rollout_oracle_fallback_blue_box_mask
+                if action_space == "oracle_planner"
+                else None
+            ),
         )
         # ######## Video saving section end ########
 
@@ -257,7 +283,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--gpus",
         type=_parse_gpus,
-        default=[0,1],
+        default=[1],
         help="GPUs to use: '0' (GPU 0 only), '1' (GPU 1 only), '0,1' (both). Default: 0.",
     )
     return parser.parse_args()

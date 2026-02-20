@@ -123,7 +123,7 @@ def _options_button_unmask(env, planner, require_target, base) -> List[dict]:
         {
             "label": "put down the container",
             "solve": lambda: solve_putdown_whenhold(
-                env, planner, release_z=0.01
+                env, planner
             ),
         },])
     return options
@@ -163,7 +163,7 @@ def _options_button_unmask_swap(env, planner, require_target, base) -> List[dict
         {
             "label": "put down the container",
             "solve": lambda: solve_putdown_whenhold(
-                env, planner, release_z=0.01
+                env, planner
             ),
         },])
     return options 
@@ -827,7 +827,7 @@ def _options_video_unmask(env, planner, require_target, base) -> List[dict]:
         {
             "label": "put down the container",
             "solve": lambda: solve_putdown_whenhold(
-                env, planner, release_z=0.01
+                env, planner
             ),
         },])
     return options
@@ -845,7 +845,7 @@ def _options_video_unmask_swap(env, planner, require_target, base) -> List[dict]
         {
             "label": "put down the container",
             "solve": lambda: solve_putdown_whenhold(
-                env, planner, release_z=0.01
+                env, planner
             ),
         },])
     return options

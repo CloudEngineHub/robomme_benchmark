@@ -180,6 +180,8 @@ class OraclePlannerDemonstrationWrapper(gym.Wrapper):
             "seg_id": None,
             "click_point": None,
             "centroid_point": None,
+            "selection_mode": None,
+            "used_random_fallback": False,
         }
 
     def _extract_seg_raw(self):
@@ -258,9 +260,36 @@ class OraclePlannerDemonstrationWrapper(gym.Wrapper):
         evaluation = self.env.unwrapped.evaluate(solve_complete_eval=True)
         print(f"Evaluation result: {evaluation}")
 
-    def _format_step_output(self, batch):
+    @staticmethod
+    def _frame_count_from_obs_batch(obs_batch) -> int:
+        if not isinstance(obs_batch, dict):
+            return 0
+        front_rgb_list = obs_batch.get("front_rgb_list")
+        if isinstance(front_rgb_list, list):
+            return len(front_rgb_list)
+        return 0
+
+    @staticmethod
+    def _build_fallback_blue_box_mask(
+        frame_count: int,
+        used_random_fallback: bool,
+    ) -> list[bool]:
+        n = max(0, int(frame_count))
+        if n == 0:
+            return []
+        if not used_random_fallback:
+            return [False] * n
+        return [True] + ([False] * (n - 1))
+
+    def _format_step_output(self, batch, used_random_fallback: bool = False):
         obs_batch, reward_batch, terminated_batch, truncated_batch, info_batch = batch
         info_flat = self._flatten_info_batch(info_batch)
+        frame_count = self._frame_count_from_obs_batch(obs_batch)
+        info_flat["oracle_random_fallback_used"] = bool(used_random_fallback)
+        info_flat["oracle_random_fallback_blue_box_mask"] = self._build_fallback_blue_box_mask(
+            frame_count=frame_count,
+            used_random_fallback=used_random_fallback,
+        )
         return (
             obs_batch,
             self._take_last_step_value(reward_batch),
@@ -292,9 +321,10 @@ class OraclePlannerDemonstrationWrapper(gym.Wrapper):
             target_point=target_point,
             seg_raw=self.seg_raw,
         )
+        used_random_fallback = bool(selected_target.get("used_random_fallback", False))
         # 6) Execute selected solve() with dense step collection; raise on solve == -1.
         batch = self._execute_selected_option(found_idx, solve_options)
         # 7) Run post-solve environment evaluation to keep existing side effects and logging.
         self._post_eval()
         # 8) Convert batch to wrapper output contract (last reward/terminated/truncated + flattened info).
-        return self._format_step_output(batch)
+        return self._format_step_output(batch, used_random_fallback=used_random_fallback)

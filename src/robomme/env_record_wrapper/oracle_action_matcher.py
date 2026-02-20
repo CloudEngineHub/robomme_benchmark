@@ -132,6 +132,8 @@ def select_target_with_point(
                 "seg_id": target_id,
                 "click_point": (int(cx), int(cy)),
                 "centroid_point": centroid_point,
+                "selection_mode": "hit",
+                "used_random_fallback": False,
             }
 
     fallback_actor = random.choice(unique_candidates)
@@ -146,4 +148,6 @@ def select_target_with_point(
         "seg_id": fallback_seg_id,
         "click_point": (int(cx), int(cy)),
         "centroid_point": fallback_centroid,
+        "selection_mode": "fallback_random",
+        "used_random_fallback": True,
     }

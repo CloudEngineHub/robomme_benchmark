@@ -2,7 +2,7 @@
 # Common utility for saving videos with captions during reset phase (demonstration phase).
 
 import os
-from typing import Dict, List, Any, Tuple
+from typing import Dict, List, Any, Optional, Tuple
 
 import numpy as np
 import cv2
@@ -146,9 +146,12 @@ def save_robomme_video(
     env_id: str,
     episode: int,
     episode_success: bool,
+    rollout_blue_box_mask: Optional[List[bool]] = None,
     fps: int = 20,
     highlight_color: Tuple[int, int, int] = (255, 0, 0),
     highlight_thickness: int = 4,
+    fallback_highlight_color: Tuple[int, int, int] = (0, 0, 255),
+    fallback_highlight_thickness: int = 4,
 ) -> bool:
     """
     Unified method to save replay videos (including reset prefix highlighting, naming, and output path concatenation).
@@ -163,9 +166,12 @@ def save_robomme_video(
         env_id: Environment ID (used to decide if highlight border is drawn; see NO_HIGHLIGHT_BORDER_ENV_IDS).
         episode: Current episode index.
         episode_success: Whether the current episode was successful.
+        rollout_blue_box_mask: Optional per-rollout-frame blue-border mask.
         fps: Output frame rate.
         highlight_color: Border color (RGB).
         highlight_thickness: Border thickness (pixels).
+        fallback_highlight_color: Random fallback border color (RGB blue by default).
+        fallback_highlight_thickness: Random fallback border thickness (pixels).
 
     Returns:
         True if at least one frame was written, False otherwise.
@@ -205,6 +211,8 @@ def save_robomme_video(
 
     base_camera = [_frame_to_numpy(f) for f in merged_base_frames if f is not None]
     wrist_camera = [_frame_to_numpy(f) for f in merged_wrist_frames if f is not None]
+    reset_base_camera = [_frame_to_numpy(f) for f in reset_base_frames if f is not None]
+    reset_wrist_camera = [_frame_to_numpy(f) for f in reset_wrist_frames if f is not None]
 
     if base_camera and wrist_camera:
         n_pair = min(len(base_camera), len(wrist_camera))
@@ -214,12 +222,26 @@ def save_robomme_video(
     else:
         image = wrist_camera
 
+    if base_camera and wrist_camera:
+        reset_frame_count = min(len(reset_base_camera), len(reset_wrist_camera))
+    elif base_camera:
+        reset_frame_count = len(reset_base_camera)
+    else:
+        reset_frame_count = len(reset_wrist_camera)
+
     subgoal_grounded = [text for text in merged_subgoal_grounded if text is not None]
 
     n_frames = len(image)
     if n_frames == 0:
         print(f"Skipped video (no frames): {out_video_path}")
         return False
+    reset_frame_count = max(0, min(reset_frame_count, n_frames))
+    rollout_frame_count = max(0, n_frames - reset_frame_count)
+
+    normalized_rollout_blue_box_mask = [False] * rollout_frame_count
+    if isinstance(rollout_blue_box_mask, (list, tuple)):
+        for idx, value in enumerate(rollout_blue_box_mask[:rollout_frame_count]):
+            normalized_rollout_blue_box_mask[idx] = bool(value)
 
     out_dir = os.path.dirname(os.path.abspath(out_video_path))
     if out_dir:
@@ -235,6 +257,13 @@ def save_robomme_video(
                     combined,
                     color=highlight_color,
                     thickness=highlight_thickness,
+                )
+            rollout_idx = i - reset_frame_count
+            if 0 <= rollout_idx < rollout_frame_count and normalized_rollout_blue_box_mask[rollout_idx]:
+                combined = add_border_to_frame(
+                    combined,
+                    color=fallback_highlight_color,
+                    thickness=fallback_highlight_thickness,
                 )
             writer.append_data(combined)
 
