@@ -741,79 +741,62 @@ def _options_stopcube(env, planner, require_target, base) -> List[dict]:
 
     steps_press = getattr(base, "steps_press", None)
     if steps_press is not None:
-        interval = getattr(base, "interval", 30)
-        final_target = max(0, int(steps_press - interval))
-        
         def solve_with_incremental_steps():
+            steps_press_value = getattr(base, "steps_press", None)
+            if steps_press_value is None:
+                return None
+
+            interval = getattr(base, "interval", 30)
+            final_target = max(0, int(steps_press_value - interval))
             current_step = int(getattr(env, "elapsed_steps", 0))
-            
-            # Get or initialize call counter
-            call_count_key = "_hold_obj_incremental_call_count"
-            call_count = getattr(base, call_count_key, 0)
-            
-            # Get saved config
-            num_calls_key = "_hold_obj_incremental_num_calls"
-            increment_step_key = "_hold_obj_incremental_step"
-            last_target_key = "_hold_obj_incremental_last_target"
-            initial_step_key = "_hold_obj_incremental_initial_step"
-            
-            num_calls = getattr(base, num_calls_key, None)
-            increment_step = getattr(base, increment_step_key, None)
-            last_target = getattr(base, last_target_key, None)
-            initial_step = getattr(base, initial_step_key, None)
-            
-            # Initialize config on first call
-            if num_calls is None:
-                num_calls = np.random.randint(2, 5)  # Total 2-4 calls (randint(2,5) generates 2, 3, or 4)
-                
-                # Generate fixed increment step: remaining steps / num_calls
-                # Keep constant, regardless of whether it exceeds, equals, or is less than final target, use same increment step
-                remaining_steps = max(0, final_target - current_step)
-                increment_step = int(remaining_steps / num_calls)
 
-                # Ensure step size at least 1
-                if increment_step < 1:
-                    increment_step = 1
-                
-                setattr(base, num_calls_key, num_calls)
-                setattr(base, increment_step_key, increment_step)
-                setattr(base, initial_step_key, current_step)
-                setattr(base, last_target_key, current_step)
-                setattr(base, call_count_key, 0)
-                call_count = 0
-                last_target = current_step
-            
-            # Determine target value for this call
-            # Ensure increment_step and last_target are not None (they will be set after first call)
-            if increment_step is None or last_target is None:
-                # This should theoretically not happen, but for safety
-                increment_step = 10
-                last_target = current_step
-            
-            if call_count < num_calls - 1:
-                # Less than num_calls: increment by step size (but do not exceed final_target)
-                target = min(last_target + increment_step, final_target)
-            elif call_count == num_calls - 1:
-                # Equal to num_calls: must strictly reach final_target
-                target = final_target
+            checkpoints_key = "_stopcube_static_checkpoints"
+            index_key = "_stopcube_static_index"
+            cached_final_target_key = "_stopcube_static_final_target"
+            last_elapsed_step_key = "_stopcube_static_last_elapsed_step"
+
+            checkpoints = getattr(base, checkpoints_key, None)
+            index = getattr(base, index_key, None)
+            cached_final_target = getattr(base, cached_final_target_key, None)
+            last_elapsed_step = getattr(base, last_elapsed_step_key, None)
+
+            needs_rebuild = (
+                not isinstance(checkpoints, list)
+                or len(checkpoints) == 0
+                or index is None
+                or cached_final_target is None
+                or int(cached_final_target) != final_target
+                or (
+                    last_elapsed_step is not None
+                    and current_step < int(last_elapsed_step)
+                )
+            )
+
+            if needs_rebuild:
+                checkpoints = list(range(100, final_target, 100))
+                if not checkpoints or checkpoints[-1] != final_target:
+                    checkpoints.append(final_target)
+                index = 0
             else:
-                # After num_calls: allow overflow, continue incrementing by step size
-                target = last_target + increment_step
-               
+                index = int(index)
+                if index < 0:
+                    index = 0
+                if index >= len(checkpoints):
+                    index = len(checkpoints) - 1
 
-            if target == final_target:
-               pass
-
-
-            # Call original solve_hold_obj_absTimestep function
+            target = checkpoints[index]
             solve_hold_obj_absTimestep(env, planner, absTimestep=target)
-            
-            # Update call count and last target value
-            setattr(base, call_count_key, call_count + 1)
-            setattr(base, last_target_key, target)
-            
+
+            if index < len(checkpoints) - 1:
+                index += 1
+
+            setattr(base, checkpoints_key, checkpoints)
+            setattr(base, index_key, index)
+            setattr(base, cached_final_target_key, final_target)
+            setattr(base, last_elapsed_step_key, current_step)
+
             return None
-        
+
         options.append(
             {
                 "label": "remain static",

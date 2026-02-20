@@ -10,11 +10,12 @@ import concurrent.futures
 import multiprocessing as mp
 from typing import Any, Optional
 
-# Add package root, parent directory, and scripts to sys.path for direct script execution (independent of PYTHONPATH)
+# Add package root and src so "robomme" can be imported when running script directly
 _ROOT = os.path.abspath(os.path.dirname(__file__))
-_PARENT = os.path.dirname(os.path.dirname(_ROOT))
-_SCRIPTS = os.path.join(_PARENT, "scripts")
-for _path in (_PARENT, _ROOT, _SCRIPTS):
+_PARENT = os.path.dirname(_ROOT)  # scripts
+_PROJECT_ROOT = os.path.dirname(_PARENT)  # repo root
+_SRC = os.path.join(_PROJECT_ROOT, "src")
+for _path in (_SRC, _PROJECT_ROOT, _PARENT, _ROOT):
     if _path not in sys.path:
         sys.path.insert(0, _path)
 
@@ -38,23 +39,23 @@ ACTION_SPACE = "oracle_planner"
 
 GUI_RENDER = False
 
-DATASET_ROOT = "/data/hongzefu/data_0219"
-OVERRIDE_METADATA_PATH = "/data/hongzefu/data_0219"
+DATASET_ROOT = "/data/hongzefu/data_0220"
+OVERRIDE_METADATA_PATH = "/data/hongzefu/data_0220"
 
 # ######## Video saving variables (output directory) start ########
 # Video output directory: Independently hardcoded, not aligned with h5 path or env_id
-OUT_VIDEO_DIR = "/data/hongzefu/dataset_replay-0219"
+OUT_VIDEO_DIR = "/data/hongzefu/dataset_replay-0220"
 # ######## Video saving variables (output directory) end ########
 MAX_STEPS = 1000
 
 DEFAULT_ENV_IDS = [
 #     "PickXtimes",
-#     "StopCube",
+    "StopCube",
 #     "SwingXtimes",
 #     "BinFill",
 #     "VideoUnmaskSwap",
 #     "VideoUnmask",
-   "ButtonUnmaskSwap",
+ #  "ButtonUnmaskSwap",
 #     "ButtonUnmask",
 #     "VideoRepick",
 #     "VideoPlaceButton",
@@ -226,6 +227,18 @@ def evaluate_episode(
         if env is not None:
             env.close()
 
+def _parse_gpus(s: str) -> list[int]:
+    """Parse --gpus: '0' -> [0], '1' -> [1], '0,1' -> [0, 1]."""
+    allowed = {"0", "1", "0,1", "1,0"}
+    v = s.strip()
+    if v not in allowed:
+        raise argparse.ArgumentTypeError(
+            f"--gpus must be one of: 0, 1, 0,1 (got {s!r})"
+        )
+    if "," in v:
+        return [int(x) for x in v.split(",")]
+    return [int(v)]
+
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Replay dataset for one env_id in parallel.")
     parser.add_argument(
@@ -238,12 +251,18 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--max_workers",
         type=int,
-        default=20,
-        help="Total max workers across 2 GPUs.",
+        default=10,
+        help="Total max workers (split across GPUs when using 2 GPUs).",
+    )
+    parser.add_argument(
+        "--gpus",
+        type=_parse_gpus,
+        default=[1],
+        help="GPUs to use: '0' (GPU 0 only), '1' (GPU 1 only), '0,1' (both). Default: 0.",
     )
     return parser.parse_args()
 
-def process_env_id(env_id: str, max_workers_total: int):
+def process_env_id(env_id: str, max_workers_total: int, gpu_ids: list[int]):
     # Simple calculation of episode count (do not instantiate env_builder to avoid overhead, or lightweight instantiation)
     # To get episode_count, we need to instantiate env_builder once
     # But we only need the metadata parsing part
@@ -256,58 +275,72 @@ def process_env_id(env_id: str, max_workers_total: int):
     )
     episode_count = temp_builder.get_episode_num()
     print(f"[{env_id}] Total episodes found in metadata: {episode_count}")
-    print(f"Parallel execution with max_workers={max_workers_total} on 2 GPUs (Alternating)")
+    print(f"Parallel execution with max_workers={max_workers_total} on GPU(s) {gpu_ids}")
     
     if episode_count == 0:
         print("No episodes to replay.")
         return
 
-
-
-    # Assign workers
-    # GPU 0: max_workers // 2 + remainder
-    # GPU 1: max_workers // 2
-    mw0 = (max_workers_total + 1) // 2
-    mw1 = max_workers_total // 2
-    
-    if mw0 == 0: mw0 = 1 # at least 1
-    if mw1 == 0 and max_workers_total > 1: mw1 = 1 
-    
-    print(f"Pool 0 (GPU 0): {mw0} workers")
-    print(f"Pool 1 (GPU 1): {mw1} workers")
+    n_gpus = len(gpu_ids)
+    if n_gpus == 1:
+        mw0 = max(max_workers_total, 1)
+        mw1 = 0
+        print(f"Pool (GPU {gpu_ids[0]}): {mw0} workers")
+    else:
+        mw0 = (max_workers_total + 1) // 2
+        mw1 = max_workers_total // 2
+        if mw0 == 0:
+            mw0 = 1
+        if mw1 == 0 and max_workers_total > 1:
+            mw1 = 1
+        print(f"Pool 0 (GPU {gpu_ids[0]}): {mw0} workers")
+        print(f"Pool 1 (GPU {gpu_ids[1]}): {mw1} workers")
 
     futures = []
-    
-    with concurrent.futures.ProcessPoolExecutor(max_workers=mw0, initializer=init_worker, initargs=(0,)) as executor0, \
-         concurrent.futures.ProcessPoolExecutor(max_workers=mw1, initializer=init_worker, initargs=(1,)) as executor1:
-        
-        for episode in range(episode_count):
-            # Alternate assignment: Even -> GPU0, Odd -> GPU1
-            if episode % 2 == 0:
-                executor = executor0
-            else:
-                executor = executor1
-                # If user only assigned 1 worker (mw1=0), then all to executor0 ?
-                # In this case mw1 should be 0.
-                if mw1 == 0:
-                    executor = executor0 # fallback to single gpu if max_workers=1
 
-            future = executor.submit(
-                evaluate_episode,
-                env_id=env_id,
-                episode=episode,
-                dataset_root=DATASET_ROOT,
-                override_metadata_path=OVERRIDE_METADATA_PATH,
-                action_space=ACTION_SPACE,
-                out_video_dir=OUT_VIDEO_DIR,
-                gui_render=GUI_RENDER
-            )
-            futures.append(future)
-            
-        # Collect results
-        for future in concurrent.futures.as_completed(futures):
-            res = future.result()
-            print(res)
+    if n_gpus == 1:
+        g0 = gpu_ids[0]
+        with concurrent.futures.ProcessPoolExecutor(max_workers=mw0, initializer=init_worker, initargs=(g0,)) as executor0:
+            for episode in range(episode_count):
+                future = executor0.submit(
+                    evaluate_episode,
+                    env_id=env_id,
+                    episode=episode,
+                    dataset_root=DATASET_ROOT,
+                    override_metadata_path=OVERRIDE_METADATA_PATH,
+                    action_space=ACTION_SPACE,
+                    out_video_dir=OUT_VIDEO_DIR,
+                    gui_render=GUI_RENDER
+                )
+                futures.append(future)
+            for future in concurrent.futures.as_completed(futures):
+                res = future.result()
+                print(res)
+    else:
+        g0, g1 = gpu_ids[0], gpu_ids[1]
+        with concurrent.futures.ProcessPoolExecutor(max_workers=mw0, initializer=init_worker, initargs=(g0,)) as executor0, \
+             concurrent.futures.ProcessPoolExecutor(max_workers=mw1, initializer=init_worker, initargs=(g1,)) as executor1:
+            for episode in range(episode_count):
+                if episode % 2 == 0:
+                    executor = executor0
+                else:
+                    executor = executor1
+                    if mw1 == 0:
+                        executor = executor0
+                future = executor.submit(
+                    evaluate_episode,
+                    env_id=env_id,
+                    episode=episode,
+                    dataset_root=DATASET_ROOT,
+                    override_metadata_path=OVERRIDE_METADATA_PATH,
+                    action_space=ACTION_SPACE,
+                    out_video_dir=OUT_VIDEO_DIR,
+                    gui_render=GUI_RENDER
+                )
+                futures.append(future)
+            for future in concurrent.futures.as_completed(futures):
+                res = future.result()
+                print(res)
 
 def main():
     # Force use of spawn to avoid PyTorch/CUDA fork issues
@@ -316,11 +349,12 @@ def main():
     args = _parse_args()
     env_ids = [args.envid] if args.envid else DEFAULT_ENV_IDS
     max_workers_total = args.max_workers
+    gpu_ids = args.gpus
 
-    print(f"Plan to replay envs: {env_ids}")
+    print(f"Plan to replay envs: {env_ids} (gpus={gpu_ids})")
     for env_id in env_ids:
         print(f"=== Processing {env_id} ===")
-        process_env_id(env_id, max_workers_total)
+        process_env_id(env_id, max_workers_total, gpu_ids)
 
 if __name__ == "__main__":
     main()

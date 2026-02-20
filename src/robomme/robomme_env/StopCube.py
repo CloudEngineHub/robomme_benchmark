@@ -258,6 +258,7 @@ class StopCube(BaseEnv):
                                 "func": lambda: button_hover(self,button=self.button),
                                 "name": "move to the top of the button to prepare",
                                 "subgoal_segment": "move to the top of the button at <> to prepare",
+                                "choice_label": "move to the top of the button to prepare",
                                 "demonstration": False,
                                 "failure_func": None,
                                 "specialflag":"swap",
@@ -265,15 +266,22 @@ class StopCube(BaseEnv):
                                 "segment":self.cap_link 
                                 },)
 
-            tasks.append({
-                                "func": lambda: before_absTimestep(self, absTimestep=self.steps_press-interval),
-                                "name": "remain static",
-                                "subgoal_segment": "remain static",
-                                "demonstration": False,
-                                "failure_func": None,
-                                "specialflag":"swap",
-                                "solve": lambda env, planner:solve_hold_obj_absTimestep(env, planner,absTimestep=self.steps_press-interval),
-                                },)
+            final_abs_timestep = self.steps_press - interval
+            static_checkpoints = list(range(100, int(final_abs_timestep), 100))
+            if not static_checkpoints or static_checkpoints[-1] != final_abs_timestep:
+                static_checkpoints.append(final_abs_timestep)
+
+            for target_timestep in static_checkpoints:
+                tasks.append({
+                                    "func": lambda target_timestep=target_timestep: before_absTimestep(self, absTimestep=target_timestep),
+                                    "name": "remain static",
+                                    "subgoal_segment": "remain static",
+                                    "choice_label": "remain static",
+                                    "demonstration": False,
+                                    "failure_func": None,
+                                    "specialflag":"swap",
+                                    "solve": lambda env, planner, target_timestep=target_timestep: solve_hold_obj_absTimestep(env, planner,absTimestep=target_timestep),
+                                    },)
             tasks.append({
                         "func": lambda: is_obj_stopped_onto(self, obj=self.cube, target=self.target, stop=self.stop),
                         "name": "press the button to stop the cube on the target",

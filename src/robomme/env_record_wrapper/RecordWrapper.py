@@ -1,6 +1,5 @@
 import copy
 import json
-import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, List, Optional, Union
@@ -94,6 +93,7 @@ class RobommeRecordWrapper(gym.Wrapper):
         # Video buffer
         self.video_frames = []  # Store combined video frames
         self.no_object_video_frames = []  # Save separately when target missing in video frame, for debugging
+        self._video_target_frame_size = None
 
         # End-effector pose continuousness cache (wxyz / XYZ-RPY), lifecycle limited to single episode
         self._prev_ee_quat_wxyz = None
@@ -352,6 +352,15 @@ class RobommeRecordWrapper(gym.Wrapper):
 
     def _video_append_step_frame(self, frame, no_object_flag):
         """Append single step video frame to corresponding buffer."""
+        # Keep all frames at one fixed size to avoid imageio writer failure.
+        # Text overlay length can change frame height; normalize at append time.
+        h, w = frame.shape[:2]
+        if self._video_target_frame_size is None:
+            self._video_target_frame_size = (h, w)
+        else:
+            target_h, target_w = self._video_target_frame_size
+            if (h, w) != (target_h, target_w):
+                frame = cv2.resize(frame, (target_w, target_h), interpolation=cv2.INTER_LINEAR)
         self.video_frames.append(frame)
         if no_object_flag == True:
             self.no_object_video_frames.append(frame)
@@ -554,6 +563,7 @@ class RobommeRecordWrapper(gym.Wrapper):
         self._prev_action_ee_rpy_xyz = None
         self._current_keypoint_action = None  # Persist keypoint_action (7D ndarray)
         self._failsafe_triggered = False
+        self._video_target_frame_size = None
         # Reset choice_action tracking per episode
         self._current_choice_label = ""
         self._prev_task_index = -1
@@ -776,7 +786,7 @@ class RobommeRecordWrapper(gym.Wrapper):
         
         # Video recording logic: Execute only when task name is not NO RECORD and video saving enabled
         if self._video_should_record(current_task):
-                
+
             # If demonstration task, add red border (video only, does not affect HDF5)
             is_demonstration = getattr(self, 'current_task_demonstration', False)
             subgoal_text = getattr(self, 'current_task_name', 'Unknown')

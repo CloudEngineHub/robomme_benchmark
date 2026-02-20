@@ -11,9 +11,10 @@ import numpy as np
 from typing import Any, Dict, Iterable, List, Optional, Set
 import h5py
 
-# Add parent directory to Python path to import robomme module
+# Add src and scripts to Python path to import robomme module
 _root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-sys.path.insert(0, _root)
+_src = os.path.join(_root, "src")
+sys.path.insert(0, _src)
 sys.path.insert(0, os.path.join(_root, "scripts"))
 import gymnasium as gym
 
@@ -46,25 +47,25 @@ Key features include:
 
 # List of all supported environment module names
 DEFAULT_ENVS =[
-"PickXtimes",
+# "PickXtimes",
 "StopCube",
-"SwingXtimes",
-"BinFill",
+# "SwingXtimes",
+# "BinFill",
 
- "VideoUnmaskSwap",
- "VideoUnmask",
-"ButtonUnmaskSwap",
-"ButtonUnmask",
+#  "VideoUnmaskSwap",
+#  "VideoUnmask",
+# "ButtonUnmaskSwap",
+# "ButtonUnmask",
 
-"VideoRepick",
-"VideoPlaceButton",
-"VideoPlaceOrder",
-"PickHighlight",
+# "VideoRepick",
+# "VideoPlaceButton",
+# "VideoPlaceOrder",
+# "PickHighlight",
 
-"InsertPeg",
-'MoveCube',
-  "PatternLock",
-"RouteStick"
+# "InsertPeg",
+# 'MoveCube',
+#   "PatternLock",
+# "RouteStick"
     ]
 
 # Reference dataset metadata root directory: used to read difficulty and Robomme_seed
@@ -679,7 +680,7 @@ def parse_args() -> argparse.Namespace:
         "--episodes",
         "-n",
         type=int,
-        default=10,
+        default=20,
         help="Number of episodes generated per environment (Default: 100)",
     )
     parser.add_argument(
@@ -733,8 +734,8 @@ def main() -> None:
         )
 
         # Create shared temporary folder for all episodes
-        temp_folder =  Path(f"/data/hongzefu/data_0219/temp_{env_id}_episodes")
-        final_dataset_path =  Path(f"/data/hongzefu/data_0219/record_dataset_{env_id}.h5")
+        temp_folder =  Path(f"/data/hongzefu/data_0220/temp_{env_id}_episodes")
+        final_dataset_path =  Path(f"/data/hongzefu/data_0220/record_dataset_{env_id}.h5")
         #final_dataset_path =  Path(f"/data/hongzefu/dataset_generate/record_dataset_{env_id}.h5")
 
         print(f"\n{'='*80}")
