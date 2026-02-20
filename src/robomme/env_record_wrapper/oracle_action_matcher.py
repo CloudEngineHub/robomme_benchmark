@@ -1,3 +1,4 @@
+import random
 from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
@@ -53,8 +54,9 @@ def select_target_with_point(
     point_like: Any,
 ) -> Optional[Dict[str, Any]]:
     """
-    Select available object whose visual centroid is nearest to click point.
-    Returns None if point/available/mask is invalid.
+    Two-stage matching:
+    1) If click point hits a visible candidate mask, return that actor immediately.
+    2) Otherwise randomly sample one actor from candidate list as fallback.
     """
     if seg_raw is None:
         return None
@@ -72,8 +74,7 @@ def select_target_with_point(
     unique_candidates = list(dict.fromkeys(candidates))
 
     cx, cy = point_xy
-    best_cand: Optional[Dict[str, Any]] = None
-    min_dist = float("inf")
+    observed_info: Dict[Any, Tuple[int, Tuple[int, int]]] = {}
 
     for actor in unique_candidates:
         target_ids = [int(seg_id) for seg_id, obj in seg_id_map.items() if obj is actor]
@@ -82,16 +83,29 @@ def select_target_with_point(
             if not np.any(mask):
                 continue
             ys, xs = np.nonzero(mask)
-            center_x, center_y = xs.mean(), ys.mean()
-            dist = (center_x - cx) ** 2 + (center_y - cy) ** 2
-            if dist < min_dist:
-                min_dist = dist
-                best_cand = {
+            centroid_point = (int(xs.mean()), int(ys.mean()))
+            if actor not in observed_info:
+                observed_info[actor] = (target_id, centroid_point)
+
+            if bool(mask[cy, cx]):
+                return {
                     "obj": actor,
                     "name": getattr(actor, "name", f"id_{target_id}"),
                     "seg_id": target_id,
                     "click_point": (int(cx), int(cy)),
-                    "centroid_point": (int(center_x), int(center_y)),
+                    "centroid_point": centroid_point,
                 }
 
-    return best_cand
+    fallback_actor = random.choice(unique_candidates)
+    fallback_seg_id: Optional[int] = None
+    fallback_centroid: Optional[Tuple[int, int]] = None
+    if fallback_actor in observed_info:
+        fallback_seg_id, fallback_centroid = observed_info[fallback_actor]
+
+    return {
+        "obj": fallback_actor,
+        "name": getattr(fallback_actor, "name", "unknown"),
+        "seg_id": fallback_seg_id,
+        "click_point": (int(cx), int(cy)),
+        "centroid_point": fallback_centroid,
+    }
