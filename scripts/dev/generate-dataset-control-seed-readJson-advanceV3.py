@@ -47,25 +47,25 @@ Key features include:
 
 # List of all supported environment module names
 DEFAULT_ENVS =[
-# "PickXtimes",
+"PickXtimes",
 "StopCube",
-# "SwingXtimes",
-# "BinFill",
+"SwingXtimes",
+"BinFill",
 
-#  "VideoUnmaskSwap",
-#  "VideoUnmask",
-# "ButtonUnmaskSwap",
-# "ButtonUnmask",
+ "VideoUnmaskSwap",
+ "VideoUnmask",
+"ButtonUnmaskSwap",
+"ButtonUnmask",
 
-# "VideoRepick",
-# "VideoPlaceButton",
-# "VideoPlaceOrder",
-# "PickHighlight",
+"VideoRepick",
+"VideoPlaceButton",
+"VideoPlaceOrder",
+"PickHighlight",
 
-# "InsertPeg",
-# 'MoveCube',
-#   "PatternLock",
-# "RouteStick"
+"InsertPeg",
+'MoveCube',
+"PatternLock",
+"RouteStick"
     ]
 
 # Reference dataset metadata root directory: used to read difficulty and Robomme_seed
@@ -700,14 +700,14 @@ def parse_args() -> argparse.Namespace:
         "--max-workers",
         "-w",
         type=int,
-        default=50,
+        default=20,
         help="Number of parallel workers when running multiple environments.",
     )
     parser.add_argument(
         "--dual-gpu",
         dest="dual_gpu",
         action="store_true",
-        default=True,
+        default=False,
         help="Use two GPUs (GPU 0 and GPU 1) for parallel processing. Default: single GPU (GPU 0 only).",
     )
     return parser.parse_args()

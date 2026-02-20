@@ -49,22 +49,22 @@ OUT_VIDEO_DIR = "/data/hongzefu/dataset_replay-0220"
 MAX_STEPS = 1000
 
 DEFAULT_ENV_IDS = [
-#     "PickXtimes",
+     "PickXtimes",
     "StopCube",
-#     "SwingXtimes",
-#     "BinFill",
-#     "VideoUnmaskSwap",
-#     "VideoUnmask",
- #  "ButtonUnmaskSwap",
-#     "ButtonUnmask",
-#     "VideoRepick",
-#     "VideoPlaceButton",
-#     "VideoPlaceOrder",
-#     "PickHighlight",
-#     "InsertPeg",
-#     "MoveCube",
-#      "PatternLock",
-#      "RouteStick",
+    "SwingXtimes",
+    "BinFill",
+    "VideoUnmaskSwap",
+    "VideoUnmask",
+  "ButtonUnmaskSwap",
+    "ButtonUnmask",
+    "VideoRepick",
+    "VideoPlaceButton",
+    "VideoPlaceOrder",
+    "PickHighlight",
+    "InsertPeg",
+    "MoveCube",
+     "PatternLock",
+     "RouteStick",
  ]
 
 def _parse_oracle_command(choice_action: Optional[Any]) -> Optional[dict[str, Any]]:
@@ -251,13 +251,13 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--max_workers",
         type=int,
-        default=10,
+        default=20,
         help="Total max workers (split across GPUs when using 2 GPUs).",
     )
     parser.add_argument(
         "--gpus",
         type=_parse_gpus,
-        default=[1],
+        default=[0,1],
         help="GPUs to use: '0' (GPU 0 only), '1' (GPU 1 only), '0,1' (both). Default: 0.",
     )
     return parser.parse_args()
