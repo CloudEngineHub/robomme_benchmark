@@ -481,6 +481,7 @@ class RobommeRecordWrapper(gym.Wrapper):
             if use_stick:
                 solver_kwargs["joint_vel_limits"] = 0.3
             solver = solver_cls(self, **solver_kwargs)
+            self.planner = solver
             self._mplib_planner = solver.planner
             self._ee_link_idx = self._mplib_planner.link_name_2_idx[
                 self._mplib_planner.move_group
@@ -491,6 +492,7 @@ class RobommeRecordWrapper(gym.Wrapper):
         except Exception as exc:
             print(f"[RecordWrapper] FK planner init failed, eef_action_raw/eef_action "
                   f"will be zeros: {exc}")
+            self.planner = None
             self._mplib_planner = None
             self._ee_link_idx = None
             self._robot_base_pose = None
@@ -1135,9 +1137,34 @@ class RobommeRecordWrapper(gym.Wrapper):
             # Write setup info (seed, difficulty, task list, camera intrinsics)
             setup_group = episode_group.create_group(f"setup")
             setup_group.create_dataset("seed", data=self.Robomme_seed)
+            try:
+                from robomme.robomme_env.utils.vqa_options import get_vqa_options
+                import json
+                
+                selected_target = {
+                    "obj": None,
+                    "name": None,
+                    "seg_id": None,
+                    "click_point": None,
+                    "centroid_point": None,
+                    "selection_mode": None,
+                    "used_random_fallback": False,
+                }
+                
+                env_id = getattr(getattr(self.unwrapped, "spec", None), "id", None) or self.Robomme_env
+                solve_options = get_vqa_options(self.env, getattr(self, "planner", None), selected_target, env_id)
+                available_options = [
+                    {"action": opt.get("label", "Unknown"), "need_parameter": bool(opt.get("available"))}
+                    for opt in solve_options
+                ]
+                available_multi_choices_str = json.dumps(available_options)
+            except Exception as e:
+                print(f"[RecordWrapper] Failed to compute available_multi_choices: {e}")
+                available_multi_choices_str = ""
+
             setup_group.create_dataset(
                 "available_multi_choices",
-                data="",
+                data=available_multi_choices_str,
                 dtype=h5py.string_dtype(encoding="utf-8"),
             )
             setup_group.create_dataset(

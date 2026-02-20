@@ -8,6 +8,10 @@ from typing import Any, Optional
 import numpy as np
 import torch
 
+import sys
+import os
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../src')))
+
 from robomme.robomme_env import *
 from robomme.robomme_env.utils import *
 from robomme.env_record_wrapper import (
@@ -25,7 +29,7 @@ ACTION_SPACE = "oracle_planner"
 
 GUI_RENDER = False
 
-DATASET_ROOT = "/data/hongzefu/data_0219"
+DATASET_ROOT = "/data/hongzefu/data_0220"
 
 DEFAULT_ENV_IDS = [
 #"PickXtimes",
@@ -110,6 +114,8 @@ def main():
             simple_subgoal_online = info["simple_subgoal_online"]
             grounded_subgoal_online = info["grounded_subgoal_online"]
             available_multi_choices = info.get("available_multi_choices")
+            if available_multi_choices is not None:
+                print(f"[{env_id}] ep{episode} RESET available_multi_choices: {available_multi_choices}")
             front_camera_intrinsic = info["front_camera_intrinsic"]
             wrist_camera_intrinsic = info["wrist_camera_intrinsic"]
             status = info.get("status")
@@ -155,6 +161,8 @@ def main():
                 simple_subgoal_online = info["simple_subgoal_online"]
                 grounded_subgoal_online = info["grounded_subgoal_online"]
                 available_multi_choices = info.get("available_multi_choices")
+                if available_multi_choices is not None:
+                    print(f"[{env_id}] ep{episode} step {step} available_multi_choices: {available_multi_choices}")
                 front_camera_intrinsic = info["front_camera_intrinsic"]
                 wrist_camera_intrinsic = info["wrist_camera_intrinsic"]
                 status = info.get("status")

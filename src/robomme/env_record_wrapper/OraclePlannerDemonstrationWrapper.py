@@ -152,7 +152,15 @@ class OraclePlannerDemonstrationWrapper(gym.Wrapper):
             self.planner,
             screw_failure_exc=ScrewPlanFailure,
         )
-        return self.env.reset(**kwargs)
+        ret = self.env.reset(**kwargs)
+        if isinstance(ret, tuple) and len(ret) == 2:
+            obs, info = ret
+        else:
+            obs, info = ret, {}
+        self._build_step_options()
+        if isinstance(info, dict):
+            info["available_multi_choices"] = self.available_options
+        return obs, info
 
     @staticmethod
     def _flatten_info_batch(info_batch: dict) -> dict:
@@ -290,6 +298,7 @@ class OraclePlannerDemonstrationWrapper(gym.Wrapper):
             frame_count=frame_count,
             used_random_fallback=used_random_fallback,
         )
+        info_flat["available_multi_choices"] = getattr(self, "available_options", [])
         return (
             obs_batch,
             self._take_last_step_value(reward_batch),
