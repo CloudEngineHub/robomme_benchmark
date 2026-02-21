@@ -219,6 +219,7 @@ class DemonstrationWrapper(gym.Wrapper):
     def _augment_obs_and_info(self, obs, info, action):
         """Extract current step data directly from obs and merge into obs and info to return, bypassing list buffer intermediate."""
         language_goal = task_goal.get_language_goal(self.env, self.unwrapped.spec.id)
+
         base_obs = obs if isinstance(obs, dict) else {}
         env_id = self.unwrapped.spec.id
         dummy_target = {"obj": None, "name": None, "seg_id": None, "click_point": None, "centroid_point": None}

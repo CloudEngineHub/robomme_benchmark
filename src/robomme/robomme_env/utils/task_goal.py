@@ -151,4 +151,5 @@ def get_language_goal(self,robomme_env):
 
         elif robomme_env=="RouteStick":
               language_goal="Watch the video carefully, then use the stick attached to the robot to navigate around the sticks on the table, following the same path"
-        return language_goal
+        language_goal = language_goal or ""
+        return [language_goal, "test"]

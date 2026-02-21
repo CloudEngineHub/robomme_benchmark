@@ -351,7 +351,7 @@ class RobommeRecordWrapper(gym.Wrapper):
         if is_demonstration:
             frame = self._add_red_border(frame)
 
-        return self._add_text_to_frame(frame, [language_goal], position="top_right")
+        return self._add_text_to_frame(frame, language_goal, position="top_right")
 
     def _video_append_step_frame(self, frame, no_object_flag):
         """Append single step video frame to corresponding buffer."""
@@ -370,9 +370,10 @@ class RobommeRecordWrapper(gym.Wrapper):
 
     def _video_build_filename_parts(self, language_goal, difficulty):
         """Build suffix in video filename."""
+        goal_text = language_goal[0]
         sanitized_goal = (
-            language_goal.replace(" ", "_").replace("/", "_")
-            if language_goal
+            goal_text.replace(" ", "_").replace("/", "_")
+            if goal_text
             else "no_goal"
         )
         difficulty_tag = (
@@ -1025,12 +1026,12 @@ class RobommeRecordWrapper(gym.Wrapper):
 
     def close(self):
         # Generate language goal (needed for both success and failure video filenames)
-        language_goal = ""
+        language_goal_list = []
         difficulty = getattr(self.env.unwrapped, 'difficulty', None)
        
         # language_goal mainly used for video naming and HDF5 metadata, needed for both failure/success
-        language_goal=task_goal.get_language_goal(self.env,self.Robomme_env)
-        filename_parts = self._video_build_filename_parts(language_goal, difficulty)
+        language_goal_list = task_goal.get_language_goal(self.env, self.Robomme_env)
+        filename_parts = self._video_build_filename_parts(language_goal_list, difficulty)
         filename_suffix = filename_parts["filename_suffix"]
         fail_recover_suffix = ""
         if getattr(self.env, "use_fail_planner", False):
@@ -1277,8 +1278,12 @@ class RobommeRecordWrapper(gym.Wrapper):
                 if 'wrist_camera_intrinsic' in intrinsics:
                     setup_group.create_dataset("wrist_camera_intrinsic", data=intrinsics['wrist_camera_intrinsic'].reshape(3, 3))
 
-            if language_goal:
-                setup_group.create_dataset("task_goal", data=language_goal)
+            if language_goal_list:
+                setup_group.create_dataset(
+                    "task_goal",
+                    data=np.asarray(language_goal_list, dtype=object),
+                    dtype=h5py.string_dtype(encoding="utf-8"),
+                )
 
             # Save success video (if enabled). Filename contains language goal/difficulty for easy lookup
             # Note: Video save failure should not affect HDF5 data saving

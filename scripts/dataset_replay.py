@@ -6,25 +6,22 @@ and writes side-by-side front/wrist camera videos to disk.
 """
 
 from pathlib import Path
-from typing import Literal, Optional
+from typing import Any, Literal, Optional
 
 import cv2
 import h5py
 import imageio
 import numpy as np
 
-from robomme.env_record_wrapper import BenchmarkEnvBuilder
-from robomme.robomme_env.utils import (
-    EE_POSE_ACTION_SPACE,
-    JOINT_ACTION_SPACE,
-    KEYPOINT_ACTION_SPACE,
-    MULTI_CHOICE_ACTION_SPACE,
-)
-
 # --- Configuration ---
 GUI_RENDER = False
 REPLAY_VIDEO_DIR = "replay_videos"
 VIDEO_FPS = 30
+
+JOINT_ACTION_SPACE = "joint_angle"
+EE_POSE_ACTION_SPACE = "ee_pose"
+KEYPOINT_ACTION_SPACE = "keypoint"
+MULTI_CHOICE_ACTION_SPACE = "multi_choice"
 
 # Video frame annotation constants
 VIDEO_FRAME_BORDER_COLOR = (255, 0, 0)  # Blue border for video frames
@@ -111,6 +108,38 @@ def _load_action_from_timestep(
     return np.asarray(action_data, dtype=np.float32)
 
 
+def _decode_h5_text(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, (bytes, np.bytes_)):
+        try:
+            return value.decode("utf-8")
+        except Exception:
+            return ""
+    if isinstance(value, str):
+        return value
+    return str(value)
+
+
+def _read_task_goal_list(setup_group: h5py.Group) -> list[str]:
+    if "task_goal" not in setup_group:
+        return ["", "test"]
+
+    raw = setup_group["task_goal"][()]
+    if isinstance(raw, np.ndarray):
+        if raw.ndim == 0:
+            values = [_decode_h5_text(raw.item())]
+        else:
+            values = [_decode_h5_text(item) for item in raw.reshape(-1)]
+    else:
+        values = [_decode_h5_text(raw)]
+
+    if len(values) == 0:
+        return ["", "test"]
+    if len(values) == 1:
+        return [values[0], "test"]
+    return [values[0], values[1]]
+
 
 def _determine_outcome(info: dict) -> str:
     status = info.get("status", "")
@@ -125,11 +154,12 @@ def _save_video(
     frames: list[np.ndarray],
     task_id: str,
     episode_idx: int,
-    task_goal: str,
+    task_goal_list: list[str],
     outcome: str,
     action_space_type: str,
 ) -> Path:
-    safe_goal = task_goal.replace(" ", "_").replace("/", "_")
+    primary_goal = task_goal_list[0] if task_goal_list else ""
+    safe_goal = primary_goal.replace(" ", "_").replace("/", "_")
     video_dir = Path(REPLAY_VIDEO_DIR) / action_space_type
     video_dir.mkdir(parents=True, exist_ok=True)
 
@@ -167,7 +197,8 @@ def process_episode(
     """
     episode_key = f"episode_{episode_idx}"
     episode_data = env_data[episode_key]
-    task_goal = episode_data["setup"]["task_goal"][()].decode()
+    task_goal_list = _read_task_goal_list(episode_data["setup"])
+    primary_task_goal = task_goal_list[0] if task_goal_list else ""
 
     # Count total timesteps
     total_steps = sum(
@@ -179,6 +210,8 @@ def process_episode(
     print(f"Execution start step index: {step_idx}")
 
     # Create and configure environment
+    from robomme.env_record_wrapper import BenchmarkEnvBuilder
+
     env_builder = BenchmarkEnvBuilder(
         env_id=task_id,
         dataset="train",
@@ -192,7 +225,7 @@ def process_episode(
     )
     print(
         f"task_name: {task_id}, episode_idx: {episode_idx}, "
-        f"task_goal: {task_goal}"
+        f"task_goal_list: {task_goal_list}, primary_task_goal: {primary_task_goal}"
     )
 
     # Reset environment and capture initial frames
@@ -229,7 +262,7 @@ def process_episode(
 
     # Save video
     video_path = _save_video(
-        frames, task_id, episode_idx, task_goal, outcome, action_space_type
+        frames, task_id, episode_idx, task_goal_list, outcome, action_space_type
     )
     print(f"Saved video to {video_path}")
 
@@ -252,6 +285,8 @@ def replay(
     Raises:
         ValueError: If task_id is invalid.
     """
+    from robomme.env_record_wrapper import BenchmarkEnvBuilder
+
     task_id_list = BenchmarkEnvBuilder.get_task_list()
 
     if task_id is None:
@@ -287,7 +322,6 @@ def replay(
 
             for episode_idx in episode_indices[:num_to_replay]:
                 process_episode(data, episode_idx, current_task_id, action_space_type)
-                import pdb; pdb.set_trace()
 
 
 if __name__ == "__main__":

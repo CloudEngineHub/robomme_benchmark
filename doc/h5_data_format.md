@@ -21,7 +21,7 @@ episode_<N>/
 |-------|------|-------------|
 | `seed` | `int` | Environment seed |
 | `difficulty` | `str` | Difficulty level |
-| `task_goal` | `str` | Natural-language task description |
+| `task_goal` | `list[str]` | Task goal list of length 2: `[primary_goal, "test"]`; old datasets may store a scalar string and should be read with compatibility handling |
 | `front_camera_intrinsic` | `float32 (3, 3)` | Front camera intrinsic matrix |
 | `wrist_camera_intrinsic` | `float32 (3, 3)` | Wrist camera intrinsic matrix |
 | `available_multi_choices` | `str` | Current available options for multi-choice action |

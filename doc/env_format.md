@@ -53,11 +53,10 @@ To use only the current (latest) observation, use `obs[key][-1]`.
 
 | Key | Meaning | Typical content |
 |-----|---------|-----------------|
-| `task_goal` | Task goal text | Natural-language string |
+| `task_goal` | Task goal list | `list[str]` with fixed length 2: `[primary_goal, "test"]` |
 | `simple_subgoal_online` | Oracle online simple subgoal | Description of the current subgoal |
 | `grounded_subgoal_online` | Oracle online grounded subgoal | Subgoal with object grounding |
 | `available_multi_choices` | Current available options for multi-choice action | List of e.g. `{"choice: "A/B/...", "action": str, "need_grounding": bool}` |
 | `front_camera_intrinsic` | Front camera intrinsic | Camera intrinsic matrix |
 | `wrist_camera_intrinsic` | Wrist camera intrinsic | Camera intrinsic matrix |
 | `status` | Status flag | One of `success`, `fail`, `timeout` |
-
