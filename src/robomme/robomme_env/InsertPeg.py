@@ -63,7 +63,7 @@ class InsertPeg(BaseEnv):
     cube_spawn_center = (0, 0)
     _clearance = 0.01
 
-    def __init__(self, *args, robot_uids="panda_wristcam", robot_init_qpos_noise=0,Robomme_seed=0,Robomme_video_episode=None,Robomme_video_path=None,
+    def __init__(self, *args, robot_uids="panda_wristcam", robot_init_qpos_noise=0,seed=0,Robomme_video_episode=None,Robomme_video_path=None,
                      **kwargs):
         self.use_demonstrationwrapper=False
         self.demonstration_record_traj=False
@@ -82,9 +82,9 @@ class InsertPeg(BaseEnv):
         self.human_cam_eye_pos = cfg["human_cam_eye_pos"]
         self.human_cam_target_pos = cfg["human_cam_target_pos"]
 
-        self.Robomme_seed = Robomme_seed
+        self.seed = seed
         self._hb_generator = torch.Generator()
-        self._hb_generator.manual_seed(int(self.Robomme_seed))
+        self._hb_generator.manual_seed(int(self.seed))
 
         self.robomme_failure_recovery = bool(
             kwargs.pop("robomme_failure_recovery", False)
@@ -97,19 +97,18 @@ class InsertPeg(BaseEnv):
                 self.robomme_failure_recovery_mode.lower()
             )
         normalized_robomme_difficulty = normalize_robomme_difficulty(
-            kwargs.pop("Robomme_difficulty", None)
+            kwargs.pop("difficulty", None)
         )
         if normalized_robomme_difficulty is not None:
             self.difficulty = normalized_robomme_difficulty
         else:
-            seed_mod = Robomme_seed % 3
+            seed_mod = seed % 3
             if seed_mod == 0:
                 self.difficulty = "easy"
             elif seed_mod == 1:
                 self.difficulty = "medium"
             else:
                 self.difficulty = "hard"
-        self.Robomme_difficulty = self.difficulty
 
         self.restore_flag=False
         super().__init__(*args, robot_uids=robot_uids, **kwargs)
@@ -289,16 +288,16 @@ class InsertPeg(BaseEnv):
             self.obj_flag = -1 if obj_sample.item() == 0 else 1
             self.direction = -1 if dir_sample.item() == 0 else 1
             
-            # if self.Robomme_seed<30:
+            # if self.seed<30:
             #     self.obj_flag=-1
             #     self.direction=1
-            # elif self.Robomme_seed<60:
+            # elif self.seed<60:
             #     self.obj_flag=-1
             #     self.direction=-1
-            # elif self.Robomme_seed<90:
+            # elif self.seed<90:
             #     self.obj_flag=1
             #     self.direction=1
-            # #elif self.Robomme_seed<60:
+            # #elif self.seed<60:
             # else:
             #     self.obj_flag=1
             #     self.direction=-1

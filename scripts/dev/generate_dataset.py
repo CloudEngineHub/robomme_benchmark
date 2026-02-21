@@ -187,8 +187,8 @@ def _run_episode_attempt(
             control_mode="pd_joint_pos",        # Control mode: Position control
             render_mode="rgb_array",            # Render mode
             reward_mode="dense",                # Reward mode
-            Robomme_seed=seed,             # Random seed
-            Robomme_difficulty=difficulty, # Difficulty setting
+            seed=seed,             # Random seed
+            difficulty=difficulty, # Difficulty setting
         )
         
         # Special failure recovery settings for first few episodes (for testing/demo only)
@@ -208,7 +208,7 @@ def _run_episode_attempt(
             Robomme_dataset=str(temp_dataset_path), # Data save path
             Robomme_env=env_id,
             Robomme_episode=episode,
-            Robomme_seed=seed,
+            seed=seed,
             save_video=save_video,
 
         )

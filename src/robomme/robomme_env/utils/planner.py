@@ -39,7 +39,7 @@ def _coerce_seed_to_int(value, default: int = 0) -> int:
 
 def _get_fail_recover_rng(env):
     env_unwrapped = getattr(env, "unwrapped", env)
-    seed_anchor = _coerce_seed_to_int(getattr(env_unwrapped, "Robomme_seed", None), default=0)
+    seed_anchor = _coerce_seed_to_int(getattr(env_unwrapped, "seed", None), default=0)
     cached_seed = getattr(env_unwrapped, "_fail_recover_seed_anchor", None)
     generator = getattr(env_unwrapped, "_fail_recover_rng", None)
     if not isinstance(generator, torch.Generator) or cached_seed != seed_anchor:
@@ -927,7 +927,7 @@ def solve_pickup_fail(env, planner, obj=None,z_offset=None,xy_offset=None,obj_ty
 
     normalized_mode = mode.lower() if isinstance(mode, str) else mode
 
-    fail_seed_anchor = _coerce_seed_to_int(getattr(env, "Robomme_seed", None), default=0)
+    fail_seed_anchor = _coerce_seed_to_int(getattr(env, "seed", None), default=0)
     env.fail_recover_mode = normalized_mode
     env.fail_recover_seed_anchor = fail_seed_anchor
     env.fail_recover_xy_signs = None

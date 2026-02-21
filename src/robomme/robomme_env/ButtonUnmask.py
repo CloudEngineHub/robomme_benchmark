@@ -85,7 +85,7 @@ class ButtonUnmask(BaseEnv):
 
 
 
-    def __init__(self, *args, robot_uids="panda_wristcam", robot_init_qpos_noise=0,Robomme_seed=0,Robomme_video_episode=None,Robomme_video_path=None,
+    def __init__(self, *args, robot_uids="panda_wristcam", robot_init_qpos_noise=0,seed=0,Robomme_video_episode=None,Robomme_video_path=None,
                      **kwargs):
         self.use_demonstrationwrapper=False
         self.demonstration_record_traj=False
@@ -104,9 +104,9 @@ class ButtonUnmask(BaseEnv):
         self.human_cam_eye_pos = cfg["human_cam_eye_pos"]
         self.human_cam_target_pos = cfg["human_cam_target_pos"]
 
-        self.Robomme_seed = Robomme_seed
+        self.seed = seed
         normalized_robomme_difficulty = normalize_robomme_difficulty(
-            kwargs.pop("Robomme_difficulty", None)
+            kwargs.pop("difficulty", None)
         )
         self.robomme_failure_recovery = bool(
             kwargs.pop("robomme_failure_recovery", False)
@@ -121,7 +121,7 @@ class ButtonUnmask(BaseEnv):
         if normalized_robomme_difficulty is not None:
             self.difficulty = normalized_robomme_difficulty
         else:
-            seed_mod = Robomme_seed % 3
+            seed_mod = seed % 3
             if seed_mod == 0:
                 self.difficulty = "easy"
             elif seed_mod == 1:
@@ -129,11 +129,10 @@ class ButtonUnmask(BaseEnv):
             else:  # seed_mod == 2
                 self.difficulty = "hard"
         #self.difficulty = "hard"
-        self.Robomme_difficulty = self.difficulty
 
         # Use seed to randomly determine number of repetitions (1-5) arbitrarily
         generator = torch.Generator()
-        generator.manual_seed(Robomme_seed)
+        generator.manual_seed(seed)
         self.num_repeats = torch.randint(1, 6, (1,), generator=generator).item()
         print(f"Task will repeat {self.num_repeats} times (pickup-drop cycles)")
         self.generator = generator  
@@ -164,7 +163,7 @@ class ButtonUnmask(BaseEnv):
 
     def _load_scene(self, options: dict):
         generator = torch.Generator()
-        generator.manual_seed(self.Robomme_seed)
+        generator.manual_seed(self.seed)
     
         self.table_scene = TableSceneBuilder(
             self, robot_init_qpos_noise=self.robot_init_qpos_noise

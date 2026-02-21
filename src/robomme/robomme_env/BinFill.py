@@ -97,13 +97,13 @@ class BinFill(BaseEnv):
         'medium': config_medium
     }
 
-    def __init__(self, *args, robot_uids="panda_wristcam", robot_init_qpos_noise=0,Robomme_seed=0,Robomme_video_episode=None,Robomme_video_path=None,
+    def __init__(self, *args, robot_uids="panda_wristcam", robot_init_qpos_noise=0,seed=0,Robomme_video_episode=None,Robomme_video_path=None,
                      **kwargs):
         self.robot_init_qpos_noise = robot_init_qpos_noise
         self.use_demonstrationwrapper=False
         self.demonstration_record_traj=False
         normalized_robomme_difficulty = normalize_robomme_difficulty(
-            kwargs.pop("Robomme_difficulty", None)
+            kwargs.pop("difficulty", None)
         )
         self.robomme_failure_recovery = bool(
             kwargs.pop("robomme_failure_recovery", False)
@@ -118,7 +118,7 @@ class BinFill(BaseEnv):
             self.difficulty = normalized_robomme_difficulty
         else:
             # Determine difficulty based on seed % 3
-            seed_mod = Robomme_seed % 3
+            seed_mod = seed % 3
             if seed_mod == 0:
                 self.difficulty = "easy"
             elif seed_mod == 1:
@@ -126,7 +126,6 @@ class BinFill(BaseEnv):
             else:  # seed_mod == 2
                 self.difficulty = "hard"
         #self.difficulty = "hard"
-        self.Robomme_difficulty = self.difficulty
 
         if robot_uids in PICK_CUBE_CONFIGS:
             cfg = PICK_CUBE_CONFIGS[robot_uids]
@@ -142,9 +141,9 @@ class BinFill(BaseEnv):
         self.human_cam_eye_pos = cfg["human_cam_eye_pos"]
         self.human_cam_target_pos = cfg["human_cam_target_pos"]
 
-        self.Robomme_seed = Robomme_seed
+        self.seed = seed
         self.generator = torch.Generator()
-        self.generator.manual_seed(Robomme_seed)
+        self.generator.manual_seed(seed)
         self.dynamic=bool(torch.randint(0, 2, (1,), generator=self.generator).item())
 
         # Track the color order and counts used to describe the language goal.

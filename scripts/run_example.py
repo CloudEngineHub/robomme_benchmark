@@ -222,8 +222,8 @@ def main(
     # Create and reset environment
     env = env_builder.make_env_for_episode(episode_idx)
     print(
-        f"seed={env.unwrapped.Robomme_seed}, "
-        f"difficulty={env.unwrapped.Robomme_difficulty}"
+        f"seed={env.unwrapped.seed}, "
+        f"difficulty={env.unwrapped.difficulty}"
     )
     obs, info = env.reset()
 

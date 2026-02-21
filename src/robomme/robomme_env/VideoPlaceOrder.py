@@ -94,7 +94,7 @@ class VideoPlaceOrder(BaseEnv):
     }
 
 
-    def __init__(self, *args, robot_uids="panda_wristcam", robot_init_qpos_noise=0,Robomme_seed=0,Robomme_video_episode=None,Robomme_video_path=None,
+    def __init__(self, *args, robot_uids="panda_wristcam", robot_init_qpos_noise=0,seed=0,Robomme_video_episode=None,Robomme_video_path=None,
                      **kwargs):
         self.use_demonstrationwrapper=False
         self.demonstration_record_traj=False
@@ -113,9 +113,9 @@ class VideoPlaceOrder(BaseEnv):
         self.human_cam_eye_pos = cfg["human_cam_eye_pos"]
         self.human_cam_target_pos = cfg["human_cam_target_pos"]
 
-        self.Robomme_seed = Robomme_seed
+        self.seed = seed
         self.generator = torch.Generator()
-        self.generator.manual_seed(Robomme_seed)
+        self.generator.manual_seed(seed)
 
         self.robomme_failure_recovery = bool(
             kwargs.pop("robomme_failure_recovery", False)
@@ -128,13 +128,13 @@ class VideoPlaceOrder(BaseEnv):
                 self.robomme_failure_recovery_mode.lower()
             )
         normalized_robomme_difficulty = normalize_robomme_difficulty(
-            kwargs.pop("Robomme_difficulty", None)
+            kwargs.pop("difficulty", None)
         )
         if normalized_robomme_difficulty is not None:
             self.difficulty = normalized_robomme_difficulty
         else:
             # Determine difficulty based on seed % 3
-            seed_mod = Robomme_seed % 3
+            seed_mod = seed % 3
             if seed_mod == 0:
                 self.difficulty = "easy"
             elif seed_mod == 1:
@@ -142,7 +142,6 @@ class VideoPlaceOrder(BaseEnv):
             else:  # seed_mod == 2
                 self.difficulty = "hard"
             # keep the difficulty selected by the seed instead of forcing it to easy
-        self.Robomme_difficulty = self.difficulty
 
         self.onto_goalsite=False
         self.start_step=99999
@@ -358,7 +357,7 @@ class VideoPlaceOrder(BaseEnv):
                 return str(actor)
 
             target_debug_payload = {
-                "robomme_seed": self.Robomme_seed,
+                "robomme_seed": self.seed,
                 "which_in_subset": self.which_in_subset,
                 "num_targets_to_pick": num_targets_to_pick,
                 "which_targets_to_pick": [_actor_to_name(target) for target in self.which_targets_to_pick],
@@ -372,7 +371,7 @@ class VideoPlaceOrder(BaseEnv):
             raise
         except Exception as exc:
             raise SceneGenerationError(
-                f"Failed to load VideoPlaceOrder scene for seed {self.Robomme_seed}"
+                f"Failed to load VideoPlaceOrder scene for seed {self.seed}"
             ) from exc
 
 

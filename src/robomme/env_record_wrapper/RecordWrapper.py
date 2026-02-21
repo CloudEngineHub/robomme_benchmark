@@ -56,7 +56,7 @@ class RobommeRecordWrapper(gym.Wrapper):
     3. Handle segmentation logic, including object recognition and center calculation.
     """
     def __init__(self, env,
-     Robomme_dataset=None,Robomme_env=None,Robomme_episode=None,Robomme_seed=None,save_video=False):
+     Robomme_dataset=None,Robomme_env=None,Robomme_episode=None,seed=None,save_video=False):
         # Initialize parent first to ensure self.env exists
         super().__init__(env)
         self.unwrapped.use_demonstrationwrapper=False
@@ -67,7 +67,7 @@ class RobommeRecordWrapper(gym.Wrapper):
         self.Robomme_dataset = Robomme_dataset
         self.Robomme_episode = Robomme_episode
         self.Robomme_env = Robomme_env
-        self.Robomme_seed = Robomme_seed
+        self.seed = seed
         self.save_video = save_video
 
 
@@ -123,7 +123,7 @@ class RobommeRecordWrapper(gym.Wrapper):
         self.hdf5_dir.mkdir(parents=True, exist_ok=True)
 
         # HDF5 file saved in new created folder
-        h5_filename = f"{self.Robomme_env}_ep{self.Robomme_episode}_seed{self.Robomme_seed}.h5"
+        h5_filename = f"{self.Robomme_env}_ep{self.Robomme_episode}_seed{self.seed}.h5"
         self.dataset_path = self.hdf5_dir / h5_filename
 
         # Generate unique filename by env/episode/seed convention for batch analysis
@@ -1041,7 +1041,7 @@ class RobommeRecordWrapper(gym.Wrapper):
                 fail_recover_suffix = "_FailRecoverZ"
             else:
                 fail_recover_suffix = "_FailRecover"
-        video_prefix = f"{self.Robomme_env}_ep{self.Robomme_episode}_seed{self.Robomme_seed}{fail_recover_suffix}"
+        video_prefix = f"{self.Robomme_env}_ep{self.Robomme_episode}_seed{self.seed}{fail_recover_suffix}"
 
         # Write data to HDF5 only when episode successful
         if self.episode_success:
@@ -1196,7 +1196,7 @@ class RobommeRecordWrapper(gym.Wrapper):
 
             # Write setup info (seed, difficulty, task list, camera intrinsics)
             setup_group = episode_group.create_group(f"setup")
-            setup_group.create_dataset("seed", data=self.Robomme_seed)
+            setup_group.create_dataset("seed", data=self.seed)
             try:
                 from robomme.robomme_env.utils.vqa_options import get_vqa_options
                 import json

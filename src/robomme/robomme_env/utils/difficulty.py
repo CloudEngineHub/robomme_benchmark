@@ -15,7 +15,7 @@ def normalize_robomme_difficulty(value: Optional[str]) -> Optional[str]:
 
     if not isinstance(value, str):
         raise TypeError(
-            "Robomme_difficulty must be a string (got "
+            "difficulty must be a string (got "
             f"{type(value).__name__!r})."
         )
 

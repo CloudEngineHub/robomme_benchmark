@@ -187,8 +187,8 @@ def process_episode(
     )
     env = env_builder.make_env_for_episode(episode_idx)
     print(
-        f"seed={env.unwrapped.Robomme_seed}, "
-        f"difficulty={env.unwrapped.Robomme_difficulty}"
+        f"seed={env.unwrapped.seed}, "
+        f"difficulty={env.unwrapped.difficulty}"
     )
     print(
         f"task_name: {task_id}, episode_idx: {episode_idx}, "

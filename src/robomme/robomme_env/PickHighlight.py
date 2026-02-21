@@ -86,7 +86,7 @@ class PickHighlight(BaseEnv):
     }
 
 
-    def __init__(self, *args, robot_uids="panda_wristcam", robot_init_qpos_noise=0,Robomme_seed=0,Robomme_video_episode=None,Robomme_video_path=None,
+    def __init__(self, *args, robot_uids="panda_wristcam", robot_init_qpos_noise=0,seed=0,Robomme_video_episode=None,Robomme_video_path=None,
                      **kwargs):
         self.robot_init_qpos_noise = robot_init_qpos_noise
         self.use_demonstrationwrapper=False
@@ -105,9 +105,9 @@ class PickHighlight(BaseEnv):
         self.human_cam_eye_pos = cfg["human_cam_eye_pos"]
         self.human_cam_target_pos = cfg["human_cam_target_pos"]
 
-        self.Robomme_seed = Robomme_seed
+        self.seed = seed
         self.generator = torch.Generator()
-        self.generator.manual_seed(self.Robomme_seed)
+        self.generator.manual_seed(self.seed)
 
         self.robomme_failure_recovery = bool(
             kwargs.pop("robomme_failure_recovery", False)
@@ -120,20 +120,19 @@ class PickHighlight(BaseEnv):
                 self.robomme_failure_recovery_mode.lower()
             )
         normalized_robomme_difficulty = normalize_robomme_difficulty(
-            kwargs.pop("Robomme_difficulty", None)
+            kwargs.pop("difficulty", None)
         )
         if normalized_robomme_difficulty is not None:
             self.difficulty = normalized_robomme_difficulty
         else:
             # Determine difficulty based on seed % 3
-            seed_mod = Robomme_seed % 3
+            seed_mod = seed % 3
             if seed_mod == 0:
                 self.difficulty = "easy"
             elif seed_mod == 1:
                 self.difficulty = "medium"
             else:  # seed_mod == 2
                 self.difficulty = "hard"
-        self.Robomme_difficulty = self.difficulty
 
         super().__init__(*args, robot_uids=robot_uids, **kwargs)
 
@@ -160,7 +159,7 @@ class PickHighlight(BaseEnv):
         super()._load_agent(options, sapien.Pose(p=[-0.615, 0, 0]))
 
     def _load_scene(self, options: dict):
-        self.generator.manual_seed(self.Robomme_seed)
+        self.generator.manual_seed(self.seed)
         self.table_scene = TableSceneBuilder(
             self, robot_init_qpos_noise=self.robot_init_qpos_noise
         )

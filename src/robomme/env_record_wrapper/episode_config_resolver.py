@@ -183,9 +183,9 @@ class BenchmarkEnvBuilder:
             reward_mode="dense",
         )
         if seed is not None:
-            env_kwargs["Robomme_seed"] = seed
+            env_kwargs["seed"] = seed
         if difficulty_hint:
-            env_kwargs["Robomme_difficulty"] = difficulty_hint
+            env_kwargs["difficulty"] = difficulty_hint
         seed_desc = seed if seed is not None else "default"
         difficulty_str = f", difficulty={difficulty_hint}" if difficulty_hint else ""
         print(f"[{self.env_id}] Episode {episode_idx}: seed={seed_desc}{difficulty_str}")

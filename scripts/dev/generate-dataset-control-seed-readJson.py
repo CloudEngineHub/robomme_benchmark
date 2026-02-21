@@ -67,7 +67,7 @@ DEFAULT_ENVS =[
 "RouteStick"
     ]
 
-# Reference dataset metadata root directory: used to read difficulty and Robomme_seed
+# Reference dataset metadata root directory: used to read difficulty and seed
 SOURCE_METADATA_ROOT = Path("/data/hongzefu/data_1206")
 VALID_DIFFICULTIES: Set[str] = {"easy", "medium", "hard"}
 DATASET_SCREW_MAX_ATTEMPTS = 3
@@ -79,7 +79,7 @@ def _load_env_metadata_records(
     metadata_root: Path,
 ) -> List[Dict[str, Any]]:
     """
-    Read metadata records for an environment from the reference directory to control difficulty and Robomme_seed.
+    Read metadata records for an environment from the reference directory to control difficulty and seed.
     """
     metadata_path = metadata_root / f"record_dataset_{env_id}_metadata.json"
     if not metadata_path.exists():
@@ -232,8 +232,8 @@ def _run_episode_attempt(
             control_mode="pd_joint_pos",        # Control mode: Position control
             render_mode="rgb_array",            # Render mode
             reward_mode="dense",                # Reward mode
-            Robomme_seed=seed,             # Random seed
-            Robomme_difficulty=difficulty, # Difficulty setting
+            seed=seed,             # Random seed
+            difficulty=difficulty, # Difficulty setting
         )
         
         # Special failure recovery settings for the first few episodes (for testing or demonstration purposes only)
@@ -253,7 +253,7 @@ def _run_episode_attempt(
             Robomme_dataset=str(temp_dataset_path), # Data save path
             Robomme_env=env_id,
             Robomme_episode=episode,
-            Robomme_seed=seed,
+            seed=seed,
             save_video=save_video,
 
         )
