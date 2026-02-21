@@ -732,6 +732,17 @@ def _options_videoplaceorder(env, planner, require_target, base) -> List[dict]:
             }
         )
 
+    button_obj = getattr(base, "button", None) or getattr(base, "button_left", None)
+    if button_obj is not None:
+        options.append(
+            {
+                "label": "c",
+                "action": "press the button",
+                "solve": lambda button_obj=button_obj: solve_button(
+                    env, planner, obj=button_obj
+                ),
+            }
+        )
 
     return options
 def _options_videoplacebutton(env, planner, require_target, base) -> List[dict]:
@@ -756,6 +767,18 @@ def _options_videoplacebutton(env, planner, require_target, base) -> List[dict]:
                     env, planner, target=require_target()
                 ),
                 "available": env.targets,
+            }
+        )
+
+    button_obj = getattr(base, "button", None) or getattr(base, "button_left", None)
+    if button_obj is not None:
+        options.append(
+            {
+                "label": "c",
+                "action": "press the button",
+                "solve": lambda button_obj=button_obj: solve_button(
+                    env, planner, obj=button_obj
+                ),
             }
         )
 
