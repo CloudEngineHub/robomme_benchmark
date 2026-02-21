@@ -33,11 +33,13 @@ from mani_skill.utils.visualization.misc import (
 from mani_skill.utils.wrappers import CPUGymWrapper
 import imageio
 from ..robomme_env.utils import task_goal
+from ..robomme_env.utils.vqa_options import get_vqa_options
 from ..robomme_env.utils.segmentation_utils import (
     process_segmentation,
     create_segmentation_visuals,
 )
 from ..robomme_env.utils.rpy_util import build_endeffector_pose_dict
+from .oracle_action_matcher import map_action_text_to_option_label
 
 class FailsafeTimeout(RuntimeError):
     """Exception raised when Robomme failsafe terminates episode early."""
@@ -87,7 +89,8 @@ class RobommeRecordWrapper(gym.Wrapper):
         self.segmentation_points_online = []  # Cache online segmentation target points
 
         # choice_action tracking
-        self._current_choice_label = ""      # choice_label of the current subgoal
+        self._current_choice_action_text = ""  # Source choice action text from env task entry
+        self._current_choice_label = ""        # Resolved option label (a/b/c/d/...)
         self._prev_task_index = -1           # Task index from previous step, used to detect subgoal switch
 
         # Video buffer
@@ -567,11 +570,51 @@ class RobommeRecordWrapper(gym.Wrapper):
         self._failsafe_triggered = False
         self._video_target_frame_size = None
         # Reset choice_action tracking per episode
+        self._current_choice_action_text = ""
         self._current_choice_label = ""
         self._prev_task_index = -1
         result = super().reset(**kwargs)
         self._init_fk_planner()
         return result
+
+    def _resolve_choice_label(self, choice_action_text, task_index) -> str:
+        """Resolve current choice action text to exact option label (a/b/c/d/...)."""
+        if not isinstance(choice_action_text, str) or not choice_action_text:
+            return ""
+
+        selected_target = {
+            "obj": None,
+            "name": None,
+            "seg_id": None,
+            "click_point": None,
+            "centroid_point": None,
+            "selection_mode": None,
+            "used_random_fallback": False,
+        }
+        env_id = getattr(getattr(self.unwrapped, "spec", None), "id", None) or self.Robomme_env
+
+        try:
+            solve_options = get_vqa_options(
+                self.env,
+                getattr(self, "planner", None),
+                selected_target,
+                env_id,
+            )
+        except Exception as exc:
+            print(
+                "[RecordWrapper] Failed to build VQA options for label mapping: "
+                f"env={env_id}, task_index={task_index}, source_action='{choice_action_text}', error={exc}"
+            )
+            return ""
+
+        matched_label = map_action_text_to_option_label(choice_action_text, solve_options)
+        if matched_label is None:
+            print(
+                "[RecordWrapper] Choice label mapping missing, writing empty label: "
+                f"env={env_id}, task_index={task_index}, source_action='{choice_action_text}'"
+            )
+            return ""
+        return matched_label
 
     def _consume_pending_keypoint(self) -> bool:
         """
@@ -747,7 +790,13 @@ class RobommeRecordWrapper(gym.Wrapper):
         # This correctly handles consecutive tasks with identical subgoal_segment strings.
         _cur_task_index = getattr(self.unwrapped, 'current_task_index', -1)
         if _cur_task_index != self._prev_task_index:
-            self._current_choice_label = getattr(self.unwrapped, 'current_choice_label', "")
+            self._current_choice_action_text = getattr(
+                self.unwrapped, "current_choice_label", ""
+            )
+            self._current_choice_label = self._resolve_choice_label(
+                self._current_choice_action_text,
+                _cur_task_index,
+            )
             self._prev_task_index = _cur_task_index
             self.previous_subgoal_segment = segmentation_output["updated_previous_subgoal_segment"]
         self.segmentation_points = segmentation_output["segmentation_points"]
@@ -905,7 +954,7 @@ class RobommeRecordWrapper(gym.Wrapper):
                     },
                     'eef_action': fk_eef_action,
                     'choice_action': json.dumps({
-                        "action": self._current_choice_label,
+                        "label": self._current_choice_label,
                         "point": list(self.segmentation_points[0]) if self.segmentation_points else [],
                         "serial_number": _cur_task_index,
                     }),

@@ -271,11 +271,11 @@ class EpisodeDatasetResolver:
         if not isinstance(payload, dict):
             return None
 
-        action = payload.get("action")
-        if not isinstance(action, str) or not action:
+        label = payload.get("label")
+        if not isinstance(label, str) or not label:
             return None
 
-        command: Dict[str, Any] = {"action": action}
+        command: Dict[str, Any] = {"label": label}
         point = self._normalize_choice_point(payload.get("point"))
         if point is not None:
             command["point"] = point

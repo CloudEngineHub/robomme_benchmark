@@ -39,8 +39,8 @@ ACTION_SPACE = "oracle_planner"
 
 GUI_RENDER = False
 
-DATASET_ROOT = "/data/hongzefu/data_0220"
-OVERRIDE_METADATA_PATH = "/data/hongzefu/data_0220"
+DATASET_ROOT = "/data/hongzefu/data_0220-test"
+OVERRIDE_METADATA_PATH = "/data/hongzefu/data_0220-test"
 
 # ######## Video saving variables (output directory) start ########
 # Video output directory: Independently hardcoded, not aligned with h5 path or env_id
@@ -52,11 +52,11 @@ DEFAULT_ENV_IDS = [
 #      "PickXtimes",
 #     "StopCube",
 #     "SwingXtimes",
-#     "BinFill",
-     "VideoUnmaskSwap",
-     "VideoUnmask",
-     "ButtonUnmaskSwap",
-     "ButtonUnmask",
+  "BinFill",
+    #  "VideoUnmaskSwap",
+    #  "VideoUnmask",
+    #  "ButtonUnmaskSwap",
+    #  "ButtonUnmask",
 #     "VideoRepick",
 #     "VideoPlaceButton",
 #     "VideoPlaceOrder",
@@ -70,8 +70,8 @@ DEFAULT_ENV_IDS = [
 def _parse_oracle_command(choice_action: Optional[Any]) -> Optional[dict[str, Any]]:
     if not isinstance(choice_action, dict):
         return None
-    action = choice_action.get("action")
-    if not isinstance(action, str) or not action:
+    label = choice_action.get("label")
+    if not isinstance(label, str) or not label:
         return None
     return choice_action
 

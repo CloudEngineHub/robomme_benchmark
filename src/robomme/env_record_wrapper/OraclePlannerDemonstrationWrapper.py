@@ -11,7 +11,7 @@ from mani_skill.examples.motionplanning.panda.motionplanner_stick import (
 )
 from ..robomme_env.utils import planner_denseStep
 from .oracle_action_matcher import (
-    find_exact_option_index,
+    find_exact_label_option_index,
     normalize_and_clip_point_xy,
     select_target_with_point,
 )
@@ -28,7 +28,7 @@ from .oracle_action_matcher import (
 class OraclePlannerDemonstrationWrapper(gym.Wrapper):
     """
     Wrap Robomme environment with Oracle planning logic into Gym Wrapper for demonstration/evaluation;
-    Input to step is command_dict (containing action and optional point).
+    Input to step is command_dict (containing label and optional point).
     step returns obs as dict-of-lists and reward/terminated/truncated as last-step values.
     """
 
@@ -211,17 +211,17 @@ class OraclePlannerDemonstrationWrapper(gym.Wrapper):
     def _resolve_command(self, command_dict, solve_options):
         if not isinstance(command_dict, dict):
             return None, None
-        if "action" not in command_dict:
+        if "label" not in command_dict:
             return None, None
 
-        target_action = command_dict.get("action")
-        if target_action is None:
+        target_label = command_dict.get("label")
+        if not isinstance(target_label, str) or not target_label:
             return None, None
 
-        found_idx = find_exact_option_index(target_action, solve_options)
+        found_idx = find_exact_label_option_index(target_label, solve_options)
         if found_idx == -1:
             print(
-                f"Error: Action '{target_action}' not found in current options by exact label match."
+                f"Error: Label '{target_label}' not found in current options by exact label match."
             )
             return None, None
 
@@ -309,7 +309,7 @@ class OraclePlannerDemonstrationWrapper(gym.Wrapper):
 
     def step(self, action):
         """
-        Execute one step: action is command_dict, must contain "action", optional "point".
+        Execute one step: action is command_dict, must contain "label", optional "point".
         Return last-step signals for reward/terminated/truncated while keeping obs as dict-of-lists.
         """
         # 1) Read the latest segmentation map from current observation for click-to-target grounding.
@@ -319,7 +319,7 @@ class OraclePlannerDemonstrationWrapper(gym.Wrapper):
         # 3) Validate/resolve the incoming command into (option index, optional click point).
         found_idx, target_point = self._resolve_command(action, solve_options)
 
-        # 4) For invalid command or unmatched action, keep legacy behavior: return an empty dense batch.
+        # 4) For invalid command or unmatched label, keep legacy behavior: return an empty dense batch.
         if found_idx is None:
             return self._format_step_output(planner_denseStep.empty_step_batch())
 

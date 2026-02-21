@@ -4,14 +4,27 @@ from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 
 
-def find_exact_option_index(target_action: Any, options: List[dict]) -> int:
-    """Return option index only when target_action exactly equals option action (full text)."""
-    if not isinstance(target_action, str):
+def find_exact_label_option_index(target_label: Any, options: List[dict]) -> int:
+    """Return option index only when target_label exactly equals option label."""
+    if not isinstance(target_label, str):
         return -1
     for idx, opt in enumerate(options):
-        if opt.get("action") == target_action:
+        if opt.get("label") == target_label:
             return idx
     return -1
+
+
+def map_action_text_to_option_label(action_text: Any, options: List[dict]) -> Optional[str]:
+    """Map exact option action text to its option label for recording-time conversion."""
+    if not isinstance(action_text, str):
+        return None
+    for opt in options:
+        if opt.get("action") == action_text:
+            label = opt.get("label")
+            if isinstance(label, str) and label:
+                return label
+            return None
+    return None
 
 
 def normalize_and_clip_point_xy(
