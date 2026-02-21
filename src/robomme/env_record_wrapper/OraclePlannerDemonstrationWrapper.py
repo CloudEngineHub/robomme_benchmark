@@ -203,7 +203,7 @@ class OraclePlannerDemonstrationWrapper(gym.Wrapper):
         selected_target = self._empty_target()
         solve_options = get_vqa_options(self.env, self.planner, selected_target, self.env_id)
         self.available_options = [
-            {"action": opt.get("label", "Unknown"), "need_parameter": bool(opt.get("available"))}
+            {"label": opt.get("label"), "action": opt.get("action", "Unknown"), "need_parameter": bool(opt.get("available"))}
             for opt in solve_options
         ]
         return selected_target, solve_options
@@ -249,17 +249,17 @@ class OraclePlannerDemonstrationWrapper(gym.Wrapper):
 
     def _execute_selected_option(self, option_idx, solve_options):
         option = solve_options[option_idx]
-        print(f"Executing option: {option_idx + 1} - {option.get('label')}")
+        print(f"Executing option: {option_idx + 1} - {option.get('action')}")
 
         result = planner_denseStep._run_with_dense_collection(
             self.planner,
             lambda: option.get("solve")(),
         )
         if result == -1:
-            action_label = option.get("label", "Unknown")
+            action_text = option.get("action", "Unknown")
             raise RuntimeError(
                 f"Oracle solve failed after screw->RRT* retries for env '{self.env_id}', "
-                f"action '{action_label}' (index {option_idx + 1})."
+                f"action '{action_text}' (index {option_idx + 1})."
             )
         return result
 

@@ -1154,7 +1154,7 @@ class RobommeRecordWrapper(gym.Wrapper):
                 env_id = getattr(getattr(self.unwrapped, "spec", None), "id", None) or self.Robomme_env
                 solve_options = get_vqa_options(self.env, getattr(self, "planner", None), selected_target, env_id)
                 available_options = [
-                    {"action": opt.get("label", "Unknown"), "need_parameter": bool(opt.get("available"))}
+                    {"label": opt.get("label"), "action": opt.get("action", "Unknown"), "need_parameter": bool(opt.get("available"))}
                     for opt in solve_options
                 ]
                 available_multi_choices_str = json.dumps(available_options)

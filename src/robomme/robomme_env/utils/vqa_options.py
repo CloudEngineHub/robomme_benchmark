@@ -42,13 +42,15 @@ def _options_default(env, planner, require_target, base) -> List[dict]:
 def _options_videorepick(env, planner, require_target, base) -> List[dict]:
     options: List[dict] = [
         {
-            "label": "pick up the cube",
+            "label": "a",
+            "action": "pick up the cube",
             "solve": lambda require_target=require_target: solve_pickup(
                 env, planner, obj=require_target()),
             "available": env.spawned_cubes
         },
         {
-            "label": "put it down",
+            "label": "b",
+            "action": "put it down",
             "solve": lambda: solve_putdown_whenhold(
                 env, planner, release_z=0.01
             ),
@@ -58,7 +60,8 @@ def _options_videorepick(env, planner, require_target, base) -> List[dict]:
     if button_obj is not None:
         options.append(
             {
-                "label": "press the button to finish",
+                "label": "c",
+                "action": "press the button to finish",
                 "solve": lambda button_obj=button_obj: solve_button(
                     env, planner, obj=button_obj
                 ),
@@ -70,7 +73,8 @@ def _options_videorepick(env, planner, require_target, base) -> List[dict]:
 def _options_binfill(env, planner, require_target, base) -> List[dict]:
     options: List[dict] = [
         {
-            "label": "pick up the cube",
+            "label": "a",
+            "action": "pick up the cube",
             "solve": lambda require_target=require_target: solve_pickup(
                 env, planner, obj=require_target()
             ),
@@ -81,7 +85,8 @@ def _options_binfill(env, planner, require_target, base) -> List[dict]:
     if target is not None:
         options.append(
             {
-                "label": "put it into the bin",
+                "label": "b",
+                "action": "put it into the bin",
                 "solve": lambda require_target=require_target, target=target: solve_putonto_whenhold_binspecial(
                     env, planner, target=target
                 ),
@@ -91,7 +96,8 @@ def _options_binfill(env, planner, require_target, base) -> List[dict]:
     if button_obj is not None:
         options.append(
             {
-                "label": "press the button",
+                "label": "c",
+                "action": "press the button",
                 "solve": lambda button_obj=button_obj: solve_button(
                     env, planner, obj=button_obj
                 ),
@@ -106,7 +112,8 @@ def _options_button_unmask(env, planner, require_target, base) -> List[dict]:
     if button_obj is not None:
         options.append(
             {
-                "label": "press the button",
+                "label": "a",
+                "action": "press the button",
                 "solve": lambda button_obj=button_obj: solve_button(
                     env, planner, obj=button_obj
                 ),
@@ -114,14 +121,16 @@ def _options_button_unmask(env, planner, require_target, base) -> List[dict]:
         )
 
     options.extend([{
-            "label": "pick up the container",
+            "label": "b",
+            "action": "pick up the container",
             "solve": lambda require_target=require_target: solve_pickup_bin(
                 env, planner, obj=require_target()
             ),
             "available": env.spawned_bins,
         },
         {
-            "label": "put down the container",
+            "label": "c",
+            "action": "put down the container",
             "solve": lambda: solve_putdown_whenhold(
                 env, planner
             ),
@@ -134,7 +143,8 @@ def _options_button_unmask_swap(env, planner, require_target, base) -> List[dict
     if button_obj_left is not None:
         options.append(
             {
-                "label": "press the first button",
+                "label": "a",
+                "action": "press the first button",
                 "solve": lambda button_obj=button_obj_left: solve_button(
                     env, planner, obj=button_obj
                 ),
@@ -144,7 +154,8 @@ def _options_button_unmask_swap(env, planner, require_target, base) -> List[dict
     if button_obj_right is not None:
         options.append(
             {
-                "label": "press the second button",
+                "label": "b",
+                "action": "press the second button",
                 "solve": lambda button_obj=button_obj_right: solve_button(
                     env, planner, obj=button_obj
                 ),
@@ -153,7 +164,8 @@ def _options_button_unmask_swap(env, planner, require_target, base) -> List[dict
 
 
     options.extend([{
-            "label": "pick up the container",
+            "label": "c",
+            "action": "pick up the container",
             "solve": lambda require_target=require_target: solve_pickup_bin(
                 env, planner, obj=require_target()
             ),
@@ -161,7 +173,8 @@ def _options_button_unmask_swap(env, planner, require_target, base) -> List[dict
             #"available": env.spawned_bins+[env.button_right],#test gradio execution error
         },
         {
-            "label": "put down the container",
+            "label": "d",
+            "action": "put down the container",
             "solve": lambda: solve_putdown_whenhold(
                 env, planner
             ),
@@ -174,7 +187,8 @@ def _options_insertpeg(env, planner, require_target, base) -> List[dict]:
 
     options.append(
         {
-            "label": "pick up the peg by grasping one end",
+            "label": "a",
+            "action": "pick up the peg by grasping one end",
             "solve": lambda require_target=require_target: grasp_and_lift_peg_side(
                 env, planner, obj=require_target()
             ),
@@ -184,7 +198,8 @@ def _options_insertpeg(env, planner, require_target, base) -> List[dict]:
 
     options.append(
         {
-            "label": "insert the peg from the right side",
+            "label": "b",
+            "action": "insert the peg from the right side",
             "solve": lambda direction=1: insert_peg(
                 env,
                 planner,
@@ -197,7 +212,8 @@ def _options_insertpeg(env, planner, require_target, base) -> List[dict]:
     )
     options.append(
         {
-            "label": "insert the peg from the left side",# Keep consistent with subgoal
+            "label": "c",
+            "action": "insert the peg from the left side",# Keep consistent with subgoal
             "solve": lambda direction=-1: insert_peg(
                 env,
                 planner,
@@ -224,7 +240,8 @@ def _options_movecube(env, planner, require_target, base) -> List[dict]:
     if peg_target is not None:
         options.append(
             {
-                "label": "pick up the peg",
+                "label": "a",
+                "action": "pick up the peg",
                 "solve": lambda peg_target=peg_target: grasp_and_lift_peg_side(
                     env, planner, obj=peg_target
                 ),
@@ -236,7 +253,8 @@ def _options_movecube(env, planner, require_target, base) -> List[dict]:
     if cube is not None and cube_goal is not None and direction2 is not None and obj_flag is not None:
         options.append(
             {
-                "label": "hook the cube to the target with the peg",
+                "label": "b",
+                "action": "hook the cube to the target with the peg",
                 "solve": lambda cube=cube, goal=cube_goal, direction=direction2, obj_flag=obj_flag: solve_push_to_target_with_peg(
                     env,
                     planner,
@@ -252,7 +270,8 @@ def _options_movecube(env, planner, require_target, base) -> List[dict]:
     if cube is not None and cube_goal is not None:
         options.append(
             {
-                "label": "close gripper and push the cube to the target",
+                "label": "c",
+                "action": "close gripper and push the cube to the target",
                 "solve": lambda cube=cube, goal=cube_goal: solve_push_to_target(
                     env, planner, obj=cube, target=goal
                 ),
@@ -261,13 +280,15 @@ def _options_movecube(env, planner, require_target, base) -> List[dict]:
     if cube is not None and cube_goal is not None:
         options.append(
             {
-                "label": "pick up the cube",
+                "label": "d",
+                "action": "pick up the cube",
                 "solve": lambda cube=cube: solve_pickup(env, planner, obj=cube),
             }
         )
         options.append(
             {
-                "label": "place the cube onto the target",
+                "label": "e",
+                "action": "place the cube onto the target",
                 "solve": lambda cube=cube, goal=cube_goal: solve_putonto_whenhold(
                     env, planner,target=goal
                 ),
@@ -422,10 +443,11 @@ def _options_patternlock(env, planner, require_target, base) -> List[dict]:
         return [solve_swingonto(env, planner, target=target),solve_swingonto(env, planner, target=target)]
 
     options: List[dict] = []
-    for dir_label in directions:
+    for i, dir_label in enumerate(directions):
         options.append(
             {
-                "label": f"move {dir_label}",
+                "label": chr(ord("a") + i),
+                "action": f"move {dir_label}",
                 "solve": (lambda d=dir_label: _solve_direction(d)),
             }
         )
@@ -549,10 +571,11 @@ def _options_routestick(env, planner, require_target, base) -> List[dict]:
         ("move to the nearest left target by circling around the stick counterclockwise", "left", "counterclockwise"),
         ("move to the nearest right target by circling around the stick counterclockwise", "right", "counterclockwise"),
     ]
-    for label, side, direction in option_defs:
+    for i, (action_text, side, direction) in enumerate(option_defs):
         options.append(
             {
-                "label": label,
+                "label": chr(ord("a") + i),
+                "action": action_text,
                 "solve": (lambda s=side, d=direction: _solve_route(s, d)),
             }
         )
@@ -565,7 +588,8 @@ def _options_pickhighlight(env, planner, require_target, base) -> List[dict]:
     if button_obj is not None:
         options.append(
             {
-                "label": "press button",
+                "label": "a",
+                "action": "press button",
                 "solve": lambda button_obj=button_obj: solve_button(
                     env, planner, obj=button_obj
                 ),
@@ -580,14 +604,16 @@ def _options_pickhighlight(env, planner, require_target, base) -> List[dict]:
     options.extend(
         [
             {
-                "label": "pick up the highlighted cube",
+                "label": "b",
+                "action": "pick up the highlighted cube",
                 "solve": lambda require_target=require_target: solve_pickup(
                     env, planner, obj=require_target()
                 ),
                 'available': env.all_cubes,
             },
             {
-                "label": "place the cube onto the table",
+                "label": "c",
+                "action": "place the cube onto the table",
                 "solve": lambda: solve_putdown_whenhold(
                     env, planner, release_z=0.01
                 ),
@@ -602,20 +628,23 @@ def _options_pickxtimes(env, planner, require_target, base) -> List[dict]:
     options.extend(
         [
             {
-                "label": "pick up the cube",
+                "label": "a",
+                "action": "pick up the cube",
                 "solve": lambda require_target=require_target: solve_pickup(
                     env, planner, obj=require_target()
                 ),
                 "available": env.all_cubes,
             },
             {
-                "label": "place the cube onto the target",
+                "label": "b",
+                "action": "place the cube onto the target",
                 "solve": lambda require_target=require_target: solve_putonto_whenhold(
                     env, planner, target=env.target
                 ),
             },
             {
-                "label": "press the button to stop",
+                "label": "c",
+                "action": "press the button to stop",
                 "solve": lambda: solve_button(
                     env, planner, obj=env.button
                 ),
@@ -630,7 +659,8 @@ def _options_swingxtimes(env, planner, require_target, base) -> List[dict]:
 
     options.append(
         {
-            "label": "pick up the cube",
+            "label": "a",
+            "action": "pick up the cube",
             "solve": lambda require_target=require_target: solve_pickup(
                 env, planner, obj=require_target()
             ),
@@ -642,7 +672,8 @@ def _options_swingxtimes(env, planner, require_target, base) -> List[dict]:
     if target_cube is not None:
         options.append(
             {
-                "label": "move to the top of the target",
+                "label": "b",
+                "action": "move to the top of the target",
                 "solve": lambda require_target=require_target, target_cube=target_cube: solve_swingonto_whenhold(
                     env,
                     planner,
@@ -654,7 +685,8 @@ def _options_swingxtimes(env, planner, require_target, base) -> List[dict]:
         )
         options.append(
             {
-                "label": "put the cube on the table",
+                "label": "c",
+                "action": "put the cube on the table",
                 "solve": lambda target_cube=target_cube: solve_putdown_whenhold(
                     env, planner
                 ),
@@ -665,7 +697,8 @@ def _options_swingxtimes(env, planner, require_target, base) -> List[dict]:
     if button_obj is not None:
         options.append(
             {
-                "label": "press the button",
+                "label": "d",
+                "action": "press the button",
                 "solve": lambda button_obj=button_obj: solve_button(
                     env, planner, obj=button_obj
                 ),
@@ -677,7 +710,8 @@ def _options_swingxtimes(env, planner, require_target, base) -> List[dict]:
 def _options_videoplaceorder(env, planner, require_target, base) -> List[dict]:
     options: List[dict] = [
         {
-            "label": "pick up the cube",
+            "label": "a",
+            "action": "pick up the cube",
             "solve": lambda require_target=require_target: solve_pickup(
                 env, planner, obj=require_target()
             ),
@@ -689,7 +723,8 @@ def _options_videoplaceorder(env, planner, require_target, base) -> List[dict]:
     if target_cube is not None:
         options.append(
             {
-                "label": "drop onto",
+                "label": "b",
+                "action": "drop onto",
                 "solve": lambda require_target=require_target, target_cube=target_cube: solve_putonto_whenhold(
                     env, planner, target=require_target()
                 ),
@@ -702,7 +737,8 @@ def _options_videoplaceorder(env, planner, require_target, base) -> List[dict]:
 def _options_videoplacebutton(env, planner, require_target, base) -> List[dict]:
     options: List[dict] = [
         {
-            "label": "pick up the cube",
+            "label": "a",
+            "action": "pick up the cube",
             "solve": lambda require_target=require_target: solve_pickup(
                 env, planner, obj=require_target()
             ),
@@ -714,7 +750,8 @@ def _options_videoplacebutton(env, planner, require_target, base) -> List[dict]:
     if target_cube is not None:
         options.append(
             {
-                "label": "drop onto",
+                "label": "b",
+                "action": "drop onto",
                 "solve": lambda target_cube=target_cube: solve_putonto_whenhold(
                     env, planner, target=require_target()
                 ),
@@ -732,7 +769,8 @@ def _options_stopcube(env, planner, require_target, base) -> List[dict]:
     if button_obj is not None:
         options.append(
             {
-                "label": "move to the top of the button to prepare",
+                "label": "a",
+                "action": "move to the top of the button to prepare",
                 "solve": lambda button_obj=button_obj: solve_button_ready(
                     env, planner, obj=button_obj
                 ),
@@ -799,7 +837,8 @@ def _options_stopcube(env, planner, require_target, base) -> List[dict]:
 
         options.append(
             {
-                "label": "remain static",
+                "label": "b",
+                "action": "remain static",
                 "solve": solve_with_incremental_steps,
             }
         )
@@ -807,7 +846,8 @@ def _options_stopcube(env, planner, require_target, base) -> List[dict]:
     if button_obj is not None:
         options.append(
             {
-                "label": "press button to stop the cube",
+                "label": "c",
+                "action": "press button to stop the cube",
                 "solve": lambda button_obj=button_obj: solve_button(
                     env, planner, obj=button_obj, without_hold=True
                 ),
@@ -818,14 +858,16 @@ def _options_stopcube(env, planner, require_target, base) -> List[dict]:
 def _options_video_unmask(env, planner, require_target, base) -> List[dict]:
     options: List[dict] = []
     options.extend([{
-            "label": "pick up the container",
+            "label": "a",
+            "action": "pick up the container",
             "solve": lambda require_target=require_target: solve_pickup_bin(
                 env, planner, obj=require_target()
             ),
             "available": env.spawned_bins,
         },
         {
-            "label": "put down the container",
+            "label": "b",
+            "action": "put down the container",
             "solve": lambda: solve_putdown_whenhold(
                 env, planner
             ),
@@ -834,16 +876,17 @@ def _options_video_unmask(env, planner, require_target, base) -> List[dict]:
 
 def _options_video_unmask_swap(env, planner, require_target, base) -> List[dict]:
     options: List[dict] = []
-    options: List[dict] = []
     options.extend([{
-            "label": "pick up the container",
+            "label": "a",
+            "action": "pick up the container",
             "solve": lambda require_target=require_target: solve_pickup_bin(
                 env, planner, obj=require_target()
             ),
             "available": env.spawned_bins,
         },
         {
-            "label": "put down the container",
+            "label": "b",
+            "action": "put down the container",
             "solve": lambda: solve_putdown_whenhold(
                 env, planner
             ),
@@ -963,6 +1006,7 @@ if __name__ == "__main__":
             
             for i, opt in enumerate(valid_options, 1):
                 label = opt.get("label", "No label")
+                action = opt.get("action", "")
                 solve_func = opt.get("solve")
                 needs_target = False
                 if solve_func:
@@ -974,7 +1018,8 @@ if __name__ == "__main__":
                         pass
                 
                 target_str = " [Need click target]" if needs_target else ""
-                print(f"    {i}. {label}{target_str}")
+                action_str = f" - {action}" if action else ""
+                print(f"    {i}. {label}{action_str}{target_str}")
         except Exception as e:
             print(f"\nTask: {task_name}")
             print(f"  Error: Failed to get options - {type(e).__name__}: {e}")

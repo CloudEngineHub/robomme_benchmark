@@ -224,7 +224,7 @@ class DemonstrationWrapper(gym.Wrapper):
         dummy_target = {"obj": None, "name": None, "seg_id": None, "click_point": None, "centroid_point": None}
         raw_options = get_vqa_options(self, None, dummy_target, env_id)
         available_options = [
-            {"action": opt.get("label", "Unknown"), "need_parameter": bool(opt.get("available"))}
+            {"label": opt.get("label"), "action": opt.get("action", "Unknown"), "need_parameter": bool(opt.get("available"))}
             for opt in raw_options
         ]
 

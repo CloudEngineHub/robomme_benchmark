@@ -5,11 +5,11 @@ import numpy as np
 
 
 def find_exact_option_index(target_action: Any, options: List[dict]) -> int:
-    """Return option index only when target_action exactly equals option label."""
+    """Return option index only when target_action exactly equals option action (full text)."""
     if not isinstance(target_action, str):
         return -1
     for idx, opt in enumerate(options):
-        if opt.get("label") == target_action:
+        if opt.get("action") == target_action:
             return idx
     return -1
 
