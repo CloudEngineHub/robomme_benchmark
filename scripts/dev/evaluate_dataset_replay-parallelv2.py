@@ -39,8 +39,8 @@ ACTION_SPACE = "oracle_planner"
 
 GUI_RENDER = False
 
-DATASET_ROOT = "/data/hongzefu/data_0220-test"
-OVERRIDE_METADATA_PATH = "/data/hongzefu/data_0220-test"
+DATASET_ROOT = "/data/hongzefu/data_0220"
+OVERRIDE_METADATA_PATH = "/data/hongzefu/data_0220"
 
 # ######## Video saving variables (output directory) start ########
 # Video output directory: Independently hardcoded, not aligned with h5 path or env_id
@@ -49,22 +49,22 @@ OUT_VIDEO_DIR = "/data/hongzefu/dataset_replay-0220"
 MAX_STEPS = 1000
 
 DEFAULT_ENV_IDS = [
-#      "PickXtimes",
-#     "StopCube",
-#     "SwingXtimes",
+     "PickXtimes",
+    "StopCube",
+    "SwingXtimes",
   "BinFill",
-    #  "VideoUnmaskSwap",
-    #  "VideoUnmask",
-    #  "ButtonUnmaskSwap",
-    #  "ButtonUnmask",
-#     "VideoRepick",
-#     "VideoPlaceButton",
-#     "VideoPlaceOrder",
-#     "PickHighlight",
-#     "InsertPeg",
-#     "MoveCube",
-#      "PatternLock",
-#      "RouteStick",
+     "VideoUnmaskSwap",
+     "VideoUnmask",
+     "ButtonUnmaskSwap",
+     "ButtonUnmask",
+    "VideoRepick",
+    "VideoPlaceButton",
+    "VideoPlaceOrder",
+    "PickHighlight",
+    "InsertPeg",
+    "MoveCube",
+     "PatternLock",
+     "RouteStick",
  ]
 
 def _parse_oracle_command(choice_action: Optional[Any]) -> Optional[dict[str, Any]]:
@@ -283,7 +283,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--gpus",
         type=_parse_gpus,
-        default=[1],
+        default=[0],
         help="GPUs to use: '0' (GPU 0 only), '1' (GPU 1 only), '0,1' (both). Default: 0.",
     )
     return parser.parse_args()

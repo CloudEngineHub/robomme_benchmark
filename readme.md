@@ -25,9 +25,33 @@ uv run scripts/run_example.py --action-space-type joint_angle --task-id PickXtim
 
 This generates a rollout video in the `sample_run_videos` directory.
 
-We provide four action types: `joint_action`, `ee_pose`, `keypoint`, and `multi_choice`. Use `joint_action` or `ee_pose` for continuous action prediction, `keypoint` for discrete waypoint actions, and `multi_choice` for VideoQA-style evaluation.
+We provide four action types: `joint_action`, `ee_pose`, `keypoint`, and `multi_choice`, e.g. predict continuous actions with `joint_action` or `ee_pose`, discrete waypoint actions with `keypoint`, or use `multi_choice` for VideoQA-style data.
 
-## 🎯 Tasks
+> **Note:** Currenetly, only `joint_action` is verified. please use it rather than other types.
+
+## Datasets
+
+### Training data
+
+Training data can be downloaded [here](https://huggingface.co/Yinpei/data_0214). There are 1,600 demonstrations in total (100 per task). The HDF5 format is described in [doc/h5_data_format.md](doc/h5_data_format.md).
+
+> **Note:** Currenetly, the training data format is not finalized, and has difference from the doc.
+
+After downloading, replay the dataset for a sanity check:
+
+```bash
+uv run scripts/dataset_replay.py --h5-data-dir=<your_downloaded_data_dir>
+```
+
+You can also re-generate your own HDF5 data (see scripts in `scripts/dev/xxxx`).
+
+## Model Training
+
+The [MME-VLA-Suite](https://github.com/RoboMME/MME-VLA-Suite) repo provides VLA model training and evaluation. Please check it out.
+
+> **Note:** Currently, environment spawning is set up for imitation learning. We are working on extending it to support more general parallel environments for reinforcement learning.
+
+## Tasks
 
 We have four task suites, each with 4 tasks:
 
