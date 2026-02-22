@@ -1,10 +1,12 @@
 # RoboMME: A Robotic Benchmark for Memory-Augmented Manipulation
 
+Here
+
 ![Robomme bench](assets/robomme_bench.jpg)
 
 ## 📢 Announcements
 
-[02/2026] We release RoboMME! It's a cognitive-motivated large-scale robotic benchmark for memory-augmented manipulation, spanning 4 task suites with a total of 16 carefully designed tasks.
+[03/2026] We release RoboMME! It's a cognitive-motivated large-scale robotic benchmark for memory-augmented manipulation, spanning 4 task suites with a total of 16 carefully designed tasks.
 
 ## 📦 Installation
 
@@ -25,31 +27,7 @@ uv run scripts/run_example.py --action-space-type joint_angle --task-id PickXtim
 
 This generates a rollout video in the `sample_run_videos` directory.
 
-We provide four action types: `joint_action`, `ee_pose`, `keypoint`, and `multi_choice`, e.g. predict continuous actions with `joint_action` or `ee_pose`, discrete waypoint actions with `keypoint`, or use `multi_choice` for VideoQA-style data.
-
-> **Note:** Currenetly, only `joint_action` is verified. please use it rather than other types.
-
-## Datasets
-
-### Training data
-
-Training data can be downloaded [here](https://huggingface.co/Yinpei/data_0214). There are 1,600 demonstrations in total (100 per task). The HDF5 format is described in [doc/h5_data_format.md](doc/h5_data_format.md).
-
-> **Note:** Currenetly, the training data format is not finalized, and has difference from the doc.
-
-After downloading, replay the dataset for a sanity check:
-
-```bash
-uv run scripts/dataset_replay.py --h5-data-dir=<your_downloaded_data_dir>
-```
-
-You can also re-generate your own HDF5 data (see scripts in `scripts/dev/xxxx`).
-
-## Model Training
-
-The [MME-VLA-Suite](https://github.com/RoboMME/MME-VLA-Suite) repo provides VLA model training and evaluation. Please check it out.
-
-> **Note:** Currently, environment spawning is set up for imitation learning. We are working on extending it to support more general parallel environments for reinforcement learning.
+We provide four action types: `joint_action`, `ee_pose`, `waypoint`, and `multi_choice`, e.g. predict continuous actions with `joint_action` or `ee_pose`, discrete waypoint actions with `waypoint`, or use `multi_choice` for VideoQA-style problems.
 
 ## Tasks
 
@@ -68,7 +46,7 @@ All tasks are defined in `src/robomme/robomme_env`. You can play those tasks via
 
 ### 📥 Training Data
 
-Training data can be downloaded [here](https://huggingface.co/Yinpei/data_0214). There are 1,600 demonstrations in total (100 per task). The HDF5 format is described in [doc/h5_data_format.md](doc/h5_data_format.md).
+Training data can be downloaded [here](https://huggingface.co/datasets/Yinpei/robomme_data). There are 1,600 demonstrations in total (100 per task). The HDF5 format is described in [doc/h5_data_format.md](doc/h5_data_format.md).
 
 After downloading, replay the dataset for a sanity check:
 
@@ -103,6 +81,13 @@ uv run scripts/dev/xxxx
 The [MME Policy Learning](https://github.com/RoboMME/robomme_policy_learning) repo provides MME-VLA-Suite model training and evaluation. Please check it out.
 
 > **Note:** Currently, environment spawning is set up only for imitation learning. We are working on extending it to support more general parallel environments for reinforcement learning in the future.
+
+
+
+## TODO List
+[] Release data generation scripts
+[] Release point clound reconstruciton script
+[] 
 
 ## 🔧 Troubleshooting
 

@@ -13,7 +13,7 @@ from ..logging_utils import logger
 DATASET_ROOT = Path(__file__).resolve().parents[1] / "env_metadata"
 
 _ALLOWED_DATASETS = {"train", "test"}
-_ALLOWED_ACTION_SPACES = {"joint_angle", "ee_pose", "ee_quat", "keypoint", "multi_choice"}
+_ALLOWED_ACTION_SPACES = {"joint_angle", "ee_pose", "ee_quat", "waypoint", "multi_choice"}
 _DEFAULT_TASK_LIST = [
     "PickXtimes",
     "StopCube",
@@ -170,7 +170,7 @@ class BenchmarkEnvBuilder:
         return len(episode_set)
 
     def make_env_for_episode(self, episode_idx: int, max_steps: Optional[int] = None):
-        """Create and configure environment for specific episode. Wrap EndeffectorDemonstrationWrapper for action_space=ee_pose/ee_quat, MultiStepDemonstrationWrapper for keypoint, OraclePlannerDemonstrationWrapper for multi_choice."""
+        """Create and configure environment for specific episode. Wrap EndeffectorDemonstrationWrapper for action_space=ee_pose/ee_quat, MultiStepDemonstrationWrapper for waypoint, OraclePlannerDemonstrationWrapper for multi_choice."""
         from .DemonstrationWrapper import DemonstrationWrapper
 
         max_steps_without_demo = (
@@ -208,7 +208,7 @@ class BenchmarkEnvBuilder:
             from .EndeffectorDemonstrationWrapper import EndeffectorDemonstrationWrapper
 
             env = EndeffectorDemonstrationWrapper(env, action_repr="quat")
-        elif self.action_space == "keypoint":
+        elif self.action_space == "waypoint":
             from .MultiStepDemonstrationWrapper import MultiStepDemonstrationWrapper
 
             env = MultiStepDemonstrationWrapper(env, gui_render=self.gui_render, vis=self.gui_render)

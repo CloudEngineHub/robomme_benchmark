@@ -5,7 +5,7 @@ import numpy as np
 from .constant import (
     EE_POSE_ACTION_SPACE,
     JOINT_ACTION_SPACE,
-    KEYPOINT_ACTION_SPACE,
+    WAYPOINT_ACTION_SPACE,
     MULTI_CHOICE_ACTION_SPACE,
 )
 
@@ -55,7 +55,7 @@ def generate_sample_actions(
             base = _get_current_ee_action(env)
             yield _add_small_noise(base, noise_level=NOISE_LEVEL)
 
-    elif action_space == KEYPOINT_ACTION_SPACE:
+    elif action_space == WAYPOINT_ACTION_SPACE:
         # Read current EE pose + gripper; add small noise to xyz only, z-0.1
         while True:
             base = _get_current_ee_action(env)  # [x, y, z, r, p, y, gripper]

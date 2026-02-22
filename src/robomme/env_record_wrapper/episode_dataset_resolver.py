@@ -84,7 +84,7 @@ def _action_to_8d(raw_action) -> Optional[np.ndarray]:
 class EpisodeDatasetResolver:
     """
     Resolves per-timestep dataset content for one (env_id, episode) from h5.
-    Build non-demo / keypoint / oracle-command indexes at initialization and
+    Build non-demo / waypoint / oracle-command indexes at initialization and
     query via get_step(mode, step).
     """
 
@@ -135,7 +135,7 @@ class EpisodeDatasetResolver:
         self._timestep_indexes.sort()
         self._timestep_group_cache: Dict[int, h5py.Group] = {}
         self._non_demo_steps: List[int] = []
-        self._keypoint_steps: List[int] = []
+        self._waypoint_steps: List[int] = []
         # oracle_planner: indexed by serial_number and request order (step = request index)
         self._oracle_serials: List[int] = []
         self._oracle_commands_by_serial: Dict[int, Dict[str, Any]] = {}
@@ -212,16 +212,16 @@ class EpisodeDatasetResolver:
 
         return np.concatenate([pose, quat, [gripper]])
 
-    def _extract_keypoint_action(self, timestep_group: h5py.Group) -> Optional[np.ndarray]:
-        # New structure: action/keypoint_action (7D: pos(3)+rpy(3)+gripper(1))
+    def _extract_waypoint_action(self, timestep_group: h5py.Group) -> Optional[np.ndarray]:
+        # New structure: action/waypoint_action (7D: pos(3)+rpy(3)+gripper(1))
         action_grp = timestep_group.get("action")
         if action_grp is not None and isinstance(action_grp, h5py.Group):
             src = action_grp
         else:
             src = timestep_group
-        if "keypoint_action" not in src:
+        if "waypoint_action" not in src:
             return None
-        return np.asarray(src["keypoint_action"][()]).flatten()
+        return np.asarray(src["waypoint_action"][()]).flatten()
 
     @staticmethod
     def _decode_h5_string(value: Any) -> Optional[str]:
@@ -297,11 +297,11 @@ class EpisodeDatasetResolver:
                 continue
 
             self._non_demo_steps.append(record_step)
-            # is_keyframe: Determine if it is a keypoint refresh frame via info/is_keyframe flag
+            # is_keyframe: Determine if it is a waypoint refresh frame via info/is_keyframe flag
             info_grp = timestep_group.get("info")
             if info_grp is not None and "is_keyframe" in info_grp:
                 if _as_bool(info_grp["is_keyframe"][()]):
-                    self._keypoint_steps.append(record_step)
+                    self._waypoint_steps.append(record_step)
 
             command = self._extract_choice_action(timestep_group)
             if command is None:
@@ -318,7 +318,7 @@ class EpisodeDatasetResolver:
 
     def get_step(
         self,
-        mode: Literal["joint_angle", "ee_pose", "ee_quat", "keypoint", "oracle_planner"],
+        mode: Literal["joint_angle", "ee_pose", "ee_quat", "waypoint", "oracle_planner"],
         step: int,
     ) -> Optional[Union[np.ndarray, Dict[str, Any]]]:
         if step < 0:
@@ -341,9 +341,9 @@ class EpisodeDatasetResolver:
         elif mode == "ee_quat":
             selected_steps = self._non_demo_steps
             extractor = self._extract_ee_quat_gripper
-        elif mode == "keypoint":
-            selected_steps = self._keypoint_steps
-            extractor = self._extract_keypoint_action
+        elif mode == "waypoint":
+            selected_steps = self._waypoint_steps
+            extractor = self._extract_waypoint_action
         else:
             return None
 

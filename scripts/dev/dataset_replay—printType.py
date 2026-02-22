@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Script function: Unified dataset replay entry point, supporting 5 action spaces: joint_angle / ee_pose / ee_quat / keypoint / oracle_planner.
+# Script function: Unified dataset replay entry point, supporting 5 action spaces: joint_angle / ee_pose / ee_quat / waypoint / oracle_planner.
 # Consistent with subgoal_evaluate_func.py main loop; difference is actions come from EpisodeDatasetResolver.
 
 import os
@@ -19,7 +19,7 @@ from robomme.env_record_wrapper import (
 ACTION_SPACE = "joint_angle"
 #ACTION_SPACE = "ee_pose"
 #ACTION_SPACE = "ee_quat"
-#ACTION_SPACE = "keypoint"
+#ACTION_SPACE = "waypoint"
 #ACTION_SPACE = "oracle_planner"
 
 GUI_RENDER = False

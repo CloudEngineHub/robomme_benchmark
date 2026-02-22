@@ -30,7 +30,7 @@ TaskID = Literal[
     "MoveCube", "InsertPeg", "PatternLock", "RouteStick",
     "All",
 ]
-ActionSpaceType = Literal["joint_angle", "ee_pose", "keypoint", "multi_choice"]
+ActionSpaceType = Literal["joint_angle", "ee_pose", "waypoint", "multi_choice"]
 DatasetType = Literal["train", "test", "val"]
 
 
@@ -87,14 +87,12 @@ def _extract_frames(obs: dict, is_video_demo_fn=None) -> list[np.ndarray]:
     ]
 
 
-def _outcome_message(task_id: str, episode_idx: int, status: str) -> str:
-    return f"task_id: {task_id} episode: {episode_idx}: {status}"
 
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 def main(
-    action_space_type: ActionSpaceType = "multi_choice",
+    action_space_type: ActionSpaceType = "joint_angle",
     dataset: DatasetType = "test",
     task_id: TaskID = "PickXtimes",
     episode_idx: int = 0,
@@ -154,12 +152,12 @@ def main(
                     env.render()
                 if terminated or truncated:
                     status = info.get("status", "unknown")
-                    print(f"{_outcome_message(tid, ep, status)}")
+                    print(f"Outcome: {status}")
                     break
 
             env.close()
             path = _save_video(frames, tid, ep, action_space_type, task_goal)
-            print(f"Saved video: {path}")
+            print(f"Saved video: {path}\n")
 
 
 if __name__ == "__main__":

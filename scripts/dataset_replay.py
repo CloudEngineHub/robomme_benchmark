@@ -1,33 +1,25 @@
 """
 Replay episodes from HDF5 datasets and save rollout videos.
-
-Loads recorded joint actions from record_dataset_<Task>.h5, steps the environment,
-and writes side-by-side front/wrist camera videos to disk.
+Loads recorded actions from record_dataset_<Task>.h5, steps the environment
 """
 
 from pathlib import Path
-from typing import Any, Literal, Optional
+from typing import Literal
 
 import cv2
 import h5py
 import imageio
 import numpy as np
+import torch
 
-# --- Configuration ---
+from robomme.env_record_wrapper import BenchmarkEnvBuilder
+
 GUI_RENDER = False
 REPLAY_VIDEO_DIR = "replay_videos"
 VIDEO_FPS = 30
+VIDEO_BORDER_COLOR = (255, 0, 0)
+VIDEO_BORDER_THICKNESS = 10
 
-JOINT_ACTION_SPACE = "joint_angle"
-EE_POSE_ACTION_SPACE = "ee_pose"
-KEYPOINT_ACTION_SPACE = "keypoint"
-MULTI_CHOICE_ACTION_SPACE = "multi_choice"
-
-# Video frame annotation constants
-VIDEO_FRAME_BORDER_COLOR = (255, 0, 0)  # Blue border for video frames
-VIDEO_FRAME_BORDER_THICKNESS = 10
-
-# Type aliases
 TaskID = Literal[
     "BinFill",
     "PickXtimes",
@@ -47,39 +39,46 @@ TaskID = Literal[
     "RouteStick",
 ]
 
-ActionSpaceType = Literal["joint_angle", "ee_pose", "keypoint", "multi_choice"]
+ActionSpaceType = Literal["joint_angle", "ee_pose", "waypoint", "multi_choice"]
+
+def _to_numpy(t) -> np.ndarray:
+    return t.cpu().numpy() if isinstance(t, torch.Tensor) else np.asarray(t)
 
 
-def _frame_from_obs(obs: dict, is_video_frame: bool = False) -> np.ndarray:
-    front = obs["front_rgb_list"][0].cpu().numpy()
-    wrist = obs["wrist_rgb_list"][0].cpu().numpy()
-    frame = np.concatenate([front, wrist], axis=1).astype(np.uint8)
-
-    if is_video_frame:
-        height, width = frame.shape[:2]
-        frame = cv2.rectangle(
-            frame,
-            (0, 0),
-            (width, height),
-            VIDEO_FRAME_BORDER_COLOR,
-            VIDEO_FRAME_BORDER_THICKNESS,
-        )
-
+def _frame_from_obs(
+    front: np.ndarray | torch.Tensor,
+    wrist: np.ndarray | torch.Tensor,
+    is_video_demo: bool = False,
+) -> np.ndarray:
+    frame = np.hstack([_to_numpy(front), _to_numpy(wrist)]).astype(np.uint8)
+    if is_video_demo:
+        h, w = frame.shape[:2]
+        cv2.rectangle(frame, (0, 0), (w, h),
+                      VIDEO_BORDER_COLOR, VIDEO_BORDER_THICKNESS)
     return frame
 
 
-def _first_execution_step(episode_data: h5py.Group) -> int:
-    step_idx = 0
-    timestep_key = f"timestep_{step_idx}"
+def _extract_frames(obs: dict, is_video_demo_fn=None) -> list[np.ndarray]:
+    n = len(obs["front_rgb_list"])
+    return [
+        _frame_from_obs(
+            obs["front_rgb_list"][i],
+            obs["wrist_rgb_list"][i],
+            is_video_demo=(is_video_demo_fn(i) if is_video_demo_fn else False),
+        )
+        for i in range(n)
+    ]
 
-    while timestep_key in episode_data:
-        timestep_group = episode_data[timestep_key]
-        if "info" in timestep_group and "is_video_demo" in timestep_group["info"]:
-            if not timestep_group["info"]["is_video_demo"][()]:
+
+def _first_execution_step(episode_data: h5py.Group) -> int:
+    """Return the index of the first non-video-demo timestep."""
+    step_idx = 0
+    while f"timestep_{step_idx}" in episode_data:
+        ts = episode_data[f"timestep_{step_idx}"]
+        if "info" in ts and "is_video_demo" in ts["info"]:
+            if not ts["info"]["is_video_demo"][()]:
                 break
         step_idx += 1
-        timestep_key = f"timestep_{step_idx}"
-
     return step_idx
 
 
@@ -89,16 +88,17 @@ def _load_action_from_timestep(
     timestep_key = f"timestep_{step_idx}"
     action_group = episode_data[timestep_key]["action"]
 
-    if action_space_type == JOINT_ACTION_SPACE:
+    if action_space_type == "joint_angle":
         action_data = action_group["joint_action"][()]
-    elif action_space_type == EE_POSE_ACTION_SPACE:
+    elif action_space_type == "ee_pose":
         action_data = action_group["eef_action"][()]
-    elif action_space_type == KEYPOINT_ACTION_SPACE: # TODO: Hongze make this correct
+    elif action_space_type == "waypoint": 
+        # TODO: Hongze implement this
         raise NotImplementedError(
-            f"Keypoint action space type is not supported for dataset replay."
+            f"waypoint action space type is not supported for dataset replay."
         )
-    elif action_space_type == MULTI_CHOICE_ACTION_SPACE: 
-        # TODO: Hongze make this correct
+    elif action_space_type == "multi_choice": 
+        # TODO: Hongze implement this
         raise NotImplementedError(
             f"Multi-choice action space type is not supported for dataset replay."
         )
@@ -108,68 +108,20 @@ def _load_action_from_timestep(
     return np.asarray(action_data, dtype=np.float32)
 
 
-def _decode_h5_text(value: Any) -> str:
-    if value is None:
-        return ""
-    if isinstance(value, (bytes, np.bytes_)):
-        try:
-            return value.decode("utf-8")
-        except Exception:
-            return ""
-    if isinstance(value, str):
-        return value
-    return str(value)
-
-
-def _read_task_goal_list(setup_group: h5py.Group) -> list[str]:
-    if "task_goal" not in setup_group:
-        return ["", "test"]
-
-    raw = setup_group["task_goal"][()]
-    if isinstance(raw, np.ndarray):
-        if raw.ndim == 0:
-            values = [_decode_h5_text(raw.item())]
-        else:
-            values = [_decode_h5_text(item) for item in raw.reshape(-1)]
-    else:
-        values = [_decode_h5_text(raw)]
-
-    if len(values) == 0:
-        return ["", "test"]
-    if len(values) == 1:
-        return [values[0], "test"]
-    return [values[0], values[1]]
-
-
-def _determine_outcome(info: dict) -> str:
-    status = info.get("status", "")
-    if status == "success":
-        return "success"
-    elif status == "fail":
-        return "fail"
-    return "unknown"
-
-
 def _save_video(
     frames: list[np.ndarray],
     task_id: str,
     episode_idx: int,
-    task_goal_list: list[str],
+    task_goal: str,
     outcome: str,
     action_space_type: str,
 ) -> Path:
-    primary_goal = task_goal_list[0] if task_goal_list else ""
-    safe_goal = primary_goal.replace(" ", "_").replace("/", "_")
     video_dir = Path(REPLAY_VIDEO_DIR) / action_space_type
     video_dir.mkdir(parents=True, exist_ok=True)
-
-    video_name = (
-        f"{outcome}_{task_id}_ep{episode_idx}_{safe_goal}_step-{len(frames)}.mp4"
-    )
-    video_path = video_dir / video_name
-
-    imageio.mimsave(str(video_path), frames, fps=VIDEO_FPS)
-    return video_path
+    name = f"{outcome}_{task_id}_ep{episode_idx}_{task_goal}.mp4"
+    path = video_dir / name
+    imageio.mimsave(str(path), frames, fps=VIDEO_FPS)
+    return path
 
 
 def _get_episode_indices(data: h5py.File) -> list[int]:
@@ -184,143 +136,73 @@ def process_episode(
     env_data: h5py.File,
     episode_idx: int,
     task_id: str,
-    action_space_type: str,
+    action_space_type: ActionSpaceType,
 ) -> None:
-    """
-    Replay one episode from HDF5 data, record frames, and save a video.
-
-    Args:
-        env_data: Open HDF5 file containing episode data.
-        episode_idx: Index of the episode to replay.
-        task_id: Task identifier.
-        action_space_type: Type of action space (joint_angle, ee_pose, etc.).
-    """
-    episode_key = f"episode_{episode_idx}"
-    episode_data = env_data[episode_key]
-    task_goal_list = _read_task_goal_list(episode_data["setup"])
-
-    # Count total timesteps
-    total_steps = sum(
-        1 for k in episode_data.keys() if k.startswith("timestep_")
-    )
-
-    # Find first execution step (skip video demo steps)
+    """Replay one episode from HDF5 data, record frames, and save a video."""
+    episode_data = env_data[f"episode_{episode_idx}"]
+    task_goal = episode_data["setup"]["task_goal"][()][0].decode()
+    total_steps = sum(1 for k in episode_data.keys() if k.startswith("timestep_"))
     step_idx = _first_execution_step(episode_data)
-    print(f"Execution start step index: {step_idx}")
 
-    # Create and configure environment
-    from robomme.env_record_wrapper import BenchmarkEnvBuilder
 
-    env_builder = BenchmarkEnvBuilder(
+    env = BenchmarkEnvBuilder(
         env_id=task_id,
         dataset="train",
         action_space=action_space_type,
         gui_render=GUI_RENDER,
-    )
-    env = env_builder.make_env_for_episode(episode_idx)
-    print(
-        f"seed={env.unwrapped.seed}, "
-        f"difficulty={env.unwrapped.difficulty}"
-    )
-    print(
-        f"task_name: {task_id}, episode_idx: {episode_idx}, "
-        f"task_goal_list: {task_goal_list}"
-    )
+    ).make_env_for_episode(episode_idx)
+    
+    print(f"\nTask: {task_id}, Episode: {episode_idx}, ",
+          f"Seed: {env.unwrapped.seed}, Difficulty: {env.unwrapped.difficulty}")
+    print(f"Task goal: {task_goal}")
+    print(f"Execution starts at step {step_idx}")
 
-    # Reset environment and capture initial frames
+
     obs, _ = env.reset()
-    frames = []
-    n_obs = len(obs["front_rgb_list"])
+    frames = _extract_frames(
+        obs, is_video_demo_fn=lambda i, n=len(obs["front_rgb_list"]): i < n - 1
+    )
 
-    # Process initial observations (video frames + current frame)
-    # Last element is current frame, others are video demo frames
-    for i in range(n_obs):
-        single_obs = {k: [v[i]] for k, v in obs.items()}
-        is_video_frame = i < n_obs - 1
-        frames.append(_frame_from_obs(single_obs, is_video_frame=is_video_frame))
-
-    print(f"Initial frames (video + current): {len(frames)}")
-
-    # Replay episode steps
     outcome = "unknown"
     while step_idx < total_steps:
         action = _load_action_from_timestep(episode_data, step_idx, action_space_type)
-        obs, _, terminated, truncated, info = env.step(action)
-        frames.append(_frame_from_obs(obs))
+        try:
+            obs, _, terminated, truncated, info = env.step(action)
+            frames.extend(_extract_frames(obs))
+        except Exception as e:
+            print(f"Error at step {step_idx}: {e}")
+            break
 
         if GUI_RENDER:
             env.render()
-
         if terminated or truncated:
-            outcome = _determine_outcome(info)
+            outcome = info.get("status", "unknown")
+            print(f"Outcome: {outcome}")
             break
-
         step_idx += 1
 
     env.close()
-
-    # Save video
-    video_path = _save_video(
-        frames, task_id, episode_idx, task_goal_list, outcome, action_space_type
-    )
-    print(f"Saved video to {video_path}")
+    path = _save_video(frames, task_id, episode_idx, task_goal, outcome, action_space_type)
+    print(f"Saved video to {path}\n")
 
 
 def replay(
     h5_data_dir: str = "data/robomme_h5_data",
-    task_id: Optional[TaskID] = None,
     action_space_type: ActionSpaceType = "joint_angle",
-    replay_number: int = 100,
+    replay_number: int = 10,
 ) -> None:
-    """
-    Replay episodes from HDF5 dataset files and save rollout videos.
-
-    Args:
-        h5_data_dir: Directory containing HDF5 dataset files.
-        task_id: Specific task ID to replay. If None, replays all tasks.
-        action_space_type: Type of action space to use for replay.
-        replay_number: Maximum number of episodes to replay per task.
-
-    Raises:
-        ValueError: If task_id is invalid.
-    """
-    from robomme.env_record_wrapper import BenchmarkEnvBuilder
-
-    task_id_list = BenchmarkEnvBuilder.get_task_list()
-
-    if task_id is None:
-        replay_list = task_id_list
-    else:
-        if task_id not in task_id_list:
-            raise ValueError(
-                f"Invalid task_id: {task_id}. "
-                f"Allowed task_ids: {task_id_list}"
-            )
-        replay_list = [task_id]
-
-    h5_data_path = Path(h5_data_dir)
-
-    for current_task_id in replay_list:
-        file_name = f"record_dataset_{current_task_id}.h5"
-        file_path = h5_data_path / file_name
+    """Replay episodes from HDF5 dataset files and save rollout videos."""
+    for task_id in BenchmarkEnvBuilder.get_task_list():
+        file_path = Path(h5_data_dir) / f"record_dataset_{task_id}.h5"
 
         if not file_path.exists():
-            print(f"Skipping {current_task_id}: file not found: {file_path}")
+            print(f"Skipping {task_id}: file not found: {file_path}")
             continue
 
         with h5py.File(file_path, "r") as data:
             episode_indices = _get_episode_indices(data)
-            num_episodes = len(episode_indices)
-            num_to_replay = min(replay_number, num_episodes)
-
-            print(
-                f"Task: {current_task_id}, "
-                f"has {num_episodes} episodes, "
-                f"replaying {num_to_replay}"
-            )
-
-            for episode_idx in episode_indices[:num_to_replay]:
-                process_episode(data, episode_idx, current_task_id, action_space_type)
+            for episode_idx in episode_indices[:min(replay_number, len(episode_indices))]:
+                process_episode(data, episode_idx, task_id, action_space_type)
 
 
 if __name__ == "__main__":

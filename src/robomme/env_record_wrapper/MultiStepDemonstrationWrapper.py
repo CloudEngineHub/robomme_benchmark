@@ -1,7 +1,7 @@
 """
-MultiStepDemonstrationWrapper: Wraps DemonstrationWrapper to provide keypoint step interface.
+MultiStepDemonstrationWrapper: Wraps DemonstrationWrapper to provide waypoint step interface.
 
-Each step(action) receives action = keypoint_p(3) + rpy(3) + gripper_action(1), total 7 dimensions.
+Each step(action) receives action = waypoint_p(3) + rpy(3) + gripper_action(1), total 7 dimensions.
 Internally converts RPY to quat then calls move_to_pose_with_screw and close_gripper/open_gripper via planner_denseStep,
 where PatternLock/RouteStick will force skip close_gripper/open_gripper.
 Returns obs as dictionary-of-lists, and reward/terminated/truncated as the last step value.
@@ -23,7 +23,7 @@ class RRTPlanFailure(RuntimeError):
 class MultiStepDemonstrationWrapper(gym.Wrapper):
     """
     Wraps DemonstrationWrapper. step(action) interprets action as
-    (keypoint_p, rpy, gripper_action) total 7 dims, internally converts RPY to quat,
+    (waypoint_p, rpy, gripper_action) total 7 dims, internally converts RPY to quat,
     executes planning via planner_denseStep, and returns last-step signals.
     """
 
@@ -119,24 +119,24 @@ class MultiStepDemonstrationWrapper(gym.Wrapper):
         return self.env.step(action)
 
     def step(self, action):
-        """Execute keypoint step and return last-step signals for reward/terminated/truncated."""
+        """Execute waypoint step and return last-step signals for reward/terminated/truncated."""
         action = np.asarray(action, dtype=np.float64).flatten()
         if action.size < 7:
             raise ValueError(f"action must have at least 7 elements, got {action.size}")
-        keypoint_p = action[:3]
+        waypoint_p = action[:3]
         rpy = action[3:6]
         gripper_action = float(action[6])
 
         # RPY → quat (wxyz) for sapien.Pose
         rpy_t = torch.as_tensor(rpy, dtype=torch.float64)
-        keypoint_q = rpy_xyz_to_quat_wxyz_torch(rpy_t).numpy()
+        waypoint_q = rpy_xyz_to_quat_wxyz_torch(rpy_t).numpy()
 
-        pose = sapien.Pose(p=keypoint_p, q=keypoint_q)
+        pose = sapien.Pose(p=waypoint_p, q=waypoint_q)
         planner = self._get_planner()
         is_stick_env = self.env.unwrapped.spec.id in ("PatternLock", "RouteStick")
 
         current_p = self._current_tcp_p()
-        dist = np.linalg.norm(current_p - keypoint_p)
+        dist = np.linalg.norm(current_p - waypoint_p)
 
         collected_steps = []
         # if dist < 0.001:
