@@ -91,7 +91,7 @@ The [MME Policy Learning](https://github.com/RoboMME/robomme_policy_learning) re
 
 ### Prior Methods
 
-### MemER
+#### MemER
 The [MME Policy Learning](https://github.com/RoboMME/robomme_policy_learning) repo also provides our implementation of the [MemER](https://jen-pan.github.io/memer/), using the same GroundSG policy model as in MME-VLA.
 
 #### SAM2Act+
@@ -104,10 +104,10 @@ The [RoboMME_MemoryVLA](https://github.com/RoboMME/MemoryVLA) repo provides our 
 The [RoboMME_DP](https://github.com/RoboMME/DiffusionPolicy) repo provides our implementation adapt from the [diffusion_policy](https://github.com/real-stanford/diffusion_policy) repo.
 
 
-## TODO List
+<!-- ## TODO List
 [] Release data generation scripts.  
 [] Release point clound reconstruciton script.  
-[] Currently, environment spawning is set up only for imitation learning. We are working on extending it to support more general parallel environments for reinforcement learning in the future.
+[] Currently, environment spawning is set up only for imitation learning. We are working on extending it to support more general parallel environments for reinforcement learning in the future. -->
 
 ## 🔧 Troubleshooting
 
@@ -123,7 +123,6 @@ A2: We recommend reinstalling the NVIDIA driver and Vulkan packages. We use NVID
 os.environ['SAPIEN_RENDER_DEVICE'] = 'cpu'
 os.environ['MUJOCO_GL'] = 'osmesa'
 ```
-
 
 
 ## 🙏 Acknowledgements
