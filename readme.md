@@ -4,7 +4,7 @@
 
 ## 📢 Announcements
 
-[03/2026] We release RoboMME! It's a cognitively motivated large-scale robotic benchmark for memory-augmented manipulation, spanning 4 task suites with a total of 16 carefully designed tasks.
+[03/2026] We release RoboMME! It's a cognitively motivated large-scale robotic benchmark to accelerate research on memory-augmented manipulation, which spans 4 task suites with a total of 16 carefully designed tasks.
 
 ## 📦 Installation
 
