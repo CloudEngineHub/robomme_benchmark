@@ -41,7 +41,7 @@ def _get_current_ee_action(env) -> np.ndarray:
 
 
 def generate_sample_actions(
-    action_space: str, env=None, task_id: Optional[str] = None
+    action_space: str, env=None, task_id: Optional[str] = None,
 ) -> Generator[Union[np.ndarray, dict], None, None]:
     if action_space == JOINT_ACTION_SPACE:
         # Read current joint state from env and add small random noise
