@@ -1,13 +1,12 @@
-import gymnasium as gym
-from robomme.env_record_wrapper import BenchmarkEnvBuilder
 import torch
 import numpy
 import random
 import numpy as np
 import cv2
 import imageio
-from pathlib import Path
 
+from pathlib import Path
+from robomme.env_record_wrapper import BenchmarkEnvBuilder
 
 class VideoRecorder:
     BORDER_COLOR = (255, 0, 0)
@@ -82,7 +81,7 @@ for task in TASKS:
         env_id=task,
         dataset="test",
         action_space="joint_angle", # change this to your model's action space
-        max_steps=200,  # we set 1300 in MME-VLA experiments.
+        max_steps=1300,  # we set 1300 in MME-VLA experiments. The longest length of training data is @daiyp
     )
     episode_count = env_builder.get_episode_num()
     for episode in range(2):
@@ -121,16 +120,3 @@ for task in TASKS:
         
 print(f"Evaluation completed.")
 print(f"Success rate: {sum(total_success) / len(total_success)}")
-
-# Dummy action: [ 0.00794185  0.01176663 -0.01435326 -1.57236456 -0.02328843  1.56911124
-#   0.76289484  1.        ]
-# > /home/daiyp/robomme/scripts/evaluation.py(106)<module>()
-# -> try:
-# (Pdb) c
-# Dummy action: [ 0.00477016  0.00600014  0.0069691  -1.58864537 -0.00364304  1.55349539
-#   0.79881119  1.        ]
-# > /home/daiyp/robomme/scripts/evaluation.py(106)<module>()
-# -> try:
-# (Pdb) c
-# Dummy action: [-0.00686769 -0.02176615 -0.00639116 -1.55468599 -0.00505415  1.58649538
-#   0.8044798   1.        ]
