@@ -7,7 +7,8 @@ My cool model leverages a novel representation for history keyframes and maintai
 
 ## Results 
 
-> We ask for **at least three runs** with different model seeds to decrease the model fluctuations on RoboMME. Since the benchmark seed is fixed internally so no need to set the environment seed.  
+> We ask for **at least three runs** with different model seeds to decrease the performance fluctuations.
+> The benchmark seed is fixed internally.
 
 ### Table
 
