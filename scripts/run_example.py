@@ -127,7 +127,17 @@ def main(
 
         for ep in episodes:
             print(f"\nRunning task: {tid}, episode: {ep}, action_space: {action_space_type}, dataset: {dataset}")
-            env = env_builder.make_env_for_episode(ep)
+            env = env_builder.make_env_for_episode(
+                ep,
+                include_maniskill_obs=True,
+                include_front_depth=True,
+                include_wrist_depth=True,
+                include_front_camera_extrinsic=True,
+                include_wrist_camera_extrinsic=True,
+                include_available_multi_choices=True,
+                include_front_camera_intrinsic=True,
+                include_wrist_camera_intrinsic=True,
+            )
             obs, info = env.reset()
 
             task_goal = info["task_goal"]

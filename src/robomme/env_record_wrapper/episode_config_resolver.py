@@ -173,14 +173,14 @@ class BenchmarkEnvBuilder:
         self,
         episode_idx: int,
         max_steps: Optional[int] = None,
-        include_maniskill_obs: bool = True,
-        include_front_depth: bool = True,
-        include_wrist_depth: bool = True,
-        include_front_camera_extrinsic: bool = True,
-        include_wrist_camera_extrinsic: bool = True,
-        include_available_multi_choices: bool = True,
-        include_front_camera_intrinsic: bool = True,
-        include_wrist_camera_intrinsic: bool = True,
+        include_maniskill_obs: bool = False,
+        include_front_depth: bool = False,
+        include_wrist_depth: bool = False,
+        include_front_camera_extrinsic: bool = False,
+        include_wrist_camera_extrinsic: bool = False,
+        include_available_multi_choices: bool = False,
+        include_front_camera_intrinsic: bool = False,
+        include_wrist_camera_intrinsic: bool = False,
     ):
         """Create and configure environment for specific episode. Wrap EndeffectorDemonstrationWrapper for action_space=ee_pose/ee_quat, MultiStepDemonstrationWrapper for waypoint, OraclePlannerDemonstrationWrapper for multi_choice."""
         from .DemonstrationWrapper import DemonstrationWrapper

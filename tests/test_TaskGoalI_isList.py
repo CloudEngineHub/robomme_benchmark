@@ -57,6 +57,14 @@ def _make_env(env_id: str, action_space: str):
         env,
         max_steps_without_demonstration=10002,
         gui_render=False,
+        include_maniskill_obs=True,
+        include_front_depth=True,
+        include_wrist_depth=True,
+        include_front_camera_extrinsic=True,
+        include_wrist_camera_extrinsic=True,
+        include_available_multi_choices=True,
+        include_front_camera_intrinsic=True,
+        include_wrist_camera_intrinsic=True,
     )
 
     # 根据 action_space 应用额外的 Wrapper

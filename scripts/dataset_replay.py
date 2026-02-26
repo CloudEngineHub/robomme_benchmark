@@ -150,7 +150,17 @@ def process_episode(
         dataset="train",
         action_space=action_space_type,
         gui_render=GUI_RENDER,
-    ).make_env_for_episode(episode_idx)
+    ).make_env_for_episode(
+        episode_idx,
+        include_maniskill_obs=True,
+        include_front_depth=True,
+        include_wrist_depth=True,
+        include_front_camera_extrinsic=True,
+        include_wrist_camera_extrinsic=True,
+        include_available_multi_choices=True,
+        include_front_camera_intrinsic=True,
+        include_wrist_camera_intrinsic=True,
+    )
     
     print(f"\nTask: {task_id}, Episode: {episode_idx}, ",
           f"Seed: {env.unwrapped.seed}, Difficulty: {env.unwrapped.difficulty}")

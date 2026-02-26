@@ -74,14 +74,14 @@ class DemonstrationWrapper(gym.Wrapper):
     2. Record data such as frames, actions, states, subgoals during demonstration for downstream tasks.
     """
     def __init__(self, env, max_steps_without_demonstration, gui_render,
-                 include_maniskill_obs=True,
-                 include_front_depth=True,
-                 include_wrist_depth=True,
-                 include_front_camera_extrinsic=True,
-                 include_wrist_camera_extrinsic=True,
-                 include_available_multi_choices=True,
-                 include_front_camera_intrinsic=True,
-                 include_wrist_camera_intrinsic=True,
+                 include_maniskill_obs=False,
+                 include_front_depth=False,
+                 include_wrist_depth=False,
+                 include_front_camera_extrinsic=False,
+                 include_wrist_camera_extrinsic=False,
+                 include_available_multi_choices=False,
+                 include_front_camera_intrinsic=False,
+                 include_wrist_camera_intrinsic=False,
                  **kwargs):
         # **kwargs for compatibility with old calls (e.g. save_video=..., action_space=...), no longer used
         # Max steps without demonstration: truncate episode if demonstration task not executed exceeding this

@@ -67,7 +67,18 @@ def process_episode(
             action_space=EE_POSE_ACTION_SPACE,
             gui_render=gui_render,
         )
-        env = env_builder.make_env_for_episode(episode_idx, max_steps=MAX_STEPS)
+        env = env_builder.make_env_for_episode(
+            episode_idx,
+            max_steps=MAX_STEPS,
+            include_maniskill_obs=True,
+            include_front_depth=True,
+            include_wrist_depth=True,
+            include_front_camera_extrinsic=True,
+            include_wrist_camera_extrinsic=True,
+            include_available_multi_choices=True,
+            include_front_camera_intrinsic=True,
+            include_wrist_camera_intrinsic=True,
+        )
         print(f"[ep{episode_idx}] task: {env_id}, goal: {task_goal}")
 
         obs, info = env.reset()

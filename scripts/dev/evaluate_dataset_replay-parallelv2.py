@@ -111,7 +111,18 @@ def evaluate_episode(
     dataset_resolver = None
     
     try:
-        env = env_builder.make_env_for_episode(episode, max_steps=MAX_STEPS)
+        env = env_builder.make_env_for_episode(
+            episode,
+            max_steps=MAX_STEPS,
+            include_maniskill_obs=True,
+            include_front_depth=True,
+            include_wrist_depth=True,
+            include_front_camera_extrinsic=True,
+            include_wrist_camera_extrinsic=True,
+            include_available_multi_choices=True,
+            include_front_camera_intrinsic=True,
+            include_wrist_camera_intrinsic=True,
+        )
         dataset_resolver = EpisodeDatasetResolver(
             env_id=env_id,
             episode=episode,

@@ -219,7 +219,18 @@ def _verify_replay(env_id: str, dataset_dir: Path, h5_path: Path, is_stick: bool
     )
     
     # 绕过 resolver json 的 episode 限缩，直接通过 dataset resolver 本地文件搜索。
-    env = env_builder.make_env_for_episode(replay_episode, max_steps=1000)
+    env = env_builder.make_env_for_episode(
+        replay_episode,
+        max_steps=1000,
+        include_maniskill_obs=True,
+        include_front_depth=True,
+        include_wrist_depth=True,
+        include_front_camera_extrinsic=True,
+        include_wrist_camera_extrinsic=True,
+        include_available_multi_choices=True,
+        include_front_camera_intrinsic=True,
+        include_wrist_camera_intrinsic=True,
+    )
     
     # EpisodeDatasetResolver expects the file to be named `record_dataset_{env_id}.h5` 
     # and placed directly in `dataset_directory`. Let's copy the mapped file there.

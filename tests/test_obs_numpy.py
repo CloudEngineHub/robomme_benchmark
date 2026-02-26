@@ -170,7 +170,18 @@ def run_one_action_space(action_space: ActionSpaceType) -> None:
         action_space=action_space,
         gui_render=False,
     )
-    env = env_builder.make_env_for_episode(TEST_EPISODE, max_steps=MAX_STEPS_ENV)
+    env = env_builder.make_env_for_episode(
+        TEST_EPISODE,
+        max_steps=MAX_STEPS_ENV,
+        include_maniskill_obs=True,
+        include_front_depth=True,
+        include_wrist_depth=True,
+        include_front_camera_extrinsic=True,
+        include_wrist_camera_extrinsic=True,
+        include_available_multi_choices=True,
+        include_front_camera_intrinsic=True,
+        include_wrist_camera_intrinsic=True,
+    )
 
     dataset_resolver = EpisodeDatasetResolver(
         env_id=TEST_ENV_ID,

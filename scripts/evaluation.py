@@ -85,7 +85,17 @@ for task in TASKS:
     )
     episode_count = env_builder.get_episode_num()
     for episode in range(2):
-        env = env_builder.make_env_for_episode(episode)
+        env = env_builder.make_env_for_episode(
+            episode,
+            include_maniskill_obs=True,
+            include_front_depth=True,
+            include_wrist_depth=True,
+            include_front_camera_extrinsic=True,
+            include_wrist_camera_extrinsic=True,
+            include_available_multi_choices=True,
+            include_front_camera_intrinsic=True,
+            include_wrist_camera_intrinsic=True,
+        )
         obs, info = env.reset()
         task_goal = info["task_goal"]
         if isinstance(task_goal, list):

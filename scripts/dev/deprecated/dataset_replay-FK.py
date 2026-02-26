@@ -161,7 +161,18 @@ def process_episode(env_data: h5py.File, episode_idx: int, env_id: str) -> None:
         action_space=EE_POSE_ACTION_SPACE,
         gui_render=GUI_RENDER,
     )
-    env = env_builder.make_env_for_episode(episode_idx, max_steps=MAX_STEPS)
+    env = env_builder.make_env_for_episode(
+        episode_idx,
+        max_steps=MAX_STEPS,
+        include_maniskill_obs=True,
+        include_front_depth=True,
+        include_wrist_depth=True,
+        include_front_camera_extrinsic=True,
+        include_wrist_camera_extrinsic=True,
+        include_available_multi_choices=True,
+        include_front_camera_intrinsic=True,
+        include_wrist_camera_intrinsic=True,
+    )
     print(f"task: {env_id}, episode: {episode_idx}, goal: {task_goal}")
 
     obs, info = env.reset()
