@@ -24,7 +24,7 @@ ACTION_SPACE = "joint_angle"
 
 GUI_RENDER = False
 
-DATASET_ROOT = "/data/hongzefu/data_0217"
+DATASET_ROOT = "/data/hongzefu/data_0225"
 
 DEFAULT_ENV_IDS = [
     # "PickXtimes",
