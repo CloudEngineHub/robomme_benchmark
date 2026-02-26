@@ -108,9 +108,8 @@ class EpisodeDatasetResolver:
         self._timestep_group_cache: Dict[int, h5py.Group] = {}
         self._non_demo_steps: List[int] = []
         self._waypoint_steps: List[int] = []
-        # multi_choice: indexed by serial_number and request order (step = request index)
-        self._oracle_serials: List[int] = []
-        self._oracle_commands_by_serial: Dict[int, Dict[str, Any]] = {}
+        # multi_choice: ordered by timestep where info/is_keyframe=True
+        self._oracle_commands: List[Dict[str, Any]] = []
         self._build_indexes()
 
     def _get_timestep_group(self, record_step: int) -> Optional[h5py.Group]:
@@ -131,6 +130,12 @@ class EpisodeDatasetResolver:
         if info_grp is None or "is_video_demo" not in info_grp:
             return False
         return _as_bool(info_grp["is_video_demo"][()])
+
+    def _is_choice_keyframe_group(self, timestep_group: h5py.Group) -> bool:
+        info_grp = timestep_group.get("info")
+        if info_grp is None or "is_keyframe" not in info_grp:
+            return False
+        return _as_bool(info_grp["is_keyframe"][()])
 
     def _extract_joint_action(self, timestep_group: h5py.Group) -> Optional[np.ndarray]:
         action_grp = timestep_group.get("action")
@@ -239,17 +244,11 @@ class EpisodeDatasetResolver:
         if point is not None:
             command["point"] = point
 
-        serial_number = payload.get("serial_number")
-        if serial_number is not None:
-            try:
-                command["serial_number"] = int(serial_number)
-            except (TypeError, ValueError):
-                pass
         return command
 
     def _build_indexes(self) -> None:
-        # Collect oracle commands by serial_number (only timesteps with serial_number count)
-        oracle_by_serial: Dict[int, Dict[str, Any]] = {}
+        # Collect oracle commands in timestep order (only timesteps marked by info/is_keyframe)
+        oracle_commands: List[Dict[str, Any]] = []
         prev_waypoint_action: Optional[np.ndarray] = None
         for record_step in self._timestep_indexes:
             timestep_group = self._get_timestep_group(record_step)
@@ -268,18 +267,13 @@ class EpisodeDatasetResolver:
                     self._waypoint_steps.append(record_step)
                     prev_waypoint_action = waypoint_action.copy()
 
+            if not self._is_choice_keyframe_group(timestep_group):
+                continue
             command = self._extract_choice_action(timestep_group)
-            if command is None:
-                continue
-            serial = command.get("serial_number")
-            if serial is None:
-                continue
-            # First occurrence of this serial_number wins (deterministic order by timestep)
-            if serial not in oracle_by_serial:
-                oracle_by_serial[serial] = command
+            if command is not None:
+                oracle_commands.append(command)
 
-        self._oracle_serials = sorted(oracle_by_serial.keys())
-        self._oracle_commands_by_serial = oracle_by_serial
+        self._oracle_commands = oracle_commands
 
     def get_step(
         self,
@@ -290,12 +284,10 @@ class EpisodeDatasetResolver:
             return None
 
         if mode == "multi_choice":
-            # step = request index (0-based); each request maps to an increasing serial_number
-            if step >= len(self._oracle_serials):
+            if step >= len(self._oracle_commands):
                 return None
-            serial = self._oracle_serials[step]
-            command = self._oracle_commands_by_serial.get(serial)
-            return dict(command) if command is not None else None
+            command = self._oracle_commands[step]
+            return dict(command)
 
         if mode == "joint_angle":
             selected_steps = self._non_demo_steps

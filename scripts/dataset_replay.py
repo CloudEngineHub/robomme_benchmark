@@ -176,8 +176,8 @@ def replay(
     replay_number: int = 1,
 ) -> None:
     """Replay episodes from HDF5 dataset files and save rollout videos."""
-    for task_id in BenchmarkEnvBuilder.get_task_list():
-    #for task_id in ["VideoUnmaskSwap"]:
+    #for task_id in BenchmarkEnvBuilder.get_task_list():
+    for task_id in ["VideoUnmaskSwap"]:
         file_path = Path(h5_data_dir) / f"record_dataset_{task_id}.h5"
 
         if not file_path.exists():

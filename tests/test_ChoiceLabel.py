@@ -64,14 +64,13 @@ def test_episode_dataset_resolver_extracts_label_command_and_ignores_empty_label
                 {
                     "label": "b",
                     "point": [12, 34],  # stored as [y, x]
-                    "serial_number": 0,
                 }
             ),
             dtype=h5py.string_dtype(encoding="utf-8"),
         )
         ts0_info = ts0.create_group("info")
         ts0_info.create_dataset("is_video_demo", data=False)
-        ts0_info.create_dataset("is_keyframe", data=False)
+        ts0_info.create_dataset("is_keyframe", data=True)
 
         ts1 = episode_group.create_group("timestep_1")
         ts1_action = ts1.create_group("action")
@@ -81,14 +80,13 @@ def test_episode_dataset_resolver_extracts_label_command_and_ignores_empty_label
                 {
                     "label": "",
                     "point": [20, 30],
-                    "serial_number": 1,
                 }
             ),
             dtype=h5py.string_dtype(encoding="utf-8"),
         )
         ts1_info = ts1.create_group("info")
         ts1_info.create_dataset("is_video_demo", data=False)
-        ts1_info.create_dataset("is_keyframe", data=False)
+        ts1_info.create_dataset("is_keyframe", data=True)
 
     resolver = resolver_mod.EpisodeDatasetResolver(
         env_id="DummyEnv",
@@ -97,7 +95,7 @@ def test_episode_dataset_resolver_extracts_label_command_and_ignores_empty_label
     )
     try:
         command0 = resolver.get_step("multi_choice", 0)
-        assert command0 == {"label": "b", "point": [34, 12], "serial_number": 0}
+        assert command0 == {"label": "b", "point": [34, 12]}
 
         command1 = resolver.get_step("multi_choice", 1)
         assert command1 is None

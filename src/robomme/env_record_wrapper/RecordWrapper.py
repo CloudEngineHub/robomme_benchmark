@@ -42,6 +42,7 @@ from ..robomme_env.utils.segmentation_utils import (
 )
 from ..robomme_env.utils.rpy_util import build_endeffector_pose_dict
 from ..robomme_env.utils.oracle_action_matcher import map_action_text_to_option_label
+from .waypoint_backfill import backfill_waypoint_actions_in_buffer
 
 from ..logging_utils import logger
 
@@ -717,94 +718,6 @@ class RobommeRecordWrapper(gym.Wrapper):
         env_unwrapped._pending_waypoint = None
         return True
 
-    def _backfill_waypoint_actions_in_buffer(self) -> None:
-        # Backfill waypoint_action in buffer before close():
-        # 1. Steps [0, k0]: filled with k0's waypoint_action (first keyframe)
-        # 2. Steps (k_prev, k_curr]: filled with k_curr's waypoint_action (between adjacent keyframes)
-        # 3. Steps (k_last, end]: filled with k_last's waypoint_action (after last keyframe)
-        # Also handles the single-keyframe case (len == 1) by filling the entire buffer.
-        if not self.buffer:
-            return
-
-        def _as_bool_flag(value) -> bool:
-            if isinstance(value, torch.Tensor):
-                if value.numel() == 0:
-                    return False
-                return bool(value.detach().cpu().bool().any().item())
-            if isinstance(value, np.ndarray):
-                if value.size == 0:
-                    return False
-                return bool(np.asarray(value).astype(bool).any())
-            return bool(value)
-
-        def _validate_waypoint_action(kf_idx):
-            """Validate and return the 7D waypoint_action for a keyframe index, or None."""
-            kf_action = self.buffer[kf_idx].get("action", {})
-            kp = kf_action.get("waypoint_action", None)
-            if kp is None:
-                logger.debug(
-                    f"Warning: keyframe {kf_idx} has None waypoint_action, skip backfill"
-                )
-                return None
-            target_kp = np.asarray(kp).flatten()
-            if target_kp.size != 7:
-                logger.debug(
-                    f"Warning: keyframe {kf_idx} waypoint_action shape invalid {target_kp.shape}, "
-                    f"skip backfill"
-                )
-                return None
-            if not np.isfinite(target_kp).all():
-                logger.debug(
-                    f"Warning: keyframe {kf_idx} waypoint_action has non-finite values, "
-                    f"skip backfill"
-                )
-                return None
-            return target_kp
-
-        def _fill_range(start, end_exclusive, target_kp):
-            """Fill buffer[start:end_exclusive] with target_kp."""
-            for fill_idx in range(start, end_exclusive):
-                fill_action = self.buffer[fill_idx].setdefault("action", {})
-                fill_action["waypoint_action"] = target_kp.copy()
-
-        keyframe_indices = []
-        for idx, record_data in enumerate(self.buffer):
-            info_data = record_data.get("info", {})
-            if _as_bool_flag(info_data.get("is_keyframe", False)):
-                keyframe_indices.append(idx)
-
-        if len(keyframe_indices) == 0:
-            return
-
-        # --- Handle single keyframe: fill entire buffer with its action ---
-        if len(keyframe_indices) == 1:
-            kf_idx = keyframe_indices[0]
-            target_kp = _validate_waypoint_action(kf_idx)
-            if target_kp is not None:
-                _fill_range(0, len(self.buffer), target_kp)
-            return
-
-        # --- Multiple keyframes ---
-
-        # 1. Fill [0, k0] with k0's waypoint_action (leading steps before/including first keyframe)
-        first_kf = keyframe_indices[0]
-        first_kp = _validate_waypoint_action(first_kf)
-        if first_kp is not None:
-            _fill_range(0, first_kf + 1, first_kp)
-
-        # 2. Fill (k_prev, k_curr] intervals between adjacent keyframes
-        for prev_idx, curr_idx in zip(keyframe_indices, keyframe_indices[1:]):
-            target_kp = _validate_waypoint_action(curr_idx)
-            if target_kp is None:
-                continue
-            _fill_range(prev_idx + 1, curr_idx + 1, target_kp)
-
-        # 3. Fill (k_last, end] with last keyframe's waypoint_action (trailing steps)
-        last_kf = keyframe_indices[-1]
-        last_kp = _validate_waypoint_action(last_kf)
-        if last_kp is not None and last_kf + 1 < len(self.buffer):
-            _fill_range(last_kf + 1, len(self.buffer), last_kp)
-
     def step(self, action):
         self.no_object_flag=False
         obs, reward, terminated, truncated, info = super().step(action)
@@ -845,6 +758,7 @@ class RobommeRecordWrapper(gym.Wrapper):
         # Detect non-online subgoal switch via task_index (integer comparison).
         # This correctly handles consecutive tasks with identical subgoal_segment strings.
         _cur_task_index = getattr(self.unwrapped, 'current_task_index', -1)
+        choice_action_keyframe = False
         if _cur_task_index != self._prev_task_index:
             self._current_choice_action_text = getattr(
                 self.unwrapped, "current_choice_label", ""
@@ -854,6 +768,7 @@ class RobommeRecordWrapper(gym.Wrapper):
                 _cur_task_index,
             )
             self._prev_task_index = _cur_task_index
+            choice_action_keyframe = True
             self.previous_subgoal_segment = segmentation_output["updated_previous_subgoal_segment"]
         self.segmentation_points = segmentation_output["segmentation_points"]
         self.current_subgoal_segment_filled = segmentation_output[
@@ -933,7 +848,7 @@ class RobommeRecordWrapper(gym.Wrapper):
             # Process waypoint info: Read pending waypoint from env (refresh cache if exists)
             # Convert to 7D waypoint_action: [position(3), rpy(3), gripper(1)]
             # Cache by "current latest waypoint" here; finally do backward fill post-processing before close().
-            is_keyframe = self._consume_pending_waypoint()
+            self._consume_pending_waypoint()
 
             eef_pose_dict, self._prev_ee_quat_wxyz, self._prev_ee_rpy_xyz = build_endeffector_pose_dict(
                 self.agent.tcp.pose.p,
@@ -1022,7 +937,6 @@ class RobommeRecordWrapper(gym.Wrapper):
                     'choice_action': json.dumps({
                         "label": self._current_choice_label,
                         "point": list(self.segmentation_points[0]) if self.segmentation_points else [],
-                        "serial_number": _cur_task_index,
                     }),
                 },
                 'info': {
@@ -1031,7 +945,7 @@ class RobommeRecordWrapper(gym.Wrapper):
                     'grounded_subgoal': self.current_subgoal_segment_filled,
                     'grounded_subgoal_online': self.current_subgoal_segment_online_filled,
                     'is_video_demo': self.current_task_demonstration if hasattr(self, 'current_task_demonstration') else False,
-                    'is_keyframe': is_keyframe,
+                    'is_keyframe': choice_action_keyframe,
                 },
                 '_setup_camera_intrinsics': {
                     'front_camera_intrinsic': base_camera_intrinsic,
@@ -1118,12 +1032,13 @@ class RobommeRecordWrapper(gym.Wrapper):
                 last_record.setdefault("action", {})["waypoint_action"] = (
                     self._current_waypoint_action.copy()
                 )
-                last_record.setdefault("info", {})["is_keyframe"] = True
-                logger.debug("Consumed trailing _pending_waypoint in close(), "
-                      f"marked buffer[-1] (timestep {len(self.buffer) - 1}) as keyframe.")
+                logger.debug(
+                    "Consumed trailing _pending_waypoint in close(), "
+                    f"updated buffer[-1] waypoint_action (timestep {len(self.buffer) - 1})."
+                )
 
             # waypoint_action backfill handled uniformly before writing to disk, avoiding changing real-time logic during step().
-            self._backfill_waypoint_actions_in_buffer()
+            backfill_waypoint_actions_in_buffer(self.buffer)
 
             # HDF5 hierarchy: episode_xxx / timestep_xxx, convenient for retrieval by environment and round
             # env_group_name = f"env_{self.env_id}"
