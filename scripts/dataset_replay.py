@@ -221,7 +221,7 @@ def process_episode(
 
 def replay(
     h5_data_dir: str = "/data/hongzefu/data_0225",
-    action_space_type: ActionSpaceType = "multi_choice",
+    action_space_type: ActionSpaceType = "waypoint",
     replay_number: int = 1,
 ) -> None:
     """Replay episodes from HDF5 dataset files and save rollout videos."""

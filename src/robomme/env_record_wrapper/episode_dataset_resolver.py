@@ -25,25 +25,16 @@ def _resolve_h5_path(env_id: str, dataset_directory: Union[str, Path]) -> Path:
 def list_episode_indices(env_id: str, dataset_directory: Union[str, Path]) -> List[int]:
     """
     Open h5 at dataset_directory (full path to .h5) or dataset_directory/record_dataset_{env_id}.h5,
-    read episode_{N} keys from root (or env_{env_id} for backward compatibility), 
-    return sorted episode numbers. Raises if file missing.
+    read episode_{N} keys from root, return sorted episode numbers. Raises if file missing.
     """
     h5_path = _resolve_h5_path(env_id, dataset_directory)
     if not h5_path.exists():
         raise FileNotFoundError(f"H5 file not found: {h5_path}")
     
     with h5py.File(h5_path, "r") as h5:
-        # Check for env_{env_id} group (legacy format)
-        env_group_key = f"env_{env_id}"
-        if env_group_key in h5:
-            source_group = h5[env_group_key]
-        else:
-            # Assume root level episodes (new format)
-            source_group = h5
-
         indices = sorted(
             int(k.split("_")[1])
-            for k in source_group.keys()
+            for k in h5.keys()
             if k.startswith("episode_") and re.match(r"episode_\d+", k)
         )
     return indices
@@ -102,37 +93,18 @@ class EpisodeDatasetResolver:
             raise FileNotFoundError(f"H5 file not found: {self._h5_path}")
         self._h5 = h5py.File(self._h5_path, "r")
         
-        # Try finding episode group in root (new format) or env_ group (old format)
         episode_key = f"episode_{episode}"
-        env_group_key = f"env_{env_id}"
-        
-        if episode_key in self._h5:
-             self._episode_group = self._h5[episode_key]
-        elif env_group_key in self._h5:
-            env_group = self._h5[env_group_key]
-            if episode_key not in env_group:
-                self._h5.close()
-                raise KeyError(f"H5 missing group '{episode_key}' in '{env_group_key}' of {self._h5_path}")
-            self._episode_group = env_group[episode_key]
-        else:
+        if episode_key not in self._h5:
             self._h5.close()
-            raise KeyError(f"H5 missing group '{episode_key}' (checked root and '{env_group_key}') in {self._h5_path}")
+            raise KeyError(f"H5 missing group '{episode_key}' in {self._h5_path}")
+        self._episode_group = self._h5[episode_key]
 
-        # Support both 'timestep_N' (new) and 'record_timestep_N' (old)
-        self._timestep_indexes = []
-        for k in self._episode_group.keys():
-            # Check for new format "timestep_N"
-            m_new = re.match(r"timestep_(\d+)$", k)
-            if m_new:
-                self._timestep_indexes.append(int(m_new.group(1)))
-                continue
-            
-            # Check for old format "record_timestep_N"
-            m_old = re.match(r"record_timestep_(\d+)$", k)
-            if m_old:
-                self._timestep_indexes.append(int(m_old.group(1)))
-        
-        self._timestep_indexes.sort()
+        self._timestep_indexes = sorted(
+            int(m.group(1))
+            for k in self._episode_group.keys()
+            for m in [re.match(r"timestep_(\d+)$", k)]
+            if m
+        )
         self._timestep_group_cache: Dict[int, h5py.Group] = {}
         self._non_demo_steps: List[int] = []
         self._waypoint_steps: List[int] = []
@@ -145,13 +117,9 @@ class EpisodeDatasetResolver:
         if record_step in self._timestep_group_cache:
             return self._timestep_group_cache[record_step]
         
-        # Try new format first
         key = f"timestep_{record_step}"
         if key not in self._episode_group:
-            # Fallback to old format
-            key = f"record_timestep_{record_step}"
-            if key not in self._episode_group:
-                return None
+            return None
                 
         timestep_group = self._episode_group[key]
         self._timestep_group_cache[record_step] = timestep_group
@@ -165,15 +133,10 @@ class EpisodeDatasetResolver:
         return _as_bool(info_grp["is_video_demo"][()])
 
     def _extract_joint_action(self, timestep_group: h5py.Group) -> Optional[np.ndarray]:
-        # New structure: action/joint_action; compatible with old structure: action (direct dataset)
         action_grp = timestep_group.get("action")
-        if action_grp is not None and isinstance(action_grp, h5py.Group) and "joint_action" in action_grp:
-            raw_action = action_grp["joint_action"][()]
-        elif "action" in timestep_group:
-            raw_action = timestep_group["action"][()]
-        else:
-            raw_action = None
-        return _action_to_8d(raw_action)
+        if action_grp is None or not isinstance(action_grp, h5py.Group) or "joint_action" not in action_grp:
+            return None
+        return _action_to_8d(action_grp["joint_action"][()])
 
     def _extract_ee_pose_gripper(self, timestep_group: h5py.Group) -> Optional[np.ndarray]:
         # Directly read action/eef_action 7-dim dataset [pose(3), rpy(3), gripper(1)]
@@ -213,15 +176,11 @@ class EpisodeDatasetResolver:
         return np.concatenate([pose, quat, [gripper]])
 
     def _extract_waypoint_action(self, timestep_group: h5py.Group) -> Optional[np.ndarray]:
-        # New structure: action/waypoint_action (7D: pos(3)+rpy(3)+gripper(1))
+        # action/waypoint_action (7D: pos(3)+rpy(3)+gripper(1))
         action_grp = timestep_group.get("action")
-        if action_grp is not None and isinstance(action_grp, h5py.Group):
-            src = action_grp
-        else:
-            src = timestep_group
-        if "waypoint_action" not in src:
+        if action_grp is None or not isinstance(action_grp, h5py.Group) or "waypoint_action" not in action_grp:
             return None
-        return np.asarray(src["waypoint_action"][()]).flatten()
+        return np.asarray(action_grp["waypoint_action"][()]).flatten()
 
     @staticmethod
     def _decode_h5_string(value: Any) -> Optional[str]:
