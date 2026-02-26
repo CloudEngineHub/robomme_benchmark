@@ -7,7 +7,7 @@ test_TaskGoalIsList.py
 全部 16 个 env 均覆盖。
 
 运行：
-    uv run python -m pytest tests/test_TaskGoalIsList.py -v -s
+    uv run python -m pytest tests/lightweight/test_TaskGoalI_isList.py -v -s
 """
 
 import gymnasium as gym
@@ -18,6 +18,8 @@ from robomme.env_record_wrapper.DemonstrationWrapper import DemonstrationWrapper
 from robomme.env_record_wrapper.EndeffectorDemonstrationWrapper import EndeffectorDemonstrationWrapper
 from robomme.env_record_wrapper.MultiStepDemonstrationWrapper import MultiStepDemonstrationWrapper
 from robomme.env_record_wrapper.OraclePlannerDemonstrationWrapper import OraclePlannerDemonstrationWrapper
+
+pytestmark = [pytest.mark.slow, pytest.mark.gpu]
 
 # ── 全部 16 个 env_id ──────────────────────────────────────────────────────────
 ALL_ENV_IDS = [
@@ -113,4 +115,3 @@ def test_task_goal_is_list(env_id: str, action_space: str):
         assert isinstance(item, str), (
             f"[{env_id} | {action_space}] task_goal[{i}] 应为 str，实际为 {type(item).__name__!r}: {item!r}"
         )
-

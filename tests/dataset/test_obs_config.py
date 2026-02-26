@@ -13,18 +13,22 @@ Tests:
 
 Run with:
     cd /data/hongzefu/robomme_benchmark
-    uv run python tests/test_obs_config.py
+    uv run python -m pytest tests/dataset/test_obs_config.py -v -s
 """
 from __future__ import annotations
 
 import sys
-import traceback
 from pathlib import Path
 from typing import Any
 
 import numpy as np
+import pytest
 
-_PROJECT_ROOT = Path(__file__).resolve().parents[1]
+from tests._shared.repo_paths import find_repo_root
+
+pytestmark = pytest.mark.dataset
+
+_PROJECT_ROOT = find_repo_root(__file__)
 sys.path.insert(0, str(_PROJECT_ROOT / "src"))
 
 from robomme.robomme_env import *  # noqa: F401,F403
@@ -34,7 +38,6 @@ from robomme.env_record_wrapper import BenchmarkEnvBuilder, EpisodeDatasetResolv
 # ──────────────────────────────────────────────────────────────────────────────
 # Config
 # ──────────────────────────────────────────────────────────────────────────────
-DATASET_ROOT = "/data/hongzefu/data_0225"
 TEST_ENV_ID = "VideoUnmaskSwap"
 TEST_EPISODE = 0
 MAX_STEPS_ENV = 1000
@@ -139,14 +142,14 @@ def _check_optional_absent(obs, info, tag):
 # Test cases
 # ──────────────────────────────────────────────────────────────────────────────
 
-def test_all_included():
+def test_all_included(video_unmaskswap_train_ep0_dataset):
     """Default: all flags True -> all 8 optional fields present."""
     print("\n[TEST 1] All flags True (default behavior)")
     env = _make_env()  # all True by default
     resolver = EpisodeDatasetResolver(
         env_id=TEST_ENV_ID,
         episode=TEST_EPISODE,
-        dataset_directory=DATASET_ROOT,
+        dataset_directory=str(video_unmaskswap_train_ep0_dataset.resolver_dataset_dir),
     )
     try:
         obs, info = env.reset()
@@ -207,7 +210,7 @@ def _check_optional_dtypes(obs, info, tag):
         )
 
 
-def test_all_excluded():
+def test_all_excluded(video_unmaskswap_train_ep0_dataset):
     """All flags False -> none of the 8 optional fields present; always-present fields still there."""
     print("\n[TEST 2] All flags False")
     env = _make_env(
@@ -223,7 +226,7 @@ def test_all_excluded():
     resolver = EpisodeDatasetResolver(
         env_id=TEST_ENV_ID,
         episode=TEST_EPISODE,
-        dataset_directory=DATASET_ROOT,
+        dataset_directory=str(video_unmaskswap_train_ep0_dataset.resolver_dataset_dir),
     )
     try:
         obs, info = env.reset()
@@ -242,7 +245,7 @@ def test_all_excluded():
     print("  [TEST 2] PASS")
 
 
-def test_selective_front_depth_only():
+def test_selective_front_depth_only(video_unmaskswap_train_ep0_dataset):
     """Only front_depth enabled; others disabled."""
     print("\n[TEST 3] Only include_front_depth=True, others False")
     env = _make_env(
@@ -258,7 +261,7 @@ def test_selective_front_depth_only():
     resolver = EpisodeDatasetResolver(
         env_id=TEST_ENV_ID,
         episode=TEST_EPISODE,
-        dataset_directory=DATASET_ROOT,
+        dataset_directory=str(video_unmaskswap_train_ep0_dataset.resolver_dataset_dir),
     )
     try:
         obs, info = env.reset()
@@ -328,38 +331,9 @@ TESTS = [
 
 
 def main():
-    all_pass = True
-    results = []
-
-    for name, fn in TESTS:
-        try:
-            fn()
-            results.append((name, "PASS", ""))
-        except AssertionError as exc:
-            results.append((name, "FAIL", str(exc)))
-            all_pass = False
-            print(f"\n  [ASSERTION FAILED] {exc}")
-            traceback.print_exc()
-        except Exception as exc:
-            results.append((name, "ERROR", str(exc)))
-            all_pass = False
-            print(f"\n  [ERROR] {exc}")
-            traceback.print_exc()
-
-    print(f"\n{'='*60}")
-    print("Test Results")
-    print(f"{'='*60}")
-    for name, status, msg in results:
-        marker = "✓" if status == "PASS" else "✗"
-        suffix = f"  ({msg[:80]})" if msg else ""
-        print(f"  {marker} [{status}] {name}{suffix}")
-
-    if all_pass:
-        print("\n✓ ALL TESTS PASSED")
-        sys.exit(0)
-    else:
-        print("\n✗ SOME TESTS FAILED")
-        sys.exit(1)
+    print("test_obs_config main() now relies on pytest fixture-generated dataset.")
+    print("Run with: uv run python -m pytest tests/dataset/test_obs_config.py -v -s")
+    sys.exit(2)
 
 
 if __name__ == "__main__":

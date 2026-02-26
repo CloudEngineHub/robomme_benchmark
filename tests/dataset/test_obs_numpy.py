@@ -2,7 +2,7 @@
 """
 test_obs_numpy.py
 ===================
-集成测试：直接调用真实环境 + /data/hongzefu/data_0225 数据集，
+集成测试：直接调用真实环境 + 测试运行时统一生成的临时 dataset，
 测试 DemonstrationWrapper._augment_obs_and_info 内部原生的类型转换
 在四种 ActionSpace 下对 obs / info 字段的输出类型和形状是否正确。
 
@@ -15,20 +15,23 @@ test_obs_numpy.py
 
 运行方式（必须用 uv）：
     cd /data/hongzefu/robomme_benchmark
-    uv run python tests/test_obs_numpy.py
+    uv run python -m pytest tests/dataset/test_obs_numpy.py -v -s
 """
 from __future__ import annotations
 
-import copy
 import sys
-import traceback
 from pathlib import Path
 from typing import Any, Literal, Optional
 
 import numpy as np
+import pytest
+
+from tests._shared.repo_paths import find_repo_root
 
 # 确保 src 路径可被找到
-_PROJECT_ROOT = Path(__file__).resolve().parents[1]
+pytestmark = pytest.mark.dataset
+
+_PROJECT_ROOT = find_repo_root(__file__)
 sys.path.insert(0, str(_PROJECT_ROOT / "src"))
 
 from robomme.robomme_env import *  # noqa: F401,F403  注册所有自定义环境
@@ -38,7 +41,6 @@ from robomme.env_record_wrapper import BenchmarkEnvBuilder, EpisodeDatasetResolv
 # ──────────────────────────────────────────────────────────────────────────────
 # 配置
 # ──────────────────────────────────────────────────────────────────────────────
-DATASET_ROOT = "/data/hongzefu/data_0225"
 TEST_ENV_ID = "VideoUnmaskSwap"
 TEST_EPISODE = 0
 MAX_STEPS_PER_ACTION_SPACE = 3   # 每种 ActionSpace 最多验证的 step 数
@@ -156,7 +158,7 @@ def _parse_oracle_command(choice_action: Optional[Any]) -> Optional[dict]:
     return choice_action
 
 
-def run_one_action_space(action_space: ActionSpaceType) -> None:
+def run_one_action_space(action_space: ActionSpaceType, dataset_root: str | Path) -> None:
     print(f"\n{'='*60}")
     print(f"[TEST] ActionSpace = {action_space}")
     print(f"{'='*60}")
@@ -186,7 +188,7 @@ def run_one_action_space(action_space: ActionSpaceType) -> None:
     dataset_resolver = EpisodeDatasetResolver(
         env_id=TEST_ENV_ID,
         episode=TEST_EPISODE,
-        dataset_directory=DATASET_ROOT,
+        dataset_directory=str(dataset_root),
     )
 
     # ── RESET ──────────────────────────────────────────────────────────────
@@ -238,39 +240,15 @@ ACTION_SPACES: list[ActionSpaceType] = [
 ]
 
 
+@pytest.mark.parametrize("action_space", ACTION_SPACES)
+def test_obs_numpy_action_space(action_space: ActionSpaceType, video_unmaskswap_train_ep0_dataset) -> None:
+    run_one_action_space(action_space, video_unmaskswap_train_ep0_dataset.resolver_dataset_dir)
+
+
 def main() -> None:
-    all_pass = True
-    results: list[tuple[str, str, str]] = []
-
-    for action_space in ACTION_SPACES:
-        try:
-            run_one_action_space(action_space)
-            results.append((action_space, "PASS", ""))
-        except AssertionError as exc:
-            results.append((action_space, "FAIL", str(exc)))
-            all_pass = False
-            print(f"\n  [断言失败] {exc}")
-            traceback.print_exc()
-        except Exception as exc:
-            results.append((action_space, "ERROR", str(exc)))
-            all_pass = False
-            print(f"\n  [异常] {exc}")
-            traceback.print_exc()
-
-    print(f"\n{'='*60}")
-    print("测试结果汇总")
-    print(f"{'='*60}")
-    for action_space, status, msg in results:
-        marker = "✓" if status == "PASS" else "✗"
-        suffix = f"  ({msg})" if msg else ""
-        print(f"  {marker} [{status}] {action_space}{suffix}")
-
-    if all_pass:
-        print("\n✓ ALL ASSERTIONS PASSED")
-        sys.exit(0)
-    else:
-        print("\n✗ SOME ASSERTIONS FAILED")
-        sys.exit(1)
+    print("test_obs_numpy main() now relies on pytest fixture-generated dataset.")
+    print("Run with: uv run python -m pytest tests/dataset/test_obs_numpy.py -v -s")
+    sys.exit(2)
 
 
 if __name__ == "__main__":

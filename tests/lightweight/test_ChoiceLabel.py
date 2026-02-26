@@ -4,9 +4,11 @@ from pathlib import Path
 
 import h5py
 
+from tests._shared.repo_paths import find_repo_root
+
 
 def _load_module(module_name: str, relative_path: str):
-    repo_root = Path(__file__).resolve().parents[1]
+    repo_root = find_repo_root(__file__)
     module_path = repo_root / relative_path
     spec = importlib.util.spec_from_file_location(module_name, module_path)
     module = importlib.util.module_from_spec(spec)

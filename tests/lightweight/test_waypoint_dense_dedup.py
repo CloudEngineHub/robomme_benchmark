@@ -7,7 +7,7 @@ test_waypoint_dense_dedup.py
 
 运行方式（必须用 uv）：
     cd /data/hongzefu/robomme_benchmark
-    uv run python tests/test_waypoint_dense_dedup.py
+    uv run python tests/lightweight/test_waypoint_dense_dedup.py
 """
 
 from __future__ import annotations
@@ -20,7 +20,9 @@ from typing import Any
 import h5py
 import numpy as np
 
-_PROJECT_ROOT = Path(__file__).resolve().parents[1]
+from tests._shared.repo_paths import find_repo_root
+
+_PROJECT_ROOT = find_repo_root(__file__)
 sys.path.insert(0, str(_PROJECT_ROOT / "src" / "robomme" / "env_record_wrapper"))
 
 from episode_dataset_resolver import EpisodeDatasetResolver

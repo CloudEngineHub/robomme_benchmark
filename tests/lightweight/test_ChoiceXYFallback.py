@@ -4,12 +4,14 @@ Visualization test: mimic the full process of select_target_with_point.
 Flow:
 1. Build synthetic seg_raw、seg_id_map、available、point_like
 2. Call select_target_with_point to get selected target
-3. Draw segmentation + click point + centroid, and save to tests/ directory.
+3. Draw segmentation + click point + centroid, and save to tests/lightweight/ directory.
 """
 from pathlib import Path
 
 import numpy as np
 import random
+
+from tests._shared.repo_paths import find_repo_root
 
 # Optional: if cv2 is available, use it to save images
 try:
@@ -21,7 +23,7 @@ except ImportError:
 # Load only oracle_action_matcher to avoid pulling dependencies like RecordWrapper/gymnasium
 import importlib.util
 
-_src_root = Path(__file__).resolve().parents[1]
+_src_root = find_repo_root(__file__)
 _matcher_path = _src_root / "src" / "robomme" / "robomme_env" / "utils" / "oracle_action_matcher.py"
 _spec = importlib.util.spec_from_file_location("oracle_action_matcher", _matcher_path)
 _matcher = importlib.util.module_from_spec(_spec)

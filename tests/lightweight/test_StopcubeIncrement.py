@@ -11,6 +11,8 @@ import importlib.util
 import sys
 import types
 
+from tests._shared.repo_paths import find_repo_root
+
 
 # Keep symbols consistent with planner module dependencies in vqa_options, used to build stubs
 PLANNER_SYMBOLS = [
@@ -74,7 +76,7 @@ def _load_vqa_options_module():
     sys.modules.update(injected)
 
     try:
-        repo_root = Path(__file__).resolve().parents[1]
+        repo_root = find_repo_root(__file__)
         module_path = repo_root / "src" / "robomme" / "robomme_env" / "utils" / "vqa_options.py"
         spec = importlib.util.spec_from_file_location("vqa_options_under_test", module_path)
         module = importlib.util.module_from_spec(spec)

@@ -2,15 +2,17 @@
 test_TaskGoal.py
 
 Coverage tests for all env_id branches in task_goal.get_language_goal.
-Run with: uv run python -m pytest tests/test_TaskGoal.py -s
+Run with: uv run python -m pytest tests/lightweight/test_TaskGoal.py -s
 """
 from pathlib import Path
 import importlib.util
 import types
 
+from tests._shared.repo_paths import find_repo_root
+
 
 def _load_task_goal_module():
-    repo_root = Path(__file__).resolve().parents[1]
+    repo_root = find_repo_root(__file__)
     module_path = repo_root / "src" / "robomme" / "robomme_env" / "utils" / "task_goal.py"
     spec = importlib.util.spec_from_file_location("task_goal_under_test", module_path)
     module = importlib.util.module_from_spec(spec)

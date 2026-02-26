@@ -24,3 +24,11 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/robomme"]
+
+[tool.pytest.ini_options]
+markers = [
+    "slow: slow-running tests",
+    "gpu: tests requiring GPU/display/headless rendering stack",
+    "dataset: tests that generate/use temporary datasets",
+    "lightweight: tests that do not require generated dataset",
+]

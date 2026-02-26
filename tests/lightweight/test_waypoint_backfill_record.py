@@ -3,7 +3,7 @@
 轻量测试：记录端 waypoint 回填逻辑（纯函数版，避免导入重型 RecordWrapper 依赖）。
 
 运行方式（使用 uv）：
-    uv run python tests/test_waypoint_backfill_record.py
+    uv run python tests/lightweight/test_waypoint_backfill_record.py
 """
 
 from __future__ import annotations
@@ -14,9 +14,11 @@ from typing import Any
 
 import numpy as np
 
+from tests._shared.repo_paths import find_repo_root
+
 
 def _load_module(module_name: str, relative_path: str):
-    repo_root = Path(__file__).resolve().parents[1]
+    repo_root = find_repo_root(__file__)
     module_path = repo_root / relative_path
     spec = importlib.util.spec_from_file_location(module_name, module_path)
     module = importlib.util.module_from_spec(spec)
