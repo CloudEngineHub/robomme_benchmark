@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Script function: Unified dataset replay entry point, supporting 5 action spaces: joint_angle / ee_pose / ee_quat / waypoint / multi_choice.
+# Script function: Unified dataset replay entry point, supporting 4 action spaces: joint_angle / ee_pose / waypoint / multi_choice.
 # Consistent with subgoal_evaluate_func.py main loop; difference is actions come from EpisodeDatasetResolver.
 
 import os

@@ -13,7 +13,7 @@ from ..logging_utils import logger
 DATASET_ROOT = Path(__file__).resolve().parents[1] / "env_metadata"
 
 _ALLOWED_DATASETS = {"train", "test"}
-_ALLOWED_ACTION_SPACES = {"joint_angle", "ee_pose", "ee_quat", "waypoint", "multi_choice"}
+_ALLOWED_ACTION_SPACES = {"joint_angle", "ee_pose", "waypoint", "multi_choice"}
 _DEFAULT_TASK_LIST = [
     "PickXtimes",
     "StopCube",
@@ -182,7 +182,7 @@ class BenchmarkEnvBuilder:
         include_front_camera_intrinsic: bool = False,
         include_wrist_camera_intrinsic: bool = False,
     ):
-        """Create and configure environment for specific episode. Wrap EndeffectorDemonstrationWrapper for action_space=ee_pose/ee_quat, MultiStepDemonstrationWrapper for waypoint, OraclePlannerDemonstrationWrapper for multi_choice."""
+        """Create and configure environment for specific episode. Wrap EndeffectorDemonstrationWrapper for action_space=ee_pose, MultiStepDemonstrationWrapper for waypoint, OraclePlannerDemonstrationWrapper for multi_choice."""
         from .DemonstrationWrapper import DemonstrationWrapper
 
         max_steps_without_demo = (
@@ -224,10 +224,7 @@ class BenchmarkEnvBuilder:
             from .EndeffectorDemonstrationWrapper import EndeffectorDemonstrationWrapper
 
             env = EndeffectorDemonstrationWrapper(env, action_repr="rpy")
-        elif self.action_space == "ee_quat":
-            from .EndeffectorDemonstrationWrapper import EndeffectorDemonstrationWrapper
 
-            env = EndeffectorDemonstrationWrapper(env, action_repr="quat")
         elif self.action_space == "waypoint":
             from .MultiStepDemonstrationWrapper import MultiStepDemonstrationWrapper
 

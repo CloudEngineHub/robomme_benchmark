@@ -318,7 +318,7 @@ class EpisodeDatasetResolver:
 
     def get_step(
         self,
-        mode: Literal["joint_angle", "ee_pose", "ee_quat", "waypoint", "multi_choice"],
+        mode: Literal["joint_angle", "ee_pose", "waypoint", "multi_choice"],
         step: int,
     ) -> Optional[Union[np.ndarray, Dict[str, Any]]]:
         if step < 0:
@@ -338,9 +338,7 @@ class EpisodeDatasetResolver:
         elif mode == "ee_pose":
             selected_steps = self._non_demo_steps
             extractor = self._extract_ee_pose_gripper
-        elif mode == "ee_quat":
-            selected_steps = self._non_demo_steps
-            extractor = self._extract_ee_quat_gripper
+
         elif mode == "waypoint":
             selected_steps = self._waypoint_steps
             extractor = self._extract_waypoint_action
