@@ -102,7 +102,7 @@ def _load_action_from_timestep(
         raise NotImplementedError(
             f"Multi-choice action space type is not supported for dataset replay."
         )
-    else:
+    else: 
         raise ValueError(f"Unknown action space type: {action_space_type}")
 
     return np.asarray(action_data, dtype=np.float32)

@@ -265,10 +265,17 @@ class DemonstrationWrapper(gym.Wrapper):
         wrist_camera_intrinsic_opencv = obs["sensor_param"]["hand_camera"]["intrinsic_cv"]
         wrist_camera_cam2world_opengl = obs["sensor_param"]["hand_camera"]["cam2world_gl"]
         # Output end-effector pose as dict, containing pose/quat/rpy representations; also update continuousness cache.
+        # squeeze out batch dim: (1, 3) -> (3,), (1, 4) -> (4,)
+        _tcp_p = self.agent.tcp.pose.p
+        _tcp_q = self.agent.tcp.pose.q
+        if _tcp_p.ndim > 1:
+            _tcp_p = _tcp_p.squeeze(0)
+        if _tcp_q.ndim > 1:
+            _tcp_q = _tcp_q.squeeze(0)
         robot_endeffector_pose, self._prev_ee_quat_wxyz, self._prev_ee_rpy_xyz = \
             build_endeffector_pose_dict(
-                self.agent.tcp.pose.p,
-                self.agent.tcp.pose.q,
+                _tcp_p,
+                _tcp_q,
                 self._prev_ee_quat_wxyz,
                 self._prev_ee_rpy_xyz,
             )
@@ -280,9 +287,17 @@ class DemonstrationWrapper(gym.Wrapper):
         wrist_camera_depth_np = _tensor_to_numpy(wrist_camera_depth, np.int16)
         
         base_camera_extrinsic_np = _tensor_to_numpy(base_camera_extrinsic_opencv, np.float32)
+        if base_camera_extrinsic_np.ndim == 3:   # (1, 3, 4) -> (3, 4)
+            base_camera_extrinsic_np = base_camera_extrinsic_np.squeeze(0)
         wrist_camera_extrinsic_np = _tensor_to_numpy(wrist_camera_extrinsic_opencv, np.float32)
+        if wrist_camera_extrinsic_np.ndim == 3:  # (1, 3, 4) -> (3, 4)
+            wrist_camera_extrinsic_np = wrist_camera_extrinsic_np.squeeze(0)
         base_camera_intrinsic_np = _tensor_to_numpy(base_camera_intrinsic_opencv, np.float32)
+        if base_camera_intrinsic_np.ndim == 3:   # (1, 3, 3) -> (3, 3)
+            base_camera_intrinsic_np = base_camera_intrinsic_np.squeeze(0)
         wrist_camera_intrinsic_np = _tensor_to_numpy(wrist_camera_intrinsic_opencv, np.float32)
+        if wrist_camera_intrinsic_np.ndim == 3:  # (1, 3, 3) -> (3, 3)
+            wrist_camera_intrinsic_np = wrist_camera_intrinsic_np.squeeze(0)
 
         robot_endeffector_pose_np = {
             "pose": _tensor_to_numpy(robot_endeffector_pose['pose'], np.float32),

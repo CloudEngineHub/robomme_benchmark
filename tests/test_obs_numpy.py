@@ -85,12 +85,21 @@ def assert_obs(obs: dict, tag: str) -> None:
         for key, dtype in (("front_depth_list", np.int16), ("wrist_depth_list", np.int16)):
             _assert_ndarray(obs[key][i], dtype, f"{pfx} {key}")
 
-        # ── end_effector_pose_raw → dict 内各键 float32 ───────────────────
+        # ── end_effector_pose_raw → dict 内各键 float32，且 shape 无 batch 维 ──
         eef_raw = obs["end_effector_pose_raw"][i]
         assert isinstance(eef_raw, dict), f"[{pfx} end_effector_pose_raw] expected dict"
         for key in ("pose", "quat", "rpy"):
             assert key in eef_raw, f"[{pfx} end_effector_pose_raw] missing key '{key}'"
             _assert_ndarray(eef_raw[key], np.float32, f"{pfx} end_effector_pose_raw['{key}']")
+        assert eef_raw["pose"].shape == (3,), (
+            f"[{pfx} end_effector_pose_raw['pose']] expected (3,), got {eef_raw['pose'].shape}"
+        )
+        assert eef_raw["quat"].shape == (4,), (
+            f"[{pfx} end_effector_pose_raw['quat']] expected (4,), got {eef_raw['quat'].shape}"
+        )
+        assert eef_raw["rpy"].shape == (3,), (
+            f"[{pfx} end_effector_pose_raw['rpy']] expected (3,), got {eef_raw['rpy'].shape}"
+        )
 
         # ── eef_state_list → float64, shape (6,) ─────────────────────────
         eef_state = obs["eef_state_list"][i]
@@ -105,9 +114,12 @@ def assert_obs(obs: dict, tag: str) -> None:
         # ── gripper_state_list → ndarray（shape 不变）─────────────────────
         _assert_ndarray_loose(obs["gripper_state_list"][i], f"{pfx} gripper_state_list")
 
-        # ── camera extrinsics → float32（shape 不变）───────────────────────
+        # ── camera extrinsics → float32, shape (3,4) ───────────────────────
         for key in ("front_camera_extrinsic_list", "wrist_camera_extrinsic_list"):
             _assert_ndarray(obs[key][i], np.float32, f"{pfx} {key}")
+            assert obs[key][i].shape == (3, 4), (
+                f"[{pfx} {key}] expected (3, 4), got {obs[key][i].shape}"
+            )
 
 
 def assert_info(info: dict, tag: str) -> None:
@@ -115,6 +127,9 @@ def assert_info(info: dict, tag: str) -> None:
     for key in ("front_camera_intrinsic", "wrist_camera_intrinsic"):
         assert key in info, f"[{tag}] info missing key '{key}'"
         _assert_ndarray(info[key], np.float32, f"{tag} info['{key}']")
+        assert info[key].shape == (3, 3), (
+            f"[{tag} info['{key}']] expected (3, 3), got {info[key].shape}"
+        )
 
     # 非 Tensor 字段类型不变
     task_goal = info.get("task_goal")
