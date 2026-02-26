@@ -48,6 +48,23 @@ from ..robomme_env.utils.rpy_util import build_endeffector_pose_dict
 
 from ..logging_utils import logger
 
+from typing import Any
+
+try:
+    import torch
+    _HAS_TORCH = True
+except ImportError:
+    _HAS_TORCH = False
+
+def _tensor_to_numpy(value: Any, dtype: np.dtype) -> np.ndarray:
+    """将单个 Tensor 转换为指定 dtype 的 ndarray；若已是 ndarray 则只转换 dtype。"""
+    if _HAS_TORCH and isinstance(value, torch.Tensor):
+        arr = value.detach().cpu().numpy()
+    else:
+        arr = np.asarray(value)
+    if arr.dtype != dtype:
+        arr = arr.astype(dtype, copy=False)
+    return arr
 class DemonstrationWrapper(gym.Wrapper):
     """
     Demonstration wrapper (does not include video saving function).
@@ -256,37 +273,52 @@ class DemonstrationWrapper(gym.Wrapper):
                 self._prev_ee_rpy_xyz,
             )
 
+        # ───────── Apply internal inline numpy conversion ─────────
+        image_np = _tensor_to_numpy(image, np.uint8)
+        wrist_image_np = _tensor_to_numpy(wrist_image, np.uint8)
+        base_camera_depth_np = _tensor_to_numpy(base_camera_depth, np.int16)
+        wrist_camera_depth_np = _tensor_to_numpy(wrist_camera_depth, np.int16)
+        
+        base_camera_extrinsic_np = _tensor_to_numpy(base_camera_extrinsic_opencv, np.float32)
+        wrist_camera_extrinsic_np = _tensor_to_numpy(wrist_camera_extrinsic_opencv, np.float32)
+        base_camera_intrinsic_np = _tensor_to_numpy(base_camera_intrinsic_opencv, np.float32)
+        wrist_camera_intrinsic_np = _tensor_to_numpy(wrist_camera_intrinsic_opencv, np.float32)
+
+        robot_endeffector_pose_np = {
+            "pose": _tensor_to_numpy(robot_endeffector_pose['pose'], np.float32),
+            "quat": _tensor_to_numpy(robot_endeffector_pose['quat'], np.float32),
+            "rpy": _tensor_to_numpy(robot_endeffector_pose['rpy'], np.float32),
+        }
+
+        eef_state_list_f64 = np.concatenate([
+            robot_endeffector_pose_np['pose'].flatten()[:3],
+            robot_endeffector_pose_np['rpy'].flatten()[:3]
+        ]).astype(np.float64, copy=False)
+
         # Extract gripper state from the last 2 dims of joint positions
-        state_flat = state.cpu().numpy().flatten() if hasattr(state, 'cpu') else np.asarray(state).flatten()
+        state_flat = state.detach().cpu().numpy().flatten() if hasattr(state, 'cpu') else np.asarray(state).flatten()
         
         is_stick_env = self.unwrapped.spec.id in ("PatternLock", "RouteStick")
         if is_stick_env:
-            gripper_state = np.zeros(2)
+            gripper_state = np.zeros(2, dtype=np.float64)
         else:
-            gripper_state = state_flat[7:9] if len(state_flat) >= 9 else np.zeros(2)
+            gripper_state = state_flat[7:9] if len(state_flat) >= 9 else np.zeros(2, dtype=np.float64)
         
         # Only keep first 7 joint dims for joint_state_list
         joint_state = state_flat[:7]
 
         new_obs = {
             'maniskill_obs': base_obs,
-            'front_rgb_list': image,
-            'wrist_rgb_list': wrist_image,
+            'front_rgb_list': image_np,
+            'wrist_rgb_list': wrist_image_np,
             'joint_state_list': joint_state,
-            # 'velocity': end_effector_velocity,
-            'front_depth_list': base_camera_depth,
-            # 'front_camera_segmentation': base_camera_segmentation,
-            'wrist_depth_list': wrist_camera_depth,
-            # 'front_camera_cam2world_opengl': base_camera_cam2world_opengl,
-            # 'wrist_camera_cam2world_opengl': wrist_camera_cam2world_opengl,
-            'end_effector_pose_raw': robot_endeffector_pose,
-            'eef_state_list': (
-                robot_endeffector_pose['pose'].detach().cpu().flatten().tolist()[:3]
-                + robot_endeffector_pose['rpy'].detach().cpu().flatten().tolist()[:3]
-            ),
+            'front_depth_list': base_camera_depth_np,
+            'wrist_depth_list': wrist_camera_depth_np,
+            'end_effector_pose_raw': robot_endeffector_pose_np,
+            'eef_state_list': eef_state_list_f64,
             'gripper_state_list': gripper_state,
-            'front_camera_extrinsic_list': base_camera_extrinsic_opencv,
-            'wrist_camera_extrinsic_list': wrist_camera_extrinsic_opencv,
+            'front_camera_extrinsic_list': base_camera_extrinsic_np,
+            'wrist_camera_extrinsic_list': wrist_camera_extrinsic_np,
         }
         new_info = {
             **info,
@@ -294,8 +326,8 @@ class DemonstrationWrapper(gym.Wrapper):
             'grounded_subgoal_online': grounded_subgoal,
             'available_options': available_options,
             'task_goal': language_goal,
-            'front_camera_intrinsic': base_camera_intrinsic_opencv,
-            'wrist_camera_intrinsic': wrist_camera_intrinsic_opencv,
+            'front_camera_intrinsic': base_camera_intrinsic_np,
+            'wrist_camera_intrinsic': wrist_camera_intrinsic_np,
         }
         return new_obs, new_info
 

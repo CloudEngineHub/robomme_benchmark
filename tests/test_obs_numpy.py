@@ -1,25 +1,25 @@
 # -*- coding: utf-8 -*-
 """
-test_obs_convert.py
+test_obs_numpy.py
 ===================
 集成测试：直接调用真实环境 + /data/hongzefu/data_0225 数据集，
-测试 dataset_replay—printType.py 中使用的 convert_obs / convert_info
-在四种 ActionSpace 下对 obs / info 字段的类型转换是否正确。
+测试 DemonstrationWrapper._augment_obs_and_info 内部原生的类型转换
+在四种 ActionSpace 下对 obs / info 字段的输出类型和形状是否正确。
 
 覆盖的 ActionSpace：
     joint_angle / ee_pose / waypoint / oracle_planner
 
-测试策略：
-  - 每种 ActionSpace 使用 VideoUnmaskSwap 环境，episode 0
-  - reset 后和每个 step 后均调用 convert_obs / convert_info
-  - 断言所有字段符合规范类型
+断言内容：
+  1. 返回的 dtype 符合规范 (如 uint8, int16, float32, float64 等)
+  2. info 非 Tensor 字段类型符合预期
 
-运行方式：
+运行方式（必须用 uv）：
     cd /data/hongzefu/robomme_benchmark
-    uv run python tests/test_obs_convert.py
+    uv run python tests/test_obs_numpy.py
 """
 from __future__ import annotations
 
+import copy
 import sys
 import traceback
 from pathlib import Path
@@ -34,8 +34,6 @@ sys.path.insert(0, str(_PROJECT_ROOT / "src"))
 from robomme.robomme_env import *  # noqa: F401,F403  注册所有自定义环境
 from robomme.robomme_env.utils import *  # noqa: F401,F403
 from robomme.env_record_wrapper import BenchmarkEnvBuilder, EpisodeDatasetResolver
-from robomme.env_record_wrapper.obs_convert import convert_obs, convert_info
-
 
 # ──────────────────────────────────────────────────────────────────────────────
 # 配置
@@ -46,9 +44,7 @@ TEST_EPISODE = 0
 MAX_STEPS_PER_ACTION_SPACE = 3   # 每种 ActionSpace 最多验证的 step 数
 MAX_STEPS_ENV = 1000
 
-
 ActionSpaceType = Literal["joint_angle", "ee_pose", "waypoint", "oracle_planner"]
-
 
 # ──────────────────────────────────────────────────────────────────────────────
 # 断言辅助
@@ -64,74 +60,67 @@ def _assert_ndarray(val: Any, dtype: np.dtype, tag: str) -> None:
 
 
 def _assert_ndarray_loose(val: Any, tag: str) -> None:
-    """只断言是 ndarray，不检查具体 dtype（用于 joint_state / gripper_state）。"""
+    """只断言是 ndarray，不检查具体 dtype。"""
     assert isinstance(val, np.ndarray), (
         f"[{tag}] expected ndarray, got {type(val).__name__}"
     )
 
+# ──────────────────────────────────────────────────────────────────────────────
+# 核心断言：原生输出类型正确
+# ──────────────────────────────────────────────────────────────────────────────
 
-def assert_obs_types(obs: dict, tag: str) -> None:
-    """断言 obs 各字段的类型和 dtype 符合规范。"""
+def assert_obs(obs: dict, tag: str) -> None:
+    """断言 obs 输出 dtype 正确且 shape 与预期一致。"""
     n = len(obs.get("front_rgb_list", []))
     assert n > 0, f"[{tag}] obs front_rgb_list is empty"
 
     for i in range(n):
         pfx = f"{tag}[{i}]"
 
-        # RGB → uint8
-        _assert_ndarray(obs["front_rgb_list"][i], np.uint8, f"{pfx} front_rgb_list")
-        _assert_ndarray(obs["wrist_rgb_list"][i], np.uint8, f"{pfx} wrist_rgb_list")
+        # ── RGB → uint8 ───────────────────────────────────────────────────
+        for key, dtype in (("front_rgb_list", np.uint8), ("wrist_rgb_list", np.uint8)):
+            _assert_ndarray(obs[key][i], dtype, f"{pfx} {key}")
 
-        # Depth → int16
-        _assert_ndarray(obs["front_depth_list"][i], np.int16, f"{pfx} front_depth_list")
-        _assert_ndarray(obs["wrist_depth_list"][i], np.int16, f"{pfx} wrist_depth_list")
+        # ── Depth → int16 ─────────────────────────────────────────────────
+        for key, dtype in (("front_depth_list", np.int16), ("wrist_depth_list", np.int16)):
+            _assert_ndarray(obs[key][i], dtype, f"{pfx} {key}")
 
-        # end_effector_pose_raw → dict 内各键 float32
+        # ── end_effector_pose_raw → dict 内各键 float32 ───────────────────
         eef_raw = obs["end_effector_pose_raw"][i]
         assert isinstance(eef_raw, dict), f"[{pfx} end_effector_pose_raw] expected dict"
         for key in ("pose", "quat", "rpy"):
             assert key in eef_raw, f"[{pfx} end_effector_pose_raw] missing key '{key}'"
             _assert_ndarray(eef_raw[key], np.float32, f"{pfx} end_effector_pose_raw['{key}']")
 
-        # eef_state_list → float64, shape (6,)
+        # ── eef_state_list → float64, shape (6,) ─────────────────────────
         eef_state = obs["eef_state_list"][i]
         _assert_ndarray(eef_state, np.float64, f"{pfx} eef_state_list")
         assert eef_state.shape == (6,), (
             f"[{pfx} eef_state_list] expected shape (6,), got {eef_state.shape}"
         )
 
-        # joint_state_list → ndarray (dtype 不限)
+        # ── joint_state_list → ndarray（shape 不变）───────────────────────
         _assert_ndarray_loose(obs["joint_state_list"][i], f"{pfx} joint_state_list")
 
-        # gripper_state_list → ndarray (dtype 不限)
+        # ── gripper_state_list → ndarray（shape 不变）─────────────────────
         _assert_ndarray_loose(obs["gripper_state_list"][i], f"{pfx} gripper_state_list")
 
-        # camera extrinsics → float32
-        _assert_ndarray(
-            obs["front_camera_extrinsic_list"][i],
-            np.float32,
-            f"{pfx} front_camera_extrinsic_list",
-        )
-        _assert_ndarray(
-            obs["wrist_camera_extrinsic_list"][i],
-            np.float32,
-            f"{pfx} wrist_camera_extrinsic_list",
-        )
+        # ── camera extrinsics → float32（shape 不变）───────────────────────
+        for key in ("front_camera_extrinsic_list", "wrist_camera_extrinsic_list"):
+            _assert_ndarray(obs[key][i], np.float32, f"{pfx} {key}")
 
 
-def assert_info_types(info: dict, tag: str) -> None:
-    """断言 info 各字段的类型符合规范。"""
-    # 相机内参 → ndarray float32
+def assert_info(info: dict, tag: str) -> None:
+    """断言 info 输出字段 dtype 等属实。"""
     for key in ("front_camera_intrinsic", "wrist_camera_intrinsic"):
         assert key in info, f"[{tag}] info missing key '{key}'"
         _assert_ndarray(info[key], np.float32, f"{tag} info['{key}']")
 
-    # 其他字段不应被转换成奇怪的类型
+    # 非 Tensor 字段类型不变
     task_goal = info.get("task_goal")
     assert isinstance(task_goal, (str, list, type(None))), (
         f"[{tag}] info['task_goal'] unexpected type {type(task_goal)}"
     )
-
     status = info.get("status")
     assert isinstance(status, (str, type(None))), (
         f"[{tag}] info['status'] unexpected type {type(status)}"
@@ -177,13 +166,11 @@ def run_one_action_space(action_space: ActionSpaceType) -> None:
 
     # ── RESET ──────────────────────────────────────────────────────────────
     obs, info = env.reset()
-    convert_obs(obs)
-    convert_info(info)
 
     reset_tag = f"{TEST_ENV_ID} ep{TEST_EPISODE} RESET [{action_space}]"
-    assert_obs_types(obs, reset_tag)
-    assert_info_types(info, reset_tag)
-    print(f"  RESET 断言通过  (obs list len={len(obs['front_rgb_list'])})")
+    assert_obs(obs, reset_tag)
+    assert_info(info, reset_tag)
+    print(f"  RESET 断言通过  (obs list len={len(obs['front_rgb_list'])}, dtype ✓)")
 
     # ── STEP LOOP ──────────────────────────────────────────────────────────
     step = 0
@@ -197,13 +184,11 @@ def run_one_action_space(action_space: ActionSpaceType) -> None:
             break
 
         obs, reward, terminated, truncated, info = env.step(action)
-        convert_obs(obs)
-        convert_info(info)
 
         step_tag = f"{TEST_ENV_ID} ep{TEST_EPISODE} STEP{step} [{action_space}]"
-        assert_obs_types(obs, step_tag)
-        assert_info_types(info, step_tag)
-        print(f"  STEP {step} 断言通过  (obs list len={len(obs['front_rgb_list'])})")
+        assert_obs(obs, step_tag)
+        assert_info(info, step_tag)
+        print(f"  STEP {step} 断言通过  (obs list len={len(obs['front_rgb_list'])}, dtype ✓)")
 
         terminated_flag = bool(terminated.item())
         truncated_flag = bool(truncated.item())

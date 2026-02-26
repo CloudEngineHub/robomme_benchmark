@@ -14,14 +14,11 @@ from robomme.env_record_wrapper import (
     BenchmarkEnvBuilder,
     EpisodeDatasetResolver,
 )
-from robomme.env_record_wrapper.obs_convert import convert_obs, convert_info
 
 # Only enable one ACTION_SPACE; others are commented out for manual switching
-ACTION_SPACE = "joint_angle"
-#ACTION_SPACE = "ee_pose"
-#ACTION_SPACE = "ee_quat"
-#ACTION_SPACE = "waypoint"
-#ACTION_SPACE = "oracle_planner"
+#ACTION_SPACE = "joint_angle"
+ACTION_SPACE = "waypoint"
+
 
 GUI_RENDER = False
 
@@ -188,12 +185,9 @@ def main():
                 dataset_directory=DATASET_ROOT,
             )
 
-            # ======== Reset ========
             # obs: dict-of-lists (columnar batch, list length = number of demo frames)
             # info: flat dict (last frame values only)
             obs, info = env.reset()
-            convert_obs(obs)
-            convert_info(info)
 
             # --- Print all obs / info field types (reset) ---
             _print_obs(obs, tag=f"{env_id} ep{episode} RESET")
@@ -214,8 +208,6 @@ def main():
                 # step returns: obs (dict-of-lists), reward (scalar tensor),
                 #               terminated (scalar tensor), truncated (scalar tensor), info (flat dict)
                 obs, reward, terminated, truncated, info = env.step(action)
-                convert_obs(obs)
-                convert_info(info)
 
                 # --- Print all obs / info / reward / terminated / truncated field types (step) ---
                 _print_obs(obs, tag=f"{env_id} ep{episode} STEP{step}")
