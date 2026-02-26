@@ -345,22 +345,41 @@ class RobommeRecordWrapper(gym.Wrapper):
         choice_action_label,
         choice_action_point,
         task_index,
+        is_completed,
     ):
         """Stitch and overlay planner / online text rows."""
         combined = prepared["combined"]
         combined_online = prepared["combined_online"]
+        choice_action_json = json.dumps(
+            {
+                "label": choice_action_label,
+                "point": choice_action_point,
+            },
+            ensure_ascii=False,
+        )
 
-        # Add subgoal_text and grounded_subgoal text for first row (PLANNER view)
+        # Add planner-side schema fields to first row for direct video inspection.
         combined = self._add_text_to_frame(
             combined,
-            ["PLANNER:", subgoal_text, grounded_text, str(choice_action_label), str(choice_action_point), str(task_index)],
+            [
+                "PLANNER:",
+                f"info.simple_subgoal: {subgoal_text}",
+                f"info.grounded_subgoal: {grounded_text}",
+                f"action.choice_action: {choice_action_json}",
+                f"info.is_completed: {bool(is_completed)}",
+                f"task_index: {task_index}",
+            ],
             position="top_right",
         )
 
-        # Add ONLINE: marker and online text for second row (ONLINE view)
+        # Add online-side schema fields to second row for direct video inspection.
         combined_online = self._add_text_to_frame(
             combined_online,
-            ["ONLINE:", subgoal_online_text, grounded_online_text],
+            [
+                "ONLINE:",
+                f"info.simple_subgoal_online: {subgoal_online_text}",
+                f"info.grounded_subgoal_online: {grounded_online_text}",
+            ],
             position="top_right",
         )
 
@@ -822,6 +841,10 @@ class RobommeRecordWrapper(gym.Wrapper):
         self.vis_obj_id_list_online = segmentation_output_online["vis_obj_id_list"]
 
         current_task=self.current_task_name if hasattr(self, 'current_task_name') else "Unknown"
+        is_completed = _is_online_subgoal_completed(
+            _cur_task_index,
+            getattr(self.unwrapped, 'task_list', None),
+        )
         
         # Video recording logic: Execute only when task name is not NO RECORD and video saving enabled
         if self._video_should_record(current_task):
@@ -848,6 +871,7 @@ class RobommeRecordWrapper(gym.Wrapper):
                 choice_action_label=self._current_choice_label,
                 choice_action_point=list(self.segmentation_points[0]) if self.segmentation_points else [],
                 task_index=_cur_task_index,
+                is_completed=is_completed,
             )
             combined = self._video_apply_overlays(
                 combined,
@@ -961,10 +985,7 @@ class RobommeRecordWrapper(gym.Wrapper):
                     'simple_subgoal_online': subgoal_online_text,
                     'grounded_subgoal': self.current_subgoal_segment_filled,
                     'grounded_subgoal_online': self.current_subgoal_segment_online_filled,
-                    'is_completed': _is_online_subgoal_completed(
-                        _cur_task_index,
-                        getattr(self.unwrapped, 'task_list', None),
-                    ),
+                    'is_completed': is_completed,
                     'is_video_demo': self.current_task_demonstration if hasattr(self, 'current_task_demonstration') else False,
                     'is_keyframe': choice_action_keyframe,
                 },
