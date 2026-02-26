@@ -22,22 +22,22 @@ VIDEO_BORDER_COLOR = (255, 0, 0)
 VIDEO_BORDER_THICKNESS = 10
 
 TaskID = Literal[
-    # "BinFill",
-    # "PickXtimes",
-    # "SwingXtimes",
-    # "StopCube",
-    # "VideoUnmask",
+    "BinFill",
+    "PickXtimes",
+    "SwingXtimes",
+    "StopCube",
+    "VideoUnmask",
     "VideoUnmaskSwap",
-    # "ButtonUnmask",
-    # "ButtonUnmaskSwap",
-    # "PickHighlight",
-    # "VideoRepick",
-    # "VideoPlaceButton",
-    # "VideoPlaceOrder",
-    # "MoveCube",
-    # "InsertPeg",
-    # "PatternLock",
-    # "RouteStick",
+    "ButtonUnmask",
+    "ButtonUnmaskSwap",
+    "PickHighlight",
+    "VideoRepick",
+    "VideoPlaceButton",
+    "VideoPlaceOrder",
+    "MoveCube",
+    "InsertPeg",
+    "PatternLock",
+    "RouteStick",
 ]
 
 ActionSpaceType = Literal["joint_angle", "ee_pose", "waypoint", "multi_choice"]

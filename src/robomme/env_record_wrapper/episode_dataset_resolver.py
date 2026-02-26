@@ -250,17 +250,23 @@ class EpisodeDatasetResolver:
     def _build_indexes(self) -> None:
         # Collect oracle commands by serial_number (only timesteps with serial_number count)
         oracle_by_serial: Dict[int, Dict[str, Any]] = {}
+        prev_waypoint_action: Optional[np.ndarray] = None
         for record_step in self._timestep_indexes:
             timestep_group = self._get_timestep_group(record_step)
             if timestep_group is None or self._is_video_demo_group(timestep_group):
                 continue
 
             self._non_demo_steps.append(record_step)
-            # is_keyframe: Determine if it is a waypoint refresh frame via info/is_keyframe flag
-            info_grp = timestep_group.get("info")
-            if info_grp is not None and "is_keyframe" in info_grp:
-                if _as_bool(info_grp["is_keyframe"][()]):
+            # waypoint_action is backfilled densely in the HDF5. Reconstruct the logical
+            # sparse waypoint sequence by keeping only adjacent changes (do not rely on
+            # info/is_keyframe).
+            waypoint_action = self._extract_waypoint_action(timestep_group)
+            if waypoint_action is not None:
+                if prev_waypoint_action is None or not np.array_equal(
+                    waypoint_action, prev_waypoint_action
+                ):
                     self._waypoint_steps.append(record_step)
+                    prev_waypoint_action = waypoint_action.copy()
 
             command = self._extract_choice_action(timestep_group)
             if command is None:
