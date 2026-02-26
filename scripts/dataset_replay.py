@@ -3,8 +3,9 @@ Replay episodes from HDF5 datasets and save rollout videos.
 Loads recorded actions from record_dataset_<Task>.h5, steps the environment
 """
 
+import json
 from pathlib import Path
-from typing import Literal
+from typing import Any, Dict, Literal, Union
 
 import cv2
 import h5py
@@ -21,22 +22,22 @@ VIDEO_BORDER_COLOR = (255, 0, 0)
 VIDEO_BORDER_THICKNESS = 10
 
 TaskID = Literal[
-    "BinFill",
-    "PickXtimes",
-    "SwingXtimes",
-    "StopCube",
-    "VideoUnmask",
+    # "BinFill",
+    # "PickXtimes",
+    # "SwingXtimes",
+    # "StopCube",
+    # "VideoUnmask",
     "VideoUnmaskSwap",
-    "ButtonUnmask",
-    "ButtonUnmaskSwap",
-    "PickHighlight",
-    "VideoRepick",
-    "VideoPlaceButton",
-    "VideoPlaceOrder",
-    "MoveCube",
-    "InsertPeg",
-    "PatternLock",
-    "RouteStick",
+    # "ButtonUnmask",
+    # "ButtonUnmaskSwap",
+    # "PickHighlight",
+    # "VideoRepick",
+    # "VideoPlaceButton",
+    # "VideoPlaceOrder",
+    # "MoveCube",
+    # "InsertPeg",
+    # "PatternLock",
+    # "RouteStick",
 ]
 
 ActionSpaceType = Literal["joint_angle", "ee_pose", "waypoint", "multi_choice"]
@@ -84,28 +85,50 @@ def _first_execution_step(episode_data: h5py.Group) -> int:
 
 def _load_action_from_timestep(
     episode_data: h5py.Group, step_idx: int, action_space_type: str
-) -> np.ndarray:
+) -> Union[np.ndarray, Dict[str, Any]]:
     timestep_key = f"timestep_{step_idx}"
     action_group = episode_data[timestep_key]["action"]
 
     if action_space_type == "joint_angle":
         action_data = action_group["joint_action"][()]
+        return np.asarray(action_data, dtype=np.float32)
     elif action_space_type == "ee_pose":
         action_data = action_group["eef_action"][()]
-    elif action_space_type == "waypoint": 
-        # TODO: @hongze implement this
-        raise NotImplementedError(
-            f"waypoint action space type is not supported for dataset replay."
-        )
-    elif action_space_type == "multi_choice": 
-        # TODO: @hongze implement this
-        raise NotImplementedError(
-            f"Multi-choice action space type is not supported for dataset replay."
-        )
-    else: 
+        return np.asarray(action_data, dtype=np.float32)
+    elif action_space_type == "waypoint":
+        action_data = action_group["waypoint_action"][()]
+        return np.asarray(action_data, dtype=np.float32)
+    elif action_space_type == "multi_choice":
+        # Read JSON-encoded choice_action and parse it, following EpisodeDatasetResolver._extract_choice_action.
+        raw = action_group["choice_action"][()]
+        # Decode bytes -> str
+        if isinstance(raw, np.ndarray):
+            raw = np.reshape(raw, -1)[0]
+        if isinstance(raw, (bytes, np.bytes_)):
+            raw = raw.decode("utf-8")
+        payload = json.loads(raw)
+        if not isinstance(payload, dict):
+            raise ValueError(f"choice_action payload is not a dict at timestep_{step_idx}")
+        label = payload.get("label")
+        if not isinstance(label, str) or not label:
+            raise ValueError(f"choice_action missing valid 'label' at timestep_{step_idx}")
+        command: Dict[str, Any] = {"label": label}
+        # point stored as [y, x]; normalize to execution format [x, y]
+        point = payload.get("point")
+        if isinstance(point, (list, tuple)) and len(point) >= 2:
+            try:
+                command["point"] = [int(point[1]), int(point[0])]
+            except (TypeError, ValueError):
+                pass
+        serial = payload.get("serial_number")
+        if serial is not None:
+            try:
+                command["serial_number"] = int(serial)
+            except (TypeError, ValueError):
+                pass
+        return command
+    else:
         raise ValueError(f"Unknown action space type: {action_space_type}")
-
-    return np.asarray(action_data, dtype=np.float32)
 
 
 def _save_video(
@@ -197,12 +220,13 @@ def process_episode(
 
 
 def replay(
-    h5_data_dir: str = "data/robomme_data",
-    action_space_type: ActionSpaceType = "joint_angle",
+    h5_data_dir: str = "/data/hongzefu/data_0225",
+    action_space_type: ActionSpaceType = "eef_action",
     replay_number: int = 1,
 ) -> None:
     """Replay episodes from HDF5 dataset files and save rollout videos."""
-    for task_id in BenchmarkEnvBuilder.get_task_list():
+    #for task_id in BenchmarkEnvBuilder.get_task_list():
+    for task_id in ["VideoUnmaskSwap"]:
         file_path = Path(h5_data_dir) / f"record_dataset_{task_id}.h5"
 
         if not file_path.exists():
