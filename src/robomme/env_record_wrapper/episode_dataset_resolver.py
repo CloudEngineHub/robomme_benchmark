@@ -185,7 +185,16 @@ class EpisodeDatasetResolver:
         action_grp = timestep_group.get("action")
         if action_grp is None or not isinstance(action_grp, h5py.Group) or "waypoint_action" not in action_grp:
             return None
-        return np.asarray(action_grp["waypoint_action"][()]).flatten()
+        try:
+            waypoint_action = np.asarray(action_grp["waypoint_action"][()]).flatten()
+        except (TypeError, ValueError):
+            return None
+
+        if waypoint_action.shape != (7,):
+            return None
+        if not np.all(np.isfinite(waypoint_action)):
+            return None
+        return waypoint_action
 
     @staticmethod
     def _decode_h5_string(value: Any) -> Optional[str]:
@@ -256,8 +265,8 @@ class EpisodeDatasetResolver:
                 continue
 
             self._non_demo_steps.append(record_step)
-            # waypoint_action is backfilled densely in the HDF5. Reconstruct the logical
-            # sparse waypoint sequence by keeping only adjacent changes (do not rely on
+            # waypoint_action is stored per step; keep only adjacent changes for logical
+            # sparse sequence and skip invalid/non-finite sentinels (do not rely on
             # info/is_keyframe).
             waypoint_action = self._extract_waypoint_action(timestep_group)
             if waypoint_action is not None:

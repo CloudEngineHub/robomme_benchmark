@@ -7,7 +7,8 @@ test_record_stick.py
 1. gripper_state  : Stick → [0.0, 0.0]；非 Stick → shape==(2,)
 2. joint_action   : Stick → shape==(8,) 且 [-1] == -1.0；非 Stick → shape==(8,)
 3. eef_action     : Stick → shape==(7,) 且 [-1] == -1.0；非 Stick → shape==(7,)
-4. waypoint_action: Stick → [-1] == -1.0；非 Stick → ±1.0
+4. waypoint_action: shape==(7,)；finite 时 Stick → [-1] == -1.0，非 Stick → ±1.0；
+                    non-finite（NaN/Inf）视为“无 keypoint”占位，跳过符号断言
 
 测试方法：参照 generate-dataset-control-seed-readJson-advanceV3.py，
 对每个测试用例使用 FailAware Planner + screw→RRT* 重试 patch 跑一个完整 episode
@@ -77,12 +78,13 @@ def _verify_stick(h5_path: Path, env_id: str):
             assert float(ea[-1]) == -1.0, \
                 f"[{env_id}/{ts_key}] eef_action[-1]={ea[-1]} 期望 -1.0"
 
-            # 4. waypoint_action → 7维，最末位 == -1.0
+            # 4. waypoint_action → 7维；non-finite 作为无 keypoint 占位，finite 才验证符号
             wa = np.array(ts["action"]["waypoint_action"]).flatten()
             assert wa.shape == (7,), \
                 f"[{env_id}/{ts_key}] waypoint_action shape={wa.shape} 期望 (7,)"
-            assert float(wa[-1]) == -1.0, \
-                f"[{env_id}/{ts_key}] waypoint_action[-1]={wa[-1]} 期望 -1.0"
+            if np.all(np.isfinite(wa)):
+                assert float(wa[-1]) == -1.0, \
+                    f"[{env_id}/{ts_key}] waypoint_action[-1]={wa[-1]} 期望 -1.0"
 
     print(f"  [验证 Stick ✓] {env_id} 所有断言通过，共 {len(ts_keys)} 个 timestep")
 
@@ -115,12 +117,13 @@ def _verify_non_stick(h5_path: Path, env_id: str):
             assert ea.shape == (7,), \
                 f"[{env_id}/{ts_key}] eef_action shape={ea.shape} 期望 (7,)"
 
-            # 4. waypoint_action → 7维，last in {-1.0, 1.0}
+            # 4. waypoint_action → 7维；non-finite 作为无 keypoint 占位，finite 才验证符号
             wa = np.array(ts["action"]["waypoint_action"]).flatten()
             assert wa.shape == (7,), \
                 f"[{env_id}/{ts_key}] waypoint_action shape={wa.shape} 期望 (7,)"
-            assert float(wa[-1]) in (-1.0, 1.0), \
-                f"[{env_id}/{ts_key}] waypoint_action[-1]={wa[-1]} 应为 ±1.0"
+            if np.all(np.isfinite(wa)):
+                assert float(wa[-1]) in (-1.0, 1.0), \
+                    f"[{env_id}/{ts_key}] waypoint_action[-1]={wa[-1]} 应为 ±1.0"
 
     print(f"  [验证 非Stick ✓] {env_id} 所有断言通过，共 {len(ts_keys)} 个 timestep")
 

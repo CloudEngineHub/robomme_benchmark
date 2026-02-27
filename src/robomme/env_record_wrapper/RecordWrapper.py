@@ -1174,10 +1174,11 @@ class RobommeRecordWrapper(gym.Wrapper):
                 # eef_action: 7-dim [pose(3), rpy(3), gripper(1)]
                 action_group.create_dataset("eef_action", data=action_data_dict['eef_action'])
 
-                # Write waypoint_action (7D: pos(3)+rpy(3)+gripper(1), latest cached value from step flow)
+                # Write waypoint_action (7D: pos(3)+rpy(3)+gripper(1), latest cached value from step flow).
+                # NaN sentinel means "no keypoint" at this timestep.
                 kp_action = action_data_dict.get('waypoint_action', None)
                 if kp_action is None:
-                    kp_action = np.zeros(7)
+                    kp_action = np.full(7, np.nan, dtype=np.float32)
                     
                 action_group.create_dataset("waypoint_action", data=kp_action)
 

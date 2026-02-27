@@ -105,9 +105,15 @@ def _verify_replay(env_id: str, dataset_dir: Path, h5_path: Path, is_stick: bool
                 if eef_action is not None:
                      assert float(eef_action[-1]) == -1.0, f"[{env_id}] eef_action[-1]={eef_action[-1]} expected -1.0"
                 if waypoint_action is not None and len(waypoint_action) > 0:
+                     waypoint_action = np.asarray(waypoint_action).flatten()
+                     assert waypoint_action.shape == (7,), f"[{env_id}] waypoint_action shape expected (7,)"
+                     assert np.all(np.isfinite(waypoint_action)), f"[{env_id}] waypoint_action should be finite"
                      assert float(waypoint_action[-1]) == -1.0, f"[{env_id}] waypoint_action[-1]={waypoint_action[-1]} expected -1.0"
             else:
                 if waypoint_action is not None and len(waypoint_action) >0:
+                    waypoint_action = np.asarray(waypoint_action).flatten()
+                    assert waypoint_action.shape == (7,), f"[{env_id}] waypoint_action shape expected (7,)"
+                    assert np.all(np.isfinite(waypoint_action)), f"[{env_id}] waypoint_action should be finite"
                     assert float(waypoint_action[-1]) in (-1.0, 1.0), f"[{env_id}] expected ±1 for waypoint_action"
 
             # ======= 执行 step =======

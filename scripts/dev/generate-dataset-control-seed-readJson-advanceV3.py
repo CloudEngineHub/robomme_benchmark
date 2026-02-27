@@ -41,25 +41,25 @@ Key features include:
 
 # List of all supported environment module names
 DEFAULT_ENVS =[
-"PickXtimes",
-"StopCube",
-"SwingXtimes",
- "BinFill",
+# "PickXtimes",
+# "StopCube",
+# "SwingXtimes",
+#  "BinFill",
 
- "VideoUnmaskSwap",
- "VideoUnmask",
-"ButtonUnmaskSwap",
-"ButtonUnmask",
+#  "VideoUnmaskSwap",
+#  "VideoUnmask",
+# "ButtonUnmaskSwap",
+# "ButtonUnmask",
 
-"VideoRepick",
-"VideoPlaceButton",
-"VideoPlaceOrder",
-"PickHighlight",
+# "VideoRepick",
+# "VideoPlaceButton",
+# "VideoPlaceOrder",
+# "PickHighlight",
 
 "InsertPeg",
-'MoveCube',
-"PatternLock",
-"RouteStick"
+# 'MoveCube',
+# "PatternLock",
+# "RouteStick"
     ]
 
 # Reference dataset metadata root directory: used to read difficulty and seed

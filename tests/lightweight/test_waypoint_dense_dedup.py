@@ -126,6 +126,26 @@ def _case_missing_waypoint_action_skipped(tmpdir: Path) -> None:
     _assert_waypoint_sequence(h5_path, [a, b])
 
 
+def _case_non_finite_waypoint_skipped(tmpdir: Path) -> None:
+    a = np.array([5, 5, 5, 5, 5, 5, -1], dtype=np.float32)
+    b = np.array([6, 6, 6, 6, 6, 6, 1], dtype=np.float32)
+    nan_waypoint = np.full(7, np.nan, dtype=np.float32)
+    inf_waypoint = np.array([0, 0, 0, 0, 0, 0, np.inf], dtype=np.float32)
+
+    h5_path = tmpdir / "case4.h5"
+    _build_h5(
+        h5_path,
+        [
+            {"waypoint_action": a, "is_keyframe": False},
+            {"waypoint_action": nan_waypoint, "is_keyframe": False},  # non-finite sentinel, skipped
+            {"waypoint_action": inf_waypoint, "is_keyframe": False},  # non-finite invalid value, skipped
+            {"waypoint_action": b, "is_keyframe": False},
+            {"waypoint_action": b, "is_keyframe": False},
+        ],
+    )
+    _assert_waypoint_sequence(h5_path, [a, b])
+
+
 def main() -> None:
     print("\n[TEST] EpisodeDatasetResolver waypoint dense dedup")
     with tempfile.TemporaryDirectory(prefix="waypoint_dense_dedup_") as tmp:
@@ -139,6 +159,9 @@ def main() -> None:
 
         _case_missing_waypoint_action_skipped(tmpdir)
         print("  case3 ✓ 缺失 waypoint_action 的 timestep 被跳过")
+
+        _case_non_finite_waypoint_skipped(tmpdir)
+        print("  case4 ✓ non-finite waypoint_action 的 timestep 被跳过")
 
     print("\nPASS: waypoint dense dedup tests passed")
 

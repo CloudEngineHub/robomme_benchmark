@@ -135,6 +135,8 @@ def _build_action_sequence(
             if "waypoint_action" not in action_grp:
                 continue
             wa = np.asarray(action_grp["waypoint_action"][()], dtype=np.float32).flatten()
+            if wa.shape != (7,) or not np.all(np.isfinite(wa)):
+                continue
             # 去除相邻重复
             if prev_waypoint is None or not np.array_equal(wa, prev_waypoint):
                 actions.append(wa)
