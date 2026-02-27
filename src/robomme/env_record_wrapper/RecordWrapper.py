@@ -42,7 +42,7 @@ from ..robomme_env.utils.segmentation_utils import (
 )
 from ..robomme_env.utils.rpy_util import build_endeffector_pose_dict
 from ..robomme_env.utils.oracle_action_matcher import map_action_text_to_option_label
-from .waypoint_backfill import backfill_waypoint_actions_in_buffer
+from ..robomme_env.utils.waypoint_backfill import backfill_waypoint_actions_in_buffer
 
 from ..logging_utils import logger
 
