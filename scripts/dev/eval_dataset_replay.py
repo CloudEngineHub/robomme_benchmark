@@ -17,21 +17,18 @@ from robomme.env_record_wrapper import (
 from robomme.robomme_env.utils.save_reset_video import save_robomme_video
 
 # Only enable one ACTION_SPACE; others are commented out for manual switching
-ACTION_SPACE = "joint_angle"
-#ACTION_SPACE = "ee_pose"
+ACTION_SPACE = "waypoint"
 
-#ACTION_SPACE = "waypoint"
-#ACTION_SPACE = "multi_choice"
 
 GUI_RENDER = False
 
-DATASET_ROOT = "/data/hongzefu/data_0220"
+DATASET_ROOT = "/data/hongzefu/data_0225"
 
 DEFAULT_ENV_IDS = [
 #"PickXtimes",
 # "StopCube",
- "SwingXtimes",
-# "BinFill",
+#"SwingXtimes",
+ "BinFill",
 # "VideoUnmaskSwap",
 # "VideoUnmask",
 # "ButtonUnmaskSwap",
@@ -70,7 +67,7 @@ def main():
 
         env = None
         for episode in range(episode_count):
-            if episode != 7:
+            if episode != 15:
                 continue
 
             env = env_builder.make_env_for_episode(
@@ -121,8 +118,6 @@ def main():
             simple_subgoal_online = info["simple_subgoal_online"]
             grounded_subgoal_online = info["grounded_subgoal_online"]
             available_multi_choices = info.get("available_multi_choices")
-            if available_multi_choices is not None:
-                print(f"[{env_id}] ep{episode} RESET available_multi_choices: {available_multi_choices}")
             front_camera_intrinsic = info["front_camera_intrinsic"]
             wrist_camera_intrinsic = info["wrist_camera_intrinsic"]
             status = info.get("status")
@@ -168,8 +163,6 @@ def main():
                 simple_subgoal_online = info["simple_subgoal_online"]
                 grounded_subgoal_online = info["grounded_subgoal_online"]
                 available_multi_choices = info.get("available_multi_choices")
-                if available_multi_choices is not None:
-                    print(f"[{env_id}] ep{episode} step {step} available_multi_choices: {available_multi_choices}")
                 front_camera_intrinsic = info["front_camera_intrinsic"]
                 wrist_camera_intrinsic = info["wrist_camera_intrinsic"]
                 status = info.get("status")

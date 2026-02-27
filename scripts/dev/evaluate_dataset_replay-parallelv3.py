@@ -21,21 +21,21 @@ from robomme.env_record_wrapper import (
 )
 from robomme.robomme_env.utils.save_reset_video import save_robomme_video
 
-# Enable only one ACTION_SPACE; other options are kept in comments for manual switching
-#ACTION_SPACE = "joint_angle"
-#ACTION_SPACE = "ee_pose"
-
-ACTION_SPACE = "waypoint"
-#ACTION_SPACE = "multi_choice"
+AVAILABLE_ACTION_SPACES = [
+    "joint_angle",
+    "ee_pose",
+    "waypoint",
+    "multi_choice",
+]
 
 GUI_RENDER = False
 
-DATASET_ROOT = "/data/hongzefu/data_0220"
-OVERRIDE_METADATA_PATH = "/data/hongzefu/data_0220"
+DATASET_ROOT = "/data/hongzefu/data_0225"
+OVERRIDE_METADATA_PATH = "/data/hongzefu/data_0225"
 
 # ######## Video saving variables (output directory) start ########
 # Video output directory: Independently hardcoded, not aligned with h5 path or env_id
-OUT_VIDEO_DIR = "/data/hongzefu/dataset_replay-0220"
+OUT_VIDEO_DIR = "/data/hongzefu/dataset_replay-0225"
 # ######## Video saving variables (output directory) end ########
 MAX_STEPS = 1000
 
@@ -267,6 +267,39 @@ def _parse_gpus(s: str) -> list[int]:
         return [int(x) for x in v.split(",")]
     return [int(v)]
 
+def _parse_action_spaces(s: str) -> list[str]:
+    tokens = [x.strip() for x in s.split(",") if x.strip()]
+    if not tokens:
+        raise argparse.ArgumentTypeError(
+            "--action_spaces cannot be empty. "
+            f"Allowed action spaces: {AVAILABLE_ACTION_SPACES}"
+        )
+
+    selected: list[str] = []
+    seen: set[str] = set()
+    invalid: list[str] = []
+
+    for token in tokens:
+        if token not in AVAILABLE_ACTION_SPACES:
+            invalid.append(token)
+            continue
+        if token in seen:
+            continue
+        seen.add(token)
+        selected.append(token)
+
+    if invalid:
+        raise argparse.ArgumentTypeError(
+            f"Invalid action space(s): {invalid}. "
+            f"Allowed action spaces: {AVAILABLE_ACTION_SPACES}"
+        )
+    if not selected:
+        raise argparse.ArgumentTypeError(
+            "--action_spaces has no valid value after parsing. "
+            f"Allowed action spaces: {AVAILABLE_ACTION_SPACES}"
+        )
+    return selected
+
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Replay dataset for one env_id in parallel.")
     parser.add_argument(
@@ -279,7 +312,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--max_workers",
         type=int,
-        default=10,
+        default=20,
         help="Total max workers (split across GPUs when using 2 GPUs).",
     )
     parser.add_argument(
@@ -288,25 +321,41 @@ def _parse_args() -> argparse.Namespace:
         default=[1],
         help="GPUs to use: '0' (GPU 0 only), '1' (GPU 1 only), '0,1' (both). Default: 0.",
     )
+    parser.add_argument(
+        "--action_spaces",
+        type=_parse_action_spaces,
+        #default=AVAILABLE_ACTION_SPACES.copy(),
+        default=["waypoint", "multi_choice"],
+        help=(
+            "Comma-separated action spaces to replay in order. "
+            "Available: joint_angle,ee_pose,waypoint,multi_choice. "
+            "Default: joint_angle,ee_pose,waypoint,multi_choice."
+        ),
+    )
     return parser.parse_args()
 
-def process_env_id(env_id: str, max_workers_total: int, gpu_ids: list[int]):
+def process_env_id(
+    env_id: str,
+    max_workers_total: int,
+    gpu_ids: list[int],
+    action_spaces: list[str],
+):
     # Simple calculation of episode count (do not instantiate env_builder to avoid overhead, or lightweight instantiation)
     # To get episode_count, we need to instantiate env_builder once
     # But we only need the metadata parsing part
     temp_builder = BenchmarkEnvBuilder(
         env_id=env_id,
         dataset="train",
-        action_space=ACTION_SPACE,
+        action_space=action_spaces[0],
         gui_render=False, # Just to read metadata
         override_metadata_path=OVERRIDE_METADATA_PATH,
     )
     episode_count = temp_builder.get_episode_num()
-    print(f"[{env_id}] Total episodes found in metadata: {episode_count}")
+    print(f"[{env_id}] episodes={episode_count}")
     print(f"Parallel execution with max_workers={max_workers_total} on GPU(s) {gpu_ids}")
     
     if episode_count == 0:
-        print("No episodes to replay.")
+        print(f"[{env_id}] No episodes to replay, skip.")
         return
 
     n_gpus = len(gpu_ids)
@@ -324,51 +373,54 @@ def process_env_id(env_id: str, max_workers_total: int, gpu_ids: list[int]):
         print(f"Pool 0 (GPU {gpu_ids[0]}): {mw0} workers")
         print(f"Pool 1 (GPU {gpu_ids[1]}): {mw1} workers")
 
-    futures = []
+    for action_space in action_spaces:
+        print(f"[{env_id}] >>> action_space={action_space}")
+        futures = []
 
-    if n_gpus == 1:
-        g0 = gpu_ids[0]
-        with concurrent.futures.ProcessPoolExecutor(max_workers=mw0, initializer=init_worker, initargs=(g0,)) as executor0:
-            for episode in range(episode_count):
-                future = executor0.submit(
-                    evaluate_episode,
-                    env_id=env_id,
-                    episode=episode,
-                    dataset_root=DATASET_ROOT,
-                    override_metadata_path=OVERRIDE_METADATA_PATH,
-                    action_space=ACTION_SPACE,
-                    out_video_dir=OUT_VIDEO_DIR,
-                    gui_render=GUI_RENDER
-                )
-                futures.append(future)
-            for future in concurrent.futures.as_completed(futures):
-                res = future.result()
-                print(res)
-    else:
-        g0, g1 = gpu_ids[0], gpu_ids[1]
-        with concurrent.futures.ProcessPoolExecutor(max_workers=mw0, initializer=init_worker, initargs=(g0,)) as executor0, \
-             concurrent.futures.ProcessPoolExecutor(max_workers=mw1, initializer=init_worker, initargs=(g1,)) as executor1:
-            for episode in range(episode_count):
-                if episode % 2 == 0:
-                    executor = executor0
-                else:
-                    executor = executor1
-                    if mw1 == 0:
+        if n_gpus == 1:
+            g0 = gpu_ids[0]
+            with concurrent.futures.ProcessPoolExecutor(max_workers=mw0, initializer=init_worker, initargs=(g0,)) as executor0:
+                for episode in range(episode_count):
+                    future = executor0.submit(
+                        evaluate_episode,
+                        env_id=env_id,
+                        episode=episode,
+                        dataset_root=DATASET_ROOT,
+                        override_metadata_path=OVERRIDE_METADATA_PATH,
+                        action_space=action_space,
+                        out_video_dir=OUT_VIDEO_DIR,
+                        gui_render=GUI_RENDER
+                    )
+                    futures.append(future)
+                for future in concurrent.futures.as_completed(futures):
+                    res = future.result()
+                    print(res)
+        else:
+            g0, g1 = gpu_ids[0], gpu_ids[1]
+            with concurrent.futures.ProcessPoolExecutor(max_workers=mw0, initializer=init_worker, initargs=(g0,)) as executor0, \
+                 concurrent.futures.ProcessPoolExecutor(max_workers=mw1, initializer=init_worker, initargs=(g1,)) as executor1:
+                for episode in range(episode_count):
+                    if episode % 2 == 0:
                         executor = executor0
-                future = executor.submit(
-                    evaluate_episode,
-                    env_id=env_id,
-                    episode=episode,
-                    dataset_root=DATASET_ROOT,
-                    override_metadata_path=OVERRIDE_METADATA_PATH,
-                    action_space=ACTION_SPACE,
-                    out_video_dir=OUT_VIDEO_DIR,
-                    gui_render=GUI_RENDER
-                )
-                futures.append(future)
-            for future in concurrent.futures.as_completed(futures):
-                res = future.result()
-                print(res)
+                    else:
+                        executor = executor1
+                        if mw1 == 0:
+                            executor = executor0
+                    future = executor.submit(
+                        evaluate_episode,
+                        env_id=env_id,
+                        episode=episode,
+                        dataset_root=DATASET_ROOT,
+                        override_metadata_path=OVERRIDE_METADATA_PATH,
+                        action_space=action_space,
+                        out_video_dir=OUT_VIDEO_DIR,
+                        gui_render=GUI_RENDER
+                    )
+                    futures.append(future)
+                for future in concurrent.futures.as_completed(futures):
+                    res = future.result()
+                    print(res)
+        print(f"[{env_id}] <<< action_space={action_space} done")
 
 def main():
     # Force use of spawn to avoid PyTorch/CUDA fork issues
@@ -378,11 +430,14 @@ def main():
     env_ids = [args.envid] if args.envid else DEFAULT_ENV_IDS
     max_workers_total = args.max_workers
     gpu_ids = args.gpus
+    action_spaces = args.action_spaces
 
     print(f"Plan to replay envs: {env_ids} (gpus={gpu_ids})")
+    print(f"Available action spaces: {AVAILABLE_ACTION_SPACES}")
+    print(f"Selected action spaces: {action_spaces}")
     for env_id in env_ids:
         print(f"=== Processing {env_id} ===")
-        process_env_id(env_id, max_workers_total, gpu_ids)
+        process_env_id(env_id, max_workers_total, gpu_ids, action_spaces)
 
 if __name__ == "__main__":
     main()
