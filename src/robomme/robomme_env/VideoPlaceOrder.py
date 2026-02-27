@@ -340,7 +340,7 @@ class VideoPlaceOrder(BaseEnv):
 
             self.which_in_subset=torch.randint(1,len(self.which_targets_to_pick)+1,(1,),generator=self.generator).item()
 
-            logger.debug("self.which_in_subset:",self.which_in_subset)
+            logger.debug("self.which_in_subset: %s", self.which_in_subset)
             self.target_target=self.which_targets_to_pick[self.which_in_subset-1]
 
             self.targets_not_true = [t for i, t in enumerate(self.targets) if self.targets[i]!=self.target_target]
@@ -599,5 +599,4 @@ class VideoPlaceOrder(BaseEnv):
             )
         obs, reward, terminated, truncated, info = super().step(action)
         return obs, reward, terminated, truncated, info
-
 

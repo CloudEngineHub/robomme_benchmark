@@ -285,14 +285,7 @@ def insert_peg(env, planner,direction,obj,insert_obj=None,cut_retreat=False):
             pose = pose * sapien.Pose(q=[0, 0, 0, 1])
         return pose
 
-    def _pose_components():
-        pose = _compute_insert_pose()
-        pose_p = np.asarray(pose.p, dtype=np.float32).reshape(-1)
-        pose_q = np.asarray(pose.q, dtype=np.float32).reshape(-1)
-        return pose, pose_p, pose_q
-
-    def _move_with_offset(offset):
-        # Recompute insert pose each time before moving to stay aligned with the box.
+    def _resolve_target_pose(offset):
         current_pose = _compute_insert_pose()
         offset_vec = np.asarray(offset, dtype=np.float32).reshape(-1).copy()
         if obj == 1 and direction == -1 and offset_vec[0] < 0:
@@ -300,69 +293,71 @@ def insert_peg(env, planner,direction,obj,insert_obj=None,cut_retreat=False):
             relative_pose = insert_obj.pose.inv() * env.agent.tcp.pose
             relative_p = np.asarray(relative_pose.p, dtype=np.float32).reshape(-1)
             offset_vec[0] += relative_p[0]
-        planner.move_to_pose_with_screw(current_pose * sapien.Pose(offset_vec.tolist()))
+        return current_pose * sapien.Pose(offset_vec.tolist())
 
-    def _move_with_offset_with_break(offset):
-        """Move function with interrupt check, interrupt when elapsed_steps > end_steps + 3, execute directly when end_steps is None"""
+    def _record_target_waypoint(target_pose, waypoint_type="close"):
+        _record_waypoint(
+            env,
+            "insert_peg",
+            waypoint_type,
+            waypoint_p=np.asarray(target_pose.p, dtype=np.float32).reshape(-1),
+            waypoint_q=np.asarray(target_pose.q, dtype=np.float32).reshape(-1),
+        )
+
+    def _move_with_offset(offset, *, target_pose=None):
+        if target_pose is None:
+            target_pose = _resolve_target_pose(offset)
+        planner.move_to_pose_with_screw(target_pose)
+
+    def _move_with_offset_with_break(offset, *, target_pose=None):
+        """Move with interrupt check; stop when elapsed_steps > end_steps + 3."""
         end_steps = getattr(env, "end_steps", None)
-        while end_steps is None or int(getattr(env, "elapsed_steps", 0)) <= end_steps + 3:
-            # Inline follow_path logic, support interrupt during motion
-            current_pose = _compute_insert_pose()
-            offset_vec = np.asarray(offset, dtype=np.float32)
-            target_pose = current_pose * sapien.Pose(offset_vec.tolist())
+        if end_steps is not None and int(getattr(env, "elapsed_steps", 0)) > end_steps + 3:
+            return True
 
-            # Plan path
-            pose_for_plan = planner._transform_pose_for_planning(target_pose)
-            pose_p = np.asarray(pose_for_plan.p, dtype=np.float32).reshape(-1)
-            pose_q = np.asarray(pose_for_plan.q, dtype=np.float32).reshape(-1)
-            result = planner.planner.plan_screw(
-                np.concatenate([pose_p, pose_q]),
-                planner.robot.get_qpos().cpu().numpy()[0],
-                time_step=planner.base_env.control_timestep,
-                use_point_cloud=planner.use_point_cloud,
-            )
-            if result["status"] != "Success":
-                return False
+        if target_pose is None:
+            target_pose = _resolve_target_pose(offset)
 
-            # Execute path, check for interrupt at each step
-            n_step = result["position"].shape[0]
-            for i in range(n_step):
-                if end_steps is not None and int(getattr(env, "elapsed_steps", 0)) > end_steps + 3:
-                    logger.debug("break early")
-                    return True  # Interrupted
-                qpos = result["position"][i]
-                if planner.control_mode == "pd_joint_pos_vel":
-                    qvel = result["velocity"][i]
-                    action = np.hstack([qpos, qvel, planner.gripper_state])
-                else:
-                    action = np.hstack([qpos, planner.gripper_state])
-                planner.env.step(action)
-                planner.elapsed_steps += 1
-            return True  # Completed normally
-        return True  # Exceeded step limit
+        # Plan path
+        pose_for_plan = planner._transform_pose_for_planning(target_pose)
+        pose_p = np.asarray(pose_for_plan.p, dtype=np.float32).reshape(-1)
+        pose_q = np.asarray(pose_for_plan.q, dtype=np.float32).reshape(-1)
+        result = planner.planner.plan_screw(
+            np.concatenate([pose_p, pose_q]),
+            planner.robot.get_qpos().cpu().numpy()[0],
+            time_step=planner.base_env.control_timestep,
+            use_point_cloud=planner.use_point_cloud,
+        )
+        if result["status"] != "Success":
+            return False
+
+        # Execute path, check for interrupt at each step
+        n_step = result["position"].shape[0]
+        for i in range(n_step):
+            if end_steps is not None and int(getattr(env, "elapsed_steps", 0)) > end_steps + 3:
+                logger.debug("break early")
+                return True  # Interrupted
+            qpos = result["position"][i]
+            if planner.control_mode == "pd_joint_pos_vel":
+                qvel = result["velocity"][i]
+                action = np.hstack([qpos, qvel, planner.gripper_state])
+            else:
+                action = np.hstack([qpos, planner.gripper_state])
+            planner.env.step(action)
+            planner.elapsed_steps += 1
+        return True  # Completed normally
+
+    def _record_and_move(offset, *, with_break=False, waypoint_type="close"):
+        target_pose = _resolve_target_pose(offset)
+        _record_target_waypoint(target_pose, waypoint_type=waypoint_type)
+        if with_break:
+            return _move_with_offset_with_break(offset, target_pose=target_pose)
+        _move_with_offset(offset, target_pose=target_pose)
+        return True
 ##########################
     if obj==-1:
-
-        _, insert_pose_p, insert_pose_q = _pose_components()
-
-
-        _record_waypoint(
-            env,
-            "insert_peg",
-            "close",
-            waypoint_p=(insert_pose_p + np.array([0.2, 0.0, -0.15], dtype=np.float32)),
-            waypoint_q=insert_pose_q,
-        )
-        _move_with_offset([0.2 , 0, -0.15])
-
-        _record_waypoint(
-            env,
-            "insert_peg",
-            "close",
-            waypoint_p=(insert_pose_p + np.array([0.2, 0.0, 0.0], dtype=np.float32)),
-            waypoint_q=insert_pose_q,
-        )
-        _move_with_offset([0.2 , 0, 0])
+        _record_and_move([0.2, 0, -0.15])
+        _record_and_move([0.2, 0, 0])
 
         _move_with_offset([0.15 , 0, 0])
         #_record_waypoint(env, 'insert_peg', 'close')
@@ -371,52 +366,24 @@ def insert_peg(env, planner,direction,obj,insert_obj=None,cut_retreat=False):
         # for i in range(5):
         #     _move_with_offset([0.05 , 0, 0])
         if cut_retreat!=True:
-            _record_waypoint(
-                env,
-                "insert_peg",
-                "close",
-                waypoint_p=(insert_pose_p + np.array([-0.05, 0.0, 0.0], dtype=np.float32)),
-                waypoint_q=insert_pose_q,
-            )
-            _move_with_offset([-0.05 , 0, 0])
+            _record_and_move([-0.05, 0, 0])
 
 
 
         else:
-            logger.debug(f"cut_retreat mode (obj=-1): elapsed_steps={int(getattr(env, 'elapsed_steps', 0))}, end_steps={env.end_steps}")
-            _record_waypoint(
-                env,
-                "insert_peg",
-                "close",
-                waypoint_p=(insert_pose_p + np.array([-0.05, 0.0, 0.0], dtype=np.float32)),
-                waypoint_q=insert_pose_q,
+            logger.debug(
+                f"cut_retreat mode (obj=-1): "
+                f"elapsed_steps={int(getattr(env, 'elapsed_steps', 0))}, "
+                f"end_steps={getattr(env, 'end_steps', None)}"
             )
-            _move_with_offset_with_break([-0.05, 0, 0])
+            _record_and_move([-0.05, 0, 0], with_break=True)
 
 
 
 
     else:#obj=1
-        
-        _, insert_pose_p, insert_pose_q = _pose_components()
-
-        _record_waypoint(
-            env,
-            "insert_peg",
-            "close",
-            waypoint_p=(insert_pose_p + np.array([-0.2, 0.0, -0.15], dtype=np.float32)),
-            waypoint_q=insert_pose_q,
-        )
-        _move_with_offset([-0.2 , 0, -0.15])
-
-        _record_waypoint(
-            env,
-            "insert_peg",
-            "close",
-            waypoint_p=(insert_pose_p + np.array([-0.2, 0.0, 0.0], dtype=np.float32)),
-            waypoint_q=insert_pose_q,
-        )
-        _move_with_offset([-0.2 , 0, 0])
+        _record_and_move([-0.2, 0, -0.15])
+        _record_and_move([-0.2, 0, 0])
 
         _move_with_offset([-0.15 , 0, 0])
         #_record_waypoint(env, 'insert_peg', 'close')
@@ -425,26 +392,16 @@ def insert_peg(env, planner,direction,obj,insert_obj=None,cut_retreat=False):
         # for i in range(5):
         #     _move_with_offset([-0.05 , 0, 0])
         if cut_retreat!=True:
-            _record_waypoint(
-                env,
-                "insert_peg",
-                "close",
-                waypoint_p=(insert_pose_p + np.array([-0.05, 0.0, 0.0], dtype=np.float32)),
-                waypoint_q=insert_pose_q,
-            )
-            _move_with_offset([-0.05 , 0, 0])
+            _record_and_move([-0.05, 0, 0])
 
 
         else:
-            logger.debug(f"cut_retreat mode (obj=1): elapsed_steps={int(getattr(env, 'elapsed_steps', 0))}, end_steps={env.end_steps}")
-            _record_waypoint(
-                env,
-                "insert_peg",
-                "close",
-                waypoint_p=(insert_pose_p + np.array([-0.05, 0.0, 0.0], dtype=np.float32)),
-                waypoint_q=insert_pose_q,
+            logger.debug(
+                f"cut_retreat mode (obj=1): "
+                f"elapsed_steps={int(getattr(env, 'elapsed_steps', 0))}, "
+                f"end_steps={getattr(env, 'end_steps', None)}"
             )
-            _move_with_offset_with_break([-0.05, 0, 0])
+            _record_and_move([-0.05, 0, 0], with_break=True)
 
 
 

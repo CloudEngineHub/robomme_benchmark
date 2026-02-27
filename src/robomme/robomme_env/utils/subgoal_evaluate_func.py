@@ -471,7 +471,7 @@ def is_A_insert_notB(self, A, B,box,direction=None,mark_end_flag=False,threashol
 
     success = bool(is_obj_insert and is_A_closer and direction_ok)
     if success and mark_end_flag:
-        logger.debug("marked end step!",self.elapsed_steps+3)
+        logger.debug("marked end step! end_at=%s", self.elapsed_steps + 3)
         self.end_steps=int(getattr(self, "elapsed_steps", 0))
     return success
 

@@ -441,7 +441,11 @@ class InsertPeg(BaseEnv):
 
 
         if self.end_steps!=None:# truncate tail, also truncate tail in planner
-            logger.debug(self.elapsed_steps,self.end_steps)
+            logger.debug(
+                "elapsed_steps=%s, end_steps=%s",
+                self.elapsed_steps,
+                self.end_steps,
+            )
             if int(getattr(self, "elapsed_steps", 0))>=self.end_steps+3:
                  self.successflag = torch.tensor([True])
 

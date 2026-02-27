@@ -57,9 +57,9 @@ DEFAULT_ENVS =[
 # "PickHighlight",
 
 "InsertPeg",
-# 'MoveCube',
-# "PatternLock",
-# "RouteStick"
+'MoveCube',
+"PatternLock",
+"RouteStick"
     ]
 
 # Reference dataset metadata root directory: used to read difficulty and seed

@@ -53,9 +53,9 @@ DEFAULT_ENV_IDS = [
 #     "VideoPlaceOrder",
 #     "PickHighlight",
     "InsertPeg",
-#     "MoveCube",
- # "PatternLock",
-#      "RouteStick",
+    "MoveCube",
+ "PatternLock",
+     "RouteStick",
  ]
 
 def _parse_oracle_command(choice_action: Optional[Any]) -> Optional[dict[str, Any]]:

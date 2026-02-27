@@ -233,7 +233,7 @@ class VideoRepick(BaseEnv):
                     raise SceneGenerationError("Failed to generate any cube")
 
                 target_idx = torch.randint(0, len(self.spawned_cubes), (1,), generator=self.generator).item()
-                logger.debug("target index", target_idx)
+                logger.debug("target index: %s", target_idx)
                 self.target_cube_1 = self.spawned_cubes[target_idx]
 
             else:

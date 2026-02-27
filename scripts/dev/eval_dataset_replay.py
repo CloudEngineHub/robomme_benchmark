@@ -37,10 +37,10 @@ DEFAULT_ENV_IDS = [
 # "VideoPlaceButton",
 # "VideoPlaceOrder",
 # "PickHighlight",
-"InsertPeg",
+#"InsertPeg",
 # "MoveCube",
  #"PatternLock",
-# "RouteStick",
+ "RouteStick",
 ]
 
 OUT_VIDEO_DIR = "/data/hongzefu/dataset_replay"
