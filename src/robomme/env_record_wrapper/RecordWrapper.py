@@ -756,26 +756,34 @@ class RobommeRecordWrapper(gym.Wrapper):
 
         return True
 
-    def _clear_waypoint_caches_on_demo_end(self) -> None:
+    def _clear_waypoint_caches_on_demo_end(self, *, clear_pending_waypoint: bool = True) -> None:
         """Clear waypoint caches when video demonstration phase ends."""
         self._current_waypoint_action = None
-        env_unwrapped = getattr(self.env, "unwrapped", self.env)
-        if hasattr(env_unwrapped, "_pending_waypoint"):
-            env_unwrapped._pending_waypoint = None
+        if clear_pending_waypoint:
+            env_unwrapped = getattr(self.env, "unwrapped", self.env)
+            if hasattr(env_unwrapped, "_pending_waypoint"):
+                env_unwrapped._pending_waypoint = None
         logger.debug("Cleared waypoint caches at demo->non-demo transition.")
 
     def step(self, action):
         self.no_object_flag=False
-        # waypoint is now recorded before planner execution, so refresh cache before env.step()
+        # Detect demo->non-demo boundary before this step starts:
+        # clear stale demo cache first, then refresh pending waypoint for current step.
+        pre_step_is_demo = bool(
+            getattr(self.unwrapped, "current_task_demonstration", False)
+        )
+        if self._prev_is_video_demo and not pre_step_is_demo:
+            # Keep env._pending_waypoint for this step so first non-demo waypoint
+            # (often RouteStick midpoint) is not accidentally dropped.
+            self._clear_waypoint_caches_on_demo_end(clear_pending_waypoint=False)
+        # waypoint is recorded before planner execution, so refresh cache before env.step()
         self._refresh_pending_waypoint()
         obs, reward, terminated, truncated, info = super().step(action)
 
-        current_is_demo = bool(
+        post_step_is_demo = bool(
             getattr(self.unwrapped, "current_task_demonstration", False)
         )
-        if self._prev_is_video_demo and not current_is_demo:
-            self._clear_waypoint_caches_on_demo_end()
-        self._prev_is_video_demo = current_is_demo
+        self._prev_is_video_demo = post_step_is_demo
 
 
         # Parse raw observation: RGB, Segmentation Mask all keep data after torch->numpy, ensure direct write to HDF5
