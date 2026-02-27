@@ -151,17 +151,16 @@ def main(
 
             action_gen = generate_sample_actions(action_space_type, env=env)
             for action in action_gen:
-                try:
-                    obs, _, terminated, truncated, info = env.step(action)
-                    frames.extend(_extract_frames(obs))
-                except Exception as exc:
-                    print(f"Step error (usually IK): {exc}")
+                obs, _, terminated, truncated, info = env.step(action)
+                status = info.get("status", "unknown")
+                if status == "error":
+                    print(f"Step error: {info.get('error_message', 'unknown error')}")
                     break
+                frames.extend(_extract_frames(obs))
 
                 if GUI_RENDER:
                     env.render()
                 if terminated or truncated:
-                    status = info.get("status", "unknown")
                     print(f"Outcome: {status}")
                     break
 

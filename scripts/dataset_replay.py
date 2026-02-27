@@ -148,17 +148,17 @@ def process_episode(
             action = _load_action_from_timestep(resolver, step_idx, action_space_type)
             if action is None:
                 break
-            try:
-                obs, _, terminated, truncated, info = env.step(action)
-                frames.extend(_extract_frames(obs))
-            except Exception as e:
-                print(f"Error at step {step_idx}: {e}")
+            obs, _, terminated, truncated, info = env.step(action)
+            status = info.get("status", "unknown")
+            if status == "error":
+                print(f"Error at step {step_idx}: {info.get('error_message', 'unknown error')}")
                 break
+            frames.extend(_extract_frames(obs))
 
             if GUI_RENDER:
                 env.render()
             if terminated or truncated:
-                outcome = info.get("status", "unknown")
+                outcome = status
                 print(f"Outcome: {outcome}")
                 break
             step_idx += 1
