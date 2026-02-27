@@ -20,7 +20,7 @@ from robomme.robomme_env.utils.save_reset_video import save_robomme_video
 ACTION_SPACE = "waypoint"
 
 
-GUI_RENDER = False
+GUI_RENDER = True
 
 DATASET_ROOT = "/data/hongzefu/data_0225"
 
@@ -28,7 +28,7 @@ DEFAULT_ENV_IDS = [
 #"PickXtimes",
 # "StopCube",
 #"SwingXtimes",
- "BinFill",
+# "BinFill",
 # "VideoUnmaskSwap",
 # "VideoUnmask",
 # "ButtonUnmaskSwap",
@@ -39,7 +39,7 @@ DEFAULT_ENV_IDS = [
 # "PickHighlight",
 # "InsertPeg",
 # "MoveCube",
-# "PatternLock",
+ "PatternLock",
 # "RouteStick",
 ]
 
@@ -50,6 +50,8 @@ MAX_STEPS = 1000
 
 
 def main():
+    from robomme.logging_utils import setup_logging
+    setup_logging(level="DEBUG")
     env_id_list = BenchmarkEnvBuilder.get_task_list()
     print(f"Running envs: {env_id_list}")
     print(f"Using action_space: {ACTION_SPACE}")
@@ -67,7 +69,7 @@ def main():
 
         env = None
         for episode in range(episode_count):
-            if episode != 15:
+            if episode !=1:
                 continue
 
             env = env_builder.make_env_for_episode(

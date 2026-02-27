@@ -40,22 +40,22 @@ OUT_VIDEO_DIR = "/data/hongzefu/dataset_replay-0225"
 MAX_STEPS = 1000
 
 DEFAULT_ENV_IDS = [
-     "PickXtimes",
-    "StopCube",
-    "SwingXtimes",
-  "BinFill",
-     "VideoUnmaskSwap",
-     "VideoUnmask",
-     "ButtonUnmaskSwap",
-     "ButtonUnmask",
-    "VideoRepick",
-    "VideoPlaceButton",
-    "VideoPlaceOrder",
-    "PickHighlight",
-    "InsertPeg",
-    "MoveCube",
-     "PatternLock",
-     "RouteStick",
+#      "PickXtimes",
+#     "StopCube",
+#     "SwingXtimes",
+#   "BinFill",
+#      "VideoUnmaskSwap",
+#      "VideoUnmask",
+#      "ButtonUnmaskSwap",
+#      "ButtonUnmask",
+#     "VideoRepick",
+#     "VideoPlaceButton",
+#     "VideoPlaceOrder",
+#     "PickHighlight",
+#     "InsertPeg",
+#     "MoveCube",
+  "PatternLock",
+#      "RouteStick",
  ]
 
 def _parse_oracle_command(choice_action: Optional[Any]) -> Optional[dict[str, Any]]:
@@ -83,6 +83,8 @@ def init_worker(gpu_id: int):
     """
     Worker process initialization function, sets CUDA_VISIBLE_DEVICES.
     """
+    from robomme.logging_utils import setup_logging
+    setup_logging(level="DEBUG")
     os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu_id)
     # print(f"[Worker] Initialized on GPU {gpu_id} (PID: {os.getpid()})")
 
@@ -325,7 +327,7 @@ def _parse_args() -> argparse.Namespace:
         "--action_spaces",
         type=_parse_action_spaces,
         #default=AVAILABLE_ACTION_SPACES.copy(),
-        default=["waypoint", "multi_choice"],
+        default=["waypoint"],
         help=(
             "Comma-separated action spaces to replay in order. "
             "Available: joint_angle,ee_pose,waypoint,multi_choice. "
@@ -423,6 +425,8 @@ def process_env_id(
         print(f"[{env_id}] <<< action_space={action_space} done")
 
 def main():
+    from robomme.logging_utils import setup_logging
+    setup_logging(level="DEBUG")
     # Force use of spawn to avoid PyTorch/CUDA fork issues
     mp.set_start_method("spawn", force=True)
     

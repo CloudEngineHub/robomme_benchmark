@@ -14,6 +14,10 @@ import gymnasium as gym
 
 from ..robomme_env.utils import planner_denseStep
 from ..robomme_env.utils.rpy_util import rpy_xyz_to_quat_wxyz_torch
+from ..robomme_env.utils.planner_fail_safe import ScrewPlanFailure
+
+DATASET_SCREW_MAX_ATTEMPTS = 3
+DATASET_RRT_MAX_ATTEMPTS = 3
 
 
 class RRTPlanFailure(RuntimeError):
@@ -141,12 +145,43 @@ class MultiStepDemonstrationWrapper(gym.Wrapper):
         collected_steps = []
         # if dist < 0.001:
         #     collected_steps.append(self._no_op_step())
-        # else:
-        move_steps = planner_denseStep._collect_dense_steps(
-            planner, lambda: planner.move_to_pose_with_screw(pose)
-        )
+        move_steps = -1
+        for attempt in range(1, DATASET_SCREW_MAX_ATTEMPTS + 1):
+            try:
+                result = planner_denseStep._collect_dense_steps(
+                    planner, lambda: planner.move_to_pose_with_screw(pose)
+                )
+            except ScrewPlanFailure as exc:
+                print(f"[MultiStep] screw planning failed (attempt {attempt}/{DATASET_SCREW_MAX_ATTEMPTS}): {exc}")
+                continue
+            
+            if isinstance(result, int) and result == -1:
+                print(f"[MultiStep] screw planning returned -1 (attempt {attempt}/{DATASET_SCREW_MAX_ATTEMPTS})")
+                continue
+
+            move_steps = result
+            break
+
         if move_steps == -1:
-            raise RRTPlanFailure("move_to_pose_with_screw failed (returned -1)")
+            print(f"[MultiStep] screw planning exhausted; fallback to RRT* (max {DATASET_RRT_MAX_ATTEMPTS} attempts)")
+            for attempt in range(1, DATASET_RRT_MAX_ATTEMPTS + 1):
+                try:
+                    result = planner_denseStep._collect_dense_steps(
+                        planner, lambda: planner.move_to_pose_with_RRTStar(pose)
+                    )
+                except Exception as exc:
+                    print(f"[MultiStep] RRT* planning failed (attempt {attempt}/{DATASET_RRT_MAX_ATTEMPTS}): {exc}")
+                    continue
+
+                if isinstance(result, int) and result == -1:
+                    print(f"[MultiStep] RRT* planning returned -1 (attempt {attempt}/{DATASET_RRT_MAX_ATTEMPTS})")
+                    continue
+
+                move_steps = result
+                break
+
+        if move_steps == -1:
+            raise RRTPlanFailure("Both screw and RRTStar planning exhausted.")
         collected_steps.extend(move_steps)
 
         # PatternLock/RouteStick force skip gripper action (even if planner object has method with same name).
