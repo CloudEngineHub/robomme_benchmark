@@ -625,6 +625,13 @@ def solve_push_to_target(env, planner, obj=None, target=None):
     planner.move_to_pose_with_screw(sapien.Pose(p=end_pos.tolist(), q=reach_pose_q))
 
     # Open gripper after push completion
+    _record_waypoint(
+        env,
+        "solve_push_to_target",
+        "open",
+        waypoint_p=end_pos,
+        waypoint_q=reach_pose_q,
+    )
     planner.open_gripper()
 
 
@@ -844,7 +851,16 @@ def solve_push_to_target_with_peg(env, planner, obj=None, target=None, direction
     planner.move_to_pose_with_screw(sapien.Pose(p=end_pos.tolist(), q=reach_pose_q))
 
     # Open gripper after push completion
+
+    _record_waypoint(
+        env,
+        "solve_push_to_target_with_peg",
+        "open",
+        waypoint_p=end_pos,
+        waypoint_q=reach_pose_q,
+    )
     planner.open_gripper()
+    
 
 def move_to_avoid(env, planner):
 
