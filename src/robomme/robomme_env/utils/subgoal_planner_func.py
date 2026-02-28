@@ -1645,13 +1645,13 @@ def solve_hold_obj(env, planner, static_steps,close=False):
 
 def solve_hold_obj_absTimestep(env,planner,absTimestep):
     current_pose = env.agent.tcp.pose
-    _record_waypoint(
-        env,
-        "solve_hold_obj_absTimestep",
-        "close",
-        waypoint_p=np.asarray(current_pose.p, dtype=np.float32).reshape(-1),
-        waypoint_q=np.asarray(current_pose.q, dtype=np.float32).reshape(-1),
-    )
+    # _record_waypoint(
+    #     env,
+    #     "solve_hold_obj_absTimestep",
+    #     "close",
+    #     waypoint_p=np.asarray(current_pose.p, dtype=np.float32).reshape(-1),
+    #     waypoint_q=np.asarray(current_pose.q, dtype=np.float32).reshape(-1),
+    # )
     while int(getattr(env, "elapsed_steps", 0)) < absTimestep:
         planner.close_gripper()
     return None

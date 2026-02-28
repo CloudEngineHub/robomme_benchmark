@@ -42,7 +42,7 @@ Key features include:
 # List of all supported environment module names
 DEFAULT_ENVS =[
 # "PickXtimes",
-# "StopCube",
+"StopCube",
 # "SwingXtimes",
 #  "BinFill",
 
@@ -56,10 +56,10 @@ DEFAULT_ENVS =[
 # "VideoPlaceOrder",
 # "PickHighlight",
 
-"InsertPeg",
-'MoveCube',
-"PatternLock",
-"RouteStick"
+# "InsertPeg",
+# 'MoveCube',
+# "PatternLock",
+# "RouteStick"
     ]
 
 # Reference dataset metadata root directory: used to read difficulty and seed

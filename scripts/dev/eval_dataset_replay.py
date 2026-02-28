@@ -26,7 +26,7 @@ DATASET_ROOT = "/data/hongzefu/data_0225"
 
 DEFAULT_ENV_IDS = [
 #"PickXtimes",
-# "StopCube",
+ "StopCube",
 #"SwingXtimes",
 # "BinFill",
 # "VideoUnmaskSwap",
@@ -38,7 +38,7 @@ DEFAULT_ENV_IDS = [
 # "VideoPlaceOrder",
 # "PickHighlight",
 #"InsertPeg",
-"MoveCube",
+#"MoveCube",
  #"PatternLock",
  #"RouteStick",
 ]
