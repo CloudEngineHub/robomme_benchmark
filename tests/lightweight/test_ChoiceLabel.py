@@ -65,7 +65,7 @@ def test_episode_dataset_resolver_extracts_label_command_and_ignores_empty_label
             data=json.dumps(
                 {
                     "label": "b",
-                    "point": [12, 34],  # stored as [y, x]
+                    "position": [0.12, 0.34, 0.56],
                 }
             ),
             dtype=h5py.string_dtype(encoding="utf-8"),
@@ -81,7 +81,7 @@ def test_episode_dataset_resolver_extracts_label_command_and_ignores_empty_label
             data=json.dumps(
                 {
                     "label": "",
-                    "point": [20, 30],
+                    "position": [0.2, 0.3, 0.4],
                 }
             ),
             dtype=h5py.string_dtype(encoding="utf-8"),
@@ -97,7 +97,7 @@ def test_episode_dataset_resolver_extracts_label_command_and_ignores_empty_label
     )
     try:
         command0 = resolver.get_step("multi_choice", 0)
-        assert command0 == {"label": "b", "point": [12, 34]}
+        assert command0 == {"label": "b", "position": [0.12, 0.34, 0.56]}
 
         command1 = resolver.get_step("multi_choice", 1)
         assert command1 is None

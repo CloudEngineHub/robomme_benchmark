@@ -343,7 +343,7 @@ class DemonstrationWrapper(gym.Wrapper):
             'task_goal': language_goal,
         }
         if self.include_available_multi_choices:
-            dummy_target = {"obj": None, "name": None, "seg_id": None, "click_point": None, "centroid_point": None}
+            dummy_target = {"obj": None, "name": None, "seg_id": None}
             raw_options = get_vqa_options(self, None, dummy_target, env_id)
             available_options = [
                 {"label": opt.get("label"), "action": opt.get("action", "Unknown"), "need_parameter": bool(opt.get("available"))}

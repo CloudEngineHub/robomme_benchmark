@@ -12,8 +12,7 @@ from mani_skill.examples.motionplanning.panda.motionplanner_stick import (
 from ..robomme_env.utils import planner_denseStep
 from ..robomme_env.utils.oracle_action_matcher import (
     find_exact_label_option_index,
-    normalize_and_clip_point_yx,
-    select_target_with_point,
+    select_target_with_position,
 )
 from ..logging_utils import logger
 
@@ -29,7 +28,7 @@ from ..logging_utils import logger
 class OraclePlannerDemonstrationWrapper(gym.Wrapper):
     """
     Wrap Robomme environment with Oracle planning logic into Gym Wrapper for demonstration/evaluation;
-    Input to step is command_dict (containing label and optional point).
+    Input to step is command_dict (containing label and optional position).
     step returns obs as dict-of-lists and reward/terminated/truncated as last-step values.
     """
 
@@ -41,11 +40,7 @@ class OraclePlannerDemonstrationWrapper(gym.Wrapper):
         self.planner = None
         self.language_goal = None
 
-        # State: segmentation map, frame buffer, current available options
-        self.seg_vis = None
-        self.seg_raw = None
-        self.base_frames = []
-        self.wrist_frames = []
+        # State: current available options
         self.available_options = []
         self._oracle_screw_max_attempts = 3
         self._oracle_rrt_max_attempts = 3
@@ -187,18 +182,10 @@ class OraclePlannerDemonstrationWrapper(gym.Wrapper):
             "obj": None,
             "name": None,
             "seg_id": None,
-            "click_point": None,
-            "centroid_point": None,
+            "position": None,
+            "match_distance": None,
             "selection_mode": None,
-            "used_random_fallback": False,
         }
-
-    def _extract_seg_raw(self):
-        obs = self.env.unwrapped.get_obs(unflattened=True)
-        seg = obs["sensor_data"]["base_camera"]["segmentation"]
-        seg = seg.cpu().numpy() if hasattr(seg, "cpu") else np.asarray(seg)
-        seg_raw = (seg[0] if seg.ndim > 2 else seg).squeeze().astype(np.int64)
-        return seg_raw
 
     def _build_step_options(self):
         selected_target = self._empty_target()
@@ -226,27 +213,18 @@ class OraclePlannerDemonstrationWrapper(gym.Wrapper):
             )
             return None, None
 
-        return found_idx, command_dict.get("point")
+        return found_idx, command_dict.get("position")
 
-    def _apply_click_target(self, selected_target, option, target_point, seg_raw):
-        if target_point is None or seg_raw is None:
+    def _apply_position_target(self, selected_target, option, target_position):
+        if target_position is None:
             return
 
-        h, w = seg_raw.shape[:2]
-        seg_id_map = getattr(self.env.unwrapped, "segmentation_id_map", {}) or {}
-        best_cand = select_target_with_point(
-            seg_raw=seg_raw,
-            seg_id_map=seg_id_map,
+        best_cand = select_target_with_position(
             available=option.get("available"),
-            point_like=target_point,
+            position_like=target_position,
         )
         if best_cand is not None:
             selected_target.update(best_cand)
-            return
-
-        click_point = normalize_and_clip_point_yx(target_point, height=h, width=w)
-        if click_point is not None:
-            selected_target["click_point"] = click_point
 
     def _execute_selected_option(self, option_idx, solve_options):
         option = solve_options[option_idx]
@@ -269,36 +247,9 @@ class OraclePlannerDemonstrationWrapper(gym.Wrapper):
         evaluation = self.env.unwrapped.evaluate(solve_complete_eval=True)
         logger.debug(f"Evaluation result: {evaluation}")
 
-    @staticmethod
-    def _frame_count_from_obs_batch(obs_batch) -> int:
-        if not isinstance(obs_batch, dict):
-            return 0
-        front_rgb_list = obs_batch.get("front_rgb_list")
-        if isinstance(front_rgb_list, list):
-            return len(front_rgb_list)
-        return 0
-
-    @staticmethod
-    def _build_fallback_blue_box_mask(
-        frame_count: int,
-        used_random_fallback: bool,
-    ) -> list[bool]:
-        n = max(0, int(frame_count))
-        if n == 0:
-            return []
-        if not used_random_fallback:
-            return [False] * n
-        return [True] + ([False] * (n - 1))
-
-    def _format_step_output(self, batch, used_random_fallback: bool = False):
+    def _format_step_output(self, batch):
         obs_batch, reward_batch, terminated_batch, truncated_batch, info_batch = batch
         info_flat = self._flatten_info_batch(info_batch)
-        frame_count = self._frame_count_from_obs_batch(obs_batch)
-        info_flat["oracle_random_fallback_used"] = bool(used_random_fallback)
-        info_flat["oracle_random_fallback_blue_box_mask"] = self._build_fallback_blue_box_mask(
-            frame_count=frame_count,
-            used_random_fallback=used_random_fallback,
-        )
         info_flat["available_multi_choices"] = getattr(self, "available_options", [])
         return (
             obs_batch,
@@ -310,31 +261,42 @@ class OraclePlannerDemonstrationWrapper(gym.Wrapper):
 
     def step(self, action):
         """
-        Execute one step: action is command_dict, must contain "label", optional "point".
+        Execute one step: action is command_dict, must contain "label", optional "position".
         Return last-step signals for reward/terminated/truncated while keeping obs as dict-of-lists.
         """
-        # 1) Read the latest segmentation map from current observation for click-to-target grounding.
-        self.seg_raw = self._extract_seg_raw()
-        # 2) Build solver options once and prepare a mutable selected_target holder for solve() closures.
+        # 1) Build solver options once and prepare a mutable selected_target holder for solve() closures.
         selected_target, solve_options = self._build_step_options()
-        # 3) Validate/resolve the incoming command into (option index, optional click point).
-        found_idx, target_point = self._resolve_command(action, solve_options)
+        # 2) Validate/resolve the incoming command into (option index, optional target position).
+        found_idx, target_position = self._resolve_command(action, solve_options)
 
-        # 4) For invalid command or unmatched label, keep legacy behavior: return an empty dense batch.
+        # 3) For invalid command or unmatched label, keep legacy behavior: return an empty dense batch.
         if found_idx is None:
             return self._format_step_output(planner_denseStep.empty_step_batch())
 
-        # 5) If a point is provided, map it to a concrete candidate target (or fallback click point only).
-        self._apply_click_target(
+        # 4) If a position is provided, map it to the nearest candidate target.
+        option = solve_options[found_idx]
+        self._apply_position_target(
             selected_target=selected_target,
-            option=solve_options[found_idx],
-            target_point=target_point,
-            seg_raw=self.seg_raw,
+            option=option,
+            target_position=target_position,
         )
-        used_random_fallback = bool(selected_target.get("used_random_fallback", False))
-        # 6) Execute selected solve() with dense step collection; raise on solve == -1.
+
+        requires_target = "available" in option
+        if requires_target:
+            if target_position is None:
+                raise ValueError(
+                    f"Multi-choice action '{option.get('action', 'Unknown')}' requires "
+                    "a target position=[x, y, z], but command did not provide it."
+                )
+            if selected_target.get("obj") is None:
+                raise ValueError(
+                    f"Multi-choice action '{option.get('action', 'Unknown')}' could not match "
+                    f"any available candidate from position={target_position}."
+                )
+
+        # 5) Execute selected solve() with dense step collection; raise on solve == -1.
         batch = self._execute_selected_option(found_idx, solve_options)
-        # 7) Run post-solve environment evaluation to keep existing side effects and logging.
+        # 6) Run post-solve environment evaluation to keep existing side effects and logging.
         self._post_eval()
-        # 8) Convert batch to wrapper output contract (last reward/terminated/truncated + flattened info).
-        return self._format_step_output(batch, used_random_fallback=used_random_fallback)
+        # 7) Convert batch to wrapper output contract (last reward/terminated/truncated + flattened info).
+        return self._format_step_output(batch)

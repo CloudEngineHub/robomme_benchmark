@@ -4,7 +4,7 @@ import json
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, List, Optional, Union
+from typing import Any, Callable, List, Optional, Union
 
 import gymnasium as gym
 import h5py
@@ -343,7 +343,7 @@ class RobommeRecordWrapper(gym.Wrapper):
         subgoal_online_text,
         grounded_online_text,
         choice_action_label,
-        choice_action_point,
+        choice_action_position,
         task_index,
         is_completed,
     ):
@@ -353,7 +353,7 @@ class RobommeRecordWrapper(gym.Wrapper):
         choice_action_json = json.dumps(
             {
                 "label": choice_action_label,
-                "point": choice_action_point,
+                "position": choice_action_position,
             },
             ensure_ascii=False,
         )
@@ -678,10 +678,6 @@ class RobommeRecordWrapper(gym.Wrapper):
             "obj": None,
             "name": None,
             "seg_id": None,
-            "click_point": None,
-            "centroid_point": None,
-            "selection_mode": None,
-            "used_random_fallback": False,
         }
         env_id = getattr(getattr(self.unwrapped, "spec", None), "id", None) or self.env_id
 
@@ -707,6 +703,59 @@ class RobommeRecordWrapper(gym.Wrapper):
             )
             return ""
         return matched_label
+
+    @staticmethod
+    def _collect_choice_segment_candidates(item: Any, out: List[Any]) -> None:
+        if isinstance(item, (list, tuple)):
+            for child in item:
+                RobommeRecordWrapper._collect_choice_segment_candidates(child, out)
+            return
+        if isinstance(item, dict):
+            for child in item.values():
+                RobommeRecordWrapper._collect_choice_segment_candidates(child, out)
+            return
+        if item is not None:
+            out.append(item)
+
+    @staticmethod
+    def _extract_actor_position_xyz(actor: Any) -> Optional[List[float]]:
+        pose = getattr(actor, "pose", None)
+        if pose is None and hasattr(actor, "get_pose"):
+            try:
+                pose = actor.get_pose()
+            except Exception:
+                return None
+        if pose is None:
+            return None
+
+        pos = getattr(pose, "p", None)
+        if pos is None:
+            return None
+        if hasattr(pos, "detach"):
+            pos = pos.detach()
+        if hasattr(pos, "cpu"):
+            pos = pos.cpu()
+        try:
+            pos_np = np.asarray(pos, dtype=np.float64).reshape(-1)
+        except (TypeError, ValueError):
+            return None
+        if pos_np.size < 3:
+            return None
+
+        xyz = pos_np[:3]
+        if not np.all(np.isfinite(xyz)):
+            return None
+        return xyz.tolist()
+
+    def _get_choice_action_position(self) -> List[float]:
+        current_segment = getattr(self, "current_segment", None)
+        candidates: List[Any] = []
+        self._collect_choice_segment_candidates(current_segment, candidates)
+        for candidate in candidates:
+            pos = self._extract_actor_position_xyz(candidate)
+            if pos is not None:
+                return pos
+        return []
 
     def _refresh_pending_waypoint(self, expected_is_demo: bool) -> bool:
         """
@@ -900,6 +949,7 @@ class RobommeRecordWrapper(gym.Wrapper):
                 segmentation_result,
                 segmentation_result_online,
             )
+            choice_action_position = self._get_choice_action_position()
             combined = self._video_compose_planner_online_rows(
                 prepared,
                 subgoal_text,
@@ -907,7 +957,7 @@ class RobommeRecordWrapper(gym.Wrapper):
                 subgoal_online_text,
                 self.current_subgoal_segment_online_filled,
                 choice_action_label=self._current_choice_label,
-                choice_action_point=list(self.segmentation_points[0]) if self.segmentation_points else [],
+                choice_action_position=choice_action_position,
                 task_index=_cur_task_index,
                 is_completed=is_completed,
             )
@@ -1017,7 +1067,7 @@ class RobommeRecordWrapper(gym.Wrapper):
                     'eef_action': fk_eef_action,
                     'choice_action': json.dumps({
                         "label": self._current_choice_label,
-                        "point": list(self.segmentation_points[0]) if self.segmentation_points else [],
+                        "position": choice_action_position,
                     }),
                 },
                 'info': {
@@ -1255,10 +1305,6 @@ class RobommeRecordWrapper(gym.Wrapper):
                     "obj": None,
                     "name": None,
                     "seg_id": None,
-                    "click_point": None,
-                    "centroid_point": None,
-                    "selection_mode": None,
-                    "used_random_fallback": False,
                 }
                 
                 env_id = getattr(getattr(self.unwrapped, "spec", None), "id", None) or self.env_id

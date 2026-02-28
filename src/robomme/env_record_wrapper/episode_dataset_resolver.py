@@ -214,18 +214,18 @@ class EpisodeDatasetResolver:
         return str(value)
 
     @staticmethod
-    def _normalize_choice_point(point_like: Any) -> Optional[List[int]]:
-        if not isinstance(point_like, (list, tuple, np.ndarray)) or len(point_like) < 2:
+    def _normalize_choice_position(position_like: Any) -> Optional[List[float]]:
+        if not isinstance(position_like, (list, tuple, np.ndarray)) or len(position_like) < 3:
             return None
         try:
-            y = float(point_like[0])
-            x = float(point_like[1])
+            x = float(position_like[0])
+            y = float(position_like[1])
+            z = float(position_like[2])
         except (TypeError, ValueError):
             return None
-        if not np.isfinite(y) or not np.isfinite(x):
+        if not np.isfinite(x) or not np.isfinite(y) or not np.isfinite(z):
             return None
-        # Stored format is [y, x]; keep execution format as [y, x].
-        return [int(y), int(x)]
+        return [x, y, z]
 
     def _extract_choice_action(self, timestep_group: h5py.Group) -> Optional[Dict[str, Any]]:
         action_grp = timestep_group.get("action")
@@ -249,9 +249,9 @@ class EpisodeDatasetResolver:
             return None
 
         command: Dict[str, Any] = {"label": label}
-        point = self._normalize_choice_point(payload.get("point"))
-        if point is not None:
-            command["point"] = point
+        position = self._normalize_choice_position(payload.get("position"))
+        if position is not None:
+            command["position"] = position
 
         return command
 

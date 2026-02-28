@@ -64,28 +64,28 @@ def _build_h5(h5_path: Path) -> None:
         _make_timestep(
             ep,
             0,
-            choice_action={"label": "a", "point": [1, 2]},
+            choice_action={"label": "a", "position": [0.1, 0.2, 0.3]},
             is_keyframe=False,
         )
         # 有效 keyframe: 应被读取
         _make_timestep(
             ep,
             1,
-            choice_action={"label": "b", "point": [12, 34]},
+            choice_action={"label": "b", "position": [1.2, 3.4, 5.6]},
             is_keyframe=True,
         )
         # keyframe 但空标签: 跳过
         _make_timestep(
             ep,
             2,
-            choice_action={"label": "", "point": [20, 30]},
+            choice_action={"label": "", "position": [2.0, 3.0, 4.0]},
             is_keyframe=True,
         )
         # video demo keyframe: 跳过
         _make_timestep(
             ep,
             3,
-            choice_action={"label": "c", "point": [7, 8]},
+            choice_action={"label": "c", "position": [7.0, 8.0, 9.0]},
             is_video_demo=True,
             is_keyframe=True,
         )
@@ -93,7 +93,7 @@ def _build_h5(h5_path: Path) -> None:
         _make_timestep(
             ep,
             4,
-            choice_action={"label": "d", "point": [90, 11]},
+            choice_action={"label": "d", "position": [9.0, 1.1, 2.2]},
             is_keyframe=True,
         )
 
@@ -107,7 +107,7 @@ def _assert_record_schema_contract(h5_path: Path) -> None:
         payload = json.loads(raw)
         assert "serial_number" not in payload, "choice_action should not store serial_number"
         assert payload["label"] == "b"
-        assert payload["point"] == [12, 34]
+        assert payload["position"] == [1.2, 3.4, 5.6]
         assert bool(ts1["info"]["is_keyframe"][()]) is True
 
 
@@ -121,11 +121,11 @@ def _assert_resolver_reads_by_is_keyframe(h5_path: Path) -> None:
         assert resolver.get_step("multi_choice", -1) is None
 
         command0 = resolver.get_step("multi_choice", 0)
-        assert command0 == {"label": "b", "point": [34, 12]}
+        assert command0 == {"label": "b", "position": [1.2, 3.4, 5.6]}
         assert "serial_number" not in command0
 
         command1 = resolver.get_step("multi_choice", 1)
-        assert command1 == {"label": "d", "point": [11, 90]}
+        assert command1 == {"label": "d", "position": [9.0, 1.1, 2.2]}
         assert "serial_number" not in command1
 
         assert resolver.get_step("multi_choice", 2) is None

@@ -1,5 +1,4 @@
-import random
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 
@@ -27,26 +26,6 @@ def map_action_text_to_option_label(action_text: Any, options: List[dict]) -> Op
     return None
 
 
-def normalize_and_clip_point_yx(
-    point_like: Any,
-    height: int,
-    width: int,
-) -> Optional[Tuple[int, int]]:
-    """Normalize arbitrary point-like input into clipped (y, x)."""
-    if point_like is None:
-        return None
-    if not isinstance(point_like, (list, tuple, np.ndarray)) or len(point_like) < 2:
-        return None
-    try:
-        y = int(float(point_like[0]))
-        x = int(float(point_like[1]))
-    except (TypeError, ValueError):
-        return None
-    y = max(0, min(y, int(height) - 1))
-    x = max(0, min(x, int(width) - 1))
-    return y, x
-
-
 def _collect_candidates(item: Any, out: List[Any]) -> None:
     if isinstance(item, (list, tuple)):
         for child in item:
@@ -67,100 +46,79 @@ def _unique_candidates(available: Any) -> List[Any]:
     return list(dict.fromkeys(candidates))
 
 
-def _target_ids_for_actor(seg_id_map: Dict[int, Any], actor: Any) -> List[int]:
-    return [int(seg_id) for seg_id, obj in seg_id_map.items() if obj is actor]
-
-
-def _scan_actor_masks(
-    seg_raw: np.ndarray,
-    seg_id_map: Dict[int, Any],
-    actor: Any,
-    click_yx: Tuple[int, int],
-) -> Tuple[Optional[Tuple[int, Tuple[int, int]]], Optional[Tuple[int, Tuple[int, int]]]]:
-    """
-    Return (hit, observed):
-    - hit: clicked (seg_id, centroid) for this actor if click is inside mask.
-    - observed: first visible (seg_id, centroid) for this actor.
-    """
-    cy, cx = click_yx
-    observed: Optional[Tuple[int, Tuple[int, int]]] = None
-
-    for target_id in _target_ids_for_actor(seg_id_map, actor):
-        mask = seg_raw == target_id
-        if not np.any(mask):
-            continue
-
-        ys, xs = np.nonzero(mask)
-        centroid_point = (int(ys.mean()), int(xs.mean()))
-        if observed is None:
-            observed = (target_id, centroid_point)
-
-        if bool(mask[cy, cx]):
-            return (target_id, centroid_point), observed
-
-    return None, observed
-
-
-def select_target_with_point(
-    seg_raw: np.ndarray,
-    seg_id_map: Dict[int, Any],
-    available: Any,
-    point_like: Any,
-) -> Optional[Dict[str, Any]]:
-    """
-    Two-stage matching:
-    1) If click point hits a visible candidate mask, return that actor immediately.
-    2) Otherwise randomly sample one actor from candidate list as fallback.
-    """
-    if seg_raw is None:
+def _normalize_position_xyz(position_like: Any) -> Optional[np.ndarray]:
+    if position_like is None:
         return None
 
-    h, w = seg_raw.shape[:2]
-    point_yx = normalize_and_clip_point_yx(point_like, height=h, width=w)
-    if point_yx is None:
+    # Accept torch-like tensors and move to host before numpy conversion.
+    if hasattr(position_like, "detach"):
+        position_like = position_like.detach()
+    if hasattr(position_like, "cpu"):
+        position_like = position_like.cpu()
+
+    try:
+        pos_arr = np.asarray(position_like, dtype=np.float64).reshape(-1)
+    except (TypeError, ValueError):
+        return None
+
+    if pos_arr.size < 3:
+        return None
+    pos = pos_arr[:3]
+
+    if pos.size != 3 or not np.all(np.isfinite(pos)):
+        return None
+    return pos
+
+
+def _get_actor_position_xyz(actor: Any) -> Optional[np.ndarray]:
+    pose = getattr(actor, "pose", None)
+    if pose is None and hasattr(actor, "get_pose"):
+        try:
+            pose = actor.get_pose()
+        except Exception:
+            return None
+    if pose is None:
+        return None
+
+    pos = getattr(pose, "p", None)
+    if pos is None:
+        return None
+    return _normalize_position_xyz(pos)
+
+
+def select_target_with_position(
+    available: Any,
+    position_like: Any,
+) -> Optional[Dict[str, Any]]:
+    target_pos = _normalize_position_xyz(position_like)
+    if target_pos is None:
         return None
 
     unique_candidates = _unique_candidates(available)
     if not unique_candidates:
         return None
 
-    cy, cx = point_yx
-    observed_info: Dict[Any, Tuple[int, Tuple[int, int]]] = {}
+    best_actor: Optional[Any] = None
+    best_pos: Optional[np.ndarray] = None
+    best_dist: Optional[float] = None
 
     for actor in unique_candidates:
-        hit, observed = _scan_actor_masks(
-            seg_raw=seg_raw,
-            seg_id_map=seg_id_map,
-            actor=actor,
-            click_yx=point_yx,
-        )
-        if observed is not None and actor not in observed_info:
-            observed_info[actor] = observed
+        actor_pos = _get_actor_position_xyz(actor)
+        if actor_pos is None:
+            continue
+        dist = float(np.linalg.norm(actor_pos - target_pos))
+        if best_dist is None or dist < best_dist:
+            best_actor = actor
+            best_pos = actor_pos
+            best_dist = dist
 
-        if hit is not None:
-            target_id, centroid_point = hit
-            return {
-                "obj": actor,
-                "name": getattr(actor, "name", f"id_{target_id}"),
-                "seg_id": target_id,
-                "click_point": (int(cy), int(cx)),
-                "centroid_point": centroid_point,
-                "selection_mode": "hit",
-                "used_random_fallback": False,
-            }
-
-    fallback_actor = random.choice(unique_candidates)
-    fallback_seg_id: Optional[int] = None
-    fallback_centroid: Optional[Tuple[int, int]] = None
-    if fallback_actor in observed_info:
-        fallback_seg_id, fallback_centroid = observed_info[fallback_actor]
+    if best_actor is None or best_pos is None or best_dist is None:
+        return None
 
     return {
-        "obj": fallback_actor,
-        "name": getattr(fallback_actor, "name", "unknown"),
-        "seg_id": fallback_seg_id,
-        "click_point": (int(cy), int(cx)),
-        "centroid_point": fallback_centroid,
-        "selection_mode": "fallback_random",
-        "used_random_fallback": True,
+        "obj": best_actor,
+        "name": getattr(best_actor, "name", "unknown"),
+        "position": best_pos.astype(np.float64).tolist(),
+        "match_distance": best_dist,
+        "selection_mode": "nearest_position",
     }
