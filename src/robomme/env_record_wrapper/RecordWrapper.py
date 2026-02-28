@@ -740,10 +740,13 @@ class RobommeRecordWrapper(gym.Wrapper):
             extrinsic_cv=front_camera_extrinsic,
             image_shape=image_shape,
         )
+        point_yx: List[int] = []
+        if position_2d is not None and len(position_2d) >= 2:
+            # project_world_to_pixel returns [x, y]; schema stores [y, x].
+            point_yx = [int(position_2d[1]), int(position_2d[0])]
         return {
             "label": label,
-            "position": position_2d if position_2d is not None else [],
-            "position_3d": position_3d,
+            "point": point_yx,
         }
 
     def _refresh_pending_waypoint(self, expected_is_demo: bool) -> bool:
@@ -870,7 +873,7 @@ class RobommeRecordWrapper(gym.Wrapper):
         # Detect non-online subgoal switch via task_index (integer comparison).
         # This correctly handles consecutive tasks with identical subgoal_segment strings.
         _cur_task_index = getattr(self.unwrapped, 'current_task_index', -1)
-        choice_action_keyframe = False
+        choice_action_subgoal_boundary = False
         if _cur_task_index != self._prev_task_index:
             self._current_choice_action_text = getattr(
                 self.unwrapped, "current_choice_label", ""
@@ -880,7 +883,7 @@ class RobommeRecordWrapper(gym.Wrapper):
                 _cur_task_index,
             )
             self._prev_task_index = _cur_task_index
-            choice_action_keyframe = True
+            choice_action_subgoal_boundary = True
             self.previous_subgoal_segment = segmentation_output["updated_previous_subgoal_segment"]
         self.segmentation_points = segmentation_output["segmentation_points"]
         self.current_subgoal_segment_filled = segmentation_output[
@@ -1069,7 +1072,7 @@ class RobommeRecordWrapper(gym.Wrapper):
                     'grounded_subgoal_online': self.current_subgoal_segment_online_filled,
                     'is_completed': is_completed,
                     'is_video_demo': self.current_task_demonstration if hasattr(self, 'current_task_demonstration') else False,
-                    'is_keyframe': choice_action_keyframe,
+                    'is_subgoal_boundary': choice_action_subgoal_boundary,
                 },
                 '_setup_camera_intrinsics': {
                     'front_camera_intrinsic': base_camera_intrinsic,
@@ -1284,7 +1287,7 @@ class RobommeRecordWrapper(gym.Wrapper):
                     data=bool(info_data.get("is_completed", False)),
                 )
                 info_group.create_dataset("is_video_demo", data=info_data['is_video_demo'])
-                info_group.create_dataset("is_keyframe", data=info_data['is_keyframe'])
+                info_group.create_dataset("is_subgoal_boundary", data=info_data['is_subgoal_boundary'])
 
             # Write setup info (seed, difficulty, task list, camera intrinsics)
             setup_group = episode_group.create_group(f"setup")

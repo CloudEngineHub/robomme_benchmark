@@ -79,11 +79,11 @@ def _is_video_demo(ts: h5py.Group) -> bool:
     return bool(np.reshape(np.asarray(info["is_video_demo"][()]), -1)[0])
 
 
-def _is_keyframe(ts: h5py.Group) -> bool:
+def _is_subgoal_boundary(ts: h5py.Group) -> bool:
     info = ts.get("info")
-    if info is None or "is_keyframe" not in info:
+    if info is None or "is_subgoal_boundary" not in info:
         return False
-    return bool(np.reshape(np.asarray(info["is_keyframe"][()]), -1)[0])
+    return bool(np.reshape(np.asarray(info["is_subgoal_boundary"][()]), -1)[0])
 
 
 def _decode_h5_str(raw) -> str:
@@ -102,7 +102,7 @@ def _build_action_sequence(
     扫描整个 episode，返回去重后的 action 序列：
     - joint_angle / ee_pose：所有非 video-demo 步的 action（顺序，不去重）
     - waypoint：去除相邻重复的 waypoint_action（同 EpisodeDatasetResolver）
-    - multi_choice：仅 is_keyframe=True 的步的 choice_action（JSON dict）
+    - multi_choice：仅 is_subgoal_boundary=True 的步的 choice_action（JSON dict）
     """
     timestep_keys = sorted(
         (k for k in episode_data.keys() if k.startswith("timestep_")),
@@ -143,7 +143,7 @@ def _build_action_sequence(
                 prev_waypoint = wa.copy()
 
         elif action_space_type == "multi_choice":
-            if not _is_keyframe(ts):
+            if not _is_subgoal_boundary(ts):
                 continue
             if "choice_action" not in action_grp:
                 continue

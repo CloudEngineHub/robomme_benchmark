@@ -123,6 +123,21 @@ def _normalize_pixel_xy(pixel_like: Any) -> Optional[list[int]]:
     return [int(np.rint(x)), int(np.rint(y))]
 
 
+def _normalize_point_yx_to_pixel_xy(point_like: Any) -> Optional[list[int]]:
+    if not isinstance(point_like, (list, tuple, np.ndarray)):
+        return None
+    if len(point_like) < 2:
+        return None
+    try:
+        y = float(point_like[0])
+        x = float(point_like[1])
+    except (TypeError, ValueError):
+        return None
+    if not np.isfinite(x) or not np.isfinite(y):
+        return None
+    return [int(np.rint(x)), int(np.rint(y))]
+
+
 def _find_oracle_wrapper(env_like: Any) -> Optional[OraclePlannerDemonstrationWrapper]:
     current = env_like
     visited: set[int] = set()
@@ -143,7 +158,7 @@ def _collect_multi_choice_visualization(
     env_like: Any,
     command: dict[str, Any],
 ) -> tuple[list[list[int]], Optional[list[int]], Optional[list[int]]]:
-    clicked_pixel = _normalize_pixel_xy(command.get("position"))
+    clicked_pixel = _normalize_point_yx_to_pixel_xy(command.get("point"))
     oracle_wrapper = _find_oracle_wrapper(env_like)
     if oracle_wrapper is None:
         return [], clicked_pixel, None

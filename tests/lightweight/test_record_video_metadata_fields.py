@@ -12,8 +12,12 @@ import ast
 import sys
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from tests._shared.repo_paths import find_repo_root
+
+pytestmark = [pytest.mark.lightweight, pytest.mark.gpu]
 
 
 def _record_wrapper_path() -> Path:
@@ -53,8 +57,7 @@ def _collect_create_dataset_names(tree: ast.AST) -> set[str]:
     return names
 
 
-def main() -> None:
-    print("\n[TEST] RecordWrapper video metadata fields")
+def _run_assertions() -> None:
     source, tree = _load_source_tree()
     dict_keys = _collect_dict_keys(tree)
     dataset_names = _collect_create_dataset_names(tree)
@@ -66,6 +69,7 @@ def main() -> None:
         "grounded_subgoal",
         "grounded_subgoal_online",
         "is_completed",
+        "is_subgoal_boundary",
     }
     missing_record_keys = sorted(required_record_keys - dict_keys)
     assert not missing_record_keys, f"record_data 缺少字段: {missing_record_keys}"
@@ -78,6 +82,7 @@ def main() -> None:
         "grounded_subgoal",
         "grounded_subgoal_online",
         "is_completed",
+        "is_subgoal_boundary",
     }
     missing_h5_datasets = sorted(required_h5_datasets - dataset_names)
     assert not missing_h5_datasets, f"HDF5 写入缺少字段: {missing_h5_datasets}"
@@ -93,6 +98,15 @@ def main() -> None:
         "info.is_completed:",
     ]:
         assert token in source, f"视频叠字缺少字段标签: {token}"
+
+
+def test_record_video_metadata_fields_pytest() -> None:
+    _run_assertions()
+
+
+def main() -> None:
+    print("\n[TEST] RecordWrapper video metadata fields")
+    _run_assertions()
     print("  video ✓ 叠字包含字段名标签")
 
     print("\nPASS: record video metadata fields tests passed")

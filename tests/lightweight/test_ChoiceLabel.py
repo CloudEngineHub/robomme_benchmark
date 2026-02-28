@@ -68,15 +68,14 @@ def test_episode_dataset_resolver_extracts_label_command_and_ignores_empty_label
             data=json.dumps(
                 {
                     "label": "b",
-                    "position": [12, 34],
-                    "position_3d": [0.12, 0.34, 0.56],
+                    "point": [34, 12],
                 }
             ),
             dtype=h5py.string_dtype(encoding="utf-8"),
         )
         ts0_info = ts0.create_group("info")
         ts0_info.create_dataset("is_video_demo", data=False)
-        ts0_info.create_dataset("is_keyframe", data=True)
+        ts0_info.create_dataset("is_subgoal_boundary", data=True)
 
         ts1 = episode_group.create_group("timestep_1")
         ts1_action = ts1.create_group("action")
@@ -85,15 +84,14 @@ def test_episode_dataset_resolver_extracts_label_command_and_ignores_empty_label
             data=json.dumps(
                 {
                     "label": "",
-                    "position": [20, 30],
-                    "position_3d": [0.2, 0.3, 0.4],
+                    "point": [30, 20],
                 }
             ),
             dtype=h5py.string_dtype(encoding="utf-8"),
         )
         ts1_info = ts1.create_group("info")
         ts1_info.create_dataset("is_video_demo", data=False)
-        ts1_info.create_dataset("is_keyframe", data=True)
+        ts1_info.create_dataset("is_subgoal_boundary", data=True)
 
     resolver = resolver_mod.EpisodeDatasetResolver(
         env_id="DummyEnv",
@@ -102,7 +100,7 @@ def test_episode_dataset_resolver_extracts_label_command_and_ignores_empty_label
     )
     try:
         command0 = resolver.get_step("multi_choice", 0)
-        assert command0 == {"label": "b", "position": [12.0, 34.0]}
+        assert command0 == {"label": "b", "point": [34.0, 12.0]}
         assert "position_3d" not in command0
 
         command1 = resolver.get_step("multi_choice", 1)

@@ -28,7 +28,7 @@ from ..logging_utils import logger
 class OraclePlannerDemonstrationWrapper(gym.Wrapper):
     """
     Wrap Robomme environment with Oracle planning logic into Gym Wrapper for demonstration/evaluation;
-    Input to step is command_dict (containing label and optional pixel position).
+    Input to step is command_dict (containing label and optional pixel point).
     step returns obs as dict-of-lists and reward/terminated/truncated as last-step values.
     """
 
@@ -278,7 +278,20 @@ class OraclePlannerDemonstrationWrapper(gym.Wrapper):
             )
             return None, None
 
-        return found_idx, command_dict.get("position")
+        point = command_dict.get("point")
+        if point is None:
+            return found_idx, None
+        if not isinstance(point, (list, tuple, np.ndarray)) or len(point) < 2:
+            return found_idx, None
+        try:
+            y = float(point[0])
+            x = float(point[1])
+        except (TypeError, ValueError):
+            return found_idx, None
+        if not np.isfinite(x) or not np.isfinite(y):
+            return found_idx, None
+        # select_target_with_pixel expects [x, y].
+        return found_idx, [int(np.rint(x)), int(np.rint(y))]
 
     def _apply_position_target(self, selected_target, option, target_pixel):
         if target_pixel is None:
@@ -331,7 +344,7 @@ class OraclePlannerDemonstrationWrapper(gym.Wrapper):
     def step(self, action):
         """
         Execute one step: action is command_dict, must contain "label", optional
-        pixel `position=[x, y]` in front_rgb.
+        pixel `point=[y, x]` in front_rgb.
         Return last-step signals for reward/terminated/truncated while keeping obs as dict-of-lists.
         """
         # 1) Build solver options once and prepare a mutable selected_target holder for solve() closures.
@@ -343,7 +356,7 @@ class OraclePlannerDemonstrationWrapper(gym.Wrapper):
         if found_idx is None:
             return self._format_step_output(planner_denseStep.empty_step_batch())
 
-        # 4) If a position is provided, map it to the nearest candidate target.
+        # 4) If a point is provided, map it to the nearest candidate target.
         option = solve_options[found_idx]
         self._apply_position_target(
             selected_target=selected_target,
@@ -356,12 +369,12 @@ class OraclePlannerDemonstrationWrapper(gym.Wrapper):
             if target_pixel is None:
                 raise ValueError(
                     f"Multi-choice action '{option.get('action', 'Unknown')}' requires "
-                    "a target pixel position=[x, y], but command did not provide it."
+                    "a target pixel point=[y, x], but command did not provide it."
                 )
             if selected_target.get("obj") is None:
                 raise ValueError(
                     f"Multi-choice action '{option.get('action', 'Unknown')}' could not match "
-                    f"any available candidate from position={target_pixel}."
+                    f"any available candidate from point={target_pixel}."
                 )
 
         # 5) Execute selected solve() with dense step collection; raise on solve == -1.

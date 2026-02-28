@@ -35,7 +35,7 @@ def inspect_actions(filepath, target_timestep=None, window=10):
                 timesteps.sort(key=lambda x: int(x.split('_')[1]))
                 
                 last_choice_action = None
-                last_is_keyframe = None
+                last_is_subgoal_boundary = None
                 last_waypoint_action = None
                 last_is_video_demo = None
                 skip_count = 0
@@ -45,7 +45,7 @@ def inspect_actions(filepath, target_timestep=None, window=10):
                     
                     # Try to find the requested fields
                     choice_action = None
-                    is_keyframe = None
+                    is_subgoal_boundary = None
                     is_video_demo = None
                     waypoint_action = None
                     
@@ -57,19 +57,19 @@ def inspect_actions(filepath, target_timestep=None, window=10):
                         if 'waypoint_action' in action_group:
                             waypoint_action = np.array(action_group['waypoint_action'])
                             
-                    # info group typically contains is_keyframe and is_video_demo
+                    # info group typically contains is_subgoal_boundary and is_video_demo
                     if 'info' in ts_group:
                         info_group = ts_group['info']
-                        if 'is_keyframe' in info_group:
-                            is_keyframe = np.array(info_group['is_keyframe'])
+                        if 'is_subgoal_boundary' in info_group:
+                            is_subgoal_boundary = np.array(info_group['is_subgoal_boundary'])
                         if 'is_video_demo' in info_group:
                             is_video_demo = np.array(info_group['is_video_demo'])
                             
                     # For safety, check if they are directly under timestep or elsewhere
                     if choice_action is None and 'choice_action' in ts_group:
                         choice_action = np.array(ts_group['choice_action'])
-                    if is_keyframe is None and 'is_keyframe' in ts_group:
-                        is_keyframe = np.array(ts_group['is_keyframe'])
+                    if is_subgoal_boundary is None and 'is_subgoal_boundary' in ts_group:
+                        is_subgoal_boundary = np.array(ts_group['is_subgoal_boundary'])
                     if is_video_demo is None and 'is_video_demo' in ts_group:
                         is_video_demo = np.array(ts_group['is_video_demo'])
                     if waypoint_action is None and 'waypoint_action' in ts_group:
@@ -78,11 +78,11 @@ def inspect_actions(filepath, target_timestep=None, window=10):
                     should_skip = False
                     if last_choice_action is not None:
                         same_choice = _is_equal(choice_action, last_choice_action)
-                        same_kf = _is_equal(is_keyframe, last_is_keyframe)
+                        same_boundary = _is_equal(is_subgoal_boundary, last_is_subgoal_boundary)
                         same_vd = _is_equal(is_video_demo, last_is_video_demo)
                         same_wp = _is_equal(waypoint_action, last_waypoint_action)
                         
-                        should_skip = same_choice and same_kf and same_vd and same_wp
+                        should_skip = same_choice and same_boundary and same_vd and same_wp
                         
                         if target_timestep is not None:
                             ts_idx = int(ts_name.split('_')[1])
@@ -99,12 +99,12 @@ def inspect_actions(filepath, target_timestep=None, window=10):
 
                     print(f"  {ts_name}:")
                     print(f"    choice_action:   {choice_action}")
-                    print(f"    is_keyframe:     {is_keyframe}")
+                    print(f"    is_subgoal_boundary: {is_subgoal_boundary}")
                     print(f"    is_video_demo:   {is_video_demo}")
                     print(f"    waypoint_action: {waypoint_action}")
 
                     last_choice_action = choice_action
-                    last_is_keyframe = is_keyframe
+                    last_is_subgoal_boundary = is_subgoal_boundary
                     last_is_video_demo = is_video_demo
                     last_waypoint_action = waypoint_action
 

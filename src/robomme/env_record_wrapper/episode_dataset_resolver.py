@@ -108,7 +108,7 @@ class EpisodeDatasetResolver:
         self._timestep_group_cache: Dict[int, h5py.Group] = {}
         self._non_demo_steps: List[int] = []
         self._waypoint_steps: List[int] = []
-        # multi_choice: ordered by timestep where info/is_keyframe=True
+        # multi_choice: ordered by timestep where info/is_subgoal_boundary=True
         self._oracle_commands: List[Dict[str, Any]] = []
         self._build_indexes()
 
@@ -131,11 +131,11 @@ class EpisodeDatasetResolver:
             return False
         return _as_bool(info_grp["is_video_demo"][()])
 
-    def _is_choice_keyframe_group(self, timestep_group: h5py.Group) -> bool:
+    def _is_choice_subgoal_boundary_group(self, timestep_group: h5py.Group) -> bool:
         info_grp = timestep_group.get("info")
-        if info_grp is None or "is_keyframe" not in info_grp:
+        if info_grp is None or "is_subgoal_boundary" not in info_grp:
             return False
-        return _as_bool(info_grp["is_keyframe"][()])
+        return _as_bool(info_grp["is_subgoal_boundary"][()])
 
     def _extract_joint_action(self, timestep_group: h5py.Group) -> Optional[np.ndarray]:
         action_grp = timestep_group.get("action")
@@ -214,18 +214,18 @@ class EpisodeDatasetResolver:
         return str(value)
 
     @staticmethod
-    def _normalize_choice_position(position_like: Any) -> Optional[List[float]]:
-        # New schema: choice_action.position stores front_rgb pixel [x, y].
-        if not isinstance(position_like, (list, tuple, np.ndarray)) or len(position_like) != 2:
+    def _normalize_choice_point(point_like: Any) -> Optional[List[float]]:
+        # New schema: choice_action.point stores front_rgb pixel [y, x].
+        if not isinstance(point_like, (list, tuple, np.ndarray)) or len(point_like) != 2:
             return None
         try:
-            x = float(position_like[0])
-            y = float(position_like[1])
+            y = float(point_like[0])
+            x = float(point_like[1])
         except (TypeError, ValueError):
             return None
         if not np.isfinite(x) or not np.isfinite(y):
             return None
-        return [x, y]
+        return [y, x]
 
     def _extract_choice_action(self, timestep_group: h5py.Group) -> Optional[Dict[str, Any]]:
         action_grp = timestep_group.get("action")
@@ -247,16 +247,18 @@ class EpisodeDatasetResolver:
         label = payload.get("label")
         if not isinstance(label, str) or not label:
             return None
+        if "point" not in payload:
+            return None
 
         command: Dict[str, Any] = {"label": label}
-        position = self._normalize_choice_position(payload.get("position"))
-        if position is not None:
-            command["position"] = position
+        point = self._normalize_choice_point(payload.get("point"))
+        if point is not None:
+            command["point"] = point
 
         return command
 
     def _build_indexes(self) -> None:
-        # Collect oracle commands in timestep order (only timesteps marked by info/is_keyframe)
+        # Collect oracle commands in timestep order (only timesteps marked by info/is_subgoal_boundary)
         oracle_commands: List[Dict[str, Any]] = []
         prev_waypoint_action: Optional[np.ndarray] = None
         for record_step in self._timestep_indexes:
@@ -267,7 +269,7 @@ class EpisodeDatasetResolver:
             self._non_demo_steps.append(record_step)
             # waypoint_action is stored per step; keep only adjacent changes for logical
             # sparse sequence and skip invalid/non-finite sentinels (do not rely on
-            # info/is_keyframe).
+            # info/is_subgoal_boundary).
             waypoint_action = self._extract_waypoint_action(timestep_group)
             if waypoint_action is not None:
                 if prev_waypoint_action is None or not np.array_equal(
@@ -276,7 +278,7 @@ class EpisodeDatasetResolver:
                     self._waypoint_steps.append(record_step)
                     prev_waypoint_action = waypoint_action.copy()
 
-            if not self._is_choice_keyframe_group(timestep_group):
+            if not self._is_choice_subgoal_boundary_group(timestep_group):
                 continue
             command = self._extract_choice_action(timestep_group)
             if command is not None:
