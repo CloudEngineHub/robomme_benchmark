@@ -53,7 +53,7 @@ DEFAULT_ENV_IDS = [
 # "PickXtimes",
 # "StopCube",
 # "SwingXtimes",
-# "BinFill",
+ "BinFill",
 # "VideoUnmaskSwap",
 # "VideoUnmask",
 # "ButtonUnmaskSwap",
@@ -205,37 +205,46 @@ def _collect_multi_choice_visualization(
     return candidate_pixels, clicked_pixel, matched_pixel
 
 
-def _draw_multi_choice_overlay(
+def _make_blackboard(frame_like: Any) -> np.ndarray:
+    frame = _to_numpy_copy(frame_like)
+    if frame.ndim < 2:
+        return np.zeros((1, 1, 3), dtype=np.uint8)
+    h, w = int(frame.shape[0]), int(frame.shape[1])
+    if h <= 0 or w <= 0:
+        return np.zeros((1, 1, 3), dtype=np.uint8)
+    return np.zeros((h, w, 3), dtype=np.uint8)
+
+
+def _draw_candidate_blackboard(
     frame_like: Any,
     candidate_pixels: list[list[int]],
-    clicked_pixel: Optional[list[int]],
-    matched_pixel: Optional[list[int]],
 ) -> np.ndarray:
-    frame = _to_numpy_copy(frame_like)
-    if frame.ndim == 2:
-        frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2RGB)
-    elif frame.ndim == 3 and frame.shape[2] == 1:
-        frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2RGB)
-
+    board = _make_blackboard(frame_like)
     for pixel in candidate_pixels:
         if len(pixel) < 2:
             continue
-        cv2.circle(frame, (int(pixel[0]), int(pixel[1])), 4, (0, 255, 255), 1)
+        cv2.circle(board, (int(pixel[0]), int(pixel[1])), 4, (0, 255, 255), 1)
+    return board
 
+
+def _draw_selection_blackboard(
+    frame_like: Any,
+    clicked_pixel: Optional[list[int]],
+    matched_pixel: Optional[list[int]],
+) -> np.ndarray:
+    board = _make_blackboard(frame_like)
     if clicked_pixel is not None:
         cv2.drawMarker(
-            frame,
+            board,
             (int(clicked_pixel[0]), int(clicked_pixel[1])),
             (255, 255, 0),
             markerType=cv2.MARKER_TILTED_CROSS,
             markerSize=10,
             thickness=1,
         )
-
     if matched_pixel is not None:
-        cv2.circle(frame, (int(matched_pixel[0]), int(matched_pixel[1])), 5, (255, 0, 0), -1)
-
-    return frame
+        cv2.circle(board, (int(matched_pixel[0]), int(matched_pixel[1])), 5, (255, 0, 0), 2)
+    return board
 
 
 def init_worker(gpu_id: int):
@@ -311,7 +320,12 @@ def evaluate_episode(
         reset_base_frames = [_to_numpy_copy(f) for f in front_camera]
         reset_wrist_frames = [_to_numpy_copy(f) for f in wrist_camera]
         reset_right_frames = (
-            [_to_numpy_copy(f) for f in reset_base_frames]
+            [_make_blackboard(f) for f in reset_base_frames]
+            if action_space == "multi_choice"
+            else None
+        )
+        reset_far_right_frames = (
+            [_make_blackboard(f) for f in reset_base_frames]
             if action_space == "multi_choice"
             else None
         )
@@ -325,6 +339,7 @@ def evaluate_episode(
         rollout_base_frames: list[np.ndarray] = []
         rollout_wrist_frames: list[np.ndarray] = []
         rollout_right_frames: list[np.ndarray] = []
+        rollout_far_right_frames: list[np.ndarray] = []
         rollout_subgoal_grounded: list[Any] = []
         # ######## Video saving variable initialization end ########
 
@@ -358,9 +373,14 @@ def evaluate_episode(
             if action_space == "multi_choice":
                 for base_frame in front_camera:
                     rollout_right_frames.append(
-                        _draw_multi_choice_overlay(
+                        _draw_candidate_blackboard(
                             base_frame,
                             candidate_pixels=candidate_pixels,
+                        )
+                    )
+                    rollout_far_right_frames.append(
+                        _draw_selection_blackboard(
+                            base_frame,
                             clicked_pixel=clicked_pixel,
                             matched_pixel=matched_pixel,
                         )
@@ -409,6 +429,12 @@ def evaluate_episode(
             episode_success=episode_success,
             reset_right_frames=reset_right_frames if action_space == "multi_choice" else None,
             rollout_right_frames=rollout_right_frames if action_space == "multi_choice" else None,
+            reset_far_right_frames=(
+                reset_far_right_frames if action_space == "multi_choice" else None
+            ),
+            rollout_far_right_frames=(
+                rollout_far_right_frames if action_space == "multi_choice" else None
+            ),
         )
         # ######## Video saving section end ########
 

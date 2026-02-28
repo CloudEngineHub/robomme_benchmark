@@ -156,6 +156,8 @@ def save_robomme_video(
     episode_success: bool,
     reset_right_frames: Optional[List[Any]] = None,
     rollout_right_frames: Optional[List[Any]] = None,
+    reset_far_right_frames: Optional[List[Any]] = None,
+    rollout_far_right_frames: Optional[List[Any]] = None,
     fps: int = 20,
     highlight_color: Tuple[int, int, int] = (255, 0, 0),
     highlight_thickness: int = 4,
@@ -165,8 +167,8 @@ def save_robomme_video(
     Whether to draw the red border on reset-phase frames is determined by env_id: tasks in NO_HIGHLIGHT_BORDER_ENV_IDS (no subgoal demonstration) do not get the border.
 
     Args:
-        reset_base_frames/reset_wrist_frames/reset_right_frames: List of camera frames from reset phase.
-        rollout_base_frames/rollout_wrist_frames/rollout_right_frames: List of camera frames from rollout phase.
+        reset_base_frames/reset_wrist_frames/reset_right_frames/reset_far_right_frames: List of camera frames from reset phase.
+        rollout_base_frames/rollout_wrist_frames/rollout_right_frames/rollout_far_right_frames: List of camera frames from rollout phase.
         reset_subgoal_grounded/rollout_subgoal_grounded: List of captions for corresponding phases.
         out_video_dir: Output directory.
         action_space: Current action space, used for filename prefix.
@@ -190,27 +192,39 @@ def save_robomme_video(
     reset_base_frames = list(reset_base_frames or [])
     reset_wrist_frames = list(reset_wrist_frames or [])
     reset_right_frames = list(reset_right_frames or [])
+    reset_far_right_frames = list(reset_far_right_frames or [])
     rollout_base_frames = list(rollout_base_frames or [])
     rollout_wrist_frames = list(rollout_wrist_frames or [])
     rollout_right_frames = list(rollout_right_frames or [])
+    rollout_far_right_frames = list(rollout_far_right_frames or [])
     reset_subgoal_grounded = list(reset_subgoal_grounded or [])
     rollout_subgoal_grounded = list(rollout_subgoal_grounded or [])
 
     merged_base_frames = reset_base_frames + rollout_base_frames
     merged_wrist_frames = reset_wrist_frames + rollout_wrist_frames
     merged_right_frames = reset_right_frames + rollout_right_frames
+    merged_far_right_frames = reset_far_right_frames + rollout_far_right_frames
     merged_subgoal_grounded = reset_subgoal_grounded + rollout_subgoal_grounded
 
-    if not (merged_base_frames or merged_wrist_frames or merged_right_frames):
+    if not (
+        merged_base_frames
+        or merged_wrist_frames
+        or merged_right_frames
+        or merged_far_right_frames
+    ):
         logger.debug(f"Skipped video (no frames): {out_video_path}")
         return False
 
     base_camera = [_frame_to_numpy(f) for f in merged_base_frames if f is not None]
     wrist_camera = [_frame_to_numpy(f) for f in merged_wrist_frames if f is not None]
     right_camera = [_frame_to_numpy(f) for f in merged_right_frames if f is not None]
+    far_right_camera = [_frame_to_numpy(f) for f in merged_far_right_frames if f is not None]
     reset_base_camera = [_frame_to_numpy(f) for f in reset_base_frames if f is not None]
     reset_wrist_camera = [_frame_to_numpy(f) for f in reset_wrist_frames if f is not None]
     reset_right_camera = [_frame_to_numpy(f) for f in reset_right_frames if f is not None]
+    reset_far_right_camera = [
+        _frame_to_numpy(f) for f in reset_far_right_frames if f is not None
+    ]
 
     merged_feeds: List[Tuple[List[np.ndarray], List[np.ndarray]]] = []
     if base_camera:
@@ -219,6 +233,8 @@ def save_robomme_video(
         merged_feeds.append((wrist_camera, reset_wrist_camera))
     if right_camera:
         merged_feeds.append((right_camera, reset_right_camera))
+    if far_right_camera:
+        merged_feeds.append((far_right_camera, reset_far_right_camera))
     if not merged_feeds:
         logger.debug(f"Skipped video (no valid frames): {out_video_path}")
         return False
