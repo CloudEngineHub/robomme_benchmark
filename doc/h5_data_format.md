@@ -67,5 +67,5 @@ In RoboMME, a gripper action of -1 means close and 1 means open.
 | `grounded_subgoal` | `bytes (UTF-8)` | Grounded subgoal text (built-in planner view) |
 | `grounded_subgoal_online` | `bytes (UTF-8)` | Grounded subgoal text (online view; may advance to the next subgoal earlier than planner view) |
 | `is_video_demo` | `bool` | Whether this frame is from the conditioning video shown before execution |
-| `is_keyframe` | `bool` | Whether this is a keyframe (i.e., a boundary between subtasks) |
+| `is_subgoal_boundary` | `bool` | Whether this is a keyframe (i.e., a boundary between subtasks) |
 | `is_completed` | `bool` | Whether the task is finished |

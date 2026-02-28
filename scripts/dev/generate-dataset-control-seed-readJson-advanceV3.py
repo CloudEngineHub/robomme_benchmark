@@ -41,25 +41,25 @@ Key features include:
 
 # List of all supported environment module names
 DEFAULT_ENVS =[
-"PickXtimes",
-"StopCube",
-"SwingXtimes",
+# "PickXtimes",
+# "StopCube",
+# "SwingXtimes",
 "BinFill",
 
-"VideoUnmaskSwap",
-"VideoUnmask",
-"ButtonUnmaskSwap",
-"ButtonUnmask",
+# "VideoUnmaskSwap",
+# "VideoUnmask",
+# "ButtonUnmaskSwap",
+# "ButtonUnmask",
 
-"VideoRepick",
-"VideoPlaceButton",
-"VideoPlaceOrder",
-"PickHighlight",
+# "VideoRepick",
+# "VideoPlaceButton",
+# "VideoPlaceOrder",
+# "PickHighlight",
 
-"InsertPeg",
-'MoveCube',
-"PatternLock",
-"RouteStick"
+# "InsertPeg",
+# 'MoveCube',
+# "PatternLock",
+# "RouteStick"
     ]
 
 # Reference dataset metadata root directory: used to read difficulty and seed
@@ -674,7 +674,7 @@ def parse_args() -> argparse.Namespace:
         "--episodes",
         "-n",
         type=int,
-        default=20,
+        default=60,
         help="Number of episodes generated per environment (Default: 100)",
     )
     parser.add_argument(
@@ -694,7 +694,7 @@ def parse_args() -> argparse.Namespace:
         "--max-workers",
         "-w",
         type=int,
-        default=20,
+        default=30,
         help="Number of parallel workers when running multiple environments.",
     )
     parser.add_argument(
