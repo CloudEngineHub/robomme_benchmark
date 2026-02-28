@@ -119,7 +119,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Inspect HDF5 dataset actions.")
     parser.add_argument("filepath", type=str, nargs="?", default=DEFAULT_PATH,
                         help="Path to the HDF5 file.")
-    parser.add_argument("-t", "--timestep", type=int, default=168,
+    parser.add_argument("-t", "--timestep", type=int, default=None,
                         help="Specific timestep to not omit even if identical.")
     parser.add_argument("-w", "--window", type=int, default=10,
                         help="Window around specified timestep to not omit (default: 10).")

@@ -54,10 +54,10 @@ DEFAULT_ENVS =[
 # "VideoRepick",
 # "VideoPlaceButton",
 # "VideoPlaceOrder",
-# "PickHighlight",
+ "PickHighlight",
 
 # "InsertPeg",
- 'MoveCube',
+ #'MoveCube',
 # "PatternLock",
 # "RouteStick"
     ]

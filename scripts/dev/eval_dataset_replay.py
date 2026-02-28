@@ -17,7 +17,7 @@ from robomme.env_record_wrapper import (
 from robomme.robomme_env.utils.save_reset_video import save_robomme_video
 
 # Only enable one ACTION_SPACE; others are commented out for manual switching
-ACTION_SPACE = "waypoint"
+ACTION_SPACE = "multi_choice"
 
 
 GUI_RENDER = True
@@ -26,7 +26,7 @@ DATASET_ROOT = "/data/hongzefu/data_0225"
 
 DEFAULT_ENV_IDS = [
 #"PickXtimes",
- "StopCube",
+ #"StopCube",
 #"SwingXtimes",
 # "BinFill",
 # "VideoUnmaskSwap",
@@ -36,7 +36,7 @@ DEFAULT_ENV_IDS = [
 # "VideoRepick",
 # "VideoPlaceButton",
 # "VideoPlaceOrder",
-# "PickHighlight",
+"PickHighlight",
 #"InsertPeg",
 #"MoveCube",
  #"PatternLock",
@@ -69,7 +69,7 @@ def main():
 
         env = None
         for episode in range(episode_count):
-            if episode !=7:
+            if episode !=19:
                 continue
 
             env = env_builder.make_env_for_episode(

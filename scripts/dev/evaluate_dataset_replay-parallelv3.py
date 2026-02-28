@@ -327,7 +327,7 @@ def _parse_args() -> argparse.Namespace:
         "--action_spaces",
         type=_parse_action_spaces,
         #default=AVAILABLE_ACTION_SPACES.copy(),
-        default=["waypoint",],
+        default=["multi_choice",],
         help=(
             "Comma-separated action spaces to replay in order. "
             "Available: joint_angle,ee_pose,waypoint,multi_choice. "
