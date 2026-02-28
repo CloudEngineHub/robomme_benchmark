@@ -43,12 +43,12 @@ Key features include:
 DEFAULT_ENVS =[
 # "PickXtimes",
 # "StopCube",
-"SwingXtimes",
- "BinFill",
+# "SwingXtimes",
+"BinFill",
 
 # "VideoUnmaskSwap",
 # "VideoUnmask",
-#"ButtonUnmaskSwap",
+# "ButtonUnmaskSwap",
 # "ButtonUnmask",
 
 # "VideoRepick",
@@ -674,7 +674,7 @@ def parse_args() -> argparse.Namespace:
         "--episodes",
         "-n",
         type=int,
-        default=1,
+        default=10,
         help="Number of episodes generated per environment (Default: 100)",
     )
     parser.add_argument(

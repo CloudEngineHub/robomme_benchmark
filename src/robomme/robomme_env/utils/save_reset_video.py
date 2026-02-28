@@ -57,15 +57,21 @@ def _ensure_rgb(frame: np.ndarray) -> np.ndarray:
     return frame
 
 
-def _concat_left_right(left_frame: Any, right_frame: Any) -> np.ndarray:
-    left = _ensure_rgb(_frame_to_numpy(left_frame))
-    right = _ensure_rgb(_frame_to_numpy(right_frame))
-    if left.shape[0] != right.shape[0]:
-        target_h = left.shape[0]
-        scale = target_h / max(1, right.shape[0])
-        target_w = max(1, int(round(right.shape[1] * scale)))
-        right = cv2.resize(right, (target_w, target_h), interpolation=cv2.INTER_LINEAR)
-    return np.hstack((left, right))
+def _resize_to_height(frame: np.ndarray, target_h: int) -> np.ndarray:
+    if frame.shape[0] == target_h:
+        return frame
+    scale = target_h / max(1, frame.shape[0])
+    target_w = max(1, int(round(frame.shape[1] * scale)))
+    return cv2.resize(frame, (target_w, target_h), interpolation=cv2.INTER_LINEAR)
+
+
+def _concat_horizontal(frames: List[Any]) -> np.ndarray:
+    rgb_frames = [_ensure_rgb(_frame_to_numpy(frame)) for frame in frames if frame is not None]
+    if not rgb_frames:
+        return np.zeros((1, 1, 3), dtype=np.uint8)
+    target_h = rgb_frames[0].shape[0]
+    aligned = [_resize_to_height(frame, target_h) for frame in rgb_frames]
+    return np.hstack(aligned)
 
 
 def add_text_to_frame(
@@ -148,32 +154,28 @@ def save_robomme_video(
     env_id: str,
     episode: int,
     episode_success: bool,
-    rollout_blue_box_mask: Optional[List[bool]] = None,
+    reset_right_frames: Optional[List[Any]] = None,
+    rollout_right_frames: Optional[List[Any]] = None,
     fps: int = 20,
     highlight_color: Tuple[int, int, int] = (255, 0, 0),
     highlight_thickness: int = 4,
-    fallback_highlight_color: Tuple[int, int, int] = (0, 0, 255),
-    fallback_highlight_thickness: int = 4,
 ) -> bool:
     """
     Unified method to save replay videos (including reset prefix highlighting, naming, and output path concatenation).
     Whether to draw the red border on reset-phase frames is determined by env_id: tasks in NO_HIGHLIGHT_BORDER_ENV_IDS (no subgoal demonstration) do not get the border.
 
     Args:
-        reset_base_frames/reset_wrist_frames: List of dual camera frames from reset phase.
-        rollout_base_frames/rollout_wrist_frames: List of dual camera frames from rollout phase.
+        reset_base_frames/reset_wrist_frames/reset_right_frames: List of camera frames from reset phase.
+        rollout_base_frames/rollout_wrist_frames/rollout_right_frames: List of camera frames from rollout phase.
         reset_subgoal_grounded/rollout_subgoal_grounded: List of captions for corresponding phases.
         out_video_dir: Output directory.
         action_space: Current action space, used for filename prefix.
         env_id: Environment ID (used to decide if highlight border is drawn; see NO_HIGHLIGHT_BORDER_ENV_IDS).
         episode: Current episode index.
         episode_success: Whether the current episode was successful.
-        rollout_blue_box_mask: Optional per-rollout-frame blue-border mask.
         fps: Output frame rate.
         highlight_color: Border color (RGB).
         highlight_thickness: Border thickness (pixels).
-        fallback_highlight_color: Random fallback border color (RGB blue by default).
-        fallback_highlight_thickness: Random fallback border thickness (pixels).
 
     Returns:
         True if at least one frame was written, False otherwise.
@@ -187,63 +189,55 @@ def save_robomme_video(
 
     reset_base_frames = list(reset_base_frames or [])
     reset_wrist_frames = list(reset_wrist_frames or [])
+    reset_right_frames = list(reset_right_frames or [])
     rollout_base_frames = list(rollout_base_frames or [])
     rollout_wrist_frames = list(rollout_wrist_frames or [])
+    rollout_right_frames = list(rollout_right_frames or [])
     reset_subgoal_grounded = list(reset_subgoal_grounded or [])
     rollout_subgoal_grounded = list(rollout_subgoal_grounded or [])
 
     merged_base_frames = reset_base_frames + rollout_base_frames
     merged_wrist_frames = reset_wrist_frames + rollout_wrist_frames
+    merged_right_frames = reset_right_frames + rollout_right_frames
     merged_subgoal_grounded = reset_subgoal_grounded + rollout_subgoal_grounded
 
-    if not (merged_base_frames or merged_wrist_frames):
+    if not (merged_base_frames or merged_wrist_frames or merged_right_frames):
         logger.debug(f"Skipped video (no frames): {out_video_path}")
         return False
-
-    draw_highlight_border = env_id not in NO_HIGHLIGHT_BORDER_ENV_IDS
-    if draw_highlight_border:
-        if reset_base_frames and reset_wrist_frames:
-            highlight_prefix_count = min(len(reset_base_frames), len(reset_wrist_frames))
-        elif reset_base_frames:
-            highlight_prefix_count = len(reset_base_frames)
-        else:
-            highlight_prefix_count = len(reset_wrist_frames)
-    else:
-        highlight_prefix_count = 0
 
     base_camera = [_frame_to_numpy(f) for f in merged_base_frames if f is not None]
     wrist_camera = [_frame_to_numpy(f) for f in merged_wrist_frames if f is not None]
+    right_camera = [_frame_to_numpy(f) for f in merged_right_frames if f is not None]
     reset_base_camera = [_frame_to_numpy(f) for f in reset_base_frames if f is not None]
     reset_wrist_camera = [_frame_to_numpy(f) for f in reset_wrist_frames if f is not None]
+    reset_right_camera = [_frame_to_numpy(f) for f in reset_right_frames if f is not None]
 
-    if base_camera and wrist_camera:
-        n_pair = min(len(base_camera), len(wrist_camera))
-        image = [_concat_left_right(base_camera[i], wrist_camera[i]) for i in range(n_pair)]
-    elif base_camera:
-        image = base_camera
-    else:
-        image = wrist_camera
+    merged_feeds: List[Tuple[List[np.ndarray], List[np.ndarray]]] = []
+    if base_camera:
+        merged_feeds.append((base_camera, reset_base_camera))
+    if wrist_camera:
+        merged_feeds.append((wrist_camera, reset_wrist_camera))
+    if right_camera:
+        merged_feeds.append((right_camera, reset_right_camera))
+    if not merged_feeds:
+        logger.debug(f"Skipped video (no valid frames): {out_video_path}")
+        return False
 
-    if base_camera and wrist_camera:
-        reset_frame_count = min(len(reset_base_camera), len(reset_wrist_camera))
-    elif base_camera:
-        reset_frame_count = len(reset_base_camera)
-    else:
-        reset_frame_count = len(reset_wrist_camera)
+    n_frames = min(len(feed) for feed, _ in merged_feeds)
+    if n_frames <= 0:
+        logger.debug(f"Skipped video (no aligned frames): {out_video_path}")
+        return False
+    image = [
+        _concat_horizontal([feed[i] for feed, _ in merged_feeds])
+        for i in range(n_frames)
+    ]
+    reset_frame_count = min(len(reset_feed) for _, reset_feed in merged_feeds)
+    reset_frame_count = max(0, min(reset_frame_count, n_frames))
+
+    draw_highlight_border = env_id not in NO_HIGHLIGHT_BORDER_ENV_IDS
+    highlight_prefix_count = reset_frame_count if draw_highlight_border else 0
 
     subgoal_grounded = [text for text in merged_subgoal_grounded if text is not None]
-
-    n_frames = len(image)
-    if n_frames == 0:
-        logger.debug(f"Skipped video (no frames): {out_video_path}")
-        return False
-    reset_frame_count = max(0, min(reset_frame_count, n_frames))
-    rollout_frame_count = max(0, n_frames - reset_frame_count)
-
-    normalized_rollout_blue_box_mask = [False] * rollout_frame_count
-    if isinstance(rollout_blue_box_mask, (list, tuple)):
-        for idx, value in enumerate(rollout_blue_box_mask[:rollout_frame_count]):
-            normalized_rollout_blue_box_mask[idx] = bool(value)
 
     out_dir = os.path.dirname(os.path.abspath(out_video_path))
     if out_dir:
@@ -259,13 +253,6 @@ def save_robomme_video(
                     combined,
                     color=highlight_color,
                     thickness=highlight_thickness,
-                )
-            rollout_idx = i - reset_frame_count
-            if 0 <= rollout_idx < rollout_frame_count and normalized_rollout_blue_box_mask[rollout_idx]:
-                combined = add_border_to_frame(
-                    combined,
-                    color=fallback_highlight_color,
-                    thickness=fallback_highlight_thickness,
                 )
             writer.append_data(combined)
 

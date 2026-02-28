@@ -5,6 +5,7 @@
 import os
 from typing import Any, Optional
 
+import cv2
 import numpy as np
 import torch
 
@@ -13,6 +14,15 @@ from robomme.robomme_env.utils import *
 from robomme.env_record_wrapper import (
     BenchmarkEnvBuilder,
     EpisodeDatasetResolver,
+)
+from robomme.env_record_wrapper.OraclePlannerDemonstrationWrapper import (
+    OraclePlannerDemonstrationWrapper,
+)
+from robomme.robomme_env.utils.choice_action_mapping import (
+    _unique_candidates,
+    extract_actor_position_xyz,
+    project_world_to_pixel,
+    select_target_with_pixel,
 )
 from robomme.robomme_env.utils.save_reset_video import save_robomme_video
 
@@ -45,6 +55,176 @@ DEFAULT_ENV_IDS = [
 
 OUT_VIDEO_DIR = "/data/hongzefu/dataset_replay"
 MAX_STEPS = 1000
+
+
+def _parse_oracle_command(choice_action: Optional[Any]) -> Optional[dict[str, Any]]:
+    if not isinstance(choice_action, dict):
+        return None
+    label = choice_action.get("label")
+    if not isinstance(label, str) or not label:
+        return None
+    return choice_action
+
+
+def _to_numpy_copy(value: Any) -> np.ndarray:
+    if isinstance(value, torch.Tensor):
+        value = value.detach().cpu().numpy()
+    else:
+        value = np.asarray(value)
+    return np.array(value, copy=True)
+
+
+def _to_frame_list(frames_like: Any) -> list[np.ndarray]:
+    if frames_like is None:
+        return []
+    if isinstance(frames_like, torch.Tensor):
+        arr = frames_like.detach().cpu().numpy()
+        if arr.ndim == 3:
+            return [np.array(arr, copy=True)]
+        if arr.ndim == 4:
+            return [np.array(x, copy=True) for x in arr]
+        return []
+    if isinstance(frames_like, np.ndarray):
+        if frames_like.ndim == 3:
+            return [np.array(frames_like, copy=True)]
+        if frames_like.ndim == 4:
+            return [np.array(x, copy=True) for x in frames_like]
+        return []
+    if isinstance(frames_like, (list, tuple)):
+        out = []
+        for frame in frames_like:
+            if frame is None:
+                continue
+            out.append(_to_numpy_copy(frame))
+        return out
+    try:
+        arr = np.asarray(frames_like)
+    except Exception:
+        return []
+    if arr.ndim == 3:
+        return [np.array(arr, copy=True)]
+    if arr.ndim == 4:
+        return [np.array(x, copy=True) for x in arr]
+    return []
+
+
+def _normalize_pixel_xy(pixel_like: Any) -> Optional[list[int]]:
+    if not isinstance(pixel_like, (list, tuple, np.ndarray)):
+        return None
+    if len(pixel_like) < 2:
+        return None
+    try:
+        x = float(pixel_like[0])
+        y = float(pixel_like[1])
+    except (TypeError, ValueError):
+        return None
+    if not np.isfinite(x) or not np.isfinite(y):
+        return None
+    return [int(np.rint(x)), int(np.rint(y))]
+
+
+def _find_oracle_wrapper(env_like: Any) -> Optional[OraclePlannerDemonstrationWrapper]:
+    current = env_like
+    visited: set[int] = set()
+    for _ in range(16):
+        if current is None:
+            return None
+        if isinstance(current, OraclePlannerDemonstrationWrapper):
+            return current
+        obj_id = id(current)
+        if obj_id in visited:
+            return None
+        visited.add(obj_id)
+        current = getattr(current, "env", None)
+    return None
+
+
+def _collect_multi_choice_visualization(
+    env_like: Any,
+    command: dict[str, Any],
+) -> tuple[list[list[int]], Optional[list[int]], Optional[list[int]]]:
+    clicked_pixel = _normalize_pixel_xy(command.get("position"))
+    oracle_wrapper = _find_oracle_wrapper(env_like)
+    if oracle_wrapper is None:
+        return [], clicked_pixel, None
+
+    try:
+        _selected_target, solve_options = oracle_wrapper._build_step_options()
+        found_idx, _ = oracle_wrapper._resolve_command(command, solve_options)
+    except Exception:
+        return [], clicked_pixel, None
+
+    if found_idx is None or found_idx < 0 or found_idx >= len(solve_options):
+        return [], clicked_pixel, None
+
+    option = solve_options[found_idx]
+    available = option.get("available")
+    intrinsic_cv = getattr(oracle_wrapper, "_front_camera_intrinsic_cv", None)
+    extrinsic_cv = getattr(oracle_wrapper, "_front_camera_extrinsic_cv", None)
+    image_shape = getattr(oracle_wrapper, "_front_rgb_shape", None)
+
+    candidate_pixels: list[list[int]] = []
+    if available is not None:
+        for actor in _unique_candidates(available):
+            actor_pos = extract_actor_position_xyz(actor)
+            if actor_pos is None:
+                continue
+            projected = project_world_to_pixel(
+                actor_pos,
+                intrinsic_cv=intrinsic_cv,
+                extrinsic_cv=extrinsic_cv,
+                image_shape=image_shape,
+            )
+            if projected is None:
+                continue
+            candidate_pixels.append([int(projected[0]), int(projected[1])])
+
+    matched_pixel: Optional[list[int]] = None
+    if available is not None and clicked_pixel is not None:
+        matched = select_target_with_pixel(
+            available=available,
+            pixel_like=clicked_pixel,
+            intrinsic_cv=intrinsic_cv,
+            extrinsic_cv=extrinsic_cv,
+            image_shape=image_shape,
+        )
+        if isinstance(matched, dict):
+            matched_pixel = _normalize_pixel_xy(matched.get("projected_pixel"))
+
+    return candidate_pixels, clicked_pixel, matched_pixel
+
+
+def _draw_multi_choice_overlay(
+    frame_like: Any,
+    candidate_pixels: list[list[int]],
+    clicked_pixel: Optional[list[int]],
+    matched_pixel: Optional[list[int]],
+) -> np.ndarray:
+    frame = _to_numpy_copy(frame_like)
+    if frame.ndim == 2:
+        frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2RGB)
+    elif frame.ndim == 3 and frame.shape[2] == 1:
+        frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2RGB)
+
+    for pixel in candidate_pixels:
+        if len(pixel) < 2:
+            continue
+        cv2.circle(frame, (int(pixel[0]), int(pixel[1])), 4, (0, 255, 255), 1)
+
+    if clicked_pixel is not None:
+        cv2.drawMarker(
+            frame,
+            (int(clicked_pixel[0]), int(clicked_pixel[1])),
+            (255, 255, 0),
+            markerType=cv2.MARKER_TILTED_CROSS,
+            markerSize=10,
+            thickness=1,
+        )
+
+    if matched_pixel is not None:
+        cv2.circle(frame, (int(matched_pixel[0]), int(matched_pixel[1])), 5, (255, 0, 0), -1)
+
+    return frame
 
 
 
@@ -103,8 +283,8 @@ def main():
 
             # --- Explicitly read all obs fields (each is a list) ---
             maniskill_obs = obs["maniskill_obs"]
-            front_rgb_list = obs["front_rgb_list"]
-            wrist_rgb_list = obs["wrist_rgb_list"]
+            front_rgb_list = _to_frame_list(obs["front_rgb_list"])
+            wrist_rgb_list = _to_frame_list(obs["wrist_rgb_list"])
             front_depth_list = obs["front_depth_list"]
             wrist_depth_list = obs["wrist_depth_list"]
             end_effector_pose_raw = obs["end_effector_pose_raw"]
@@ -126,22 +306,38 @@ def main():
 
 
             # --- Video saving variable preparation (reset phase) ---
-            reset_base_frames = [torch.as_tensor(f).detach().cpu().numpy().copy() for f in front_rgb_list]
-            reset_wrist_frames = [torch.as_tensor(f).detach().cpu().numpy().copy() for f in wrist_rgb_list]
+            reset_base_frames = [_to_numpy_copy(f) for f in front_rgb_list]
+            reset_wrist_frames = [_to_numpy_copy(f) for f in wrist_rgb_list]
+            reset_right_frames = (
+                [_to_numpy_copy(f) for f in reset_base_frames]
+                if ACTION_SPACE == "multi_choice"
+                else None
+            )
             reset_subgoal_grounded = [grounded_subgoal_online] * len(front_rgb_list)
 
             step = 0
             episode_success = False
             rollout_base_frames: list[np.ndarray] = []
             rollout_wrist_frames: list[np.ndarray] = []
+            rollout_right_frames: list[np.ndarray] = []
             rollout_subgoal_grounded: list[Any] = []
 
             # ======== Step loop ========
             while True:
                 replay_key = ACTION_SPACE
                 action = dataset_resolver.get_step(replay_key, step)
+                if ACTION_SPACE == "multi_choice":
+                    action = _parse_oracle_command(action)
                 if action is None:
                     break
+
+                candidate_pixels: list[list[int]] = []
+                clicked_pixel: Optional[list[int]] = None
+                matched_pixel: Optional[list[int]] = None
+                if ACTION_SPACE == "multi_choice":
+                    candidate_pixels, clicked_pixel, matched_pixel = _collect_multi_choice_visualization(
+                        env, action
+                    )
 
                 # step returns: obs (dict-of-lists), reward (scalar tensor),
                 #               terminated (scalar tensor), truncated (scalar tensor), info (flat dict)
@@ -149,8 +345,8 @@ def main():
 
                 # --- Explicitly read all obs fields (dict-of-lists, typically 1 element per list) ---
                 maniskill_obs = obs["maniskill_obs"]
-                front_rgb_list = obs["front_rgb_list"]
-                wrist_rgb_list = obs["wrist_rgb_list"]
+                front_rgb_list = _to_frame_list(obs["front_rgb_list"])
+                wrist_rgb_list = _to_frame_list(obs["wrist_rgb_list"])
                 front_depth_list = obs["front_depth_list"]
                 wrist_depth_list = obs["wrist_depth_list"]
                 end_effector_pose_raw = obs["end_effector_pose_raw"]
@@ -171,11 +367,21 @@ def main():
 
                 # --- Video saving variable preparation (replay phase) ---
                 rollout_base_frames.extend(
-                    torch.as_tensor(f).detach().cpu().numpy().copy() for f in front_rgb_list
+                    _to_numpy_copy(f) for f in front_rgb_list
                 )
                 rollout_wrist_frames.extend(
-                    torch.as_tensor(f).detach().cpu().numpy().copy() for f in wrist_rgb_list
+                    _to_numpy_copy(f) for f in wrist_rgb_list
                 )
+                if ACTION_SPACE == "multi_choice":
+                    for base_frame in front_rgb_list:
+                        rollout_right_frames.append(
+                            _draw_multi_choice_overlay(
+                                base_frame,
+                                candidate_pixels=candidate_pixels,
+                                clicked_pixel=clicked_pixel,
+                                matched_pixel=matched_pixel,
+                            )
+                        )
                 rollout_subgoal_grounded.extend([grounded_subgoal_online] * len(front_rgb_list))
 
                 terminated_flag = bool(terminated.item())
@@ -208,6 +414,8 @@ def main():
                 env_id=env_id,
                 episode=episode,
                 episode_success=episode_success,
+                reset_right_frames=reset_right_frames if ACTION_SPACE == "multi_choice" else None,
+                rollout_right_frames=rollout_right_frames if ACTION_SPACE == "multi_choice" else None,
             )
 
         if env is not None:
