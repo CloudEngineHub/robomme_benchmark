@@ -1193,10 +1193,12 @@ class RobommeRecordWrapper(gym.Wrapper):
                 obs_group.create_dataset("front_camera_extrinsic", data=obs_data['front_camera_extrinsic'])
                 obs_group.create_dataset("wrist_camera_extrinsic", data=obs_data['wrist_camera_extrinsic'])
 
-                eef_state_raw_group = obs_group.create_group("eef_state_raw")
-                eef_state_raw_group.create_dataset("pose", data=obs_data['eef_state_raw']['pose'])
-                eef_state_raw_group.create_dataset("quat", data=obs_data['eef_state_raw']['quat'])
-                eef_state_raw_group.create_dataset("rpy", data=obs_data['eef_state_raw']['rpy'])
+                # Temporarily disabled by request: do not generate obs/eef_state_raw in HDF5.
+                # Keep code commented for future restoration.
+                # eef_state_raw_group = obs_group.create_group("eef_state_raw")
+                # eef_state_raw_group.create_dataset("pose", data=obs_data['eef_state_raw']['pose'])
+                # eef_state_raw_group.create_dataset("quat", data=obs_data['eef_state_raw']['quat'])
+                # eef_state_raw_group.create_dataset("rpy", data=obs_data['eef_state_raw']['rpy'])
 
                 # eef_state: 6D [pose(3), rpy(3)] consistent with h5_data_format.md
                 eef_state = np.concatenate([
@@ -1230,11 +1232,12 @@ class RobommeRecordWrapper(gym.Wrapper):
                             action_data = action_data.reshape(1, 8)
                     action_group.create_dataset("joint_action", data=action_data)
 
-                # eef_action_raw information (pose/quat/rpy sub-datasets)
-                eef_action_raw_group = action_group.create_group("eef_action_raw")
-                eef_action_raw_group.create_dataset("pose", data=action_data_dict['eef_action_raw']['pose'])
-                eef_action_raw_group.create_dataset("quat", data=action_data_dict['eef_action_raw']['quat'])
-                eef_action_raw_group.create_dataset("rpy", data=action_data_dict['eef_action_raw']['rpy'])
+                # Temporarily disabled by request: do not generate action/eef_action_raw in HDF5.
+                # Keep code commented for future restoration.
+                # eef_action_raw_group = action_group.create_group("eef_action_raw")
+                # eef_action_raw_group.create_dataset("pose", data=action_data_dict['eef_action_raw']['pose'])
+                # eef_action_raw_group.create_dataset("quat", data=action_data_dict['eef_action_raw']['quat'])
+                # eef_action_raw_group.create_dataset("rpy", data=action_data_dict['eef_action_raw']['rpy'])
 
                 # eef_action: 7-dim [pose(3), rpy(3), gripper(1)]
                 action_group.create_dataset("eef_action", data=action_data_dict['eef_action'])
@@ -1324,42 +1327,44 @@ class RobommeRecordWrapper(gym.Wrapper):
                     data=difficulty,
                     dtype=h5py.string_dtype(encoding="utf-8"),
                 )
-            env_unwrapped = getattr(self.env, "unwrapped", self.env)
-            fail_recover_mode = getattr(env_unwrapped, "fail_recover_mode", None)
-            if fail_recover_mode is not None:
-                setup_group.create_dataset(
-                    "fail_recover_mode",
-                    data=str(fail_recover_mode),
-                    dtype=h5py.string_dtype(encoding="utf-8"),
-                )
-            fail_recover_seed_anchor = getattr(env_unwrapped, "fail_recover_seed_anchor", None)
-            if fail_recover_seed_anchor is not None:
-                setup_group.create_dataset(
-                    "fail_recover_seed_anchor",
-                    data=int(fail_recover_seed_anchor),
-                )
-            fail_recover_xy_signs = getattr(env_unwrapped, "fail_recover_xy_signs", None)
-            if fail_recover_xy_signs is not None:
-                xy_signs_np = np.asarray(fail_recover_xy_signs).reshape(-1)
-                if xy_signs_np.size == 2:
-                    setup_group.create_dataset("fail_recover_xy_signs", data=xy_signs_np)
-                else:
-                    logger.debug(
-                        "Warning: skip writing fail_recover_xy_signs due to invalid size "
-                        f"{xy_signs_np.size}"
-                    )
-            fail_recover_xy_signed_offset = getattr(env_unwrapped, "fail_recover_xy_signed_offset", None)
-            if fail_recover_xy_signed_offset is not None:
-                xy_signed_offset_np = np.asarray(fail_recover_xy_signed_offset).reshape(-1)
-                if xy_signed_offset_np.size == 2:
-                    setup_group.create_dataset(
-                        "fail_recover_xy_signed_offset", data=xy_signed_offset_np
-                    )
-                else:
-                    logger.debug(
-                        "Warning: skip writing fail_recover_xy_signed_offset due to invalid size "
-                        f"{xy_signed_offset_np.size}"
-                    )
+            # Temporarily disabled by request: do not generate fail_recover_* setup fields in HDF5.
+            # Keep code commented for future restoration.
+            # env_unwrapped = getattr(self.env, "unwrapped", self.env)
+            # fail_recover_mode = getattr(env_unwrapped, "fail_recover_mode", None)
+            # if fail_recover_mode is not None:
+            #     setup_group.create_dataset(
+            #         "fail_recover_mode",
+            #         data=str(fail_recover_mode),
+            #         dtype=h5py.string_dtype(encoding="utf-8"),
+            #     )
+            # fail_recover_seed_anchor = getattr(env_unwrapped, "fail_recover_seed_anchor", None)
+            # if fail_recover_seed_anchor is not None:
+            #     setup_group.create_dataset(
+            #         "fail_recover_seed_anchor",
+            #         data=int(fail_recover_seed_anchor),
+            #     )
+            # fail_recover_xy_signs = getattr(env_unwrapped, "fail_recover_xy_signs", None)
+            # if fail_recover_xy_signs is not None:
+            #     xy_signs_np = np.asarray(fail_recover_xy_signs).reshape(-1)
+            #     if xy_signs_np.size == 2:
+            #         setup_group.create_dataset("fail_recover_xy_signs", data=xy_signs_np)
+            #     else:
+            #         logger.debug(
+            #             "Warning: skip writing fail_recover_xy_signs due to invalid size "
+            #             f"{xy_signs_np.size}"
+            #         )
+            # fail_recover_xy_signed_offset = getattr(env_unwrapped, "fail_recover_xy_signed_offset", None)
+            # if fail_recover_xy_signed_offset is not None:
+            #     xy_signed_offset_np = np.asarray(fail_recover_xy_signed_offset).reshape(-1)
+            #     if xy_signed_offset_np.size == 2:
+            #         setup_group.create_dataset(
+            #             "fail_recover_xy_signed_offset", data=xy_signed_offset_np
+            #         )
+            #     else:
+            #         logger.debug(
+            #             "Warning: skip writing fail_recover_xy_signed_offset due to invalid size "
+            #             f"{xy_signed_offset_np.size}"
+            #         )
 
             # Camera intrinsics: Save only once per episode (take value from first buffer)
             if self.buffer:
