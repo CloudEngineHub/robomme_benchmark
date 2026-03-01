@@ -3163,7 +3163,7 @@
       "episode_idx": 30
     }
   ],
-  "Ryan_Lu": [
+  "user15": [
     {
       "env_id": "BinFill",
       "episode_idx": 98
@@ -3389,7 +3389,7 @@
       "episode_idx": 5
     }
   ],
-  "Xiaoyu_Ma": [
+  "user16": [
     {
       "env_id": "BinFill",
       "episode_idx": 98
@@ -3615,7 +3615,7 @@
       "episode_idx": 48
     }
   ],
-  "Rui-Yu_Lin": [
+  "user17": [
     {
       "env_id": "BinFill",
       "episode_idx": 98
@@ -3841,7 +3841,7 @@
       "episode_idx": 41
     }
   ],
-  "Chimaobi_Okite": [
+  "user18": [
     {
       "env_id": "BinFill",
       "episode_idx": 98
@@ -4067,7 +4067,7 @@
       "episode_idx": 11
     }
   ],
-  "Xiangyu_Zhou": [
+  "user19": [
     {
       "env_id": "BinFill",
       "episode_idx": 98
@@ -4518,23 +4518,5 @@
       "env_id": "RouteStick",
       "episode_idx": 48
     }
-  ],
-  "test": [
-    {
-      "env_id": "VideoPlaceButton",
-      "episode_idx": 98
-    },
-  {
-    "env_id": "BinFill",
-    "episode_idx": 33
-  },
-  {
-    "env_id": "BinFill",
-    "episode_idx": 34
-  },
-  {
-    "env_id": "BinFill",
-    "episode_idx": 35
-  }
   ]
 }

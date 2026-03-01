@@ -2175,6 +2175,32 @@ def create_ui_blocks():
         #   2. 底部容器：操作区域（Operation Zone）- 用户交互和操作控制
         with gr.Group(visible=False) as main_interface:
             # ====================================================================
+            # 教程视频区域 (Tutorial Video Zone)
+            # ====================================================================
+            # 用途：显示教程视频（仅在episode 98时显示）
+            # 布局：位于主界面最上方
+            # 可见性：初始为 False，仅在episode 98时显示
+            with gr.Group(visible=False) as tutorial_video_group:
+                gr.Markdown("### Tutorial Video🧑‍🏫 Watch the tutorial video and scroll down to finish the task below!")
+                # 教程视频播放器
+                # 功能：仅在episode 98时，根据当前任务的 env_id 自动加载对应的教程视频
+                # 初始值：None（无视频）
+                # 可见性：初始为 False，仅在episode 98且有视频时显示
+                # 交互：允许用户控制播放/暂停/进度条等
+                tutorial_video_display = gr.Video(
+                    label="Tutorial Video",
+                    value=None,         # 初始值为 None
+                    visible=False,      # 初始隐藏，仅在episode 98时显示
+                    interactive=True,   # 允许用户交互控制
+                    show_label=False    # 不显示标签
+                )
+                # 横线分隔
+                gr.HTML('<hr style="border-top: 3px solid #888; margin: 20px 0;">')
+                gr.HTML('<hr style="border-top: 3px solid #888; margin: 20px 0;">')
+                gr.HTML('<hr style="border-top: 3px solid #888; margin: 20px 0;">')
+                gr.Markdown("### Finish the task below!")
+            
+            # ====================================================================
             # 顶部容器：参考区域 (Reference Zone)
             # ====================================================================
             # 用途：显示任务信息、目标和参考视图（演示视频或实时流）
@@ -2424,7 +2450,7 @@ def create_ui_blocks():
                 # ====================================================================
                 # 用途：显示当前任务的提示信息，帮助用户理解任务要求
                 # 可见性：初始为 True（显示），任务加载后自动填充内容
-                # 布局：垂直排列，Task Hint 在上，教程视频在下，位于操作区域下方
+                # 布局：位于操作区域下方
                 with gr.Group(visible=True) as task_hint_group:
                     gr.HTML('<hr style="border-top: 3px solid #888; margin: 20px 0;">')
                     with gr.Column():
@@ -2437,22 +2463,6 @@ def create_ui_blocks():
                         task_hint_display = gr.Markdown(
                             value="",           # 初始值为空，任务加载时自动填充
                             elem_id="task_hint_display"
-                        )
-                        # 横线分隔
-                        gr.HTML('<hr style="border-top: 3px solid #888; margin: 20px 0;">')
-                        # 下方：教程视频标题和播放器（仅在episode 98时显示）
-                        gr.Markdown("### Tutorial Video🧑‍🏫")
-                        # 教程视频播放器
-                        # 功能：仅在episode 98时，根据当前任务的 env_id 自动加载对应的教程视频
-                        # 初始值：None（无视频）
-                        # 可见性：初始为 False，仅在episode 98且有视频时显示
-                        # 交互：允许用户控制播放/暂停/进度条等
-                        tutorial_video_display = gr.Video(
-                            label="Tutorial Video",
-                            value=None,         # 初始值为 None
-                            visible=False,      # 初始隐藏，仅在episode 98时显示
-                            interactive=True,   # 允许用户交互控制
-                            show_label=False    # 不显示标签
                         )
 
         # --- Event Wiring ---
@@ -2505,6 +2515,7 @@ def create_ui_blocks():
                 play_video_btn,
                 coords_group,
                 task_hint_display,  # 任务提示显示（自动加载）
+                tutorial_video_group,  # 教程视频组（仅在episode 98时显示）
                 tutorial_video_display,  # 教程视频显示（仅在episode 98时显示）
                 loading_overlay  # 【关键】加载完成后返回空字符串，清空 overlay 组件内容，遮罩层自动隐藏
             ]
@@ -2565,6 +2576,7 @@ def create_ui_blocks():
                 play_video_btn, 
                 coords_group, 
                 task_hint_display,  # 任务提示显示（自动加载）
+                tutorial_video_group,  # 教程视频组（仅在episode 98时显示）
                 tutorial_video_display,  # 教程视频显示（仅在episode 98时显示）
                 loading_overlay  # 【关键】加载完成后返回空字符串，清空 overlay 组件内容，遮罩层自动隐藏
             ]
@@ -2744,6 +2756,7 @@ def create_ui_blocks():
                 play_video_btn,                    # 重置播放视频按钮
                 coords_group,                      # 重置坐标组
                 task_hint_display,                 # 重置任务提示显示
+                tutorial_video_group,              # 重置教程视频组
                 tutorial_video_display             # 重置教程视频显示
             ]
         )

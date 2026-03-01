@@ -82,4 +82,9 @@ USER_PORT_MAP = {
     "Yue_Hu": 7871,
     "Yunqi_Zhao": 7872,
     "Long-Jing_Hsu": 7873,
+    "Ryan_Lu": 7874,
+    "Xiaoyu_Ma": 7875,
+    "Rui-Yu_Lin": 7876,
+    "Chimaobi_Okite": 7877,
+    "Xiangyu_Zhou": 7878,
 }

@@ -4519,22 +4519,5 @@
       "episode_idx": 48
     }
   ],
-  "test": [
-    {
-      "env_id": "VideoPlaceButton",
-      "episode_idx": 98
-    },
-  {
-    "env_id": "BinFill",
-    "episode_idx": 33
-  },
-  {
-    "env_id": "BinFill",
-    "episode_idx": 34
-  },
-  {
-    "env_id": "BinFill",
-    "episode_idx": 35
-  }
-  ]
+  
 }
