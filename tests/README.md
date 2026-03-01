@@ -13,7 +13,6 @@
 *   **`test_record_stick.py`**: 验证在使用 `RecordWrapper` 录制演示为 HDF5 数据集格式时，具有特殊轨迹要求（如 `PatternLock`/`RouteStick`）和普通要求（如 `PickXtimes`）的任务，其夹爪状态 (`gripper_state`)、机械臂关节 (`joint_action`) 及末端位姿 (`eef_action`) 的存储维度正确无误。
 *   **`test_replay_stick.py`**: 反向验证测试。用于读取测试：检验上一步生成好的特殊或普通数据集交由 `EpisodeDatasetResolver` 重新解析重放时，返回的数据维度和数值能否像录制时一样精准对齐。
 *   **`test_eepose_error_handling.py`**: 重度环境交互测试。验证当传入超出机械臂可达范围的末端位姿目标 (`ee_pose` 动作空间) 时，`DemonstrationWrapper` 能够优雅地捕获到底层物理引擎或 IK 求解的报错，并通过返回 `info["status"] = "error"` 上报异常信息以避免仿真程序崩溃。
-*   **`test_heavy_replay_4_modes.py`**: 基于视频拼接等复杂任务 (`VideoUnmaskSwap`) 的轨迹重放。针对四种动作空间 (`joint_angle`, `ee_pose`, `waypoint`, `multi_choice`)，验证其能否正确回放临时数据集，且行为终止/截断状态流转保持一致。
 *   **`test_route_stick_waypoint_boundary.py`**: 特有路线类任务验证。确保演示生成的数据从离线示范过渡到在线交互 (Demo -> Non-demo) 的边界时，记录的首个在线航点 (Waypoint) 数据具有足够的保真度。
 *   **`test_waypoint_phase_isolation.py`**: 验证演示录制与在线交互之间对于动作命令（尤其是航点 Waypoint）的数据隔离，防止缓冲中的演示动作残留到在线阶段污染录制的数据。
 
