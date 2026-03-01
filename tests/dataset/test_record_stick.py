@@ -1,20 +1,20 @@
 """
 test_record_stick.py
 ====================
-验证 Stick 环境（PatternLock）和非 Stick 环境（PickXtimes）
-在 RecordWrapper 录制 HDF5 时，以下四处维度对齐是否正确：
+Verify Stick environment (PatternLock) and non-Stick environment (PickXtimes)
+when RecordWrapper records HDF5, whether the following four dimensions are correctly aligned:
 
-1. gripper_state  : Stick → [0.0, 0.0]；非 Stick → shape==(2,)
-2. joint_action   : Stick → shape==(8,) 且 [-1] == -1.0；非 Stick → shape==(8,)
-3. eef_action     : Stick → shape==(7,) 且 [-1] == -1.0；非 Stick → shape==(7,)
-4. waypoint_action: shape==(7,)；finite 时 Stick → [-1] == -1.0，非 Stick → ±1.0；
-                    non-finite（NaN/Inf）视为“无 keypoint”占位，跳过符号断言
+1. gripper_state  : Stick → [0.0, 0.0]；non-Stick → shape==(2,)
+2. joint_action   : Stick → shape==(8,) and [-1] == -1.0；non-Stick → shape==(8,)
+3. eef_action     : Stick → shape==(7,) and [-1] == -1.0；non-Stick → shape==(7,)
+4. waypoint_action: shape==(7,)；finite Stick → [-1] == -1.0，non-Stick → ±1.0；
+                    non-finite (NaN/Inf) is treated as a "no keypoint" placeholder, skip sign assertion
 
-测试方法：参照 generate-dataset-control-seed-readJson-advanceV3.py，
-对每个测试用例使用 FailAware Planner + screw→RRT* 重试 patch 跑一个完整 episode
-（带种子重试），然后打开生成的 HDF5 文件逐项断言。
+Test method: refer to generate-dataset-control-seed-readJson-advanceV3.py,
+run a complete episode for each test case using FailAware Planner + screw→RRT* retry patch
+(with seed retry), then open the generated HDF5 file and assert item by item.
 
-运行方式（需要 display / headless GPU）：
+Run (requires display / headless GPU):
     cd /data/hongzefu/robomme_benchmark
     uv run python tests/dataset/test_record_stick.py
 """
@@ -35,24 +35,24 @@ from tests._shared.repo_paths import find_repo_root
 
 pytestmark = pytest.mark.dataset
 
-# ── 确保 robomme 包可被找到（main() 直跑兼容）──────────────────────────────────
+# ── Ensure robomme package can be found (compatible with direct main() run) ──────────────────────────────────
 _PROJECT_ROOT = find_repo_root(__file__)
 sys.path.insert(0, str(_PROJECT_ROOT / "src"))
 
 
 # ────────────────────────────────────────────────────────────────────────────
-# 断言函数
+# Assertion functions
 # ────────────────────────────────────────────────────────────────────────────
 
 def _verify_stick(h5_path: Path, env_id: str):
-    """验证 Stick 环境 HDF5 数据断言。"""
-    print(f"\n  [验证 Stick] 打开 {h5_path.name}")
+    """Verify Stick environment HDF5 data assertions."""
+    print(f"\n  [Verify Stick] Opening {h5_path.name}")
     with h5py.File(h5_path, "r") as f:
         episode_keys = [k for k in f.keys() if k.startswith("episode_")]
-        assert len(episode_keys) > 0, "HDF5 文件中没有 episode 组"
+        assert len(episode_keys) > 0, "No episode group in HDF5 file"
         ep_grp = f[episode_keys[0]]
         ts_keys = [k for k in ep_grp.keys() if k.startswith("timestep_")]
-        assert len(ts_keys) > 0, "episode 组中没有 timestep"
+        assert len(ts_keys) > 0, "No timestep in episode group"
 
         for ts_key in ts_keys:
             ts = ep_grp[ts_key]
@@ -60,44 +60,44 @@ def _verify_stick(h5_path: Path, env_id: str):
             # 1. gripper_state → [0.0, 0.0]
             gs = np.array(ts["obs"]["gripper_state"])
             assert gs.shape == (2,), \
-                f"[{env_id}/{ts_key}] gripper_state shape={gs.shape} 期望 (2,)"
+                f"[{env_id}/{ts_key}] gripper_state shape={gs.shape} expected (2,)"
             assert np.allclose(gs, 0.0), \
-                f"[{env_id}/{ts_key}] gripper_state={gs} 期望 [0.0, 0.0]"
+                f"[{env_id}/{ts_key}] gripper_state={gs} expected [0.0, 0.0]"
 
-            # 2. joint_action → 8维，最末位 == -1.0
+            # 2. joint_action → 8D, last bit == -1.0
             ja = np.array(ts["action"]["joint_action"]).flatten()
             assert ja.shape == (8,), \
-                f"[{env_id}/{ts_key}] joint_action shape={ja.shape} 期望 (8,)"
+                f"[{env_id}/{ts_key}] joint_action shape={ja.shape} expected (8,)"
             assert float(ja[-1]) == -1.0, \
-                f"[{env_id}/{ts_key}] joint_action[-1]={ja[-1]} 期望 -1.0"
+                f"[{env_id}/{ts_key}] joint_action[-1]={ja[-1]} expected -1.0"
 
-            # 3. eef_action → 7维，最末位 == -1.0
+            # 3. eef_action → 7D, last bit == -1.0
             ea = np.array(ts["action"]["eef_action"]).flatten()
             assert ea.shape == (7,), \
-                f"[{env_id}/{ts_key}] eef_action shape={ea.shape} 期望 (7,)"
+                f"[{env_id}/{ts_key}] eef_action shape={ea.shape} expected (7,)"
             assert float(ea[-1]) == -1.0, \
-                f"[{env_id}/{ts_key}] eef_action[-1]={ea[-1]} 期望 -1.0"
+                f"[{env_id}/{ts_key}] eef_action[-1]={ea[-1]} expected -1.0"
 
-            # 4. waypoint_action → 7维；non-finite 作为无 keypoint 占位，finite 才验证符号
+            # 4. waypoint_action → 7D; non-finite as no keypoint placeholder, finite then verify sign
             wa = np.array(ts["action"]["waypoint_action"]).flatten()
             assert wa.shape == (7,), \
-                f"[{env_id}/{ts_key}] waypoint_action shape={wa.shape} 期望 (7,)"
+                f"[{env_id}/{ts_key}] waypoint_action shape={wa.shape} expected (7,)"
             if np.all(np.isfinite(wa)):
                 assert float(wa[-1]) == -1.0, \
-                    f"[{env_id}/{ts_key}] waypoint_action[-1]={wa[-1]} 期望 -1.0"
+                    f"[{env_id}/{ts_key}] waypoint_action[-1]={wa[-1]} expected -1.0"
 
-    print(f"  [验证 Stick ✓] {env_id} 所有断言通过，共 {len(ts_keys)} 个 timestep")
+    print(f"  [Verify Stick ✓] {env_id} all assertions passed, total {len(ts_keys)} timesteps")
 
 
 def _verify_non_stick(h5_path: Path, env_id: str):
-    """验证非 Stick 环境 HDF5 数据断言（原有逻辑未被破坏）。"""
-    print(f"\n  [验证 非Stick] 打开 {h5_path.name}")
+    """Verify non-Stick environment HDF5 data assertions (original logic not broken)."""
+    print(f"\n  [Verify Non-Stick] Opening {h5_path.name}")
     with h5py.File(h5_path, "r") as f:
         episode_keys = [k for k in f.keys() if k.startswith("episode_")]
-        assert len(episode_keys) > 0, "HDF5 文件中没有 episode 组"
+        assert len(episode_keys) > 0, "No episode group in HDF5 file"
         ep_grp = f[episode_keys[0]]
         ts_keys = [k for k in ep_grp.keys() if k.startswith("timestep_")]
-        assert len(ts_keys) > 0, "episode 组中没有 timestep"
+        assert len(ts_keys) > 0, "No timestep in episode group"
 
         for ts_key in ts_keys:
             ts = ep_grp[ts_key]
@@ -105,36 +105,36 @@ def _verify_non_stick(h5_path: Path, env_id: str):
             # 1. gripper_state shape == (2,)
             gs = np.array(ts["obs"]["gripper_state"])
             assert gs.shape == (2,), \
-                f"[{env_id}/{ts_key}] gripper_state shape={gs.shape} 期望 (2,)"
+                f"[{env_id}/{ts_key}] gripper_state shape={gs.shape} expected (2,)"
 
-            # 2. joint_action → 8维
+            # 2. joint_action → 8D
             ja = np.array(ts["action"]["joint_action"]).flatten()
             assert ja.shape == (8,), \
-                f"[{env_id}/{ts_key}] joint_action shape={ja.shape} 期望 (8,)"
+                f"[{env_id}/{ts_key}] joint_action shape={ja.shape} expected (8,)"
 
-            # 3. eef_action → 7维
+            # 3. eef_action → 7D
             ea = np.array(ts["action"]["eef_action"]).flatten()
             assert ea.shape == (7,), \
-                f"[{env_id}/{ts_key}] eef_action shape={ea.shape} 期望 (7,)"
+                f"[{env_id}/{ts_key}] eef_action shape={ea.shape} expected (7,)"
 
-            # 4. waypoint_action → 7维；non-finite 作为无 keypoint 占位，finite 才验证符号
+            # 4. waypoint_action → 7D; non-finite as no keypoint placeholder, finite then verify sign
             wa = np.array(ts["action"]["waypoint_action"]).flatten()
             assert wa.shape == (7,), \
-                f"[{env_id}/{ts_key}] waypoint_action shape={wa.shape} 期望 (7,)"
+                f"[{env_id}/{ts_key}] waypoint_action shape={wa.shape} expected (7,)"
             if np.all(np.isfinite(wa)):
                 assert float(wa[-1]) in (-1.0, 1.0), \
-                    f"[{env_id}/{ts_key}] waypoint_action[-1]={wa[-1]} 应为 ±1.0"
+                    f"[{env_id}/{ts_key}] waypoint_action[-1]={wa[-1]} should be ±1.0"
 
-    print(f"  [验证 非Stick ✓] {env_id} 所有断言通过，共 {len(ts_keys)} 个 timestep")
+    print(f"  [Verify Non-Stick ✓] {env_id} all assertions passed, total {len(ts_keys)} timesteps")
 
 
 # ────────────────────────────────────────────────────────────────────────────
-# 测试用例配置
+# Test case configuration
 # ────────────────────────────────────────────────────────────────────────────
 
 # (env_id, is_stick, episode, base_seed, difficulty)
-# base_seed 与 V3 脚本中 SOURCE_METADATA_ROOT 对应的 seed 无关，
-# 这里直接使用 generate_dataset.py 的 SEED_OFFSET 规则
+# base_seed is unrelated to the seed corresponding to SOURCE_METADATA_ROOT in the V3 script,
+# here directly use the SEED_OFFSET rule of generate_dataset.py
 TEST_CASES = [
     ("PatternLock", True,  0, 510001, "easy"),
     ("PickXtimes",  False, 0, 504101, "easy"),
@@ -176,7 +176,7 @@ def main():
         cache = DatasetFactoryCache(Path(tmpdir))
         for env_id, is_stick, episode, base_seed, difficulty in TEST_CASES:
             print(f"\n{'='*60}")
-            print(f"测试用例: {env_id}  (is_stick={is_stick}, ep={episode}, base_seed={base_seed})")
+            print(f"Test case: {env_id}  (is_stick={is_stick}, ep={episode}, base_seed={base_seed})")
             print(f"{'='*60}")
             try:
                 generated = cache.get(_make_case(env_id, episode, base_seed, difficulty))
@@ -188,16 +188,16 @@ def main():
             except AssertionError as exc:
                 results.append((env_id, "FAIL", str(exc)))
                 all_pass = False
-                print(f"\n  [断言失败] {exc}")
+                print(f"\n  [Assertion failed] {exc}")
                 traceback.print_exc()
             except Exception as exc:
                 results.append((env_id, "ERROR", str(exc)))
                 all_pass = False
-                print(f"\n  [错误] {exc}")
+                print(f"\n  [Error] {exc}")
                 traceback.print_exc()
 
     print(f"\n{'='*60}")
-    print("测试结果汇总")
+    print("Test results summary")
     print(f"{'='*60}")
     for env_id, status, msg in results:
         marker = "✓" if status == "PASS" else "✗"

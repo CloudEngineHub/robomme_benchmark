@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-轻量测试：RecordWrapper 的 info/is_completed 判定与写入接线。
+Lightweight test: RecordWrapper info/is_completed determination and write wiring.
 
-运行方式（使用 uv）：
+Run (using uv):
     uv run python tests/lightweight/test_record_info_is_completed.py
 """
 
@@ -35,7 +35,7 @@ def _load_completion_fn_from_ast():
             func_node = node
             break
 
-    assert func_node is not None, "未找到 _is_online_subgoal_completed"
+    assert func_node is not None, "_is_online_subgoal_completed not found"
 
     module = ast.Module(body=[func_node], type_ignores=[])
     ast.fix_missing_locations(module)
@@ -79,9 +79,9 @@ def _assert_source_wired(source: str, tree: ast.AST) -> None:
                 if isinstance(key, ast.Constant) and key.value == "is_completed":
                     has_info_key = True
 
-    assert has_helper_call, "RecordWrapper 未调用 _is_online_subgoal_completed"
-    assert has_info_key, "record_data['info'] 未包含 is_completed"
-    assert has_h5_dataset, "HDF5 写入未包含 info/is_completed"
+    assert has_helper_call, "RecordWrapper did not call _is_online_subgoal_completed"
+    assert has_info_key, "record_data['info'] does not contain is_completed"
+    assert has_h5_dataset, "HDF5 write does not contain info/is_completed"
 
     assert "is_completed" in source
 
@@ -105,13 +105,13 @@ def main() -> None:
     fn, source, tree = _load_completion_fn_from_ast()
 
     _assert_completion_logic(fn)
-    print("  logic ✓ 在线递进完成判定")
+    print("  logic ✓ Online progressive completion judgment")
 
     _assert_source_wired(source, tree)
-    print("  wiring ✓ RecordWrapper 已接入 buffer + HDF5 写入")
+    print("  wiring ✓ RecordWrapper has connected buffer + HDF5 write")
 
     _assert_h5_bool_contract()
-    print("  hdf5 ✓ bool 字段契约可读")
+    print("  hdf5 ✓ bool field contract readable")
 
     print("\nPASS: record info is_completed tests passed")
 

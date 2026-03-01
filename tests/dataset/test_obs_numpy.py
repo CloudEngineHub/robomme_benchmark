@@ -2,18 +2,18 @@
 """
 test_obs_numpy.py
 ===================
-集成测试：直接调用真实环境 + 测试运行时统一生成的临时 dataset，
-测试 DemonstrationWrapper._augment_obs_and_info 内部原生的类型转换
-在四种 ActionSpace 下对 obs / info 字段的输出类型和形状是否正确。
+Integration test: Directly call the real environment + unified temporary dataset generated at test runtime,
+test the native type conversions inside DemonstrationWrapper._augment_obs_and_info
+and whether the output types and shapes of obs/info fields are correct under the four ActionSpaces.
 
-覆盖的 ActionSpace：
+Covered ActionSpaces:
     joint_angle / ee_pose / waypoint / multi_choice
 
-断言内容：
-  1. 返回的 dtype 符合规范 (如 uint8, int16, float32, float64 等)
-  2. info 非 Tensor 字段类型符合预期
+Asserts content:
+  1. Returned dtype complies with specifications (e.g. uint8, int16, float32, float64, etc.)
+  2. Non-Tensor field types in info meet expectations
 
-运行方式（必须用 uv）：
+Run (must use uv):
     cd /data/hongzefu/robomme_benchmark
     uv run python -m pytest tests/dataset/test_obs_numpy.py -v -s
 """
@@ -28,28 +28,28 @@ import pytest
 
 from tests._shared.repo_paths import find_repo_root
 
-# 确保 src 路径可被找到
+# Ensure src path can be found
 pytestmark = pytest.mark.dataset
 
 _PROJECT_ROOT = find_repo_root(__file__)
 sys.path.insert(0, str(_PROJECT_ROOT / "src"))
 
-from robomme.robomme_env import *  # noqa: F401,F403  注册所有自定义环境
+from robomme.robomme_env import *  # noqa: F401,F403  Register all custom environments
 from robomme.robomme_env.utils import *  # noqa: F401,F403
 from robomme.env_record_wrapper import BenchmarkEnvBuilder, EpisodeDatasetResolver
 
 # ──────────────────────────────────────────────────────────────────────────────
-# 配置
+# Configuration
 # ──────────────────────────────────────────────────────────────────────────────
 TEST_ENV_ID = "VideoUnmaskSwap"
 TEST_EPISODE = 0
-MAX_STEPS_PER_ACTION_SPACE = 3   # 每种 ActionSpace 最多验证的 step 数
+MAX_STEPS_PER_ACTION_SPACE = 3   # Max steps to verify per ActionSpace
 MAX_STEPS_ENV = 1000
 
 ActionSpaceType = Literal["joint_angle", "ee_pose", "waypoint", "multi_choice"]
 
 # ──────────────────────────────────────────────────────────────────────────────
-# 断言辅助
+# Assertion helpers
 # ──────────────────────────────────────────────────────────────────────────────
 
 def _assert_ndarray(val: Any, dtype: np.dtype, tag: str) -> None:
@@ -62,17 +62,17 @@ def _assert_ndarray(val: Any, dtype: np.dtype, tag: str) -> None:
 
 
 def _assert_ndarray_loose(val: Any, tag: str) -> None:
-    """只断言是 ndarray，不检查具体 dtype。"""
+    """Only assert it is an ndarray, do not check specific dtype."""
     assert isinstance(val, np.ndarray), (
         f"[{tag}] expected ndarray, got {type(val).__name__}"
     )
 
 # ──────────────────────────────────────────────────────────────────────────────
-# 核心断言：原生输出类型正确
+# Core assertion: native output type is correct
 # ──────────────────────────────────────────────────────────────────────────────
 
 def assert_obs(obs: dict, tag: str) -> None:
-    """断言 obs 输出 dtype 正确且 shape 与预期一致。"""
+    """Assert obs output dtype is correct and shape matches expectation."""
     n = len(obs.get("front_rgb_list", []))
     assert n > 0, f"[{tag}] obs front_rgb_list is empty"
 
@@ -94,10 +94,10 @@ def assert_obs(obs: dict, tag: str) -> None:
             f"[{pfx} eef_state_list] expected shape (6,), got {eef_state.shape}"
         )
 
-        # ── joint_state_list → ndarray（shape 不变）───────────────────────
+        # ── joint_state_list → ndarray (shape unchanged) ───────────────────────
         _assert_ndarray_loose(obs["joint_state_list"][i], f"{pfx} joint_state_list")
 
-        # ── gripper_state_list → ndarray（shape 不变）─────────────────────
+        # ── gripper_state_list → ndarray (shape unchanged) ─────────────────────
         _assert_ndarray_loose(obs["gripper_state_list"][i], f"{pfx} gripper_state_list")
 
         # ── camera extrinsics → float32, shape (3,4) ───────────────────────
@@ -109,7 +109,7 @@ def assert_obs(obs: dict, tag: str) -> None:
 
 
 def assert_info(info: dict, tag: str) -> None:
-    """断言 info 输出字段 dtype 等属实。"""
+    """Assert the dtypes of info output fields are correct."""
     for key in ("front_camera_intrinsic", "wrist_camera_intrinsic"):
         assert key in info, f"[{tag}] info missing key '{key}'"
         _assert_ndarray(info[key], np.float32, f"{tag} info['{key}']")
@@ -117,7 +117,7 @@ def assert_info(info: dict, tag: str) -> None:
             f"[{tag} info['{key}']] expected (3, 3), got {info[key].shape}"
         )
 
-    # 非 Tensor 字段类型不变
+    # Non-Tensor field types unchanged
     task_goal = info.get("task_goal")
     assert isinstance(task_goal, (str, list, type(None))), (
         f"[{tag}] info['task_goal'] unexpected type {type(task_goal)}"
@@ -129,11 +129,11 @@ def assert_info(info: dict, tag: str) -> None:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# 单次 ActionSpace 的完整 episode 测试
+# Full episode test for a single ActionSpace
 # ──────────────────────────────────────────────────────────────────────────────
 
 def _parse_oracle_command(choice_action: Optional[Any]) -> Optional[dict]:
-    """与 dataset_replay—printType.py 中保持一致的 oracle 命令解析。"""
+    """Oracle command parsing consistent with dataset_replay—printType.py."""
     if not isinstance(choice_action, dict):
         return None
     choice = choice_action.get("choice")
@@ -149,8 +149,8 @@ def run_one_action_space(action_space: ActionSpaceType, dataset_root: str | Path
     print(f"[TEST] ActionSpace = {action_space}")
     print(f"{'='*60}")
 
-    # multi_choice 使用 OraclePlannerDemonstrationWrapper，
-    # BenchmarkEnvBuilder 直接使用统一后的 action_space 命名。
+    # multi_choice uses OraclePlannerDemonstrationWrapper,
+    # BenchmarkEnvBuilder directly uses unified action_space naming.
 
     env_builder = BenchmarkEnvBuilder(
         env_id=TEST_ENV_ID,
@@ -183,7 +183,7 @@ def run_one_action_space(action_space: ActionSpaceType, dataset_root: str | Path
     reset_tag = f"{TEST_ENV_ID} ep{TEST_EPISODE} RESET [{action_space}]"
     assert_obs(obs, reset_tag)
     assert_info(info, reset_tag)
-    print(f"  RESET 断言通过  (obs list len={len(obs['front_rgb_list'])}, dtype ✓)")
+    print(f"  RESET assertion passed  (obs list len={len(obs['front_rgb_list'])}, dtype ✓)")
 
     # ── STEP LOOP ──────────────────────────────────────────────────────────
     step = 0
@@ -193,7 +193,7 @@ def run_one_action_space(action_space: ActionSpaceType, dataset_root: str | Path
         if action_space == "multi_choice":
             action = _parse_oracle_command(action)
         if action is None:
-            print(f"  step {step}: action=None（数据集结束），跳出")
+            print(f"  step {step}: action=None (dataset ended), breaking out")
             break
 
         obs, reward, terminated, truncated, info = env.step(action)
@@ -201,21 +201,21 @@ def run_one_action_space(action_space: ActionSpaceType, dataset_root: str | Path
         step_tag = f"{TEST_ENV_ID} ep{TEST_EPISODE} STEP{step} [{action_space}]"
         assert_obs(obs, step_tag)
         assert_info(info, step_tag)
-        print(f"  STEP {step} 断言通过  (obs list len={len(obs['front_rgb_list'])}, dtype ✓)")
+        print(f"  STEP {step} assertion passed  (obs list len={len(obs['front_rgb_list'])}, dtype ✓)")
 
         terminated_flag = bool(terminated.item())
         truncated_flag = bool(truncated.item())
         step += 1
         if terminated_flag or truncated_flag:
-            print(f"  terminated={terminated_flag} truncated={truncated_flag}，提前退出")
+            print(f"  terminated={terminated_flag} truncated={truncated_flag}, exiting early")
             break
 
     env.close()
-    print(f"  [{action_space}] ✓ 全部断言通过 (共 {step} 个 step)")
+    print(f"  [{action_space}] ✓ All assertions passed (total {step} steps)")
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# 入口
+# Entry point
 # ──────────────────────────────────────────────────────────────────────────────
 
 ACTION_SPACES: list[ActionSpaceType] = [

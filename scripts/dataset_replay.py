@@ -90,7 +90,7 @@ def _is_subgoal_boundary(ts: h5py.Group) -> bool:
 
 
 def _decode_h5_str(raw) -> str:
-    """将 HDF5 中的 bytes / numpy bytes / str 统一解码为 str。"""
+    """Uniformly decode bytes / numpy bytes / str from HDF5 to str."""
     if isinstance(raw, np.ndarray):
         raw = raw.flatten()[0]
     if isinstance(raw, (bytes, np.bytes_)):
@@ -102,10 +102,10 @@ def _build_action_sequence(
     episode_data: h5py.Group, action_space_type: str
 ) -> list[Union[np.ndarray, Dict[str, Any]]]:
     """
-    扫描整个 episode，返回去重后的 action 序列：
-    - joint_angle / ee_pose：所有非 video-demo 步的 action（顺序，不去重）
-    - waypoint：去除相邻重复的 waypoint_action（同 EpisodeDatasetResolver）
-    - multi_choice：仅 is_subgoal_boundary=True 的步的 choice_action（JSON dict）
+    Scan the entire episode and return the deduplicated action sequence:
+    - joint_angle / ee_pose: actions of all non-video-demo steps (sequential, not deduplicated)
+    - waypoint: remove adjacent duplicate waypoint_action (like EpisodeDatasetResolver)
+    - multi_choice: choice_action (JSON dict) only for steps where is_subgoal_boundary=True
     """
     timestep_keys = sorted(
         (k for k in episode_data.keys() if k.startswith("timestep_")),
@@ -140,7 +140,7 @@ def _build_action_sequence(
             wa = np.asarray(action_grp["waypoint_action"][()], dtype=np.float32).flatten()
             if wa.shape != (7,) or not np.all(np.isfinite(wa)):
                 continue
-            # 去除相邻重复
+            # Remove adjacent duplicates
             if prev_waypoint is None or not np.array_equal(wa, prev_waypoint):
                 actions.append(wa)
                 prev_waypoint = wa.copy()

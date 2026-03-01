@@ -62,7 +62,7 @@ DEFAULT_ENVS =[
     ]
 
 # Reference dataset metadata root directory: used to read difficulty and seed
-SOURCE_METADATA_ROOT = Path("/data/hongzefu/data_1206")
+SOURCE_METADATA_ROOT = Path("/data/hongzefu/robomme_benchmark/src/robomme/env_metadata/1206")
 VALID_DIFFICULTIES: Set[str] = {"easy", "medium", "hard"}
 DATASET_SCREW_MAX_ATTEMPTS = 3
 DATASET_RRT_MAX_ATTEMPTS = 3
@@ -666,7 +666,7 @@ def parse_args() -> argparse.Namespace:
         "-n",
         type=int,
         nargs="+",
-        default=[19],
+        default=[0],
         help="List of episodes to generate.",
     )
     parser.add_argument(

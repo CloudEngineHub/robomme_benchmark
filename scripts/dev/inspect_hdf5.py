@@ -40,7 +40,7 @@ def _format_value(obj, max_elems=20, max_str_len=200, max_array_size=10000):
         shape = obj.shape
         size = int(np.prod(shape)) if shape else 0
         if size > max_array_size:
-            # 大数组：只读前 max_elems 个元素（按 C-order 展平）
+            # Large array: read only the first max_elems elements (flattened in C-order)
             take = min(max_elems, size)
             if take == 0:
                 return "[]"
@@ -90,7 +90,7 @@ def print_recursive(obj, indent=0):
     if isinstance(obj, h5py.Dataset):
         name = (obj.name or "").split("/")[-1]
         print(f"{tab}- [Dataset] {name}: shape={obj.shape}, dtype={obj.dtype}")
-        # 打印值：标量、小数组或数组摘要
+        # Print value: scalar, small array, or array summary
         value_str = _format_value(obj)
         if value_str:
             print(f"{tab}    -> {value_str}")

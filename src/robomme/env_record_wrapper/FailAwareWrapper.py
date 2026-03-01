@@ -4,7 +4,7 @@ from ..logging_utils import logger
 
 class FailAwareWrapper(gym.Wrapper):
     """
-    统一在最外侧接住所有的异常崩溃 (例如 IK Fail)。将抛出的代码 Error 转化为状态码 info = {"status": "error"} 并终止 episode，保证所有外围执行脚本无需手写 try except。
+    Uniformly catch all exception crashes (e.g. IK Fail) at the outermost layer. Convert thrown code Errors to status code info = {"status": "error"} and terminate the episode, ensuring all peripheral execution scripts do not need to write try-except manually.
     """
     
     def __init__(self, env):
@@ -22,14 +22,14 @@ class FailAwareWrapper(gym.Wrapper):
             self._last_obs = obs
             return obs, reward, terminated, truncated, info
         except Exception as e:
-            # 记录异常方便溯源调试
-            logger.error(f"环境中途阻断执行发生异常: {str(e)}")
+            # Record exceptions for traceability and debugging
+            logger.error(f"Environment execution interrupted due to exception: {str(e)}")
             
-            # 直接触发 terminated 的退出机制，且向 info 注入错误标志即可
+            # Directly trigger the terminated exit mechanism and inject an error flag into info
             return (
-                None,            #no obs
-                0.0,            # 惩罚性 reward 或维持 0
-                True,           # terminated: True，令循环切断
+                None,            # no obs
+                0.0,            # Punitive reward or maintain 0
+                True,           # terminated: True, cut off loop
                 False,          # truncated
                 {
                     "status": "error", 

@@ -1,12 +1,12 @@
 """
 test_TaskGoalIsList.py
 
-直接创建真实 Gymnasium 环境（包裹 DemonstrationWrapper），
-调用 env.reset()，验证 info["task_goal"] 是 list 且非空。
+Directly create a real Gymnasium environment (wrapped in DemonstrationWrapper),
+call env.reset(), and verify that info["task_goal"] is a list and not empty.
 
-全部 16 个 env 均覆盖。
+Covers all 16 envs.
 
-运行：
+Run:
     uv run python -m pytest tests/lightweight/test_TaskGoalI_isList.py -v -s
 """
 
@@ -21,7 +21,7 @@ from robomme.env_record_wrapper.OraclePlannerDemonstrationWrapper import OracleP
 
 pytestmark = [pytest.mark.slow, pytest.mark.gpu]
 
-# ── 全部 16 个 env_id ──────────────────────────────────────────────────────────
+# ── All 16 env_ids ─────────────────────────────────────────────────────────────
 ALL_ENV_IDS = [
     "BinFill",
     "PickXtimes",
@@ -41,12 +41,12 @@ ALL_ENV_IDS = [
     "RouteStick",
 ]
 
-# ── 四种 ActionSpaceType ───────────────────────────────────────────────────────
+# ── Four ActionSpaceTypes ──────────────────────────────────────────────────────
 ACTION_SPACES = ["joint_angle", "ee_pose", "waypoint", "multi_choice"]
 
 
 def _make_env(env_id: str, action_space: str):
-    """创建并返回包裹了相应 Wrapper 的真实环境。"""
+    """Create and return a real environment wrapped with the corresponding Wrapper."""
     env = gym.make(
         env_id,
         obs_mode="rgb+depth+segmentation",
@@ -54,7 +54,7 @@ def _make_env(env_id: str, action_space: str):
         render_mode="rgb_array",
         reward_mode="dense",
     )
-    # 基础 Wrapper
+    # Base Wrapper
     env = DemonstrationWrapper(
         env,
         max_steps_without_demonstration=10002,
@@ -69,7 +69,7 @@ def _make_env(env_id: str, action_space: str):
         include_wrist_camera_intrinsic=True,
     )
 
-    # 根据 action_space 应用额外的 Wrapper
+    # Apply additional Wrapper depending on action_space
     if action_space == "joint_angle":
         pass
     elif action_space == "ee_pose":
@@ -90,10 +90,10 @@ def _make_env(env_id: str, action_space: str):
 )
 def test_task_goal_is_list(env_id: str, action_space: str):
     """
-    对每个 env_id 连续测试四种 action_space：
-    1. 创建真实环境（含相应的 Wrapper）
-    2. 调用 reset()
-    3. 断言 info["task_goal"] 是 list 且非空
+    Test four action_spaces consecutively for each env_id:
+    1. Create real environment (including corresponding Wrapper)
+    2. Call reset()
+    3. Assert info["task_goal"] is list and not empty
     """
     print(f"\nTesting [{env_id}] with action_space={action_space!r}")
     env = _make_env(env_id, action_space)
@@ -106,12 +106,12 @@ def test_task_goal_is_list(env_id: str, action_space: str):
     print(f"[{env_id} | {action_space}] task_goal = {task_goal!r}")
 
     assert isinstance(task_goal, list), (
-        f"[{env_id} | {action_space}] info['task_goal'] 应为 list，实际为 {type(task_goal).__name__!r}: {task_goal!r}"
+        f"[{env_id} | {action_space}] info['task_goal'] should be list, actually {type(task_goal).__name__!r}: {task_goal!r}"
     )
     assert len(task_goal) >= 1, (
-        f"[{env_id} | {action_space}] info['task_goal'] 不应为空 list"
+        f"[{env_id} | {action_space}] info['task_goal'] should not be empty list"
     )
     for i, item in enumerate(task_goal):
         assert isinstance(item, str), (
-            f"[{env_id} | {action_space}] task_goal[{i}] 应为 str，实际为 {type(item).__name__!r}: {item!r}"
+            f"[{env_id} | {action_space}] task_goal[{i}] should be str, actually {type(item).__name__!r}: {item!r}"
         )

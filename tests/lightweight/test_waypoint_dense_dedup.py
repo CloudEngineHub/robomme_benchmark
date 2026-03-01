@@ -2,10 +2,10 @@
 """
 test_waypoint_dense_dedup.py
 ============================
-单元测试：验证 EpisodeDatasetResolver 的 waypoint 读取逻辑
-从依赖 info/is_keyframe 改为扫描密集 waypoint_action 并做相邻严格去重。
+Unit test: Verify that EpisodeDatasetResolver's waypoint read logic
+changes from depending on info/is_keyframe to scanning dense waypoint_action and strictly deduplicating adjacent ones.
 
-运行方式（必须用 uv）：
+Run (using uv):
     cd /data/hongzefu/robomme_benchmark
     uv run python tests/lightweight/test_waypoint_dense_dedup.py
 """
@@ -152,16 +152,16 @@ def main() -> None:
         tmpdir = Path(tmp)
 
         _case_adjacent_dedup_ignore_keyframe(tmpdir)
-        print("  case1 ✓ 相邻去重 + 忽略 is_keyframe + 跳过 video_demo")
+        print("  case1 ✓ Adjacent deduplication + ignore is_keyframe + skip video_demo")
 
         _case_all_keyframe_false(tmpdir)
-        print("  case2 ✓ 全部 is_keyframe=False 仍可提取")
+        print("  case2 ✓ Can still extract even if all is_keyframe=False")
 
         _case_missing_waypoint_action_skipped(tmpdir)
-        print("  case3 ✓ 缺失 waypoint_action 的 timestep 被跳过")
+        print("  case3 ✓ Timesteps missing waypoint_action are skipped")
 
         _case_non_finite_waypoint_skipped(tmpdir)
-        print("  case4 ✓ non-finite waypoint_action 的 timestep 被跳过")
+        print("  case4 ✓ Timesteps with non-finite waypoint_action are skipped")
 
     print("\nPASS: waypoint dense dedup tests passed")
 

@@ -1,17 +1,17 @@
 """
 test_replay_stick.py
 ====================
-验证 Stick 环境（PatternLock）和非 Stick 环境（PickXtimes）
-在被 EpisodeDatasetResolver（dataset_replay.py 读取的方式）解析和重放时，
-各类维度和 state 是否按预期对齐。
-与 test_record_stick.py 类似，我们会先短跑一两个完整的 episode，确保本地有一个正确的 HDF5 文件。
-然后用 BenchmarkEnvBuilder 结合 EpisodeDatasetResolver 进行重放读取并针对 obs 断言。
+Verify Stick environment (PatternLock) and non-Stick environment (PickXtimes)
+when being parsed and replayed by EpisodeDatasetResolver (used in dataset_replay.py),
+whether various dimensions and states are aligned as expected.
+Similar to test_record_stick.py, we will first run one or two complete episodes to ensure a correct HDF5 file is available locally.
+Then use BenchmarkEnvBuilder combined with EpisodeDatasetResolver for replay read and assertion against obs.
 
-1. gripper_state(读出的 eef_state_list 和 obs): Stick -> [0.0, 0.0]; 非 Stick -> shape(2,)
-2. action (eef / joint_action 从 resolver 中读取): 末端维度对齐
-3. 等等
+1. gripper_state(eef_state_list and obs read): Stick -> [0.0, 0.0]; non-Stick -> shape(2,)
+2. action (eef / joint_action read from resolver): end-effector dimensions aligned
+3. etc.
 
-运行方式（需要 display / headless GPU）：
+Run (requires display / headless GPU):
     cd /data/hongzefu/robomme_benchmark
     uv run python tests/dataset/test_replay_stick.py
 """
@@ -31,35 +31,35 @@ from tests._shared.repo_paths import find_repo_root
 
 pytestmark = pytest.mark.dataset
 
-# ── 确保 robomme 包可被找到 ──────────────────────────────────────────────────
+# ── Ensure robomme package can be found ──────────────────────────────────────────────────
 _PROJECT_ROOT = find_repo_root(__file__)
 sys.path.insert(0, str(_PROJECT_ROOT / "src"))
 
 from robomme.env_record_wrapper import BenchmarkEnvBuilder, EpisodeDatasetResolver  # noqa: E402
-from robomme.robomme_env import *  # noqa: F401,F403,E402  注册所有自定义环境
+from robomme.robomme_env import *  # noqa: F401,F403,E402  Register all custom environments
 
 
 # ────────────────────────────────────────────────────────────────────────────
-# 断言函数（重放测试阶段）
+# Assertion functions (replay test phase)
 # ────────────────────────────────────────────────────────────────────────────
 def _verify_replay(env_id: str, dataset_dir: Path, h5_path: Path, is_stick: bool):
-    """验证从 Builder 和 Resolver 读取的状态是否符合预期模型维数规则"""
+    """Verify whether the states read from Builder and Resolver comply with expected model dimension rules"""
 
-    # 我们知道我们刚录制的是 ep 0
+    # We know we just recorded ep 0
     replay_episode = 0
-    # 注意，在 Dataset Resolver 中，我们会扫描 H5 文件所在夹，由于我们在重试时可能会导致后缀 Seed 变化
-    # 解析依然能自动找到以 dataset_dir 传参对应的第一个 HDF5 文件
+    # Note that in Dataset Resolver, we scan the folder where the H5 file is located, because retrying may cause the suffix Seed to change.
+    # Parsing can still automatically find the first HDF5 file corresponding to the dataset_dir parameter.
 
     ACTION_SPACE = "joint_angle"
-    print(f"\n  [启动 Replay 验证] ACTION_SPACE: {ACTION_SPACE}, env: {env_id}")
+    print(f"\n  [Start Replay Validation] ACTION_SPACE: {ACTION_SPACE}, env: {env_id}")
     env_builder = BenchmarkEnvBuilder(
         env_id=env_id,
-        dataset="test",  # 并不真实用 dataset json 扫描，只是作为 placeholder
+        dataset="test",  # Does not actually use dataset json scan, just acts as a placeholder
         action_space=ACTION_SPACE,
         gui_render=False,
     )
 
-    # 绕过 resolver json 的 episode 限缩，直接通过 dataset resolver 本地文件搜索。
+    # Bypass resolver json's episode reduction, directly search local files via dataset resolver.
     env = env_builder.make_env_for_episode(
         replay_episode,
         max_steps=1000,
@@ -73,9 +73,9 @@ def _verify_replay(env_id: str, dataset_dir: Path, h5_path: Path, is_stick: bool
         include_wrist_camera_intrinsic=True,
     )
 
-    # 统一数据生成 fixture 已提前准备好 record_dataset_{env_id}.h5 命名。
+    # The unified data generation fixture is pre-prepared with the record_dataset_{env_id}.h5 naming.
 
-    # 创建解析器（需传到 dataset_dir/hdf5_files 的上一层，即 dataset_dir）
+    # Create the parser (needs to point to the directory above dataset_dir/hdf5_files, which is dataset_dir)
     try:
         dataset_resolver = EpisodeDatasetResolver(
             env_id=env_id,
@@ -91,7 +91,7 @@ def _verify_replay(env_id: str, dataset_dir: Path, h5_path: Path, is_stick: bool
 
         step_id = 0
         while True:
-            # ======= 获取并验证 Dataset中的action =======
+            # ======= Get and verify action in Dataset =======
             action = dataset_resolver.get_step(ACTION_SPACE, step_id)
             if action is None:
                 break
@@ -116,10 +116,10 @@ def _verify_replay(env_id: str, dataset_dir: Path, h5_path: Path, is_stick: bool
                     assert np.all(np.isfinite(waypoint_action)), f"[{env_id}] waypoint_action should be finite"
                     assert float(waypoint_action[-1]) in (-1.0, 1.0), f"[{env_id}] expected ±1 for waypoint_action"
 
-            # ======= 执行 step =======
+            # ======= Execute step =======
             obs, reward, terminated, truncated, info = env.step(action)
 
-            # ======= 断言 DemonstrationWrapper 返回的 obs 状态 =======
+            # ======= Assert the obs state returned by DemonstrationWrapper =======
             gripper_state_list = obs["gripper_state_list"]
 
             if is_stick:
@@ -137,11 +137,11 @@ def _verify_replay(env_id: str, dataset_dir: Path, h5_path: Path, is_stick: bool
     finally:
         env.close()
 
-    print(f"  [{env_id} - Replay 验证 ✓] 所有断言通过，共重放 {step_id} 个 timestep")
+    print(f"  [{env_id} - Replay Validation ✓] All assertions passed, totally replayed {step_id} timesteps")
 
 
 # ────────────────────────────────────────────────────────────────────────────
-# 测试流程控制
+# Test flow control
 # ────────────────────────────────────────────────────────────────────────────
 TEST_CASES = [
     ("PatternLock", True,  0, 510001, "easy"),
@@ -186,12 +186,12 @@ def main():
         cache = DatasetFactoryCache(Path(tmpdir))
         for env_id, is_stick, episode, base_seed, difficulty in TEST_CASES:
             print(f"\n{'='*60}")
-            print(f"测试用例: {env_id}  (is_stick={is_stick}, ep={episode})")
+            print(f"Test case: {env_id}  (is_stick={is_stick}, ep={episode})")
             print(f"{'='*60}")
             try:
                 generated = cache.get(_make_case(env_id, episode, base_seed, difficulty))
-                print(f"  => 录制完成：{generated.raw_h5_path}")
-                print(f"  [2. Replay解析阶段]")
+                print(f"  => Recording complete: {generated.raw_h5_path}")
+                print(f"  [2. Replay Parsing Phase]")
                 _verify_replay(
                     env_id=env_id,
                     dataset_dir=generated.resolver_dataset_dir,
@@ -202,16 +202,16 @@ def main():
             except AssertionError as exc:
                 results.append((env_id, "FAIL", str(exc)))
                 all_pass = False
-                print(f"\n  [断言失败] {exc}")
+                print(f"\n  [Assertion failed] {exc}")
                 traceback.print_exc()
             except Exception as exc:
                 results.append((env_id, "ERROR", str(exc)))
                 all_pass = False
-                print(f"\n  [错误] {exc}")
+                print(f"\n  [Error] {exc}")
                 traceback.print_exc()
 
     print(f"\n{'='*60}")
-    print("测试结果汇总")
+    print("Test results summary")
     print(f"{'='*60}")
     for env_id, status, msg in results:
         marker = "✓" if status == "PASS" else "✗"

@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-轻量测试：choice_action 新 schema + EpisodeDatasetResolver 按 info/is_subgoal_boundary 读取。
+Lightweight test: choice_action new schema + EpisodeDatasetResolver read by info/is_subgoal_boundary.
 
-运行方式（使用 uv）：
+Run (using uv):
     uv run python tests/lightweight/test_choice_action_is_keyframe_flow.py
 """
 
@@ -63,7 +63,7 @@ def _build_h5(h5_path: Path) -> None:
     with h5py.File(h5_path, "w") as h5:
         ep = h5.create_group("episode_0")
 
-        # 非 subgoal boundary: 有效 choice 也必须忽略
+        # Non-subgoal boundary: valid choice must also be ignored
         _make_timestep(
             ep,
             0,
@@ -73,7 +73,7 @@ def _build_h5(h5_path: Path) -> None:
             },
             is_subgoal_boundary=False,
         )
-        # 有效 subgoal boundary: 应被读取
+        # Valid subgoal boundary: should be read
         _make_timestep(
             ep,
             1,
@@ -83,7 +83,7 @@ def _build_h5(h5_path: Path) -> None:
             },
             is_subgoal_boundary=True,
         )
-        # subgoal boundary 但空 choice: 跳过
+        # Subgoal boundary but empty choice: skip
         _make_timestep(
             ep,
             2,
@@ -93,7 +93,7 @@ def _build_h5(h5_path: Path) -> None:
             },
             is_subgoal_boundary=True,
         )
-        # video demo subgoal boundary: 跳过
+        # Video demo subgoal boundary: skip
         _make_timestep(
             ep,
             3,
@@ -104,7 +104,7 @@ def _build_h5(h5_path: Path) -> None:
             is_video_demo=True,
             is_subgoal_boundary=True,
         )
-        # 第二个有效 subgoal boundary
+        # Second valid subgoal boundary
         _make_timestep(
             ep,
             4,
@@ -197,10 +197,10 @@ def main() -> None:
         h5_path = Path(tmp) / "choice_action_flow.h5"
         _build_h5(h5_path)
         _assert_record_schema_contract(h5_path)
-        print("  schema ✓ choice_action 新字段 point 可读, 不写 position_3d")
+        print("  schema ✓ choice_action new field point readable, don't write position_3d")
 
         _assert_resolver_reads_by_is_subgoal_boundary(h5_path)
-        print("  resolver ✓ 仅按 is_subgoal_boundary 读取 + 严格拒绝 legacy 字段")
+        print("  resolver ✓ Read only by is_subgoal_boundary + strictly reject legacy fields")
 
     print("\nPASS: choice_action is_subgoal_boundary flow tests passed")
 

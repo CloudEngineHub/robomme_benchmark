@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-轻量测试：RecordWrapper 视频相关元数据字段接线（buffer + HDF5 写入）。
+Lightweight test: RecordWrapper video-related metadata field wiring (buffer + HDF5 writing).
 
-运行方式（使用 uv）：
+Run (using uv):
     uv run python tests/lightweight/test_record_video_metadata_fields.py
 """
 
@@ -72,8 +72,8 @@ def _run_assertions() -> None:
         "is_subgoal_boundary",
     }
     missing_record_keys = sorted(required_record_keys - dict_keys)
-    assert not missing_record_keys, f"record_data 缺少字段: {missing_record_keys}"
-    print("  buffer ✓ record_data 包含目标字段")
+    assert not missing_record_keys, f"record_data missing fields: {missing_record_keys}"
+    print("  buffer ✓ record_data contains target fields")
 
     required_h5_datasets = {
         "choice_action",
@@ -85,10 +85,10 @@ def _run_assertions() -> None:
         "is_subgoal_boundary",
     }
     missing_h5_datasets = sorted(required_h5_datasets - dataset_names)
-    assert not missing_h5_datasets, f"HDF5 写入缺少字段: {missing_h5_datasets}"
-    print("  hdf5 ✓ create_dataset 已包含目标字段")
+    assert not missing_h5_datasets, f"HDF5 writing missing fields: {missing_h5_datasets}"
+    print("  hdf5 ✓ create_dataset already contains target fields")
 
-    # 视频叠字应直接展示 schema 字段名，便于人工核对录制结果。
+    # Video superimposed text should directly display the schema field name, facilitating manual verification of recording results.
     for token in [
         "info.simple_subgoal:",
         "info.simple_subgoal_online:",
@@ -97,7 +97,7 @@ def _run_assertions() -> None:
         "action.choice_action:",
         "info.is_completed:",
     ]:
-        assert token in source, f"视频叠字缺少字段标签: {token}"
+        assert token in source, f"Video superimposed text missing field label: {token}"
 
 
 def test_record_video_metadata_fields_pytest() -> None:
@@ -107,7 +107,7 @@ def test_record_video_metadata_fields_pytest() -> None:
 def main() -> None:
     print("\n[TEST] RecordWrapper video metadata fields")
     _run_assertions()
-    print("  video ✓ 叠字包含字段名标签")
+    print("  video ✓ Superimposed text contains field name labels")
 
     print("\nPASS: record video metadata fields tests passed")
 

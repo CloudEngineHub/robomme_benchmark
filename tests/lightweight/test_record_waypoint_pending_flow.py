@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-轻量测试：RecordWrapper waypoint pending 刷新流程。
+Lightweight test: RecordWrapper waypoint pending refresh flow.
 
-运行方式（使用 uv）：
+Run (using uv):
     uv run python tests/lightweight/test_record_waypoint_pending_flow.py
 """
 
@@ -32,14 +32,14 @@ def _find_wrapper_class(tree: ast.Module) -> ast.ClassDef:
     for node in tree.body:
         if isinstance(node, ast.ClassDef) and node.name == "RobommeRecordWrapper":
             return node
-    raise AssertionError("未找到 RobommeRecordWrapper")
+    raise AssertionError("RobommeRecordWrapper not found")
 
 
 def _find_method(cls_node: ast.ClassDef, method_name: str) -> ast.FunctionDef:
     for node in cls_node.body:
         if isinstance(node, ast.FunctionDef) and node.name == method_name:
             return node
-    raise AssertionError(f"未找到方法 {method_name}")
+    raise AssertionError(f"Method {method_name} not found")
 
 
 def _is_refresh_call(node: ast.Call) -> bool:
@@ -72,7 +72,7 @@ def _is_clear_call(node: ast.Call) -> bool:
 
 def _assert_demo_tracking_and_clear_method(cls_node: ast.ClassDef, source: str) -> None:
     has_prev_demo_attr = "_prev_is_video_demo" in source
-    assert has_prev_demo_attr, "未检测到 _prev_is_video_demo 状态追踪字段"
+    assert has_prev_demo_attr, "State tracking field _prev_is_video_demo not detected"
 
     clear_fn = _find_method(cls_node, "_clear_waypoint_caches_on_demo_end")
     has_clear_current = False
@@ -88,8 +88,8 @@ def _assert_demo_tracking_and_clear_method(cls_node: ast.ClassDef, source: str) 
                         if isinstance(node.value, ast.Constant) and node.value.value is None:
                             has_clear_pending = True
 
-    assert has_clear_current, "清理函数未将 self._current_waypoint_action 置空"
-    assert has_clear_pending, "清理函数未将 env._pending_waypoint 置空"
+    assert has_clear_current, "Clean function did not empty self._current_waypoint_action"
+    assert has_clear_pending, "Clean function did not empty env._pending_waypoint"
 
 
 def _assert_step_refresh_before_super_step(step_fn: ast.FunctionDef) -> None:
@@ -103,10 +103,10 @@ def _assert_step_refresh_before_super_step(step_fn: ast.FunctionDef) -> None:
         if _is_super_step_call(node):
             super_step_lines.append(node.lineno)
 
-    assert refresh_lines, "step() 未调用 self._refresh_pending_waypoint"
-    assert super_step_lines, "step() 未调用 super().step"
+    assert refresh_lines, "step() did not call self._refresh_pending_waypoint"
+    assert super_step_lines, "step() did not call super().step"
     assert min(refresh_lines) < min(super_step_lines), (
-        "step() 中 _refresh_pending_waypoint 应位于 super().step 之前"
+        "_refresh_pending_waypoint should be placed before super().step in step()"
     )
 
 
@@ -140,12 +140,12 @@ def _assert_step_demo_transition_clear_before_waypoint_write(step_fn: ast.Functi
                 if isinstance(key, ast.Constant) and key.value == "waypoint_action":
                     waypoint_write_lines.append(key.lineno)
 
-    assert transition_if_lines, "step() 未检测到 demo->non-demo 边界判断"
-    assert clear_call_lines, "step() 未调用 _clear_waypoint_caches_on_demo_end"
-    assert prev_demo_update_lines, "step() 未更新 self._prev_is_video_demo"
-    assert waypoint_write_lines, "step() 未检测到 waypoint_action 写入"
+    assert transition_if_lines, "step() did not detect demo->non-demo boundary condition"
+    assert clear_call_lines, "step() did not call _clear_waypoint_caches_on_demo_end"
+    assert prev_demo_update_lines, "step() did not update self._prev_is_video_demo"
+    assert waypoint_write_lines, "step() did not detect waypoint_action write"
     assert min(clear_call_lines) < min(waypoint_write_lines), (
-        "清理调用必须发生在写入 record_data['action']['waypoint_action'] 之前"
+        "Clean call must occur before writing to record_data['action']['waypoint_action']"
     )
 
 
@@ -160,11 +160,11 @@ def _assert_close_no_trailing_consume(close_fn: ast.FunctionDef) -> None:
         func = node.func
         if isinstance(func, ast.Attribute) and func.attr in banned_attrs:
             raise AssertionError(
-                f"close() 不应调用 {func.attr}，当前检测到 trailing waypoint 后处理逻辑"
+                f"close() should not call {func.attr}, trailing waypoint post-processing logic detected"
             )
         if isinstance(func, ast.Name) and func.id in banned_attrs:
             raise AssertionError(
-                f"close() 不应调用 {func.id}，当前检测到 trailing waypoint 后处理逻辑"
+                f"close() should not call {func.id}, trailing waypoint post-processing logic detected"
             )
 
 
@@ -174,17 +174,17 @@ def main() -> None:
     cls_node = _find_wrapper_class(tree)
 
     _assert_demo_tracking_and_clear_method(cls_node, source)
-    print("  clear ✓ demo结束边界清理函数存在且清空 current+pending")
+    print("  clear ✓ demo end boundary clean function exists and clears current+pending")
 
     step_fn = _find_method(cls_node, "step")
     _assert_step_refresh_before_super_step(step_fn)
-    print("  step ✓ _refresh_pending_waypoint 在 super().step 之前")
+    print("  step ✓ _refresh_pending_waypoint is before super().step")
     _assert_step_demo_transition_clear_before_waypoint_write(step_fn)
-    print("  step ✓ demo->非demo边界触发清理，且先于 waypoint 写入")
+    print("  step ✓ demo->non-demo boundary triggers clean, and precedes waypoint write")
 
     close_fn = _find_method(cls_node, "close")
     _assert_close_no_trailing_consume(close_fn)
-    print("  close ✓ 无 trailing consume/backfill 后处理")
+    print("  close ✓ no trailing consume/backfill post-processing")
 
     print("\nPASS: record waypoint pending flow tests passed")
 

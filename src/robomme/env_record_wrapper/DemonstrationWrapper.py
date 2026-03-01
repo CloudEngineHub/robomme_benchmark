@@ -57,7 +57,7 @@ except ImportError:
     _HAS_TORCH = False
 
 def _tensor_to_numpy(value: Any, dtype: np.dtype) -> np.ndarray:
-    """将单个 Tensor 转换为指定 dtype 的 ndarray；若已是 ndarray 则只转换 dtype。"""
+    """Convert a single Tensor to an ndarray of specified dtype; if already ndarray, only convert dtype."""
     if _HAS_TORCH and isinstance(value, torch.Tensor):
         arr = value.detach().cpu().numpy()
     else:
