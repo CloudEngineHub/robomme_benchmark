@@ -57,22 +57,22 @@ OUT_VIDEO_DIR = "/data/hongzefu/dataset_replay-0226-test"
 MAX_STEPS = 2000
 
 DEFAULT_ENV_IDS = [
-# "PickXtimes",
-# "StopCube",
-# "SwingXtimes",
-# "BinFill",
-# "VideoUnmaskSwap",
-# "VideoUnmask",
-# "ButtonUnmaskSwap",
-# "ButtonUnmask",
-# "VideoRepick",
-# "VideoPlaceButton",
-# "VideoPlaceOrder",
-# "PickHighlight",
-# "InsertPeg",
-# "MoveCube",
+"PickXtimes",
+"StopCube",
+"SwingXtimes",
+"BinFill",
+"VideoUnmaskSwap",
+"VideoUnmask",
+"ButtonUnmaskSwap",
+"ButtonUnmask",
+"VideoRepick",
+"VideoPlaceButton",
+"VideoPlaceOrder",
+"PickHighlight",
+"InsertPeg",
+"MoveCube",
 "PatternLock",
-# "RouteStick",
+"RouteStick",
  ]
 
 def _parse_oracle_command(choice_action: Optional[Any]) -> Optional[dict[str, Any]]:
@@ -555,8 +555,8 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--action_spaces",
         type=_parse_action_spaces,
-        default=AVAILABLE_ACTION_SPACES.copy(),
-        #default=["multi_choice",],
+        #default=AVAILABLE_ACTION_SPACES.copy(),
+        default=["multi_choice",],
         help=(
             "Comma-separated action spaces to replay in order. "
             "Available: joint_angle,ee_pose,waypoint,multi_choice. "
