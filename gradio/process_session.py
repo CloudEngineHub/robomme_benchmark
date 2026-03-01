@@ -20,7 +20,6 @@ import sys
 import os
 
 # 添加父目录到路径（逻辑复制自 oracle_logic.py）
-from pathlib import Path
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(current_dir)
 if parent_dir not in sys.path:
@@ -29,11 +28,8 @@ if parent_dir not in sys.path:
 from oracle_logic import OracleSession, DEFAULT_DATASET_ROOT
 
 # Import ScrewPlanFailure for exception handling
-scripts_dir = Path(parent_dir) / "scripts"
-if scripts_dir.exists() and str(scripts_dir) not in sys.path:
-    sys.path.insert(0, str(scripts_dir))
 try:
-    from planner_fail_safe import ScrewPlanFailure
+    from robomme.robomme_env.utils.planner_fail_safe import ScrewPlanFailure
 except ImportError:
     # Fallback if import fails
     ScrewPlanFailure = RuntimeError
@@ -428,4 +424,3 @@ class ProcessSessionProxy:
         self.process.join(timeout=1)
         if self.process.is_alive():
             self.process.terminate()
-

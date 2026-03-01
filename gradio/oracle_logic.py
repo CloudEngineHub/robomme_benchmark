@@ -4,13 +4,12 @@ import numpy as np
 import gymnasium as gym
 import cv2
 import colorsys
-import json
 import torch
 from pathlib import Path
 from PIL import Image
 
 # --- Setup Paths ---
-# Ensure we can import historybench and mani_skill from parent directory
+# Ensure we can import local project packages from parent directory
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(current_dir)
 if parent_dir not in sys.path:
@@ -30,31 +29,31 @@ except Exception as e:
     _NLP_MODEL = None
 
 # --- Project Imports ---
-from historybench.env_record_wrapper import EpisodeConfigResolver
-from historybench.HistoryBench_env.util.vqa_options import get_vqa_options
+from robomme.env_record_wrapper import BenchmarkEnvBuilder
+from robomme.robomme_env import *  # noqa: F401,F403; ensure gym envs are registered
+from robomme.robomme_env.utils.vqa_options import get_vqa_options
 from mani_skill.examples.motionplanning.panda.motionplanner import PandaArmMotionPlanningSolver
 from mani_skill.examples.motionplanning.panda.motionplanner_stick import PandaStickMotionPlanningSolver
 
 # --- FailAware Planner Imports ---
-# Import from scripts directory (parent_dir/scripts)
-scripts_dir = Path(parent_dir) / "scripts"
-if scripts_dir.exists() and str(scripts_dir) not in sys.path:
-    sys.path.insert(0, str(scripts_dir))
 try:
-    from planner_fail_safe import (
+    from robomme.robomme_env.utils.planner_fail_safe import (
         FailAwarePandaArmMotionPlanningSolver,
         FailAwarePandaStickMotionPlanningSolver,
         ScrewPlanFailure,
     )
 except ImportError as e:
-    print(f"Warning: Failed to import FailAware planners: {e}")
+    print(f"Warning: Failed to import robomme fail-aware planners: {e}")
     # Fallback to regular planners
     FailAwarePandaArmMotionPlanningSolver = PandaArmMotionPlanningSolver
     FailAwarePandaStickMotionPlanningSolver = PandaStickMotionPlanningSolver
     ScrewPlanFailure = RuntimeError
 
 # --- Constants ---
-DEFAULT_DATASET_ROOT = Path(parent_dir) / "dataset_json"
+ROBOMME_METADATA_ROOT_ENV = "ROBOMME_METADATA_ROOT"
+# For backward compatibility with process_session constructor naming.
+# Semantics: optional override root for metadata json files.
+DEFAULT_DATASET_ROOT = os.environ.get(ROBOMME_METADATA_ROOT_ENV)
 
 # --- Helper Functions from Script ---
 
@@ -165,7 +164,7 @@ class OracleSession:
         gui_render: If True, uses 'human' render mode (pops up window). 
                     For Gradio, we usually want False (rgb_array).
         """
-        self.dataset_root = Path(dataset_root)
+        self.dataset_root = Path(dataset_root) if dataset_root else None
         self.gui_render = gui_render # Usually False for web app
         self.render_mode = "human" if gui_render else "rgb_array"
         
@@ -192,31 +191,46 @@ class OracleSession:
         self.last_wrist_frame_idx = 0
         self.non_demonstration_task_length = None  # 从 DemonstrationWrapper 读取
 
+    def _resolve_metadata_override_root(self):
+        if self.dataset_root:
+            return self.dataset_root
+        env_root = os.environ.get(ROBOMME_METADATA_ROOT_ENV)
+        if env_root:
+            return Path(env_root)
+        return None
+
     def load_episode(self, env_id, episode_idx):
         """Initialize environment for a specific episode."""
         if self.env:
             self.env.close()
-            
-        metadata_path = self.dataset_root / f"record_dataset_{env_id}_metadata.json"
-        if not metadata_path.exists():
-            return None, f"Dataset metadata not found for {env_id}"
-
-        resolver = EpisodeConfigResolver(
-            env_id=env_id,
-            dataset=None,
-            metadata_path=metadata_path,
-            render_mode=self.render_mode,
-            gui_render=self.gui_render,
-            max_steps_without_demonstration=3000,
-        )
 
         try:
-            self.env, episode_dataset, seed, difficulty = resolver.make_env_for_episode(episode_idx)
+            metadata_override_root = self._resolve_metadata_override_root()
+            builder = BenchmarkEnvBuilder(
+                env_id=env_id,
+                dataset="train",
+                action_space="multi_choice",
+                gui_render=self.gui_render,
+                override_metadata_path=metadata_override_root,
+                max_steps=3000,
+            )
+
+            episode_num = builder.get_episode_num()
+            if episode_num <= 0:
+                if metadata_override_root:
+                    expected = metadata_override_root / f"record_dataset_{env_id}_metadata.json"
+                    return None, f"Dataset metadata not found or empty: {expected}"
+                return None, f"Dataset metadata not found or empty for env '{env_id}' in split 'test'"
+
+            if episode_idx < 0 or episode_idx >= episode_num:
+                return None, f"Episode index out of range for {env_id}: {episode_idx} (valid 0-{episode_num - 1})"
+
+            seed, difficulty = builder.resolve_episode(episode_idx)
+            self.env = builder.make_env_for_episode(episode_idx)
             self.env.reset()
             self.env_id = env_id
             self.episode_idx = episode_idx
             self.difficulty = difficulty
-            # 保存 seed（直接使用 resolver 返回的 seed）
             self.seed = seed
             
             # Demonstration data
@@ -309,8 +323,13 @@ class OracleSession:
         # Format for UI
         self.available_options = []
         for i, opt in enumerate(self.raw_solve_options):
-            label = opt.get("label", f"Option {i+1}")
-            self.available_options.append((label, i)) # Tuple for Gradio Radio/Dropdown
+            opt_label = str(opt.get("label", f"Option {i + 1}")).strip()
+            opt_action = str(opt.get("action", "")).strip()
+            if opt_label and opt_action:
+                ui_label = f"{opt_label}. {opt_action}"
+            else:
+                ui_label = opt_label or opt_action or f"Option {i + 1}"
+            self.available_options.append((ui_label, i)) # Tuple for Gradio Radio/Dropdown
 
         return self.get_pil_image(), "Ready"
 
