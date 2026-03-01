@@ -57,22 +57,22 @@ OUT_VIDEO_DIR = "/data/hongzefu/dataset_replay-0226-test"
 MAX_STEPS = 2000
 
 DEFAULT_ENV_IDS = [
-"PickXtimes",
-"StopCube",
-"SwingXtimes",
-"BinFill",
-"VideoUnmaskSwap",
-"VideoUnmask",
-"ButtonUnmaskSwap",
-"ButtonUnmask",
-"VideoRepick",
-"VideoPlaceButton",
-"VideoPlaceOrder",
-"PickHighlight",
-"InsertPeg",
-"MoveCube",
+# "PickXtimes",
+# "StopCube",
+# "SwingXtimes",
+# "BinFill",
+# "VideoUnmaskSwap",
+# "VideoUnmask",
+# "ButtonUnmaskSwap",
+# "ButtonUnmask",
+# "VideoRepick",
+# "VideoPlaceButton",
+# "VideoPlaceOrder",
+# "PickHighlight",
+# "InsertPeg",
+# "MoveCube",
 "PatternLock",
-"RouteStick",
+# "RouteStick",
  ]
 
 def _parse_oracle_command(choice_action: Optional[Any]) -> Optional[dict[str, Any]]:
@@ -81,10 +81,12 @@ def _parse_oracle_command(choice_action: Optional[Any]) -> Optional[dict[str, An
     choice = choice_action.get("choice")
     if not isinstance(choice, str) or not choice.strip():
         return None
-    point = choice_action.get("point")
-    if not isinstance(point, (list, tuple, np.ndarray)) or len(point) != 2:
+    if "point" not in choice_action:
         return None
-    return choice_action
+    return {
+        "choice": choice_action.get("choice"),
+        "point": choice_action.get("point"),
+    }
 
 
 def _to_numpy_copy(value: Any) -> np.ndarray:

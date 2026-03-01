@@ -74,10 +74,12 @@ def _parse_oracle_command(choice_action: Optional[Any]) -> Optional[dict[str, An
     choice = choice_action.get("choice")
     if not isinstance(choice, str) or not choice.strip():
         return None
-    point = choice_action.get("point")
-    if not isinstance(point, (list, tuple, np.ndarray)) or len(point) != 2:
+    if "point" not in choice_action:
         return None
-    return choice_action
+    return {
+        "choice": choice_action.get("choice"),
+        "point": choice_action.get("point"),
+    }
 
 
 def _to_numpy_copy(value: Any) -> np.ndarray:
@@ -353,6 +355,7 @@ def evaluate_episode(
 
         # ######## Video saving variable initialization start ########
         step = 0
+        read_step = 0
         episode_success = False
         rollout_base_frames: list[np.ndarray] = []
         rollout_wrist_frames: list[np.ndarray] = []
@@ -363,11 +366,14 @@ def evaluate_episode(
 
         while True:
             replay_key = action_space
-            action = dataset_resolver.get_step(replay_key, step)
+            action = dataset_resolver.get_step(replay_key, read_step)
+            read_step += 1
+            if action is None:
+                break
             if action_space == "multi_choice":
                 action = _parse_oracle_command(action)
             if action is None:
-                break
+                continue
 
             candidate_pixels: list[list[int]] = []
             clicked_pixel: Optional[list[int]] = None

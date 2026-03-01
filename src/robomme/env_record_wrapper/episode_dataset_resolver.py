@@ -213,20 +213,6 @@ class EpisodeDatasetResolver:
             return value
         return str(value)
 
-    @staticmethod
-    def _normalize_choice_point(point_like: Any) -> Optional[List[float]]:
-        # New schema: choice_action.point stores front_rgb pixel [y, x].
-        if not isinstance(point_like, (list, tuple, np.ndarray)) or len(point_like) != 2:
-            return None
-        try:
-            y = float(point_like[0])
-            x = float(point_like[1])
-        except (TypeError, ValueError):
-            return None
-        if not np.isfinite(x) or not np.isfinite(y):
-            return None
-        return [y, x]
-
     def _extract_choice_action(self, timestep_group: h5py.Group) -> Optional[Dict[str, Any]]:
         action_grp = timestep_group.get("action")
         if action_grp is None or not isinstance(action_grp, h5py.Group):
@@ -247,19 +233,15 @@ class EpisodeDatasetResolver:
         choice = payload.get("choice")
         if not isinstance(choice, str):
             return None
-        choice = choice.strip().upper()
-        if not choice:
+        if not choice.strip():
             return None
         if "point" not in payload:
             return None
 
-        command: Dict[str, Any] = {"choice": choice}
-        point = self._normalize_choice_point(payload.get("point"))
-        if point is None:
-            return None
-        command["point"] = point
-
-        return command
+        return {
+            "choice": choice,
+            "point": payload.get("point"),
+        }
 
     def _build_indexes(self) -> None:
         # Collect oracle commands in timestep order (only timesteps marked by info/is_subgoal_boundary)

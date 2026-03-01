@@ -155,10 +155,9 @@ def _parse_oracle_command(choice_action: Optional[Any]) -> Optional[dict]:
     choice = choice_action.get("choice")
     if not isinstance(choice, str) or not choice.strip():
         return None
-    point = choice_action.get("point")
-    if not isinstance(point, (list, tuple, np.ndarray)) or len(point) != 2:
+    if "point" not in choice_action:
         return None
-    return choice_action
+    return {"choice": choice_action.get("choice"), "point": choice_action.get("point")}
 
 
 def run_one_action_space(action_space: ActionSpaceType, dataset_root: str | Path) -> None:

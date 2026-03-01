@@ -149,9 +149,17 @@ def _build_action_sequence(
                 continue
             raw = _decode_h5_str(action_grp["choice_action"][()])
             try:
-                actions.append(json.loads(raw))
+                payload = json.loads(raw)
             except (TypeError, ValueError, json.JSONDecodeError):
                 continue
+            if not isinstance(payload, dict):
+                continue
+            choice = payload.get("choice")
+            if not isinstance(choice, str) or not choice.strip():
+                continue
+            if "point" not in payload:
+                continue
+            actions.append({"choice": choice, "point": payload.get("point")})
 
         else:
             raise ValueError(f"Unknown action space type: {action_space_type}")

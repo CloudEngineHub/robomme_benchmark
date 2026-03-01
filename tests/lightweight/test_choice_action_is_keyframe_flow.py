@@ -135,6 +135,13 @@ def _build_h5(h5_path: Path) -> None:
             choice_action={"choice": "MISSING_POINT"},
             is_subgoal_boundary=True,
         )
+        # point can be empty list and should still be read as-is.
+        _make_timestep(
+            ep,
+            7,
+            choice_action={"choice": "E", "point": []},
+            is_subgoal_boundary=True,
+        )
 
 
 def _assert_record_schema_contract(h5_path: Path) -> None:
@@ -161,16 +168,18 @@ def _assert_resolver_reads_by_is_subgoal_boundary(h5_path: Path) -> None:
         assert resolver.get_step("multi_choice", -1) is None
 
         command0 = resolver.get_step("multi_choice", 0)
-        assert command0 == {"choice": "B", "point": [34.0, 12.0]}
+        assert command0 == {"choice": "B", "point": [34, 12]}
         assert "position_3d" not in command0
         assert "serial_number" not in command0
 
         command1 = resolver.get_step("multi_choice", 1)
-        assert command1 == {"choice": "D", "point": [11.0, 90.0]}
+        assert command1 == {"choice": "D", "point": [11, 90]}
         assert "position_3d" not in command1
         assert "serial_number" not in command1
 
-        assert resolver.get_step("multi_choice", 2) is None
+        command2 = resolver.get_step("multi_choice", 2)
+        assert command2 == {"choice": "E", "point": []}
+        assert resolver.get_step("multi_choice", 3) is None
     finally:
         resolver.close()
 

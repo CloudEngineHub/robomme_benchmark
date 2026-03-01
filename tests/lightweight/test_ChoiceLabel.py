@@ -100,7 +100,7 @@ def test_episode_dataset_resolver_extracts_choice_command_and_ignores_empty_choi
     )
     try:
         command0 = resolver.get_step("multi_choice", 0)
-        assert command0 == {"choice": "B", "point": [34.0, 12.0]}
+        assert command0 == {"choice": "B", "point": [34, 12]}
         assert "position_3d" not in command0
 
         command1 = resolver.get_step("multi_choice", 1)
