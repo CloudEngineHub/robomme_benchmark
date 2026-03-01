@@ -44,6 +44,18 @@ class _FakeEnv:
         self.closed = True
 
 
+class _FakeEnvTupleDemo(_FakeEnv):
+    def __init__(self):
+        super().__init__()
+        self.demonstration_data = (
+            {"front_rgb_list": ["tuple_f1", "tuple_f2"]},
+            None,
+            None,
+            None,
+            {"task_goal": ["tuple goal", "backup goal"]},
+        )
+
+
 class _BuilderSuccess:
     last_init_kwargs = None
 
@@ -58,6 +70,11 @@ class _BuilderSuccess:
 
     def make_env_for_episode(self, episode_idx):
         return _FakeEnv()
+
+
+class _BuilderTupleDemo(_BuilderSuccess):
+    def make_env_for_episode(self, episode_idx):
+        return _FakeEnvTupleDemo()
 
 
 class _BuilderNoMetadata:
@@ -148,3 +165,20 @@ def test_load_episode_init_failure_is_caught(monkeypatch, reload_module):
 
     assert img is None
     assert msg.startswith("Error initializing episode:")
+
+
+def test_load_episode_supports_tuple_demonstration_data(monkeypatch, reload_module):
+    oracle_logic = reload_module("oracle_logic")
+
+    monkeypatch.setattr(oracle_logic, "BenchmarkEnvBuilder", _BuilderTupleDemo)
+    monkeypatch.setattr(oracle_logic, "FailAwarePandaArmMotionPlanningSolver", _DummyPlanner)
+    monkeypatch.setattr(oracle_logic, "FailAwarePandaStickMotionPlanningSolver", _DummyPlanner)
+    monkeypatch.setattr(oracle_logic.OracleSession, "update_observation", lambda self: ("IMG", "Ready"))
+
+    session = oracle_logic.OracleSession(dataset_root=None, gui_render=False)
+    img, msg = session.load_episode("BinFill", 0)
+
+    assert img == "IMG"
+    assert msg == "Ready"
+    assert session.language_goal == "tuple goal"
+    assert session.demonstration_frames == ["tuple_f1", "tuple_f2"]

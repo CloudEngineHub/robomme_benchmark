@@ -134,6 +134,71 @@ def _fetch_segmentation(env):
 def _build_solve_options(env, planner, selected_target, env_id):
     return get_vqa_options(env, planner, selected_target, env_id)
 
+def _extract_first_text(value, default="Unknown Goal"):
+    if isinstance(value, str):
+        text = value.strip()
+        return text or default
+    if isinstance(value, (list, tuple)):
+        for item in value:
+            if item is None:
+                continue
+            text = str(item).strip()
+            if text:
+                return text
+    return default
+
+def _ensure_list(value):
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return value
+    if isinstance(value, tuple):
+        return list(value)
+    return []
+
+def _extract_demonstration_payload(demonstration_data):
+    """
+    Compatible with both legacy dict payloads and current DemonstrationWrapper tuple batch:
+    - dict style: {"language goal": "...", "frames": [...]}
+    - tuple/list style: (obs_batch, reward_batch, terminated_batch, truncated_batch, info_batch)
+    """
+    default_goal = "Unknown Goal"
+    default_frames = []
+
+    if isinstance(demonstration_data, dict):
+        goal_candidate = (
+            demonstration_data.get("language goal")
+            or demonstration_data.get("language_goal")
+            or demonstration_data.get("task_goal")
+        )
+        frames_candidate = demonstration_data.get("frames")
+        if frames_candidate is None:
+            frames_candidate = demonstration_data.get("front_rgb_list")
+        return _extract_first_text(goal_candidate, default_goal), _ensure_list(frames_candidate)
+
+    if isinstance(demonstration_data, (tuple, list)):
+        obs_batch = demonstration_data[0] if len(demonstration_data) >= 1 else None
+        info_batch = demonstration_data[4] if len(demonstration_data) >= 5 else None
+        if info_batch is None and len(demonstration_data) >= 2 and isinstance(demonstration_data[1], dict):
+            # Fallback for (obs, info) shaped payloads
+            info_batch = demonstration_data[1]
+
+        frames_candidate = None
+        if isinstance(obs_batch, dict):
+            frames_candidate = obs_batch.get("front_rgb_list")
+
+        goal_candidate = None
+        if isinstance(info_batch, dict):
+            goal_candidate = info_batch.get("task_goal")
+            if goal_candidate is None:
+                goal_candidate = info_batch.get("language goal")
+            if goal_candidate is None:
+                goal_candidate = info_batch.get("language_goal")
+
+        return _extract_first_text(goal_candidate, default_goal), _ensure_list(frames_candidate)
+
+    return default_goal, default_frames
+
 def _find_best_semantic_match(user_query, options):
     if _NLP_MODEL is None:
         return -1, 0.0
@@ -234,9 +299,8 @@ class OracleSession:
             self.seed = seed
             
             # Demonstration data
-            demonstration_data = getattr(self.env, "demonstration_data", {}) or {}
-            self.language_goal = demonstration_data.get('language goal', 'Unknown Goal')
-            self.demonstration_frames = demonstration_data.get('frames', [])
+            demonstration_data = getattr(self.env, "demonstration_data", None)
+            self.language_goal, self.demonstration_frames = _extract_demonstration_payload(demonstration_data)
             
             # Setup Color Map
             self.color_map = _generate_color_map()
