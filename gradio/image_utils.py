@@ -7,9 +7,63 @@ import tempfile
 import os
 import traceback
 import math
+from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 import cv2
 from config import VIDEO_PLAYBACK_FPS
+
+
+def _video_output_dirs():
+    """视频输出目录候选（按优先级）。"""
+    current_dir = Path(__file__).resolve().parent
+    project_root = current_dir.parent
+    env_dir = os.environ.get("ROBOMME_TEMP_DEMOS_DIR")
+
+    candidates = [
+        Path(env_dir).expanduser() if env_dir else None,
+        project_root / "temp_demos",
+        current_dir / "temp_demos",
+        Path.cwd() / "temp_demos",
+        Path(tempfile.gettempdir()) / "robomme_temp_demos",
+    ]
+
+    result = []
+    seen = set()
+    for path in candidates:
+        if path is None:
+            continue
+        resolved = path.resolve()
+        key = str(resolved)
+        if key in seen:
+            continue
+        seen.add(key)
+        result.append(resolved)
+    return result
+
+
+def _write_with_opencv(path, frames):
+    """imageio 不可用时使用 OpenCV 写视频。"""
+    if not frames:
+        return False
+
+    h, w = frames[0].shape[:2]
+    writer = cv2.VideoWriter(
+        path,
+        cv2.VideoWriter_fourcc(*"mp4v"),
+        VIDEO_PLAYBACK_FPS,
+        (w, h),
+    )
+    if not writer.isOpened():
+        return False
+
+    try:
+        for frame in frames:
+            if frame.shape[:2] != (h, w):
+                frame = cv2.resize(frame, (w, h), interpolation=cv2.INTER_LINEAR)
+            writer.write(cv2.cvtColor(frame, cv2.COLOR_RGB2BGR))
+        return True
+    finally:
+        writer.release()
 
 
 def save_video(frames, suffix=""):
@@ -25,39 +79,62 @@ def save_video(frames, suffix=""):
         return None
     
     try:
-        import imageio
-        
-        # 准备帧：确保是uint8格式的numpy数组
+        # 准备帧：确保是 uint8 RGB
         processed_frames = []
         for f in frames:
             if not isinstance(f, np.ndarray):
                 f = np.array(f)
-            # 确保是uint8格式
             if f.dtype != np.uint8:
                 if np.max(f) <= 1.0:
                     f = (f * 255).astype(np.uint8)
                 else:
                     f = f.clip(0, 255).astype(np.uint8)
-            # 处理灰度图
             if len(f.shape) == 2:
                 f = np.stack([f] * 3, axis=-1)
-            # imageio期望RGB格式，frames已经是RGB
+            elif len(f.shape) == 3 and f.shape[2] == 4:
+                f = f[:, :, :3]
             processed_frames.append(f)
-        
-        # 使用项目内的临时目录，避免系统/tmp清理或权限问题
-        temp_dir = os.path.join(os.getcwd(), "temp_demos")
-        os.makedirs(temp_dir, exist_ok=True)
-        
-        # 使用mkstemp创建唯一文件名，但在我们的temp_dir中
-        fd, path = tempfile.mkstemp(suffix=f"_{suffix}.mp4", dir=temp_dir)
-        os.close(fd)
-        
-        # imageio.mimwrite会自动处理编码
-        imageio.mimwrite(path, processed_frames, fps=VIDEO_PLAYBACK_FPS, quality=8, macro_block_size=None)
 
-        return path
-    except ImportError:
-        print("Error: imageio module not found. Please install it: pip install imageio imageio-ffmpeg")
+        imageio = None
+        try:
+            import imageio as _imageio
+            imageio = _imageio
+        except Exception:
+            imageio = None
+
+        for temp_dir in _video_output_dirs():
+            try:
+                temp_dir.mkdir(parents=True, exist_ok=True)
+                fd, path = tempfile.mkstemp(suffix=f"_{suffix}.mp4", dir=str(temp_dir))
+                os.close(fd)
+
+                if imageio is not None:
+                    imageio.mimwrite(
+                        path,
+                        processed_frames,
+                        fps=VIDEO_PLAYBACK_FPS,
+                        quality=8,
+                        macro_block_size=None,
+                    )
+                else:
+                    ok = _write_with_opencv(path, processed_frames)
+                    if not ok:
+                        raise RuntimeError("OpenCV video writer failed")
+
+                if os.path.exists(path) and os.path.getsize(path) > 0:
+                    return path
+
+                raise RuntimeError(f"generated empty video: {path}")
+            except Exception as e:
+                print(f"save_video failed in {temp_dir}: {e}")
+                traceback.print_exc()
+                try:
+                    if "path" in locals() and path and os.path.exists(path):
+                        os.remove(path)
+                except Exception:
+                    pass
+
+        print("Error in save_video: all video output directories failed")
         return None
     except Exception as e:
         print(f"Error in save_video: {e}")

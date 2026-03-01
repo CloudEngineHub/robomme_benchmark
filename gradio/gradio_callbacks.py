@@ -9,6 +9,7 @@ import traceback
 import queue
 import os
 import re
+from pathlib import Path
 from datetime import datetime
 from state_manager import (
     get_session,
@@ -201,7 +202,7 @@ def show_task_hint(uid, current_hint=""):
     return get_task_hint(env_id)
 
 
-def get_tutorial_video_path(env_id):
+def get_tutorial_video_path(env_id, fallback_frames=None):
     """
     根据环境ID获取对应的教程视频文件路径（仅在episode 98时使用）
     
@@ -214,19 +215,36 @@ def get_tutorial_video_path(env_id):
     if not env_id:
         return None
     
-    # 获取当前文件所在目录，然后构建videos目录的路径
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    videos_dir = os.path.join(current_dir, "videos")
-    
-    # 直接使用 env_id 添加 .mp4 后缀（视频文件名是大写的，如 BinFill.mp4）
-    video_filename = env_id + ".mp4"
-    video_path = os.path.join(videos_dir, video_filename)
-    
-    # 检查文件是否存在
-    if os.path.exists(video_path):
-        return video_path
-    else:
-        return None
+    current_dir = Path(__file__).resolve().parent
+    videos_dirs = [
+        current_dir / "videos",
+        current_dir.parent / "assets" / "videos",
+        Path.cwd() / "videos",
+        Path.cwd() / "gradio" / "videos",
+    ]
+
+    video_filenames = [
+        f"{env_id}.mp4",
+        f"{env_id}.MP4",
+        f"{env_id.lower()}.mp4",
+        f"{env_id.lower()}.MP4",
+    ]
+
+    for videos_dir in videos_dirs:
+        for filename in video_filenames:
+            candidate = videos_dir / filename
+            if candidate.exists() and candidate.is_file():
+                return str(candidate.resolve())
+
+    # 静态教程视频缺失时，回退为当前任务演示帧生成的视频
+    if fallback_frames:
+        generated = save_video(fallback_frames, f"tutorial_{env_id}")
+        if generated and os.path.exists(generated):
+            print(f"[tutorial] fallback generated for {env_id}: {generated}")
+            return generated
+
+    print(f"[tutorial] missing tutorial video for {env_id} in paths: {[str(p) for p in videos_dirs]}")
+    return None
 
 
 def show_loading_info():
@@ -533,7 +551,10 @@ def login_and_load_task(username, uid):
         
         # 仅在episode 98时显示教程视频
         if int(ep_num) == 98:
-            tutorial_video_path = get_tutorial_video_path(actual_env_id)
+            tutorial_video_path = get_tutorial_video_path(
+                actual_env_id,
+                getattr(session, "demonstration_frames", None),
+            )
             if tutorial_video_path:
                 tutorial_video_group_update = gr.update(visible=True)  # 显示整个教程视频组
                 tutorial_video_update = gr.update(value=tutorial_video_path, visible=True)
@@ -702,7 +723,10 @@ def login_and_load_task(username, uid):
         
         # 仅在episode 98时显示教程视频
         if int(ep_num) == 98:
-            tutorial_video_path = get_tutorial_video_path(actual_env_id)
+            tutorial_video_path = get_tutorial_video_path(
+                actual_env_id,
+                getattr(session, "demonstration_frames", None),
+            )
             if tutorial_video_path:
                 tutorial_video_group_update = gr.update(visible=True)  # 显示整个教程视频组
                 tutorial_video_update = gr.update(value=tutorial_video_path, visible=True)
@@ -789,7 +813,10 @@ def login_and_load_task(username, uid):
         
         # 仅在episode 98时显示教程视频
         if int(ep_num) == 98:
-            tutorial_video_path = get_tutorial_video_path(actual_env_id)
+            tutorial_video_path = get_tutorial_video_path(
+                actual_env_id,
+                getattr(session, "demonstration_frames", None),
+            )
             if tutorial_video_path:
                 tutorial_video_group_update = gr.update(visible=True)  # 显示整个教程视频组
                 tutorial_video_update = gr.update(value=tutorial_video_path, visible=True)

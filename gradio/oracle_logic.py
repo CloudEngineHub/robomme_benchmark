@@ -370,15 +370,31 @@ class OracleSession:
             self.seg_vis, self.seg_raw = _prepare_segmentation_visual(seg_data, self.color_map, seg_hw)
         else:
             # If not using segmentation view, use RGB but scale to match seg logic
-             _, self.seg_raw = (_prepare_segmentation_visual(seg_data, self.color_map, seg_hw) if seg_data is not None else (None, None))
+             seg_vis_from_seg, self.seg_raw = (
+                 _prepare_segmentation_visual(seg_data, self.color_map, seg_hw)
+                 if seg_data is not None
+                 else (None, None)
+             )
              if self.base_frames:
                 vis_frame = _prepare_frame(self.base_frames[-1])
                 vis_frame = cv2.cvtColor(vis_frame, cv2.COLOR_RGB2BGR) # Keep consistent BGR internally
                 if vis_frame.shape[:2] != seg_hw:
                     vis_frame = cv2.resize(vis_frame, (seg_hw[1], seg_hw[0]), interpolation=cv2.INTER_LINEAR)
                 self.seg_vis = vis_frame
+             elif seg_vis_from_seg is not None:
+                 # 没有 RGB 原始帧时，回退到 segmentation 可视化，避免首屏空白。
+                 self.seg_vis = seg_vis_from_seg
              else:
                  self.seg_vis = np.zeros((seg_hw[0], seg_hw[1], 3), dtype=np.uint8)
+
+        # 某些环境不会在 reset/update 后立即填充 env.frames。
+        # 为了让 Keypoint Selection 和 LiveStream 在首帧就可见，回退使用 seg_vis 生成一帧 RGB。
+        if (not self.base_frames) and (self.seg_vis is not None):
+            try:
+                fallback_rgb = cv2.cvtColor(self.seg_vis, cv2.COLOR_BGR2RGB)
+                self.base_frames = [fallback_rgb]
+            except Exception:
+                self.base_frames = []
 
         # 4. Generate Options
         dummy_target = {"obj": None, "name": None, "seg_id": None, "click_point": None, "centroid_point": None}
@@ -414,6 +430,10 @@ class OracleSession:
         else:
             # 返回原图
             if not self.base_frames or len(self.base_frames) == 0:
+                # 回退：没有原始帧时，使用分割视图（转换为 RGB）避免空白图。
+                if self.seg_vis is not None:
+                    rgb = cv2.cvtColor(self.seg_vis, cv2.COLOR_BGR2RGB)
+                    return Image.fromarray(rgb)
                 return Image.new('RGB', (255, 255), color='gray')
             # 获取最后一帧
             frame = self.base_frames[-1]

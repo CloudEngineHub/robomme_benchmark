@@ -162,14 +162,49 @@ import gradio as gr
 from fastapi import FastAPI
 from streaming_service import create_video_feed_route
 from ui_layout import create_ui_blocks, CSS, SYNC_JS
-from state_manager import create_session, start_timeout_monitor
+from state_manager import start_timeout_monitor
 from user_manager import user_manager
 from config import USER_PORT_MAP
 
 import os
+import tempfile
 import multiprocessing
 import signal
 import sys
+from pathlib import Path
+
+APP_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = APP_DIR.parent
+VIDEOS_DIR = APP_DIR / "videos"
+TEMP_DEMOS_DIR = PROJECT_ROOT / "temp_demos"
+CWD_TEMP_DEMOS_DIR = Path.cwd() / "temp_demos"
+
+
+def ensure_media_dirs():
+    """确保媒体临时目录存在，避免首次写入失败。"""
+    TEMP_DEMOS_DIR.mkdir(parents=True, exist_ok=True)
+    CWD_TEMP_DEMOS_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def build_allowed_paths():
+    """构建 Gradio 文件访问白名单（绝对路径且去重）。"""
+    candidates = [
+        Path.cwd(),
+        PROJECT_ROOT,
+        APP_DIR,
+        VIDEOS_DIR,
+        TEMP_DEMOS_DIR,
+        CWD_TEMP_DEMOS_DIR,
+        Path(tempfile.gettempdir()),
+    ]
+    deduped = []
+    seen = set()
+    for path in candidates:
+        normalized = str(path.resolve())
+        if normalized not in seen:
+            seen.add(normalized)
+            deduped.append(normalized)
+    return deduped
 
 def find_free_port(start_port=7860):
     """查找单个可用端口"""
@@ -233,10 +268,23 @@ def start_user_server(username, port, gpu_id):
     # 必须在导入torch等库之前设置环境变量
     os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu_id)
     
-    # 确保每个子进程都有 session 和 timeout monitor
-    # 注意：在多进程环境下，每个进程都有独立的内存空间
-    create_session()
+    # 每个子进程都启动自己的超时监控线程
     start_timeout_monitor()
+    ensure_media_dirs()
+    os.environ.setdefault("ROBOMME_TEMP_DEMOS_DIR", str(TEMP_DEMOS_DIR))
+    allowed_paths = build_allowed_paths()
+    
+    print(f"[{username}] Gradio allowed_paths:")
+    for path in allowed_paths:
+        print(f"[{username}]   - {path}")
+    print(
+        f"[{username}] media checks: "
+        f"videos_exists={VIDEOS_DIR.exists()}, "
+        f"temp_demos_dir={TEMP_DEMOS_DIR}, "
+        f"temp_demos_writable={os.access(TEMP_DEMOS_DIR, os.W_OK)}, "
+        f"cwd_temp_demos_dir={CWD_TEMP_DEMOS_DIR}, "
+        f"cwd_temp_demos_writable={os.access(CWD_TEMP_DEMOS_DIR, os.W_OK)}"
+    )
     
     # 创建独立的 FastAPI 应用实例
     fastapi_app = FastAPI(title=f"HistoryBench Oracle Planner - {username}")
@@ -252,6 +300,7 @@ def start_user_server(username, port, gpu_id):
         fastapi_app,
         demo,
         path="/",
+        allowed_paths=allowed_paths,
         css=CSS,
         js=SYNC_JS
     )
@@ -342,8 +391,7 @@ def get_all_network_ips():
 
 
 if __name__ == "__main__":
-    # Ensure session created for imports
-    create_session()
+    ensure_media_dirs()
     
     # 启动session超时监控线程
     start_timeout_monitor()
