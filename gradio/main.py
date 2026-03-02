@@ -164,7 +164,6 @@ from streaming_service import create_video_feed_route
 from ui_layout import create_ui_blocks, CSS, SYNC_JS
 from state_manager import start_timeout_monitor
 from user_manager import user_manager
-from config import USER_PORT_MAP
 
 import os
 import tempfile
@@ -316,80 +315,6 @@ def start_user_server(username, port, gpu_id):
     )
 
 
-def get_all_network_ips():
-    """获取所有网络接口的 IP 地址"""
-    ips = []
-    
-    # 方法1: 使用 socket 连接外部地址获取默认路由 IP
-    try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        try:
-            # 连接到一个远程地址（不需要实际连接）
-            s.connect(('8.8.8.8', 80))
-            local_ip = s.getsockname()[0]
-            if local_ip and local_ip != "127.0.0.1":
-                ips.append(("default", local_ip))
-        except Exception:
-            pass
-        finally:
-            s.close()
-    except Exception:
-        pass
-    
-    # 方法2: 尝试使用 netifaces 获取所有接口（如果可用）
-    try:
-        import netifaces
-        interfaces = netifaces.interfaces()
-        for interface in interfaces:
-            addrs = netifaces.ifaddresses(interface)
-            if netifaces.AF_INET in addrs:
-                for addr_info in addrs[netifaces.AF_INET]:
-                    ip = addr_info.get('addr')
-                    if ip and ip != "127.0.0.1" and ip not in [ip_addr for _, ip_addr in ips]:
-                        ips.append((interface, ip))
-    except ImportError:
-        # netifaces 不可用，跳过
-        pass
-    except Exception:
-        pass
-    
-    # 方法3: 使用 psutil（如果可用）
-    try:
-        import psutil
-        for interface, addrs in psutil.net_if_addrs().items():
-            for addr in addrs:
-                if addr.family == socket.AF_INET:
-                    ip = addr.address
-                    if ip and ip != "127.0.0.1" and ip not in [ip_addr for _, ip_addr in ips]:
-                        ips.append((interface, ip))
-    except ImportError:
-        # psutil 不可用，跳过
-        pass
-    except Exception:
-        pass
-    
-    # 方法4: 使用 ip 命令（Linux）
-    try:
-        import subprocess
-        import re
-        result = subprocess.run(['ip', 'addr', 'show'], 
-                              capture_output=True, text=True, timeout=2)
-        if result.returncode == 0:
-            # 解析 ip addr show 的输出
-            pattern = r'inet\s+(\d+\.\d+\.\d+\.\d+)/\d+'
-            matches = re.findall(pattern, result.stdout)
-            for ip in matches:
-                if ip and ip != "127.0.0.1" and ip not in [ip_addr for _, ip_addr in ips]:
-                    ips.append(("interface", ip))
-    except (ImportError, FileNotFoundError):
-        pass
-    except Exception:
-        # 包括 subprocess.TimeoutExpired 等其他异常
-        pass
-    
-    return ips
-
-
 if __name__ == "__main__":
     ensure_media_dirs()
     
@@ -403,57 +328,16 @@ if __name__ == "__main__":
         print("\n⚠️  警告: 未找到任何用户配置")
         sys.exit(1)
     
-    # 获取所有网络接口 IP
-    network_ips = get_all_network_ips()
-    base_ip = network_ips[0][1] if network_ips else "localhost"
-    
-    # 为每个用户分配端口（使用固定映射，未映射的用户使用动态分配）
+    # 为每个用户动态分配端口
     user_port_map = {}
-    unmapped_users = []
-    
-    # 首先分配固定端口映射的用户
-    for username in sorted(available_users):
-        if username in USER_PORT_MAP:
-            user_port_map[username] = USER_PORT_MAP[username]
-        else:
-            unmapped_users.append(username)
-    
-    # 为未映射的用户动态分配端口（从固定映射的最大端口号+1开始，并排除已分配的端口）
-    if unmapped_users:
-        # 计算固定映射中使用的最大端口号
-        max_fixed_port = max(USER_PORT_MAP.values()) if USER_PORT_MAP else 7859
-        dynamic_start_port = max_fixed_port + 1
-        
-        # 获取所有已分配的端口（避免冲突）
-        allocated_ports = set(user_port_map.values())
-        
-        try:
-            # 动态分配端口，跳过已被占用的端口
-            dynamic_ports = []
-            current_port = dynamic_start_port
-            max_attempts = 1000
-            
-            while len(dynamic_ports) < len(unmapped_users) and current_port < dynamic_start_port + max_attempts:
-                # 检查端口是否已被分配或正在使用
-                if current_port not in allocated_ports:
-                    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                        try:
-                            s.bind(('localhost', current_port))
-                            dynamic_ports.append(current_port)
-                            allocated_ports.add(current_port)  # 标记为已分配
-                        except OSError:
-                            # 端口已被占用，跳过
-                            pass
-                current_port += 1
-            
-            if len(dynamic_ports) < len(unmapped_users):
-                raise RuntimeError(f"无法找到 {len(unmapped_users)} 个可用端口（从 {dynamic_start_port} 开始）")
-            
-            for i, username in enumerate(sorted(unmapped_users)):
-                user_port_map[username] = dynamic_ports[i]
-        except RuntimeError as e:
-            print(f"\n❌ 错误: 无法为未映射用户分配端口: {e}")
-            sys.exit(1)
+    sorted_users = sorted(available_users)
+    try:
+        dynamic_ports = find_free_ports(start_port=7860, count=len(sorted_users))
+        for i, username in enumerate(sorted_users):
+            user_port_map[username] = dynamic_ports[i]
+    except RuntimeError as e:
+        print(f"\n❌ 错误: 无法动态分配端口: {e}")
+        sys.exit(1)
     
     # 存储所有子进程
     processes = []
@@ -522,18 +406,11 @@ if __name__ == "__main__":
     print("-" * 60)
     
     # 打印每个用户的访问链接
-    if network_ips:
-        print("\n所有可用的访问地址:")
-        print("-" * 60)
-        for interface, ip in network_ips:
-            print(f"  网络接口: {interface}")
-        print("-" * 60)
-    
     print("\n用户访问链接:")
     print("-" * 60)
     for username in sorted(available_users):
         port = user_port_map[username]
-        login_link = f"http://{base_ip}:{port}/?user={username}&__theme=light"
+        login_link = f"http://localhost:{port}/?user={username}&__theme=light"
         print(f"  {username:20s} -> {login_link}")
     print("-" * 60)
     
@@ -541,7 +418,7 @@ if __name__ == "__main__":
     print("-" * 60)
     for username in sorted(available_users):
         port = user_port_map[username]
-        stream_endpoint = f"http://{base_ip}:{port}/video_feed/{{uid}}"
+        stream_endpoint = f"http://localhost:{port}/video_feed/{{uid}}"
         print(f"  {username:20s} -> {stream_endpoint}")
     print("-" * 60)
     

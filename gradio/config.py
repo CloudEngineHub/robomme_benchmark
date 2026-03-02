@@ -64,27 +64,3 @@ def should_show_demo_video(env_id):
     只有DEMO_VIDEO_ENV_IDS列表中的环境才显示demonstration videos
     """
     return env_id in DEMO_VIDEO_ENV_IDS
-
-# 用户端口映射配置（固定端口分配）
-# 格式: 用户名 -> 端口号
-USER_PORT_MAP = {
-    "Haoran_Zhang": 7860,
-    "Hongyu_Zhou": 7861,
-    "Hongze_Fu": 7862,
-    "Jacob_Sansom": 7863,
-    "Josue_Torres-Fonseca": 7864,
-    "Jung-Chun_Liu": 7865,
-    "Run_Peng": 7866,
-    "Wanling_Cai": 7867,
-    "Xinyi_Wang": 7868,
-    "Yinpei_Dai": 7869,
-    "Yiwei_Lyu": 7870,
-    "Yue_Hu": 7871,
-    "Yunqi_Zhao": 7872,
-    "Long-Jing_Hsu": 7873,
-    "Ryan_Lu": 7874,
-    "Xiaoyu_Ma": 7875,
-    "Rui-Yu_Lin": 7876,
-    "Chimaobi_Okite": 7877,
-    "Xiangyu_Zhou": 7878,
-}

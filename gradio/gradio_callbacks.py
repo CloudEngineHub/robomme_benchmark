@@ -9,7 +9,6 @@ import traceback
 import queue
 import os
 import re
-from pathlib import Path
 from datetime import datetime
 from state_manager import (
     get_session,
@@ -199,51 +198,6 @@ def show_task_hint(uid, current_hint=""):
     # 根据环境ID调用get_task_hint函数获取对应的任务提示内容
     # 该函数会根据不同的env_id返回不同的提示文本（如PickXtimes、VideoPlaceOrder等）
     return get_task_hint(env_id)
-
-
-def get_tutorial_video_path(env_id, fallback_frames=None):
-    """
-    根据环境ID获取对应的教程视频文件路径（仅在episode 98时使用）
-    
-    Args:
-        env_id: 环境ID（如 "VideoPlaceOrder", "InsertPeg" 等）
-    
-    Returns:
-        str: 视频文件的完整路径，如果文件不存在则返回 None
-    """
-    if not env_id:
-        return None
-    
-    current_dir = Path(__file__).resolve().parent
-    videos_dirs = [
-        current_dir / "videos",
-        current_dir.parent / "assets" / "videos",
-        Path.cwd() / "videos",
-        Path.cwd() / "gradio" / "videos",
-    ]
-
-    video_filenames = [
-        f"{env_id}.mp4",
-        f"{env_id}.MP4",
-        f"{env_id.lower()}.mp4",
-        f"{env_id.lower()}.MP4",
-    ]
-
-    for videos_dir in videos_dirs:
-        for filename in video_filenames:
-            candidate = videos_dir / filename
-            if candidate.exists() and candidate.is_file():
-                return str(candidate.resolve())
-
-    # 静态教程视频缺失时，回退为当前任务演示帧生成的视频
-    if fallback_frames:
-        generated = save_video(fallback_frames, f"tutorial_{env_id}")
-        if generated and os.path.exists(generated):
-            print(f"[tutorial] fallback generated for {env_id}: {generated}")
-            return generated
-
-    print(f"[tutorial] missing tutorial video for {env_id} in paths: {[str(p) for p in videos_dirs]}")
-    return None
 
 
 def show_loading_info():
@@ -469,91 +423,6 @@ def login_and_load_task(username, uid):
     env_id = current_task["env_id"]
     ep_num = current_task["episode_idx"]
     
-    
-    # 特殊处理episode98：如果当前任务是episode98且已有成功记录，自动跳过并推进到下一个任务
-    # 这确保用户在episode98成功后关闭重进时，不会再次加载episode98
-    if ep_num == 98:
-        has_success = user_manager.has_episode98_success(username, env_id)
-        if has_success:
-            # 已有成功记录，但索引可能没有推进（用户关闭时没有点击Next Task）
-            # 使用complete_current_task推进索引（会创建新的进度记录，但这是合理的，因为标记了任务完成）
-            # 注意：这里会调用complete_current_task，但传入的env_id和episode_idx是当前任务的
-            # 需要从任务列表中获取正确的信息
-            print(f"Episode98 for {username}/{env_id} already succeeded, skipping to next task")
-            
-            # 从任务列表中获取当前任务的完整信息（包括difficulty等）
-            tasks = user_manager.user_tasks.get(username, [])
-            if tasks and status.get("current_index") is not None:
-                current_idx = status["current_index"]
-                if current_idx < len(tasks):
-                    current_task_info = tasks[current_idx]
-                    
-                    # #region agent log
-                    import json as json_module
-                    try:
-                        with open('/home/hongzefu/historybench-v5.6.11b5-debug/.cursor/debug.log', 'a', encoding='utf-8') as f:
-                            f.write(json_module.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"D","location":"gradio_callbacks.py:317","message":"current_task_info before complete_current_task","data":{"username":username,"current_idx":current_idx,"current_task_info":current_task_info},"timestamp":int(__import__('time').time()*1000)})+"\n")
-                    except: pass
-                    # #endregion
-                    
-                    # 推进任务索引（这会创建新的进度记录，标记任务已完成）
-                    # 使用"success"状态，因为episode98已经成功
-                    next_status = user_manager.complete_current_task(
-                        username,
-                        env_id=env_id,
-                        episode_idx=ep_num,
-                        status="success",  # 使用success状态
-                        difficulty=current_task_info.get("difficulty"),
-                        language_goal=None,  # 不需要language_goal，因为只是推进索引
-                        seed=None  # 不需要seed
-                    )
-                    
-                    # 重新获取任务状态
-                    if next_status:
-                        status = next_status
-                        if status.get("is_done_all"):
-                            # 如果所有任务完成，返回完成状态
-                            set_task_index(uid, status['total_tasks'] - 1, status['total_tasks'])
-                            task_info = get_task_index(uid)
-                            task_idx = task_info["task_index"]
-                            total = task_info["total_tasks"]
-                            import random
-                            random_id = random.randint(0, 1000000)
-                            combined_html = f'<div id="combined_view_html"><img src="/video_feed/{uid}?r={random_id}" style="max-width: 100%; height: {REFERENCE_VIEW_HEIGHT}; width: auto; margin: 0 auto; display: block; border-radius: 8px; object-fit: contain;" alt="Desk View | Robot View" /></div>'
-                            set_ui_phase(uid, "executing_task")
-                            return (
-                                uid,
-                                gr.update(visible=False),  # login_group
-                                gr.update(visible=True),   # main_interface
-                                f"Welcome {username}. You have completed all tasks!",
-                                gr.update(value=None, interactive=False), format_log_html("All tasks completed! Thank you."),
-                                gr.update(choices=[], value=None),
-                                "All tasks completed.", "No need for coordinates",
-                                gr.update(value=combined_html),  # combined_display
-                                gr.update(value=None, visible=False),  # video_display
-                                "No active task", f"Progress: {total}/{total}",
-                                gr.update(interactive=True),   # login_btn
-                                gr.update(interactive=False),  # next_task_btn
-                                gr.update(interactive=False),  # exec_btn
-                                gr.update(visible=False),  # video_phase_group
-                                gr.update(visible=False),  # livestream_phase_group
-                                gr.update(visible=True),   # action_phase_group
-                                gr.update(visible=True),   # control_panel_group
-                                gr.update(visible=False),  # coords_group
-                                gr.update(value=""),       # task_hint_display
-                                gr.update(visible=False),  # tutorial_video_group
-                                gr.update(value=None, visible=False),  # tutorial_video_display
-                                ""  # loading_overlay
-                            )
-                        else:
-                            # 更新当前任务信息
-                            if status.get("current_task"):
-                                current_task = status["current_task"]
-                                env_id = current_task["env_id"]
-                                ep_num = current_task["episode_idx"]
-                                print(f"Skipped to next task: {env_id} Ep {ep_num}")
-                                
-    
     # Load the environment
     session = get_session(uid)
 
@@ -612,21 +481,8 @@ def login_and_load_task(username, uid):
         # 加载失败，直接进入执行阶段
         set_ui_phase(uid, "executing_task")
         
-        # 仅在episode 98时显示教程视频
-        if int(ep_num) == 98:
-            tutorial_video_path = get_tutorial_video_path(
-                actual_env_id,
-                getattr(session, "demonstration_frames", None),
-            )
-            if tutorial_video_path:
-                tutorial_video_group_update = gr.update(visible=True)
-                tutorial_video_update = gr.update(value=tutorial_video_path, visible=True)
-            else:
-                tutorial_video_group_update = gr.update(visible=False)
-                tutorial_video_update = gr.update(value=None, visible=False)
-        else:
-            tutorial_video_group_update = gr.update(visible=False)
-            tutorial_video_update = gr.update(value=None, visible=False)
+        tutorial_video_group_update = gr.update(visible=False)
+        tutorial_video_update = gr.update(value=None, visible=False)
 
         return (
             uid,
@@ -659,16 +515,6 @@ def login_and_load_task(username, uid):
         goal_text = get_videoplacebutton_goal(session.language_goal)
     else:
         goal_text = capitalize_first_letter(session.language_goal) if session.language_goal else ""
-    
-    # 检查是否为 episode 98 (trial mode)
-    if int(ep_num) == 98:
-        gr.Info("This is tutorial mode. You have to complete all the tutorials before you can start testing.")
-        # 如果是 VideoPlaceButton 任务，使用特殊的任务目标格式
-        if session.env_id == "VideoPlaceButton" and session.language_goal:
-            capitalized_goal = get_videoplacebutton_goal(session.language_goal)
-        else:
-            capitalized_goal = capitalize_first_letter(session.language_goal) if session.language_goal else ""
-        goal_text = f"[[tutorial mode]]\n{capitalized_goal}"
     
     options = session.available_options
     # 生成选项列表，如果选项需要坐标选择，在标签后添加提示  
@@ -780,21 +626,8 @@ def login_and_load_task(username, uid):
                             break
         
         
-        # 仅在episode 98时显示教程视频
-        if int(ep_num) == 98:
-            tutorial_video_path = get_tutorial_video_path(
-                actual_env_id,
-                getattr(session, "demonstration_frames", None),
-            )
-            if tutorial_video_path:
-                tutorial_video_group_update = gr.update(visible=True)  # 显示整个教程视频组
-                tutorial_video_update = gr.update(value=tutorial_video_path, visible=True)
-            else:
-                tutorial_video_group_update = gr.update(visible=False)  # 无视频时隐藏整个组
-                tutorial_video_update = gr.update(value=None, visible=False)
-        else:
-            tutorial_video_group_update = gr.update(visible=False)  # 非episode 98时隐藏整个组
-            tutorial_video_update = gr.update(value=None, visible=False)
+        tutorial_video_group_update = gr.update(visible=False)
+        tutorial_video_update = gr.update(value=None, visible=False)
         
         return (
             uid,
@@ -867,21 +700,8 @@ def login_and_load_task(username, uid):
         
         # No demo video - skip directly to action phase
 
-        # 仅在episode 98时显示教程视频
-        if int(ep_num) == 98:
-            tutorial_video_path = get_tutorial_video_path(
-                actual_env_id,
-                getattr(session, "demonstration_frames", None),
-            )
-            if tutorial_video_path:
-                tutorial_video_group_update = gr.update(visible=True)
-                tutorial_video_update = gr.update(value=tutorial_video_path, visible=True)
-            else:
-                tutorial_video_group_update = gr.update(visible=False)
-                tutorial_video_update = gr.update(value=None, visible=False)
-        else:
-            tutorial_video_group_update = gr.update(visible=False)
-            tutorial_video_update = gr.update(value=None, visible=False)
+        tutorial_video_group_update = gr.update(visible=False)
+        tutorial_video_update = gr.update(value=None, visible=False)
 
         return (
             uid,
@@ -918,8 +738,6 @@ def load_next_task_wrapper(username, uid):
     如果当前任务已有 actions，则创建新的 attempt。
     对于 user_test，next task 时跳转回 env_id 选择界面。
     For user_test, jump back to env_id selection interface when next task.
-    
-    特殊处理episode98：如果episode98没有成功记录，保持在当前episode98，不推进索引。
     """
     
     if username:
@@ -934,35 +752,14 @@ def load_next_task_wrapper(username, uid):
         if uid:
             update_session_activity(uid)
         
-        # 检查所有ep98是否都完成且没有其他任务完成
-        if user_manager.check_all_ep98_completed_and_no_other_tasks(username):
-            gr.Info("Tutorial Finished, start testing!")
-        
         success, msg, status = user_manager.login(username, uid)
         if success and not status["is_done_all"]:
             current_task = status["current_task"]
             env_id = current_task["env_id"]
             ep_num = current_task["episode_idx"]
-            
-            # 特殊处理episode98：检查是否有成功记录
-            if ep_num == 98:
-                has_success = user_manager.has_episode98_success(username, env_id)
-                if not has_success:
-                    # 没有成功记录，保持在当前episode98（不推进索引）
-                    # 检查是否已有actions，如果有则创建新的attempt
-                    if has_existing_actions(username, env_id, ep_num):
-                        create_new_attempt(username, env_id, ep_num)
-                    # 继续加载当前episode98（login_and_load_task会使用status中的当前任务）
-                else:
-                    # 有成功记录，正常推进到下一个任务
-                    # 检查当前任务是否已有 actions，如果有则创建新的 attempt
-                    if has_existing_actions(username, env_id, ep_num):
-                        create_new_attempt(username, env_id, ep_num)
-            else:
-                # 非episode98，正常处理
-                # 检查当前任务是否已有 actions，如果有则创建新的 attempt
-                if has_existing_actions(username, env_id, ep_num):
-                    create_new_attempt(username, env_id, ep_num)
+
+            if has_existing_actions(username, env_id, ep_num):
+                create_new_attempt(username, env_id, ep_num)
     
     return login_and_load_task(username, uid)
 
@@ -1584,41 +1381,25 @@ def execute_step(uid, username, option_idx, coords_str):
 
         # Update user progress (但不更新 progress_info_box，等用户按 next task/refresh 时再更新)
         if username:
-            # 判断是否为 episode_idx == 98
-            ep_val = getattr(session, 'episode_idx', None)
-            ep_is_98 = False
-            if ep_val is not None:
-                if isinstance(ep_val, int):
-                    ep_is_98 = (ep_val == 98)
+            seed = getattr(session, 'seed', None)
+            user_status = user_manager.complete_current_task(
+                username,
+                env_id=session.env_id,
+                episode_idx=session.episode_idx,
+                status=final_log_status,
+                difficulty=session.difficulty if hasattr(session, 'difficulty') and session.difficulty is not None else None,
+                language_goal=session.language_goal,
+                seed=seed
+            )
+            if user_status:
+                if user_status["is_done_all"]:
+                    task_update = "All tasks completed!"
+                    # progress_update 保持为 gr.update()，不改变
                 else:
-                    ep_is_98 = (str(ep_val) == "98")
-            
-            # episode98失败时不推进索引，成功时推进索引
-            if ep_is_98 and (final_log_status == "failed"):
-                # 跳过 complete_current_task，不推进任务索引
-                gr.Info("---please press Next Task to redo it again---")
-                task_update = "Task Failed. Press Next Task to retry same episode."
-            else:
-                # 正常推进任务索引并生成下一任务提示（包括episode98成功的情况）
-                seed = getattr(session, 'seed', None)
-                user_status = user_manager.complete_current_task(
-                    username,
-                    env_id=session.env_id,
-                    episode_idx=session.episode_idx,
-                    status=final_log_status,
-                    difficulty=session.difficulty if hasattr(session, 'difficulty') and session.difficulty is not None else None,
-                    language_goal=session.language_goal,
-                    seed=seed
-                )
-                if user_status:
-                    if user_status["is_done_all"]:
-                        task_update = "All tasks completed!"
-                        # progress_update 保持为 gr.update()，不改变
-                    else:
-                        next_env = user_status["current_task"]["env_id"]
-                        next_ep = user_status["current_task"]["episode_idx"]
-                        task_update = f"Task Completed! Next: {next_env} (Ep {next_ep})"
-                        # progress_update 保持为 gr.update()，不改变
+                    next_env = user_status["current_task"]["env_id"]
+                    next_ep = user_status["current_task"]["episode_idx"]
+                    task_update = f"Task Completed! Next: {next_env} (Ep {next_ep})"
+                    # progress_update 保持为 gr.update()，不改变
     
     # 根据视图模式重新获取图片
     img = session.get_pil_image(use_segmented=USE_SEGMENTED_VIEW)

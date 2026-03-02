@@ -4,15 +4,36 @@
   
   {
     "env_id": "VideoPlaceOrder",
-    "episode_idx": 33
+    "episode_idx": 98
   },
   {
-    "env_id": "BinFill",
+    "env_id": "VideoPlaceOrder",
     "episode_idx": 34
   },
   {
-    "env_id": "BinFill",
+    "env_id": "VideoPlaceOrder",
     "episode_idx": 35
+  },
+  {
+    "env_id": "VideoPlaceOrder",
+    "episode_idx": 36
+  },
+  {
+    "env_id": "VideoPlaceOrder",
+    "episode_idx": 37
+  },
+  {
+    "env_id": "VideoPlaceOrder",
+    "episode_idx": 38
+  },
+  {
+    "env_id": "VideoPlaceOrder",
+    "episode_idx": 39
+  },
+  {
+    "env_id": "VideoPlaceOrder",
+    "episode_idx": 40
   }
   ]
+
 }

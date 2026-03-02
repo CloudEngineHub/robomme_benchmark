@@ -407,7 +407,7 @@ def create_ui_blocks():
         # Main Interface
         # =====================================================================
         with gr.Group(visible=False) as main_interface:
-            # Tutorial video (episode 98 only)
+            # Tutorial video (currently disabled by callbacks)
             with gr.Group(visible=False) as tutorial_video_group:
                 gr.Markdown("### Tutorial Video - Watch and scroll down to finish the task below!")
                 tutorial_video_display = gr.Video(
