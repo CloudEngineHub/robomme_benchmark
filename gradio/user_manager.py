@@ -72,21 +72,8 @@ class UserManager:
                                 record = json.loads(line)
                                 username = record.get("username")
                                 if username:
-                                    # #region agent log
-                                    import json as json_module
-                                    try:
-                                        with open('/home/hongzefu/historybench-v5.6.11b5-debug/.cursor/debug.log', 'a', encoding='utf-8') as f_log:
-                                            f_log.write(json_module.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"A","location":"user_manager.py:115","message":"load_progress reading record","data":{"username":username,"record":record,"has_current_task_index":"current_task_index" in record},"timestamp":int(__import__('time').time()*1000)})+"\n")
-                                    except: pass
-                                    # #endregion
                                     # 只更新包含 current_task_index 的记录，避免用默认值0覆盖
                                     if "current_task_index" in record:
-                                        # #region agent log
-                                        try:
-                                            with open('/home/hongzefu/historybench-v5.6.11b5-debug/.cursor/debug.log', 'a', encoding='utf-8') as f_log:
-                                                f_log.write(json_module.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"B","location":"user_manager.py:123","message":"load_progress updating with current_task_index","data":{"username":username,"current_task_index":record.get("current_task_index"),"completed_tasks":record.get("completed_tasks",[])},"timestamp":int(__import__('time').time()*1000)})+"\n")
-                                        except: pass
-                                        # #endregion
                                         # Update in-memory state with latest record that has current_task_index
                                         self.user_progress[username] = {
                                             "current_task_index": record.get("current_task_index", 0),
@@ -160,14 +147,6 @@ class UserManager:
         # 这样 load_progress 才能正确恢复任务索引
         record["current_task_index"] = current_index
         record["completed_tasks"] = list(completed_tasks) if isinstance(completed_tasks, set) else completed_tasks
-        
-        # #region agent log
-        import json as json_module
-        try:
-            with open('/home/hongzefu/historybench-v5.6.11b5-debug/.cursor/debug.log', 'a', encoding='utf-8') as f:
-                f.write(json_module.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"C","location":"user_manager.py:187","message":"save_progress_record before write","data":{"username":username,"current_index":current_index,"completed_tasks":list(completed_tasks) if isinstance(completed_tasks, set) else completed_tasks,"record":record},"timestamp":int(__import__('time').time()*1000)})+"\n")
-        except: pass
-        # #endregion
         
         with self.lock:
             try:
@@ -257,14 +236,6 @@ class UserManager:
         current_idx = progress["current_task_index"]
         completed = progress["completed_tasks"]
         
-        # #region agent log
-        import json as json_module
-        try:
-            with open('/home/hongzefu/historybench-v5.6.11b5-debug/.cursor/debug.log', 'a', encoding='utf-8') as f:
-                f.write(json_module.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"D","location":"user_manager.py:272","message":"get_user_status","data":{"username":username,"current_idx":current_idx,"total_tasks":len(tasks),"completed_count":len(completed)},"timestamp":int(__import__('time').time()*1000)})+"\n")
-        except: pass
-        # #endregion
-        
         # Ensure index is within bounds
         if current_idx >= len(tasks):
             current_task = None
@@ -286,14 +257,6 @@ class UserManager:
     def complete_current_task(self, username, env_id=None, episode_idx=None, 
                              status=None, difficulty=None, language_goal=None, seed=None):
         """Mark current task as complete and move to next."""
-        # #region agent log
-        import json as json_module
-        try:
-            with open('/home/hongzefu/historybench-v5.6.11b5-debug/.cursor/debug.log', 'a', encoding='utf-8') as f:
-                f.write(json_module.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"A","location":"user_manager.py:293","message":"complete_current_task called","data":{"username":username,"env_id":env_id,"episode_idx":episode_idx,"status":status,"difficulty":difficulty,"language_goal":language_goal,"seed":seed},"timestamp":int(__import__('time').time()*1000)})+"\n")
-        except: pass
-        # #endregion
-        
         user_status = self.get_user_status(username)
         if not user_status or user_status["is_done_all"]:
             return None
@@ -312,22 +275,8 @@ class UserManager:
         if env_id is not None and episode_idx is not None:
             start_time = get_task_start_time(username, env_id, episode_idx)
         
-        # #region agent log
-        try:
-            with open('/home/hongzefu/historybench-v5.6.11b5-debug/.cursor/debug.log', 'a', encoding='utf-8') as f:
-                f.write(json_module.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"B","location":"user_manager.py:312","message":"start_time retrieved","data":{"username":username,"env_id":env_id,"episode_idx":episode_idx,"start_time":start_time},"timestamp":int(__import__('time').time()*1000)})+"\n")
-        except: pass
-        # #endregion
-        
         # 获取任务结束时间
         end_time = datetime.datetime.now().isoformat()
-        
-        # #region agent log
-        try:
-            with open('/home/hongzefu/historybench-v5.6.11b5-debug/.cursor/debug.log', 'a', encoding='utf-8') as f:
-                f.write(json_module.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"C","location":"user_manager.py:318","message":"before save_progress_record","data":{"username":username,"next_idx":next_idx,"env_id":env_id,"episode_idx":episode_idx,"status":status,"difficulty":difficulty,"language_goal":language_goal,"seed":seed,"start_time":start_time,"end_time":end_time},"timestamp":int(__import__('time').time()*1000)})+"\n")
-        except: pass
-        # #endregion
         
         # Save persistence with episode information
         self.save_progress_record(

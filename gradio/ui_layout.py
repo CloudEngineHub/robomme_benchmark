@@ -611,7 +611,8 @@ def create_ui_blocks():
         # --- Execute: switch to livestream → execute → switch back to action ---
         exec_btn.click(
             fn=switch_to_livestream_phase,
-            outputs=[livestream_phase_group, action_phase_group, options_radio, exec_btn, next_task_btn]
+            inputs=[uid_state],
+            outputs=[livestream_phase_group, action_phase_group, options_radio, exec_btn, next_task_btn, combined_display]
         ).then(
             fn=execute_step,
             inputs=[uid_state, username_state, options_radio, coords_box],
@@ -621,7 +622,7 @@ def create_ui_blocks():
             ]
         ).then(
             fn=switch_to_action_phase,
-            outputs=[livestream_phase_group, action_phase_group, options_radio, exec_btn, next_task_btn]
+            outputs=[livestream_phase_group, action_phase_group, options_radio, exec_btn, next_task_btn, combined_display]
         )
 
         # --- App Load (init) ---

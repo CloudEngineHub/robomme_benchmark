@@ -231,7 +231,7 @@ def generate_mjpeg_stream(uid: str):
     """
     # 捕获当前 generation ID，用于检测流是否已被新任务替换
     my_generation = STREAM_GENERATIONS.get(uid, 0)
-    
+
     # MJPEG 格式边界标识
     boundary = b"frame"
     
@@ -244,132 +244,132 @@ def generate_mjpeg_stream(uid: str):
     last_frame_sent_time = 0
     
     while True:
-        # 检查流是否已被新任务替换（cleanup_queue 会递增 generation ID）
-        current_generation = STREAM_GENERATIONS.get(uid, 0)
-        if current_generation != my_generation:
-            print(f"Stream generation mismatch for {uid}: {my_generation} vs {current_generation}. Terminating old stream.")
-            break
+            # 检查流是否已被新任务替换（cleanup_queue 会递增 generation ID）
+            current_generation = STREAM_GENERATIONS.get(uid, 0)
+            if current_generation != my_generation:
+                print(f"Stream generation mismatch for {uid}: {my_generation} vs {current_generation}. Terminating old stream.")
+                break
+                
+            if uid not in FRAME_QUEUES:
+                # Session 不存在，等待一段时间后重试
+                time.sleep(0.1)
+                continue
             
-        if uid not in FRAME_QUEUES:
-            # Session 不存在，等待一段时间后重试
-            time.sleep(0.1)
-            continue
-        
-        queue_info = FRAME_QUEUES[uid]
-        frame_queue = queue_info["frame_queue"]
-        
-        try:
-            frame_to_send = None
+            queue_info = FRAME_QUEUES[uid]
+            frame_queue = queue_info["frame_queue"]
             
-            # 从队列中获取一帧（阻塞等待，最多等待 0.1 秒）
             try:
-                frame = frame_queue.get(timeout=0.1)
-                frame_to_send = frame
-            except queue.Empty:
-                # 队列为空时的处理策略
-                if last_yielded_frame_bytes and (time.time() - last_yield_time > KEEP_ALIVE_INTERVAL):
-                    # 策略1: 如果已有缓存帧，定期重发以保持连接活跃
-                    try:
-                        yield (b'--' + boundary + b'\r\n'
-                               b'Content-Type: image/jpeg\r\n'
-                               b'Content-Length: ' + str(len(last_yielded_frame_bytes)).encode() + b'\r\n\r\n' +
-                               last_yielded_frame_bytes + b'\r\n')
-                        last_yield_time = time.time()
-                    except Exception as e:
-                        print(f"Error sending keep-alive frame for {uid}: {e}")
-                        break
-                elif last_yielded_frame_bytes is None:
-                    # 策略2: 如果从未发送过帧（队列初始化时为空），直接从 session 获取当前帧
-                    # 这解决了新任务加载时队列尚未填充导致的空白屏幕问题
-                    try:
-                        session = get_session(uid)
-                        if session:
-                            last_base_frame = session.base_frames[-1] if session.base_frames else None
-                            
-                            if last_base_frame is not None:
-                                env_id = getattr(session, 'env_id', None)
-                                current_frames = concatenate_frames_horizontally(
-                                    [last_base_frame],
-                                    env_id=env_id
-                                )
-                                if current_frames:
-                                    frame_to_send = current_frames[0]
-                    except Exception as e:
-                        print(f"Error fetching fallback frame for {uid}: {e}")
+                frame_to_send = None
+                
+                # 从队列中获取一帧（阻塞等待，最多等待 0.1 秒）
+                try:
+                    frame = frame_queue.get(timeout=0.1)
+                    frame_to_send = frame
+                except queue.Empty:
+                    # 队列为空时的处理策略
+                    if last_yielded_frame_bytes and (time.time() - last_yield_time > KEEP_ALIVE_INTERVAL):
+                        # 策略1: 如果已有缓存帧，定期重发以保持连接活跃
+                        try:
+                            yield (b'--' + boundary + b'\r\n'
+                                   b'Content-Type: image/jpeg\r\n'
+                                   b'Content-Length: ' + str(len(last_yielded_frame_bytes)).encode() + b'\r\n\r\n' +
+                                   last_yielded_frame_bytes + b'\r\n')
+                            last_yield_time = time.time()
+                        except Exception as e:
+                            print(f"Error sending keep-alive frame for {uid}: {e}")
+                            break
+                    elif last_yielded_frame_bytes is None:
+                        # 策略2: 如果从未发送过帧（队列初始化时为空），直接从 session 获取当前帧
+                        # 这解决了新任务加载时队列尚未填充导致的空白屏幕问题
+                        try:
+                            session = get_session(uid)
+                            if session:
+                                last_base_frame = session.base_frames[-1] if session.base_frames else None
+                                
+                                if last_base_frame is not None:
+                                    env_id = getattr(session, 'env_id', None)
+                                    current_frames = concatenate_frames_horizontally(
+                                        [last_base_frame],
+                                        env_id=env_id
+                                    )
+                                    if current_frames:
+                                        frame_to_send = current_frames[0]
+                        except Exception as e:
+                            print(f"Error fetching fallback frame for {uid}: {e}")
 
-                time.sleep(0.01)
+                    time.sleep(0.01)
+                    
+                    # 如果获取到了 fallback 帧，继续处理；否则继续循环等待
+                    if frame_to_send is None:
+                        continue
                 
-                # 如果获取到了 fallback 帧，继续处理；否则继续循环等待
-                if frame_to_send is None:
-                    continue
-            
-            # Process the new frame
-            if frame_to_send is not None:
-                frame = frame_to_send
-                # 确保帧是 numpy array 且格式正确
-                if not isinstance(frame, np.ndarray):
-                    frame = np.array(frame)
-                
-                # 确保是 uint8 格式
-                if frame.dtype != np.uint8:
-                    if np.max(frame) <= 1.0:
-                        frame = (frame * 255).astype(np.uint8)
+                # Process the new frame
+                if frame_to_send is not None:
+                    frame = frame_to_send
+                    # 确保帧是 numpy array 且格式正确
+                    if not isinstance(frame, np.ndarray):
+                        frame = np.array(frame)
+                    
+                    # 确保是 uint8 格式
+                    if frame.dtype != np.uint8:
+                        if np.max(frame) <= 1.0:
+                            frame = (frame * 255).astype(np.uint8)
+                        else:
+                            frame = frame.clip(0, 255).astype(np.uint8)
+                    
+                    # 确保是 RGB 格式（3通道）
+                    if len(frame.shape) == 2:
+                        frame = np.stack([frame] * 3, axis=-1)
+                    elif len(frame.shape) == 3 and frame.shape[2] == 4:
+                        frame = frame[:, :, :3]
+                    
+                    # OpenCV 使用 BGR，如果帧是 RGB 格式，需要转换为 BGR
+                    # 假设输入的 frame 是 RGB 格式（从 concatenate_frames_horizontally 来的）
+                    if len(frame.shape) == 3 and frame.shape[2] == 3:
+                        # 转换为 BGR 供 OpenCV 使用
+                        frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
                     else:
-                        frame = frame.clip(0, 255).astype(np.uint8)
-                
-                # 确保是 RGB 格式（3通道）
-                if len(frame.shape) == 2:
-                    frame = np.stack([frame] * 3, axis=-1)
-                elif len(frame.shape) == 3 and frame.shape[2] == 4:
-                    frame = frame[:, :, :3]
-                
-                # OpenCV 使用 BGR，如果帧是 RGB 格式，需要转换为 BGR
-                # 假设输入的 frame 是 RGB 格式（从 concatenate_frames_horizontally 来的）
-                if len(frame.shape) == 3 and frame.shape[2] == 3:
-                    # 转换为 BGR 供 OpenCV 使用
-                    frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-                else:
-                    frame_bgr = frame
-                
-                # 使用 OpenCV 将帧编码为 JPEG
-                success, jpeg_bytes = cv2.imencode('.jpg', frame_bgr, [cv2.IMWRITE_JPEG_QUALITY, 85])
-                
-                if success:
-                    # 按照 MJPEG 格式发送帧
-                    current_bytes = jpeg_bytes.tobytes()
-                    last_yielded_frame_bytes = current_bytes  # Update cache
+                        frame_bgr = frame
                     
-                    # 帧率控制：确保不超过 30fps
-                    current_time = time.time()
-                    time_since_last_frame = current_time - last_frame_sent_time
-                    if time_since_last_frame < MIN_FRAME_INTERVAL:
-                        sleep_time = MIN_FRAME_INTERVAL - time_since_last_frame
-                        time.sleep(sleep_time)
-                        current_time = time.time()  # 重新获取时间，考虑 sleep 的误差
+                    # 使用 OpenCV 将帧编码为 JPEG
+                    success, jpeg_bytes = cv2.imencode('.jpg', frame_bgr, [cv2.IMWRITE_JPEG_QUALITY, 85])
                     
-                    last_frame_sent_time = current_time
+                    if success:
+                        # 按照 MJPEG 格式发送帧
+                        current_bytes = jpeg_bytes.tobytes()
+                        last_yielded_frame_bytes = current_bytes  # Update cache
+                        
+                        # 帧率控制：确保不超过 30fps
+                        current_time = time.time()
+                        time_since_last_frame = current_time - last_frame_sent_time
+                        if time_since_last_frame < MIN_FRAME_INTERVAL:
+                            sleep_time = MIN_FRAME_INTERVAL - time_since_last_frame
+                            time.sleep(sleep_time)
+                            current_time = time.time()  # 重新获取时间，考虑 sleep 的误差
+                        
+                        last_frame_sent_time = current_time
+                        
+                        try:
+                            yield (b'--' + boundary + b'\r\n'
+                                   b'Content-Type: image/jpeg\r\n'
+                                   b'Content-Length: ' + str(len(current_bytes)).encode() + b'\r\n\r\n' +
+                                   current_bytes + b'\r\n')
+                            last_yield_time = time.time()
+                        except GeneratorExit:
+                            # 客户端断开连接
+                            print(f"Client disconnected for {uid}")
+                            break
+                        except Exception as e:
+                            print(f"Error sending frame for {uid}: {e}")
+                            break
+                    else:
+                        # 编码失败，跳过此帧
+                        continue
                     
-                    try:
-                        yield (b'--' + boundary + b'\r\n'
-                               b'Content-Type: image/jpeg\r\n'
-                               b'Content-Length: ' + str(len(current_bytes)).encode() + b'\r\n\r\n' +
-                               current_bytes + b'\r\n')
-                        last_yield_time = time.time()
-                    except GeneratorExit:
-                        # 客户端断开连接
-                        print(f"Client disconnected for {uid}")
-                        break
-                    except Exception as e:
-                        print(f"Error sending frame for {uid}: {e}")
-                        break
-                else:
-                    # 编码失败，跳过此帧
-                    continue
-                
-        except Exception as e:
-            # 发生错误，记录并退出（防止僵尸线程窃取队列数据）
-            print(f"Error in MJPEG stream generator for {uid}: {e}")
-            break
+            except Exception as e:
+                # 发生错误，记录并退出（防止僵尸线程窃取队列数据）
+                print(f"Error in MJPEG stream generator for {uid}: {e}")
+                break
 
 
 def create_video_feed_route(fastapi_app):
@@ -390,6 +390,10 @@ def create_video_feed_route(fastapi_app):
         Returns:
             StreamingResponse: MJPEG 格式的视频流
         """
+        # 每次新建 video_feed 连接都递增 generation，强制旧连接尽快退出。
+        # 这样即使浏览器没有及时断开旧 TCP，也不会继续占用服务端流循环。
+        STREAM_GENERATIONS[uid] = STREAM_GENERATIONS.get(uid, 0) + 1
+
         return StreamingResponse(
             generate_mjpeg_stream(uid),
             media_type="multipart/x-mixed-replace; boundary=frame",

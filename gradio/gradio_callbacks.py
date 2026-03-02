@@ -252,25 +252,38 @@ def on_video_end(uid):
     return format_log_html("please select the action below 👇🏻,\nsome actions also need to select keypoint")
 
 
-def switch_to_livestream_phase():
+def switch_to_livestream_phase(uid):
     """Switch display to livestream phase and keep control panel as read-only."""
+    if uid:
+        random_id = int(time.time() * 1000)
+        stream_html = (
+            f'<div id="combined_view_html"><img src="/video_feed/{uid}?r={random_id}" '
+            f'style="max-width: 100%; height: {REFERENCE_VIEW_HEIGHT}; width: auto; margin: 0 auto; display: block; border-radius: 8px; object-fit: contain;" '
+            'alt="Desk View | Robot View" /></div>'
+        )
+    else:
+        stream_html = "<div id='combined_view_html'><p>Waiting for video stream...</p></div>"
     return (
         gr.update(visible=True),   # livestream_phase_group
         gr.update(visible=False),  # action_phase_group
         gr.update(interactive=False),  # options_radio
         gr.update(interactive=False),  # exec_btn
         gr.update(interactive=False),  # next_task_btn
+        gr.update(value=stream_html),  # combined_display
     )
 
 
 def switch_to_action_phase():
     """Switch display to action phase and restore control panel interactions."""
+    # 强制移除 <img>，让浏览器主动关闭旧的 /video_feed 长连接
+    paused_stream_html = "<div id='combined_view_html'><p>Stream paused.</p></div>"
     return (
         gr.update(visible=False),  # livestream_phase_group
         gr.update(visible=True),   # action_phase_group
         gr.update(interactive=True),  # options_radio
         gr.update(),  # exec_btn (keep execute_step result)
         gr.update(),  # next_task_btn (keep execute_step result)
+        gr.update(value=paused_stream_html),  # combined_display
     )
 
 
@@ -289,8 +302,10 @@ def _wait_for_livestream_drain(uid, max_wait_sec=12.0, warmup_sec=0.8, empty_gra
     start_time = time.time()
     empty_since = None
     seen_non_empty = False
+    loop_count = 0
 
     while True:
+        loop_count += 1
         elapsed = time.time() - start_time
         if elapsed >= max_wait_sec:
             break
@@ -323,7 +338,6 @@ def _wait_for_livestream_drain(uid, max_wait_sec=12.0, warmup_sec=0.8, empty_gra
                 break
 
         time.sleep(poll_sec)
-
 
 def on_video_end_transition(uid):
     """Called when demo video finishes. Transition from video to action phase."""
@@ -376,14 +390,6 @@ def login_and_load_task(username, uid):
             gr.update(value=None, visible=False),  # tutorial_video_display
             ""  # loading_overlay
         )
-    
-    # #region agent log
-    import json as json_module
-    try:
-        with open('/home/hongzefu/historybench-v5.6.11b5-debug/.cursor/debug.log', 'a', encoding='utf-8') as f:
-            f.write(json_module.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"E","location":"gradio_callbacks.py:259","message":"login_and_load_task after login","data":{"username":username,"status":status},"timestamp":int(__import__('time').time()*1000)})+"\n")
-    except: pass
-    # #endregion
     
     # Login success - Load current task
     if status["is_done_all"]:
