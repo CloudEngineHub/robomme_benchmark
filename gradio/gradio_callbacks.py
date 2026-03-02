@@ -40,7 +40,7 @@ from streaming_service import FrameQueueManager, cleanup_frame_queue
 from image_utils import draw_marker, save_video, concatenate_frames_horizontally
 from user_manager import user_manager, LeaseLost
 from logger import log_user_action, create_new_attempt, has_existing_actions
-from config import USE_SEGMENTED_VIEW, REFERENCE_VIEW_HEIGHT, DEMO_VIDEO_HEIGHT, should_show_demo_video, SESSION_TIMEOUT, EXECUTE_LIMIT_OFFSET
+from config import USE_SEGMENTED_VIEW, DEMO_VIDEO_HEIGHT, should_show_demo_video, SESSION_TIMEOUT, EXECUTE_LIMIT_OFFSET
 from process_session import ScrewPlanFailureError, ProcessSessionProxy
 from note_content import get_task_hint
 
@@ -258,7 +258,7 @@ def switch_to_livestream_phase(uid):
         random_id = int(time.time() * 1000)
         stream_html = (
             f'<div id="combined_view_html"><img src="/video_feed/{uid}?r={random_id}" '
-            f'style="max-width: 100%; height: {REFERENCE_VIEW_HEIGHT}; width: auto; margin: 0 auto; display: block; border-radius: 8px; object-fit: contain;" '
+            f'style="max-width: 100%; width: 100%; height: auto; margin: 0 auto; display: block; border-radius: 8px; object-fit: contain;" '
             'alt="Desk View | Robot View" /></div>'
         )
     else:
@@ -398,7 +398,7 @@ def login_and_load_task(username, uid):
         total = task_info["total_tasks"]
         import random
         random_id = random.randint(0, 1000000)
-        combined_html = f'<div id="combined_view_html"><img src="/video_feed/{uid}?r={random_id}" style="max-width: 100%; height: {REFERENCE_VIEW_HEIGHT}; width: auto; margin: 0 auto; display: block; border-radius: 8px; object-fit: contain;" alt="Desk View | Robot View" /></div>'
+        combined_html = f'<div id="combined_view_html"><img src="/video_feed/{uid}?r={random_id}" style="max-width: 100%; width: 100%; height: auto; margin: 0 auto; display: block; border-radius: 8px; object-fit: contain;" alt="Desk View | Robot View" /></div>'
         set_ui_phase(uid, "executing_task")
         return (
             uid,
@@ -483,7 +483,7 @@ def login_and_load_task(username, uid):
         # 生成 HTML 内容，包含 MJPEG 流
         import random
         random_id = random.randint(0, 1000000)
-        combined_html = f'<div id="combined_view_html"><img src="/video_feed/{uid}?r={random_id}" style="max-width: 100%; height: {REFERENCE_VIEW_HEIGHT}; width: auto; margin: 0 auto; display: block; border-radius: 8px; object-fit: contain;" alt="Desk View | Robot View" /></div>'
+        combined_html = f'<div id="combined_view_html"><img src="/video_feed/{uid}?r={random_id}" style="max-width: 100%; width: 100%; height: auto; margin: 0 auto; display: block; border-radius: 8px; object-fit: contain;" alt="Desk View | Robot View" /></div>'
         # 加载失败，直接进入执行阶段
         set_ui_phase(uid, "executing_task")
         
@@ -591,7 +591,7 @@ def login_and_load_task(username, uid):
     # 使用随机参数强制浏览器重新建立连接，避免缓存旧流导致显示问题
     import random
     random_id = random.randint(0, 1000000)
-    combined_html = f'<div id="combined_view_html"><img src="/video_feed/{uid}?r={random_id}" style="max-width: 100%; height: {REFERENCE_VIEW_HEIGHT}; width: auto; margin: 0 auto; display: block; border-radius: 8px; object-fit: contain;" alt="Desk View | Robot View" /></div>'
+    combined_html = f'<div id="combined_view_html"><img src="/video_feed/{uid}?r={random_id}" style="max-width: 100%; width: 100%; height: auto; margin: 0 auto; display: block; border-radius: 8px; object-fit: contain;" alt="Desk View | Robot View" /></div>'
     
     # 根据是否有示范视频决定UI阶段
     if has_demo_video:

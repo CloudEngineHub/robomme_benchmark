@@ -44,7 +44,7 @@ ui_layout.py (视图层 - 主进程)
   │   └── 功能：应用配置常量
   │       - USE_SEGMENTED_VIEW: 是否使用分割视图
   │       - ENV_IDS: 环境ID列表
-  │       - SYSTEM_LOG_SCALE / KEYPOINT_SELECTION_SCALE / CONTROL_PANEL_SCALE: 三列宽度比例
+  │       - KEYPOINT_SELECTION_SCALE / CONTROL_PANEL_SCALE: 两列宽度比例
   │
   └── state_manager.py
       └── 功能：管理 Gradio State 组件（uid_state, username_state）

@@ -12,10 +12,9 @@ DEMO_VIDEO_HEIGHT = "50vh"          # 演示视频的固定高度（Watch video 
 # 全局字体大小配置（绝对值）
 FONT_SIZE = "20px"  # 统一字体大小，可在config.py中调整（如"14px", "16px", "18px", "20px"等）
 
-# 主界面三列宽度比例 (System Log : Keypoint Selection : Control Panel)
-SYSTEM_LOG_SCALE = 3
-KEYPOINT_SELECTION_SCALE = 3
-CONTROL_PANEL_SCALE = 3
+# 主界面两列宽度比例 (Keypoint Selection + System Log : Control Panel)
+KEYPOINT_SELECTION_SCALE = 1
+CONTROL_PANEL_SCALE = 2
 
 # Session超时配置
 SESSION_TIMEOUT = 300  # Session超时时间（秒），如果30秒内没有execute_step操作，将自动回收session

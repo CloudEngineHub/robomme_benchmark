@@ -1,17 +1,15 @@
 """
 UI布局模块 - 顺序执行界面
 Video → Livestream → Action+Keypoint 顺序显示，同一时间只显示一个
-三列布局: System Log | Keypoint/Livestream | Control Panel
+两列布局: Keypoint/Livestream(+System Log) | Control Panel
 """
 import ast
 import html
 import gradio as gr
 from user_manager import user_manager
 from config import (
-    REFERENCE_VIEW_HEIGHT,
     DEMO_VIDEO_HEIGHT,
     FONT_SIZE,
-    SYSTEM_LOG_SCALE,
     KEYPOINT_SELECTION_SCALE,
     CONTROL_PANEL_SCALE,
 )
@@ -320,9 +318,9 @@ h1, h2, h3, h4, h5, h6, .gr-button, .gr-textbox, .gr-dropdown, .gr-radio {{
 /* Livestream image */
 #combined_view_html {{ border: none !important; }}
 #combined_view_html img {{
-    max-width: 100%;
-    height: {REFERENCE_VIEW_HEIGHT};
-    width: auto;
+    max-width: 100% !important;
+    width: 100% !important;
+    height: auto !important;
     margin: 0 auto;
     display: block;
     border: none !important;
@@ -341,14 +339,27 @@ h1, h2, h3, h4, h5, h6, .gr-button, .gr-textbox, .gr-dropdown, .gr-radio {{
 }}
 
 /* Keypoint image */
-#live_obs {{ border: none !important; }}
-#live_obs img {{
-    max-width: 100%;
-    height: {REFERENCE_VIEW_HEIGHT} !important;
-    width: auto;
+#live_obs {{
+    border: none !important;
+    width: 100% !important;
+}}
+#live_obs .image-container,
+#live_obs .image-container > div,
+#live_obs .image-frame,
+#live_obs .canvas-container {{
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+}}
+#live_obs img,
+#live_obs canvas {{
+    max-width: 100% !important;
+    width: 100% !important;
+    height: auto !important;
+    max-height: none !important;
     margin: 0 auto;
     display: block;
-    object-fit: contain;
+    object-fit: contain !important;
 }}
 
 /* Action radio - 每行一个选项 */
@@ -423,7 +434,7 @@ h1, h2, h3, h4, h5, h6, .gr-button, .gr-textbox, .gr-dropdown, .gr-radio {{
 
 
 def create_ui_blocks():
-    """创建 Gradio Blocks — 三列布局: System Log | Keypoint/Livestream | Control Panel"""
+    """创建 Gradio Blocks — 两列布局: Keypoint/Livestream(+System Log) | Control Panel"""
     def render_header_info(task_text, goal_text):
         """Render compact header lines with safe HTML escaping."""
         clean_task = str(task_text or "").strip()
@@ -491,19 +502,10 @@ def create_ui_blocks():
                 gr.Markdown("### Finish the task below!")
 
             # =============================================================
-            # Three-column layout: System Log | Phases | Control Panel
+            # Two-column layout: Phases(+System Log) | Control Panel
             # =============================================================
             with gr.Row():
-                # ---- Left column: System Log ----
-                with gr.Column(scale=SYSTEM_LOG_SCALE):
-                    with gr.Group():
-                        gr.Markdown("### System Log")
-                        log_output = gr.HTML(
-                            value="", elem_classes="compact-log",
-                            elem_id="log_output"
-                        )
-
-                # ---- Middle column: Video / Livestream / Keypoint ----
+                # ---- Left column: Video / Livestream / Keypoint + System Log ----
                 with gr.Column(scale=KEYPOINT_SELECTION_SCALE):
                     # Phase 1: VIDEO (auto-play demo video)
                     with gr.Group(visible=False) as video_phase_group:
@@ -531,6 +533,13 @@ def create_ui_blocks():
                         img_display = gr.Image(
                             label="Live Observation", interactive=False,
                             type="pil", elem_id="live_obs", show_label=False
+                        )
+
+                    with gr.Group():
+                        gr.Markdown("### System Log")
+                        log_output = gr.HTML(
+                            value="", elem_classes="compact-log",
+                            elem_id="log_output"
                         )
 
                 # ---- Right column: Control Panel (vertical) ----
