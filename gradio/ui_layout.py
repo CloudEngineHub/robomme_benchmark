@@ -338,9 +338,9 @@ SYNC_JS = """
         v.autoplay = false;
         v.setAttribute('autoplay', 'false');
         
-        // 启用循环播放，确保视频播放完成后自动重新开始
-        v.loop = true;
-        v.setAttribute('loop', 'true');
+        // 禁用循环播放，确保视频播放完成后自动停止
+        v.loop = false;
+        v.removeAttribute('loop');
         
         // 禁用视频控制栏（播放/暂停按钮、进度条等）
         // 用户只能通过我们提供的"播放视频"按钮来控制播放
@@ -543,7 +543,7 @@ SYNC_JS = """
      * 
      * 功能说明：
      * - 查找页面中的演示视频元素
-     * - 确保视频设置正确（静音、循环）
+     * - 确保视频设置正确（静音、非循环）
      * - 根据视频加载状态选择播放策略
      * - 处理视频播放的 Promise（现代浏览器的 play() 方法返回 Promise）
      * 
@@ -559,8 +559,8 @@ SYNC_JS = """
                 // 确保视频设置正确（这些设置可能在页面更新时被重置）
                 v.muted = true;
                 v.setAttribute('muted', 'true');
-                v.loop = true;
-                v.setAttribute('loop', 'true');
+                v.loop = false;
+                v.removeAttribute('loop');
                 
                 // 尝试播放视频
                 // readyState 值说明：
@@ -689,8 +689,7 @@ SYNC_JS = """
                     updateExecuteButtonState();
                     // 移除演示视频组高亮（视频播放完毕）
                     removeDemoVideoGroupHighlight();
-                    // 注意：如果视频设置了 loop=true，ended 后会自动重新播放
-                    // 但我们需要等待实际的 play 事件来更新状态
+                    // 非循环播放：播放结束后保持停止状态
                 }, { once: false });
                 
                 // 检查当前播放状态（处理页面加载时视频已经在播放的情况）
