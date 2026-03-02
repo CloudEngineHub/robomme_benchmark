@@ -32,6 +32,15 @@ except Exception as e:
 from robomme.env_record_wrapper import BenchmarkEnvBuilder
 from robomme.robomme_env import *  # noqa: F401,F403; ensure gym envs are registered
 from robomme.robomme_env.utils.vqa_options import get_vqa_options
+from robomme.robomme_env.utils.oracle_action_matcher import (
+    find_exact_label_option_index,
+    map_action_text_to_option_label,
+)
+from robomme.robomme_env.utils.choice_action_mapping import (
+    extract_actor_position_xyz,
+    project_world_to_pixel,
+    select_target_with_position,
+)
 from mani_skill.examples.motionplanning.panda.motionplanner import PandaArmMotionPlanningSolver
 from mani_skill.examples.motionplanning.panda.motionplanner_stick import PandaStickMotionPlanningSolver
 
@@ -218,6 +227,61 @@ def _collect_front_frames_from_step_output(step_output):
     if not isinstance(obs, dict):
         return []
     return _to_frame_list(obs.get("front_rgb_list"))
+
+
+def _collect_choice_segment_candidates(item, out):
+    if isinstance(item, (list, tuple)):
+        for child in item:
+            _collect_choice_segment_candidates(child, out)
+        return
+    if isinstance(item, dict):
+        for child in item.values():
+            _collect_choice_segment_candidates(child, out)
+        return
+    if item is not None:
+        out.append(item)
+
+
+def _extract_choice_segment_position_xyz(current_segment):
+    candidates = []
+    _collect_choice_segment_candidates(current_segment, candidates)
+    for candidate in candidates:
+        pos = extract_actor_position_xyz(candidate)
+        if pos is not None:
+            return pos.astype(np.float64)
+    return None
+
+
+def _find_actor_segmentation_id(segmentation_id_map, actor):
+    if not isinstance(segmentation_id_map, dict):
+        return None
+    for seg_id, obj in segmentation_id_map.items():
+        if obj is actor:
+            try:
+                return int(seg_id)
+            except Exception:
+                continue
+    return None
+
+
+def _compute_segmentation_centroid_xy(segmentation, seg_id):
+    if segmentation is None:
+        return None
+    try:
+        seg_arr = np.asarray(segmentation)
+    except Exception:
+        return None
+    if seg_arr.ndim > 2:
+        seg_arr = np.squeeze(seg_arr)
+    if seg_arr.ndim != 2:
+        return None
+    mask = seg_arr == int(seg_id)
+    if not np.any(mask):
+        return None
+    ys, xs = np.nonzero(mask)
+    x = int(np.rint(xs.mean()))
+    y = int(np.rint(ys.mean()))
+    return [x, y]
 
 def _extract_demonstration_payload(demonstration_data):
     """
@@ -521,6 +585,216 @@ class OracleSession:
     def close(self):
         if self.env:
             self.env.close()
+
+    def _get_front_camera_projection_params(self):
+        if not self.env:
+            return None, None, None
+
+        intrinsic = None
+        extrinsic = None
+        image_shape = None
+
+        try:
+            obs = self.env.unwrapped.get_obs(unflattened=True)
+        except Exception:
+            obs = None
+
+        if isinstance(obs, dict):
+            try:
+                cam_param = obs.get("sensor_param", {}).get("base_camera", {})
+                intrinsic = np.asarray(cam_param.get("intrinsic_cv")).reshape(-1)[:9].reshape(3, 3)
+                extrinsic = np.asarray(cam_param.get("extrinsic_cv")).reshape(-1)[:12].reshape(3, 4)
+            except Exception:
+                intrinsic = None
+                extrinsic = None
+
+            try:
+                rgb = obs.get("sensor_data", {}).get("base_camera", {}).get("rgb")
+                if rgb is not None and hasattr(rgb, "cpu"):
+                    rgb = rgb.cpu().numpy()
+                rgb = np.asarray(rgb)
+                if rgb.ndim == 4:
+                    image_shape = (int(rgb.shape[1]), int(rgb.shape[2]))
+                elif rgb.ndim == 3:
+                    image_shape = (int(rgb.shape[0]), int(rgb.shape[1]))
+            except Exception:
+                image_shape = None
+
+        if image_shape is None and self.seg_raw is not None:
+            try:
+                seg = np.asarray(self.seg_raw)
+                image_shape = (int(seg.shape[0]), int(seg.shape[1]))
+            except Exception:
+                image_shape = None
+
+        if image_shape is None and self.base_frames:
+            frame = np.asarray(self.base_frames[-1])
+            image_shape = (int(frame.shape[0]), int(frame.shape[1]))
+
+        return intrinsic, extrinsic, image_shape
+
+    def get_reference_action(self):
+        if not self.env:
+            return {
+                "ok": False,
+                "option_idx": None,
+                "option_label": "",
+                "option_action": "",
+                "need_coords": False,
+                "coords_xy": None,
+                "message": "Environment not initialized.",
+            }
+
+        target_action_text = getattr(self.env.unwrapped, "current_choice_label", "")
+        if not isinstance(target_action_text, str) or not target_action_text.strip():
+            return {
+                "ok": False,
+                "option_idx": None,
+                "option_label": "",
+                "option_action": "",
+                "need_coords": False,
+                "coords_xy": None,
+                "message": "Current step has no reference action text.",
+            }
+
+        selected_target = {
+            "obj": None,
+            "name": None,
+            "seg_id": None,
+            "click_point": None,
+            "centroid_point": None,
+        }
+        try:
+            current_options = _build_solve_options(self.env, self.planner, selected_target, self.env_id)
+        except Exception as exc:
+            return {
+                "ok": False,
+                "option_idx": None,
+                "option_label": "",
+                "option_action": "",
+                "need_coords": False,
+                "coords_xy": None,
+                "message": f"Failed to build options: {exc}",
+            }
+
+        if not current_options:
+            return {
+                "ok": False,
+                "option_idx": None,
+                "option_label": "",
+                "option_action": "",
+                "need_coords": False,
+                "coords_xy": None,
+                "message": "No available options for current step.",
+            }
+
+        matched_label = map_action_text_to_option_label(target_action_text, current_options)
+        if matched_label is None:
+            return {
+                "ok": False,
+                "option_idx": None,
+                "option_label": "",
+                "option_action": "",
+                "need_coords": False,
+                "coords_xy": None,
+                "message": f"Cannot map reference action '{target_action_text}' to option label.",
+            }
+
+        option_idx = find_exact_label_option_index(matched_label, current_options)
+        if option_idx < 0:
+            return {
+                "ok": False,
+                "option_idx": None,
+                "option_label": "",
+                "option_action": "",
+                "need_coords": False,
+                "coords_xy": None,
+                "message": f"Mapped label '{matched_label}' not found in current options.",
+            }
+
+        option = current_options[option_idx]
+        option_label = str(option.get("label", "")).strip()
+        option_action = str(option.get("action", "")).strip()
+        need_coords = bool(option.get("available"))
+
+        if not need_coords:
+            return {
+                "ok": True,
+                "option_idx": int(option_idx),
+                "option_label": option_label,
+                "option_action": option_action,
+                "need_coords": False,
+                "coords_xy": None,
+                "message": "Reference action resolved.",
+            }
+
+        reference_position = _extract_choice_segment_position_xyz(
+            getattr(self.env.unwrapped, "current_segment", None)
+        )
+        if reference_position is None:
+            return {
+                "ok": False,
+                "option_idx": int(option_idx),
+                "option_label": option_label,
+                "option_action": option_action,
+                "need_coords": True,
+                "coords_xy": None,
+                "message": "Cannot resolve reference target position from current segment.",
+            }
+
+        best_candidate = select_target_with_position(option.get("available"), reference_position)
+        if best_candidate is None or best_candidate.get("obj") is None:
+            return {
+                "ok": False,
+                "option_idx": int(option_idx),
+                "option_label": option_label,
+                "option_action": option_action,
+                "need_coords": True,
+                "coords_xy": None,
+                "message": "Cannot match reference target to available candidates.",
+            }
+
+        actor = best_candidate.get("obj")
+        segmentation_id_map = getattr(self.env.unwrapped, "segmentation_id_map", {}) or {}
+        seg_id = _find_actor_segmentation_id(segmentation_id_map, actor)
+        coords_xy = None
+        if seg_id is not None:
+            coords_xy = _compute_segmentation_centroid_xy(self.seg_raw, seg_id)
+
+        if coords_xy is None:
+            world_xyz = best_candidate.get("position")
+            if world_xyz is None:
+                world_xyz = extract_actor_position_xyz(actor)
+            intrinsic, extrinsic, image_shape = self._get_front_camera_projection_params()
+            if world_xyz is not None and intrinsic is not None and extrinsic is not None and image_shape is not None:
+                coords_xy = project_world_to_pixel(
+                    world_xyz=world_xyz,
+                    intrinsic_cv=intrinsic,
+                    extrinsic_cv=extrinsic,
+                    image_shape=image_shape,
+                )
+
+        if coords_xy is None:
+            return {
+                "ok": False,
+                "option_idx": int(option_idx),
+                "option_label": option_label,
+                "option_action": option_action,
+                "need_coords": True,
+                "coords_xy": None,
+                "message": "Failed to compute pixel coordinates for reference target.",
+            }
+
+        coords_xy = [int(coords_xy[0]), int(coords_xy[1])]
+        return {
+            "ok": True,
+            "option_idx": int(option_idx),
+            "option_label": option_label,
+            "option_action": option_action,
+            "need_coords": True,
+            "coords_xy": coords_xy,
+            "message": f"Reference action resolved at ({coords_xy[0]}, {coords_xy[1]}).",
+        }
 
     def execute_action(self, action_idx, click_coords):
 

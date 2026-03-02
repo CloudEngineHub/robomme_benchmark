@@ -891,6 +891,86 @@ def on_option_select(uid, username, option_value):
     return default_msg, gr.update(interactive=False), gr.update(visible=False)
 
 
+def on_reference_action(uid, username):
+    """
+    自动获取并回填当前步参考 action + 像素坐标（不执行）。
+    """
+    # Check lease
+    if username:
+        try:
+            user_manager.assert_lease(username, uid)
+        except LeaseLost as e:
+            raise gr.Error(
+                "You have been logged in elsewhere. This page is no longer valid. "
+                f"Please refresh the page to log in again.\\n{str(e)}"
+            )
+
+    if uid:
+        update_session_activity(uid)
+
+    session = get_session(uid)
+    if not session:
+        return (
+            None,
+            gr.update(),
+            "No need for coordinates",
+            gr.update(visible=False),
+            format_log_html("Session Error"),
+        )
+
+    current_img = session.get_pil_image(use_segmented=USE_SEGMENTED_VIEW)
+
+    try:
+        reference = session.get_reference_action()
+    except Exception as exc:
+        return (
+            current_img,
+            gr.update(),
+            gr.update(),
+            gr.update(),
+            format_log_html(f"Reference Action Error: {exc}"),
+        )
+
+    if not isinstance(reference, dict) or not reference.get("ok", False):
+        message = "Failed to resolve reference action."
+        if isinstance(reference, dict) and reference.get("message"):
+            message = str(reference.get("message"))
+        return (
+            current_img,
+            gr.update(),
+            gr.update(),
+            gr.update(),
+            format_log_html(f"Reference Action: {message}"),
+        )
+
+    option_idx = reference.get("option_idx")
+    option_label = str(reference.get("option_label", "")).strip()
+    option_action = str(reference.get("option_action", "")).strip()
+    need_coords = bool(reference.get("need_coords", False))
+    coords_xy = reference.get("coords_xy")
+
+    updated_img = current_img
+    coords_text = "No need for coordinates"
+    coords_group_update = gr.update(visible=False)
+    log_text = f"Reference Action: {option_label}. {option_action}".strip()
+
+    if need_coords and isinstance(coords_xy, (list, tuple)) and len(coords_xy) >= 2:
+        x = int(coords_xy[0])
+        y = int(coords_xy[1])
+        updated_img = draw_marker(current_img, x, y)
+        coords_text = f"{x}, {y}"
+        coords_group_update = gr.update(visible=True)
+        log_text = f"Reference Action: {option_label}. {option_action} | coords: {coords_text}"
+
+    return (
+        updated_img,
+        gr.update(value=option_idx),
+        coords_text,
+        coords_group_update,
+        format_log_html(log_text),
+    )
+
+
 def init_app(request: gr.Request):
     """
     处理初始页面加载。

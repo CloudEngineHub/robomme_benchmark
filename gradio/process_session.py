@@ -44,6 +44,7 @@ CMD_LOAD_EPISODE = "load_episode"
 CMD_UPDATE_OBSERVATION = "update_observation"
 CMD_GET_PIL_IMAGE = "get_pil_image"
 CMD_EXECUTE_ACTION = "execute_action"
+CMD_GET_REFERENCE_ACTION = "get_reference_action"
 CMD_CLOSE = "close"
 
 def _sanitize_options(options):
@@ -214,6 +215,10 @@ def session_worker_loop(cmd_queue, result_queue, stream_queue, dataset_root, gui
                     "is_demonstration": is_demonstration
                 }
                 result_queue.put({"status": "success", "result": res, "state": state_update})
+
+            elif cmd == CMD_GET_REFERENCE_ACTION:
+                res = session.get_reference_action(*args, **kwargs)
+                result_queue.put({"status": "success", "result": res})
                 
             else:
                 result_queue.put({"status": "error", "message": f"Unknown command: {cmd}"})
@@ -404,6 +409,15 @@ class ProcessSessionProxy:
             tuple: (PIL.Image, str) 图像和状态消息
         """
         return self._send_cmd(CMD_UPDATE_OBSERVATION, use_segmentation=use_segmentation)
+
+    def get_reference_action(self):
+        """
+        获取当前步参考动作与坐标（在工作进程中执行）
+
+        Returns:
+            dict: 参考动作结果
+        """
+        return self._send_cmd(CMD_GET_REFERENCE_ACTION)
         
     def close(self):
         """

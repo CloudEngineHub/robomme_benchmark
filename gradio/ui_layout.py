@@ -16,6 +16,7 @@ from gradio_callbacks import (
     load_next_task_wrapper,
     on_map_click,
     on_option_select,
+    on_reference_action,
     execute_step,
     init_app,
     show_loading_info,
@@ -507,6 +508,10 @@ def create_ui_blocks():
                                     "EXECUTE", variant="stop", size="lg",
                                     elem_id="exec_btn"
                                 )
+                                reference_action_btn = gr.Button(
+                                    "Reference Action", variant="secondary",
+                                    elem_id="reference_action_btn"
+                                )
                                 next_task_btn = gr.Button(
                                     "Next Task", variant="primary",
                                     interactive=False, elem_id="next_task_btn"
@@ -583,6 +588,13 @@ def create_ui_blocks():
             fn=on_option_select,
             inputs=[uid_state, username_state, options_radio],
             outputs=[coords_box, img_display, coords_group]
+        )
+
+        # --- Reference Action (auto fill action + coords only) ---
+        reference_action_btn.click(
+            fn=on_reference_action,
+            inputs=[uid_state, username_state],
+            outputs=[img_display, options_radio, coords_box, coords_group, log_output]
         )
 
         # --- Execute: switch to livestream → execute → switch back to action ---
