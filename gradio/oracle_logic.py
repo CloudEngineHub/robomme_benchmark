@@ -328,8 +328,13 @@ class OracleSession:
             builder = BenchmarkEnvBuilder(
                 env_id=env_id,
                 dataset="train",
-                action_space="multi_choice",
+                # Gradio uses local oracle solve() directly (not env.step(command_dict)),
+                # so we must keep a low-level stepping wrapper chain.
+                # "multi_choice" inserts OraclePlannerDemonstrationWrapper, which expects
+                # dict commands and may swallow planner low-level action arrays.
+                action_space="joint_angle",
                 gui_render=self.gui_render,
+                #gui_render=True,
                 override_metadata_path=metadata_override_root,
                 max_steps=3000,
             )
@@ -605,6 +610,7 @@ class OracleSession:
         #   ↓
         #   gradio_callbacks.py: 捕获并显示弹窗 (gr.Info)
         status_msg = f"Executing: {chosen_opt.get('label')}"
+        before_elapsed_steps = getattr(self.env.unwrapped, "elapsed_steps", None)
         try:
             chosen_opt.get("solve")()
         except ScrewPlanFailure as e:
@@ -615,6 +621,11 @@ class OracleSession:
             # Re-raise all other exceptions so they can be displayed as popup too
             print(f"Execution Error")
             raise
+        after_elapsed_steps = getattr(self.env.unwrapped, "elapsed_steps", None)
+        print(
+            "[execute_action] elapsed_steps: "
+            f"{before_elapsed_steps} -> {after_elapsed_steps}"
+        )
             
         # 4. Evaluate
         self.env.unwrapped.evaluate()

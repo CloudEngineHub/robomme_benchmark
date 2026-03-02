@@ -386,4 +386,6 @@ class OraclePlannerDemonstrationWrapper(gym.Wrapper):
         # 6) Run post-solve environment evaluation to keep existing side effects and logging.
         self._post_eval()
         # 7) Convert batch to wrapper output contract (last reward/terminated/truncated + flattened info).
+
+        print("step!!!!!!")
         return self._format_step_output(batch)
