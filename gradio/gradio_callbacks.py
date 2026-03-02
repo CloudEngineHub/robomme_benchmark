@@ -1535,15 +1535,10 @@ def execute_step(uid, username, option_idx, coords_str):
             new_count = increment_execute_count(username, session.env_id, session.episode_idx)
             print(f"Execute count for {username}:{session.env_id}:{session.episode_idx} = {new_count}")
     
-    # 等待一小段时间，确保continuous_frame_monitor线程处理完所有帧
-    # 不再手动调用monitor_frames_and_enqueue，因为continuous_frame_monitor线程已经在处理
+    # 给后台线程一点时间开始消费新帧。
+    # 注意：不要在这里主动停止 streaming_active，否则在帧同步稍慢时会被提前截断，
+    # 导致 LiveStream 只显示最后一帧。
     time.sleep(0.3)
-    
-    # 标记流式输出完成（让Timer有机会读取最后的帧）
-    from state_manager import FRAME_QUEUES
-    if uid in FRAME_QUEUES:
-        # 停止流式输出，continuous_frame_monitor线程会检测到并退出
-        FRAME_QUEUES[uid]["streaming_active"] = False
     
     # 记录执行操作（包含从上次action到这次action之间的所有coordinate_click）
     if username and session.env_id is not None and session.episode_idx is not None:

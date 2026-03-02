@@ -207,6 +207,18 @@ def _extract_obs_front_frames(env):
             return front_list, id(obs_candidate)
     return None, None
 
+def _collect_front_frames_from_step_output(step_output):
+    """
+    Extract front camera frames from a single env.step(...) output.
+    Supports both classic step tuple and dense batch tuple.
+    """
+    if not (isinstance(step_output, tuple) and len(step_output) == 5):
+        return []
+    obs = step_output[0]
+    if not isinstance(obs, dict):
+        return []
+    return _to_frame_list(obs.get("front_rgb_list"))
+
 def _extract_demonstration_payload(demonstration_data):
     """
     Compatible with both legacy dict payloads and current DemonstrationWrapper tuple batch:
@@ -611,6 +623,21 @@ class OracleSession:
         #   gradio_callbacks.py: 捕获并显示弹窗 (gr.Info)
         status_msg = f"Executing: {chosen_opt.get('label')}"
         before_elapsed_steps = getattr(self.env.unwrapped, "elapsed_steps", None)
+        # Collect intermediate front-camera frames during solve() so livestream
+        # can show the full execution process instead of only the final frame.
+        original_step = self.env.step
+        captured_front_frames = []
+
+        def _step_with_capture(action):
+            step_output = original_step(action)
+            step_front_frames = _collect_front_frames_from_step_output(step_output)
+            if step_front_frames:
+                captured_front_frames.extend(
+                    _prepare_frame(frame) for frame in step_front_frames if frame is not None
+                )
+            return step_output
+
+        self.env.step = _step_with_capture
         try:
             chosen_opt.get("solve")()
         except ScrewPlanFailure as e:
@@ -621,6 +648,12 @@ class OracleSession:
             # Re-raise all other exceptions so they can be displayed as popup too
             print(f"Execution Error")
             raise
+        finally:
+            self.env.step = original_step
+
+        if captured_front_frames:
+            self.base_frames.extend(captured_front_frames)
+        print(f"[execute_action] captured_front_frames={len(captured_front_frames)}")
         after_elapsed_steps = getattr(self.env.unwrapped, "elapsed_steps", None)
         print(
             "[execute_action] elapsed_steps: "
