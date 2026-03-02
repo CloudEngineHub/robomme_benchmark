@@ -6,8 +6,8 @@ VIDEO_PLAYBACK_FPS = 30.0  # Frame rate for demonstration video playback
 USE_SEGMENTED_VIEW = False  # Set to True to use segmented view, False to use original image
 
 # 视图高度配置
-REFERENCE_VIEW_HEIGHT = "30vh"      # 实时流和关键点图像高度
-DEMO_VIDEO_HEIGHT = "30vh"          # 演示视频的固定高度（Watch video 部分的视频高度）
+REFERENCE_VIEW_HEIGHT = "50vh"      # 实时流和关键点图像高度
+DEMO_VIDEO_HEIGHT = "50vh"          # 演示视频的固定高度（Watch video 部分的视频高度）
 
 # 全局字体大小配置（绝对值）
 FONT_SIZE = "20px"  # 统一字体大小，可在config.py中调整（如"14px", "16px", "18px", "20px"等）

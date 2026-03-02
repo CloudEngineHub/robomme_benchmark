@@ -114,4 +114,4 @@ def test_get_reference_action_when_choice_text_cannot_match(monkeypatch, reload_
 
     assert result["ok"] is False
     assert result["option_idx"] is None
-    assert "Cannot map reference action" in result["message"]
+    assert "Cannot map ground truth action" in result["message"]

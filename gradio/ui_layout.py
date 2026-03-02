@@ -377,7 +377,7 @@ h1, h2, h3, h4, h5, h6, .gr-button, .gr-textbox, .gr-dropdown, .gr-radio {{
 /* 按钮禁用状态 */
 #next_task_btn:disabled, #next_task_btn[disabled] {{ opacity: 0.5 !important; }}
 
-/* Reference Action 按钮改为绿色 */
+/* Ground Truth Action 按钮改为绿色 */
 #reference_action_btn {{
     background-color: #22c55e !important;  /* 绿色背景 */
     border-color: #16a34a !important;
@@ -554,7 +554,7 @@ def create_ui_blocks():
                             elem_id="exec_btn"
                         )
                         reference_action_btn = gr.Button(
-                            "Reference Action", variant="secondary",
+                            "Ground Truth Action", variant="secondary",
                             elem_id="reference_action_btn"
                         )
                         next_task_btn = gr.Button(
@@ -655,7 +655,7 @@ def create_ui_blocks():
             outputs=[coords_box, img_display, coords_group]
         )
 
-        # --- Reference Action (auto fill action + coords only) ---
+        # --- Ground Truth Action (auto fill action + coords only) ---
         reference_action_btn.click(
             fn=on_reference_action,
             inputs=[uid_state, username_state],

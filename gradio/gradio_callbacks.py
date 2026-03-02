@@ -953,11 +953,11 @@ def on_reference_action(uid, username):
             gr.update(),
             gr.update(),
             gr.update(),
-            format_log_html(f"Reference Action Error: {exc}"),
+            format_log_html(f"Ground Truth Action Error: {exc}"),
         )
 
     if not isinstance(reference, dict) or not reference.get("ok", False):
-        message = "Failed to resolve reference action."
+        message = "Failed to resolve ground truth action."
         if isinstance(reference, dict) and reference.get("message"):
             message = str(reference.get("message"))
         return (
@@ -965,7 +965,7 @@ def on_reference_action(uid, username):
             gr.update(),
             gr.update(),
             gr.update(),
-            format_log_html(f"Reference Action: {message}"),
+            format_log_html(f"Ground Truth Action: {message}"),
         )
 
     option_idx = reference.get("option_idx")
@@ -977,7 +977,7 @@ def on_reference_action(uid, username):
     updated_img = current_img
     coords_text = "No need for coordinates"
     coords_group_update = gr.update(visible=False)
-    log_text = f"Reference Action: {option_label}. {option_action}".strip()
+    log_text = f"Ground Truth Action: {option_label}. {option_action}".strip()
 
     if need_coords and isinstance(coords_xy, (list, tuple)) and len(coords_xy) >= 2:
         x = int(coords_xy[0])
@@ -985,7 +985,7 @@ def on_reference_action(uid, username):
         updated_img = draw_marker(current_img, x, y)
         coords_text = f"{x}, {y}"
         coords_group_update = gr.update(visible=True)
-        log_text = f"Reference Action: {option_label}. {option_action} | coords: {coords_text}"
+        log_text = f"Ground Truth Action: {option_label}. {option_action} | coords: {coords_text}"
 
     return (
         updated_img,

@@ -654,7 +654,7 @@ class OracleSession:
                 "option_action": "",
                 "need_coords": False,
                 "coords_xy": None,
-                "message": "Current step has no reference action text.",
+                "message": "Current step has no ground truth action text.",
             }
 
         selected_target = {
@@ -697,7 +697,7 @@ class OracleSession:
                 "option_action": "",
                 "need_coords": False,
                 "coords_xy": None,
-                "message": f"Cannot map reference action '{target_action_text}' to option label.",
+                "message": f"Cannot map ground truth action '{target_action_text}' to option label.",
             }
 
         option_idx = find_exact_label_option_index(matched_label, current_options)
@@ -725,7 +725,7 @@ class OracleSession:
                 "option_action": option_action,
                 "need_coords": False,
                 "coords_xy": None,
-                "message": "Reference action resolved.",
+                "message": "Ground truth action resolved.",
             }
 
         reference_position = _extract_choice_segment_position_xyz(
@@ -793,7 +793,7 @@ class OracleSession:
             "option_action": option_action,
             "need_coords": True,
             "coords_xy": coords_xy,
-            "message": f"Reference action resolved at ({coords_xy[0]}, {coords_xy[1]}).",
+            "message": f"Ground truth action resolved at ({coords_xy[0]}, {coords_xy[1]}).",
         }
 
     def execute_action(self, action_idx, click_coords):

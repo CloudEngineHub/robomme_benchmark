@@ -49,7 +49,7 @@ def test_on_reference_action_success_updates_option_and_coords(monkeypatch, relo
     assert option_update.get("value") == 2
     assert coords_text == "5, 6"
     assert coords_group_update.get("visible") is True
-    assert "Reference Action" in log_html
+    assert "Ground Truth Action" in log_html
 
 
 def test_on_reference_action_session_missing(monkeypatch, reload_module):
