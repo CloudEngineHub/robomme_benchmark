@@ -8,10 +8,12 @@ import html
 import gradio as gr
 from user_manager import user_manager
 from config import (
-    RESTRICT_VIDEO_PLAYBACK, REFERENCE_VIEW_HEIGHT,
-    LIVE_OBSERVATION_SCALE, ACTION_SCALE, CONTROL_SCALE,
-    FONT_SIZE, TEXT_INFO_SCALE,
-    REFERENCE_ZONE_HEIGHT, OPERATION_ZONE_HEIGHT, DEMO_VIDEO_HEIGHT
+    REFERENCE_VIEW_HEIGHT,
+    DEMO_VIDEO_HEIGHT,
+    FONT_SIZE,
+    SYSTEM_LOG_SCALE,
+    KEYPOINT_SELECTION_SCALE,
+    CONTROL_PANEL_SCALE,
 )
 from note_content import get_task_hint
 from gradio_callbacks import (
@@ -493,7 +495,7 @@ def create_ui_blocks():
             # =============================================================
             with gr.Row():
                 # ---- Left column: System Log ----
-                with gr.Column(scale=2):
+                with gr.Column(scale=SYSTEM_LOG_SCALE):
                     with gr.Group():
                         gr.Markdown("### System Log")
                         log_output = gr.HTML(
@@ -502,7 +504,7 @@ def create_ui_blocks():
                         )
 
                 # ---- Middle column: Video / Livestream / Keypoint ----
-                with gr.Column(scale=5):
+                with gr.Column(scale=KEYPOINT_SELECTION_SCALE):
                     # Phase 1: VIDEO (auto-play demo video)
                     with gr.Group(visible=False) as video_phase_group:
                         gr.Markdown("### Watch the demonstration video")
@@ -532,7 +534,7 @@ def create_ui_blocks():
                         )
 
                 # ---- Right column: Control Panel (vertical) ----
-                with gr.Column(scale=3):
+                with gr.Column(scale=CONTROL_PANEL_SCALE):
                     with gr.Group(visible=False) as control_panel_group:
                         gr.Markdown("### Control Panel")
                         gr.Markdown("**Action Selection**")
