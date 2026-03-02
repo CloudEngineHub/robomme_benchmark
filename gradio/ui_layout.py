@@ -4,7 +4,6 @@ Video → Livestream → Action+Keypoint 顺序显示，同一时间只显示一
 两列布局: Keypoint/Livestream(+System Log) | Control Panel
 """
 import ast
-import html
 import gradio as gr
 from user_manager import user_manager
 from config import (
@@ -269,7 +268,7 @@ h1, h2, h3, h4, h5, h6, .gr-button, .gr-textbox, .gr-dropdown, .gr-radio {{
 }}
 
 /* 日志样式 */
-.compact-log, #log_output {{
+.compact-log .prose, #log_output .prose {{
     max-height: 60vh !important;
     overflow-y: auto !important;
     font-family: monospace !important;
@@ -280,38 +279,29 @@ h1, h2, h3, h4, h5, h6, .gr-button, .gr-textbox, .gr-dropdown, .gr-radio {{
     background-color: transparent !important;
     line-height: 1.4 !important;
 }}
-.compact-log *, #log_output *, .compact-log div, #log_output div {{
+.compact-log .prose *, #log_output .prose * {{
     font-size: calc({FONT_SIZE} * 0.8) !important;
     font-family: monospace !important;
 }}
 
 /* 暗色模式 */
-.dark .compact-log, .dark #log_output,
-.dark .compact-log *, .dark #log_output *,
-[data-theme="dark"] .compact-log, [data-theme="dark"] #log_output,
-[data-theme="dark"] .compact-log *, [data-theme="dark"] #log_output * {{
+.dark .compact-log .prose, .dark #log_output .prose,
+.dark .compact-log .prose *, .dark #log_output .prose *,
+[data-theme="dark"] .compact-log .prose, [data-theme="dark"] #log_output .prose,
+[data-theme="dark"] .compact-log .prose *, [data-theme="dark"] #log_output .prose * {{
     color: #ffffff !important;
 }}
-.dark .compact-log, .dark #log_output,
-[data-theme="dark"] .compact-log, [data-theme="dark"] #log_output {{
+.dark .compact-log .prose, .dark #log_output .prose,
+[data-theme="dark"] .compact-log .prose, [data-theme="dark"] #log_output .prose {{
     border-color: rgba(255, 255, 255, 0.2) !important;
 }}
 
-/* Header info (compact stack without blank lines) */
-#header_info {{
-    padding: 2px 0 !important;
-    margin: 0 !important;
-    line-height: 1.25 !important;
-}}
-#header_info .header-line {{
-    margin: 0 !important;
+/* Header compact spacing */
+#header_title, #header_task, #header_goal {{
     padding: 0 !important;
+    margin: 0 !important;
 }}
-#header_info .header-title {{
-    font-size: calc({FONT_SIZE} * 1.2) !important;
-    font-weight: 700 !important;
-}}
-#header_info .header-meta, #header_info .header-goal {{
+#header_task .prose, #header_goal .prose {{
     font-size: calc({FONT_SIZE} * 1.05) !important;
 }}
 
@@ -400,17 +390,20 @@ h1, h2, h3, h4, h5, h6, .gr-button, .gr-textbox, .gr-dropdown, .gr-radio {{
 }}
 
 /* Loading Overlay */
-.loading-overlay {{
-    position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-    background: rgba(0, 0, 0, 0.5); display: flex;
-    justify-content: center; align-items: center; z-index: 9999;
+#loading_overlay_group {{
+    position: fixed !important; top: 0; left: 0;
+    width: 100vw !important; height: 100vh !important;
+    background: rgba(0, 0, 0, 0.5) !important;
+    display: flex !important; justify-content: center !important;
+    align-items: center !important; z-index: 9999 !important;
 }}
-.loading-content {{
-    position: relative; background: #ffffff; padding: 30px 50px;
-    border-radius: 10px; text-align: center;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.3); z-index: 10000;
+#loading_overlay_group .prose {{
+    text-align: center !important;
+    background: #ffffff; padding: 30px 50px;
+    border-radius: 10px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    color: #000000 !important;
 }}
-@keyframes spin {{ from {{ transform: rotate(0deg); }} to {{ transform: rotate(360deg); }} }}
 
 /* Task hint markdown compact spacing */
 #task_hint_display, #task_hint_display .prose {{
@@ -435,35 +428,30 @@ h1, h2, h3, h4, h5, h6, .gr-button, .gr-textbox, .gr-dropdown, .gr-radio {{
 
 def create_ui_blocks():
     """创建 Gradio Blocks — 两列布局: Keypoint/Livestream(+System Log) | Control Panel"""
-    def render_header_info(task_text, goal_text):
-        """Render compact header lines with safe HTML escaping."""
+    def render_header_task(task_text):
+        """Render task markdown."""
         clean_task = str(task_text or "").strip()
         if clean_task.lower().startswith("current task:"):
             clean_task = clean_task.split(":", 1)[1].strip()
         clean_task = " ".join(clean_task.splitlines()).strip() or "—"
-        first_goal = extract_first_goal(goal_text or "")
-        task_html = html.escape(clean_task)
-        goal_html = html.escape(first_goal) if first_goal else ""
+        return f"**Current Task:** {clean_task}"
 
-        parts = [
-            "<div class='header-line header-title'>RoboMME Human Evaluation</div>",
-            f"<div class='header-line header-meta'><strong>Current Task:</strong> {task_html}</div>",
-        ]
-        if goal_html:
-            parts.append(f"<div class='header-line header-goal'><strong>Goal:</strong> {goal_html}</div>")
-        return "".join(parts)
+    def render_header_goal(goal_text):
+        """Render goal markdown."""
+        first_goal = extract_first_goal(goal_text or "")
+        return f"**Goal:** {first_goal}" if first_goal else ""
 
     with gr.Blocks(title="Oracle Planner Interface") as demo:
         # =================================================================
         # Header: Title + Current Task + First Goal
         # =================================================================
-        header_info_display = gr.HTML(
-            value=render_header_info("", ""),
-            elem_id="header_info"
-        )
+        header_title_md = gr.Markdown("## RoboMME Human Evaluation", elem_id="header_title")
+        header_task_md = gr.Markdown(render_header_task(""), elem_id="header_task")
+        header_goal_md = gr.Markdown(render_header_goal(""), elem_id="header_goal")
 
         # Loading overlay
-        loading_overlay = gr.HTML(value="", elem_id="loading_overlay")
+        with gr.Group(visible=False, elem_id="loading_overlay_group") as loading_overlay:
+            gr.Markdown("# ⏳\n\n### Loading environment, please wait...")
 
         # State
         uid_state = gr.State(value=None)
@@ -498,7 +486,7 @@ def create_ui_blocks():
                     label="Tutorial Video", value=None, visible=False,
                     interactive=True, show_label=False
                 )
-                gr.HTML('<hr style="border-top: 3px solid #888; margin: 20px 0;">')
+                gr.Markdown("---")
                 gr.Markdown("### Finish the task below!")
 
             # =============================================================
@@ -537,7 +525,7 @@ def create_ui_blocks():
 
                     with gr.Group():
                         gr.Markdown("### System Log")
-                        log_output = gr.HTML(
+                        log_output = gr.Markdown(
                             value="", elem_classes="compact-log",
                             elem_id="log_output"
                         )
@@ -573,7 +561,7 @@ def create_ui_blocks():
 
             # Task Hint
             with gr.Group(visible=True):
-                gr.HTML('<hr style="border-top: 3px solid #888; margin: 20px 0;">')
+                gr.Markdown("---")
                 gr.Markdown("### Task Hint")
                 task_hint_display = gr.Markdown(value="", elem_id="task_hint_display")
 
@@ -583,22 +571,22 @@ def create_ui_blocks():
 
         # --- Sync hidden textboxes → header Markdown ---
         def sync_header_from_task(task_text, goal_text):
-            """Sync task updates into compact header."""
-            return render_header_info(task_text, goal_text)
+            """Sync task updates into header Markdown components."""
+            return render_header_task(task_text), render_header_goal(goal_text)
 
         def sync_header_from_goal(goal_text, task_text):
-            """Sync goal updates into compact header."""
-            return render_header_info(task_text, goal_text)
+            """Sync goal updates into header Markdown components."""
+            return render_header_task(task_text), render_header_goal(goal_text)
 
         task_info_box.change(
             fn=sync_header_from_task,
             inputs=[task_info_box, goal_box],
-            outputs=[header_info_display]
+            outputs=[header_task_md, header_goal_md]
         )
         goal_box.change(
             fn=sync_header_from_goal,
             inputs=[goal_box, task_info_box],
-            outputs=[header_info_display]
+            outputs=[header_task_md, header_goal_md]
         )
 
         # --- Login ---

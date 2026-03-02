@@ -92,70 +92,70 @@ def _ui_option_label(session, opt_label: str, opt_idx: int) -> str:
     return opt_label
 
 
-def format_log_html(log_message):
+def _mjpeg_stream_html(uid):
+    """Generate MJPEG stream HTML for the livestream display."""
+    random_id = int(time.time() * 1000)
+    return (
+        f'<div id="combined_view_html">'
+        f'<img src="/video_feed/{uid}?r={random_id}" '
+        f'style="max-width:100%;width:100%;height:auto;margin:0 auto;'
+        f'display:block;border-radius:8px;object-fit:contain;" '
+        f'alt="Desk View | Robot View" /></div>'
+    )
+
+
+MJPEG_WAITING_HTML = "<div id='combined_view_html'><p>Waiting for video stream...</p></div>"
+MJPEG_PAUSED_HTML = "<div id='combined_view_html'><p>Stream paused.</p></div>"
+
+
+def format_log_markdown(log_message):
     """
-    将纯文本日志消息格式化为带颜色的 HTML 格式
-    
+    将纯文本日志消息格式化为 Markdown 格式（支持彩色文本）
+
     Args:
         log_message: 纯文本日志消息（可以是多行）
-    
+
     Returns:
-        str: 格式化的 HTML 字符串，成功消息显示绿色，错误消息显示红色
+        str: 格式化的 Markdown 字符串，成功消息显示绿色，错误消息显示红色
+             使用内联 HTML <span> 实现颜色（gr.Markdown 支持）
     """
     if not log_message or not log_message.strip():
         return ""
-    
-    # 先检查整个消息是否包含成功或失败的关键词，如果包含，整个消息都使用相同颜色
+
     message_upper = log_message.upper()
     global_color = None
     if any(keyword in message_upper for keyword in ["SUCCESS", "成功", "EPISODE SUCCESS"]):
-        global_color = "#28a745"  # 绿色
+        global_color = "#28a745"
     elif any(keyword in message_upper for keyword in ["FAILED", "失败", "ERROR", "EPISODE FAILED"]):
-        global_color = "#dc3545"  # 红色
-    
-    # 将消息按行分割
+        global_color = "#dc3545"
+
     lines = log_message.split('\n')
     formatted_lines = []
-    
+
     for line in lines:
-        # 检查是否是空行（只包含空白字符）
         if not line.strip():
-            # 保留空行，但使用最小高度的div
-            if global_color:
-                formatted_lines.append(f'<div style="color: {global_color}; margin: 0; padding: 0; line-height: 1.4; height: 0.7em;"></div>')
-            else:
-                formatted_lines.append('<div style="margin: 0; padding: 0; line-height: 1.4; height: 0.7em;"></div>')
+            formatted_lines.append("")
             continue
-        
-        # 保留原始行的空格（不strip），用于正确显示格式化边框
-        original_line = line
-        
-        # 如果整个消息有全局颜色，使用全局颜色；否则按行判断
+
+        escaped_line = line.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
         if global_color:
             color = global_color
         else:
-            # 判断消息类型并设置颜色（使用strip后的行进行判断）
-            line_upper = original_line.strip().upper()
+            line_upper = line.strip().upper()
             if any(keyword in line_upper for keyword in ["SUCCESS", "成功", "EPISODE SUCCESS"]):
-                color = "#28a745"  # 绿色
+                color = "#28a745"
             elif any(keyword in line_upper for keyword in ["FAILED", "失败", "ERROR", "EPISODE FAILED"]):
-                color = "#dc3545"  # 红色
+                color = "#dc3545"
             else:
-                color = "inherit"  # 默认颜色
-        
-        # 转义 HTML 特殊字符（保留空格）
-        escaped_line = original_line.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-        
-        # 创建带颜色的 div，设置 white-space: pre 保留空格，margin 和 padding 为 0 确保无间距
-        formatted_lines.append(f'<div style="color: {color}; margin: 0; padding: 0; line-height: 1.4; white-space: pre;">{escaped_line}</div>')
-    
-    # 包装在容器中，保持紧凑布局
-    # 使用 white-space: normal 让div正常换行，但每个div内部使用 white-space: pre 保留空格
-    # 注意：不设置 font-size，使用 CSS 中定义的字体大小（.compact-log 和 #log_output）
-    html_content = ''.join(formatted_lines)
-    result = f'<div style="font-family: monospace; line-height: 1.4;">{html_content}</div>'
-    
-    return result
+                color = None
+
+        if color:
+            formatted_lines.append(f'<span style="color:{color}">{escaped_line}</span>')
+        else:
+            formatted_lines.append(escaped_line)
+
+    return "<br>".join(formatted_lines)
 
 
 def show_task_hint(uid, current_hint=""):
@@ -214,34 +214,12 @@ def show_loading_info():
     1. 用户点击按钮（如 Login、Next Task 等）
     2. 按钮的 click 事件首先调用此函数，显示遮罩层
     3. 然后通过 .then() 链式调用实际的加载函数（如 login_and_load_task）
-    4. 加载函数执行完成后，返回空字符串给 loading_overlay，遮罩层消失
-    
+    4. 加载函数执行完成后，返回 gr.update(visible=False) 隐藏遮罩层
+
     Returns:
-        str: 包含全屏遮罩层 HTML 的字符串
-            - 返回 HTML 字符串时：显示遮罩层
-            - 返回空字符串 "" 时：隐藏遮罩层（由回调函数在加载完成后返回）
-    
-    样式说明：
-    - 使用 .loading-overlay 类作为全屏遮罩层容器
-    - 使用 .loading-content 类作为中央的白色提示卡片
-    - 显示英文提示信息："Loading environment, please wait..."
+        gr.update: 显示 loading overlay group
     """
-    # 构建全屏遮罩层的 HTML 结构
-    # 外层 div 使用 .loading-overlay 类，实现全屏半透明遮罩效果
-    # 内层 div 使用 .loading-content 类，显示中央的白色提示卡片
-    overlay_html = '''
-    <div class="loading-overlay">
-        <div class="loading-content">
-            <!-- 加载图标：使用时钟表情符号 ⏳ 作为视觉提示，完全不透明 -->
-            <div style="font-size: 40px; margin-bottom: 15px; opacity: 1;">⏳</div>
-            <!-- 加载提示文本：英文提示，完全不透明，使用深色确保清晰可见 -->
-            <div style="font-size: 18px; color: #000000; opacity: 1;">
-                Loading environment, please wait...
-            </div>
-        </div>
-    </div>
-    '''
-    return overlay_html
+    return gr.update(visible=True)
 
 
 def on_video_end(uid):
@@ -249,20 +227,12 @@ def on_video_end(uid):
     Called when the demonstration video finishes playing.
     Updates the system log to prompt for action selection.
     """
-    return format_log_html("please select the action below 👇🏻,\nsome actions also need to select keypoint")
+    return format_log_markdown("please select the action below 👇🏻,\nsome actions also need to select keypoint")
 
 
 def switch_to_livestream_phase(uid):
     """Switch display to livestream phase and keep control panel as read-only."""
-    if uid:
-        random_id = int(time.time() * 1000)
-        stream_html = (
-            f'<div id="combined_view_html"><img src="/video_feed/{uid}?r={random_id}" '
-            f'style="max-width: 100%; width: 100%; height: auto; margin: 0 auto; display: block; border-radius: 8px; object-fit: contain;" '
-            'alt="Desk View | Robot View" /></div>'
-        )
-    else:
-        stream_html = "<div id='combined_view_html'><p>Waiting for video stream...</p></div>"
+    stream_html = _mjpeg_stream_html(uid) if uid else MJPEG_WAITING_HTML
     return (
         gr.update(visible=True),   # livestream_phase_group
         gr.update(visible=False),  # action_phase_group
@@ -276,14 +246,13 @@ def switch_to_livestream_phase(uid):
 def switch_to_action_phase():
     """Switch display to action phase and restore control panel interactions."""
     # 强制移除 <img>，让浏览器主动关闭旧的 /video_feed 长连接
-    paused_stream_html = "<div id='combined_view_html'><p>Stream paused.</p></div>"
     return (
         gr.update(visible=False),  # livestream_phase_group
         gr.update(visible=True),   # action_phase_group
         gr.update(interactive=True),  # options_radio
         gr.update(),  # exec_btn (keep execute_step result)
         gr.update(),  # next_task_btn (keep execute_step result)
-        gr.update(value=paused_stream_html),  # combined_display
+        gr.update(value=MJPEG_PAUSED_HTML),  # combined_display
     )
 
 
@@ -345,7 +314,7 @@ def on_video_end_transition(uid):
         gr.update(visible=False),  # video_phase_group
         gr.update(visible=True),   # action_phase_group
         gr.update(visible=True),   # control_panel_group
-        format_log_html("please select the action below 👇🏻,\nsome actions also need to select keypoint")
+        format_log_markdown("please select the action below 👇🏻,\nsome actions also need to select keypoint")
     )
 
 
@@ -371,10 +340,10 @@ def login_and_load_task(username, uid):
             gr.update(visible=True), # login_group
             gr.update(visible=False), # main_interface
             msg, # login_message
-            gr.update(value=None, interactive=False), format_log_html(""), # img, log_output
+            gr.update(value=None, interactive=False), format_log_markdown(""), # img, log_output
             gr.update(choices=[], value=None), # options
             "", "No need for coordinates", # goal, coords
-            gr.update(value="<div id='combined_view_html'><p>Waiting...</p></div>"),  # combined_display
+            gr.update(value=MJPEG_WAITING_HTML),  # combined_display
             gr.update(value=None, visible=False),  # video_display
             "", "",  # task_info, progress_info
             gr.update(interactive=True), # login_btn
@@ -388,7 +357,7 @@ def login_and_load_task(username, uid):
             gr.update(value=""),  # task_hint_display
             gr.update(visible=False),  # tutorial_video_group
             gr.update(value=None, visible=False),  # tutorial_video_display
-            ""  # loading_overlay
+            gr.update(visible=False)  # loading_overlay
         )
     
     # Login success - Load current task
@@ -396,16 +365,14 @@ def login_and_load_task(username, uid):
         set_task_index(uid, status['total_tasks'] - 1, status['total_tasks'])
         task_info = get_task_index(uid)
         total = task_info["total_tasks"]
-        import random
-        random_id = random.randint(0, 1000000)
-        combined_html = f'<div id="combined_view_html"><img src="/video_feed/{uid}?r={random_id}" style="max-width: 100%; width: 100%; height: auto; margin: 0 auto; display: block; border-radius: 8px; object-fit: contain;" alt="Desk View | Robot View" /></div>'
+        combined_html = _mjpeg_stream_html(uid)
         set_ui_phase(uid, "executing_task")
         return (
             uid,
             gr.update(visible=False), # login_group
             gr.update(visible=True), # main_interface
             f"Welcome {username}. You have completed all tasks!",
-            gr.update(value=None, interactive=False), format_log_html("All tasks completed! Thank you."),
+            gr.update(value=None, interactive=False), format_log_markdown("All tasks completed! Thank you."),
             gr.update(choices=[], value=None),
             "All tasks completed.", "No need for coordinates",
             gr.update(value=combined_html),  # combined_display
@@ -422,7 +389,7 @@ def login_and_load_task(username, uid):
             gr.update(value=""),  # task_hint_display
             gr.update(visible=False),  # tutorial_video_group
             gr.update(value=None, visible=False),  # tutorial_video_display
-            ""  # loading_overlay
+            gr.update(visible=False)  # loading_overlay
         )
         
     current_task = status["current_task"]
@@ -481,9 +448,7 @@ def login_and_load_task(username, uid):
         task_idx = task_info["task_index"]
         total = task_info["total_tasks"]
         # 生成 HTML 内容，包含 MJPEG 流
-        import random
-        random_id = random.randint(0, 1000000)
-        combined_html = f'<div id="combined_view_html"><img src="/video_feed/{uid}?r={random_id}" style="max-width: 100%; width: 100%; height: auto; margin: 0 auto; display: block; border-radius: 8px; object-fit: contain;" alt="Desk View | Robot View" /></div>'
+        combined_html = _mjpeg_stream_html(uid)
         # 加载失败，直接进入执行阶段
         set_ui_phase(uid, "executing_task")
         
@@ -495,7 +460,7 @@ def login_and_load_task(username, uid):
             gr.update(visible=False), # login_group
             gr.update(visible=True),  # main_interface
             f"Error loading task for {username}",
-            gr.update(value=None, interactive=False), format_log_html(f"Error: {load_msg}"),
+            gr.update(value=None, interactive=False), format_log_markdown(f"Error: {load_msg}"),
             gr.update(choices=[], value=None),
             "", "No need for coordinates",
             gr.update(value=combined_html),  # combined_display
@@ -512,7 +477,7 @@ def login_and_load_task(username, uid):
             gr.update(value=get_task_hint(env_id) if env_id else ""),  # task_hint_display
             tutorial_video_group_update,
             tutorial_video_update,
-            ""  # loading_overlay
+            gr.update(visible=False)  # loading_overlay
         )
         
     # Success loading
@@ -550,11 +515,11 @@ def login_and_load_task(username, uid):
     should_show = should_show_demo_video(actual_env_id) if actual_env_id else False
     
     # Set initial log message based on whether video is shown
-    initial_log_msg = format_log_html("please select the action below 👇🏻,\nsome actions also need to select keypoint")
+    initial_log_msg = format_log_markdown("please select the action below 👇🏻,\nsome actions also need to select keypoint")
     
     if should_show:
         has_demo_video = True  # 环境在列表中，标记为需要显示视频
-        initial_log_msg = format_log_html('press "Watch Video Input🎬" to watch a video\nNote: you can only watch the video once') # Show Watch Video prompt
+        initial_log_msg = format_log_markdown('press "Watch Video Input🎬" to watch a video\nNote: you can only watch the video once') # Show Watch Video prompt
         # 尝试生成视频（即使没有 demonstration_frames 也尝试）
         if session.demonstration_frames:
             try:
@@ -588,11 +553,8 @@ def login_and_load_task(username, uid):
     img = session.get_pil_image(use_segmented=USE_SEGMENTED_VIEW)
     
     # 生成 HTML 内容，包含 MJPEG 流
-    # 使用随机参数强制浏览器重新建立连接，避免缓存旧流导致显示问题
-    import random
-    random_id = random.randint(0, 1000000)
-    combined_html = f'<div id="combined_view_html"><img src="/video_feed/{uid}?r={random_id}" style="max-width: 100%; width: 100%; height: auto; margin: 0 auto; display: block; border-radius: 8px; object-fit: contain;" alt="Desk View | Robot View" /></div>'
-    
+    combined_html = _mjpeg_stream_html(uid)
+
     # 根据是否有示范视频决定UI阶段
     if has_demo_video:
         # 有示范视频：同时显示演示视频和执行界面
@@ -660,7 +622,7 @@ def login_and_load_task(username, uid):
             gr.update(value=get_task_hint(actual_env_id)),  # task_hint_display
             tutorial_video_group_update,
             tutorial_video_update,
-            ""  # loading_overlay
+            gr.update(visible=False)  # loading_overlay
         )
     else:
         # 环境不在 DEMO_VIDEO_ENV_IDS 中：直接进入执行阶段
@@ -734,7 +696,7 @@ def login_and_load_task(username, uid):
             gr.update(value=get_task_hint(actual_env_id)),  # task_hint_display
             tutorial_video_group_update,  # tutorial_video_group
             tutorial_video_update,  # tutorial_video_display
-            ""  # loading_overlay
+            gr.update(visible=False)  # loading_overlay
         )
 
 
@@ -940,7 +902,7 @@ def on_reference_action(uid, username):
             gr.update(),
             "No need for coordinates",
             gr.update(visible=False),
-            format_log_html("Session Error"),
+            format_log_markdown("Session Error"),
         )
 
     current_img = session.get_pil_image(use_segmented=USE_SEGMENTED_VIEW)
@@ -953,7 +915,7 @@ def on_reference_action(uid, username):
             gr.update(),
             gr.update(),
             gr.update(),
-            format_log_html(f"Ground Truth Action Error: {exc}"),
+            format_log_markdown(f"Ground Truth Action Error: {exc}"),
         )
 
     if not isinstance(reference, dict) or not reference.get("ok", False):
@@ -965,7 +927,7 @@ def on_reference_action(uid, username):
             gr.update(),
             gr.update(),
             gr.update(),
-            format_log_html(f"Ground Truth Action: {message}"),
+            format_log_markdown(f"Ground Truth Action: {message}"),
         )
 
     option_idx = reference.get("option_idx")
@@ -992,7 +954,7 @@ def on_reference_action(uid, username):
         gr.update(value=option_idx),
         coords_text,
         coords_group_update,
-        format_log_html(log_text),
+        format_log_markdown(log_text),
     )
 
 
@@ -1031,11 +993,11 @@ def init_app(request: gr.Request):
         gr.update(visible=False),  # main_interface
         "",  # login_msg
         gr.update(value=None, interactive=False),  # img_display
-        format_log_html(""),  # log_output
+        format_log_markdown(""),  # log_output
         gr.update(choices=[], value=None),  # options_radio
         "",  # goal_box
         "No need for coordinates",  # coords_box
-        gr.update(value="<div id='combined_view_html'><p>等待登录...</p></div>"),  # combined_display
+        gr.update(value=MJPEG_WAITING_HTML),  # combined_display
         gr.update(value=None, visible=False),  # video_display
         "",  # task_info_box
         "",  # progress_info_box
@@ -1115,11 +1077,11 @@ def init_app(request: gr.Request):
                 gr.update(visible=False),  # main_interface
                 error_msg,  # login_msg
                 gr.update(value=None, interactive=False),  # img_display
-                format_log_html(""),  # log_output
+                format_log_markdown(""),  # log_output
                 gr.update(choices=[], value=None),  # options_radio
                 "",  # goal_box
                 "No need for coordinates",  # coords_box
-                gr.update(value="<div id='combined_view_html'><p>等待登录...</p></div>"),  # combined_display
+                gr.update(value=MJPEG_WAITING_HTML),  # combined_display
                 gr.update(value=None, visible=False),  # video_display
                 "",  # task_info_box
                 "",  # progress_info_box
@@ -1163,7 +1125,7 @@ def execute_step(uid, username, option_idx, coords_str):
     
     session = get_session(uid)
     if not session:
-        return None, format_log_html("Session Error"), gr.update(), gr.update(), gr.update(interactive=False), gr.update(interactive=False), gr.update(visible=False)
+        return None, format_log_markdown("Session Error"), gr.update(), gr.update(), gr.update(interactive=False), gr.update(interactive=False), gr.update(visible=False)
     
     # 检查 execute 次数限制（在执行前检查，如果达到限制则模拟失败状态）
     execute_limit_reached = False
@@ -1256,7 +1218,7 @@ def execute_step(uid, username, option_idx, coords_str):
                         break
     
     if option_idx is None:
-        return session.get_pil_image(use_segmented=USE_SEGMENTED_VIEW), format_log_html("Error: No action selected"), gr.update(), gr.update(), gr.update(interactive=False), gr.update(interactive=True), gr.update(visible=False)
+        return session.get_pil_image(use_segmented=USE_SEGMENTED_VIEW), format_log_markdown("Error: No action selected"), gr.update(), gr.update(), gr.update(interactive=False), gr.update(interactive=True), gr.update(visible=False)
 
     # 检查当前选项是否需要坐标
     needs_coords = False
@@ -1284,7 +1246,7 @@ def execute_step(uid, username, option_idx, coords_str):
         if not is_valid_coords:
             current_img = session.get_pil_image(use_segmented=USE_SEGMENTED_VIEW)
             error_msg = "please click the keypoint selection image before execute!"
-            return current_img, format_log_html(error_msg), gr.update(), gr.update(), gr.update(interactive=False), gr.update(interactive=True), gr.update(visible=True)
+            return current_img, format_log_markdown(error_msg), gr.update(), gr.update(), gr.update(interactive=False), gr.update(interactive=True), gr.update(visible=True)
 
     # Parse coords
     click_coords = None
@@ -1516,6 +1478,6 @@ def execute_step(uid, username, option_idx, coords_str):
     coords_group_update = gr.update(visible=False)
     
     # 格式化日志消息为 HTML 格式（支持颜色显示）
-    formatted_status = format_log_html(status)
+    formatted_status = format_log_markdown(status)
     
     return img, formatted_status, task_update, progress_update, next_task_update, exec_btn_update, coords_group_update
