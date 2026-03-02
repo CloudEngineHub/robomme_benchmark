@@ -586,7 +586,7 @@ def create_ui_blocks():
         # --- Action Selection Change ---
         options_radio.change(
             fn=on_option_select,
-            inputs=[uid_state, username_state, options_radio],
+            inputs=[uid_state, username_state, options_radio, coords_box],
             outputs=[coords_box, img_display, coords_group]
         )
 

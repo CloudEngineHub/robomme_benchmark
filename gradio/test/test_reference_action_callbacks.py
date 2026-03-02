@@ -15,6 +15,12 @@ class _FakeSession:
         return Image.new("RGB", (24, 24), color=(0, 0, 0))
 
 
+class _FakeOptionSession:
+    def __init__(self):
+        self.raw_solve_options = [{"available": [object()]}]
+        self.available_options = [("pick", 0)]
+
+
 def test_on_reference_action_success_updates_option_and_coords(monkeypatch, reload_module):
     callbacks = reload_module("gradio_callbacks")
 
@@ -75,3 +81,21 @@ def test_on_reference_action_lease_lost_raises(monkeypatch, reload_module):
         callbacks.on_reference_action("uid-lease", "user1")
 
     assert "logged in elsewhere" in str(excinfo.value)
+
+
+def test_on_option_select_keeps_valid_coords_when_option_needs_coords(monkeypatch, reload_module):
+    callbacks = reload_module("gradio_callbacks")
+
+    session = _FakeOptionSession()
+    monkeypatch.setattr(callbacks.user_manager, "assert_lease", lambda username, uid: None)
+    monkeypatch.setattr(callbacks, "update_session_activity", lambda uid: None)
+    monkeypatch.setattr(callbacks, "get_session", lambda uid: session)
+    monkeypatch.setattr(callbacks, "add_option_select", lambda uid, payload: None)
+
+    coords_text, img_update, coords_group_update = callbacks.on_option_select(
+        "uid-1", "user1", 0, "12, 34"
+    )
+
+    assert coords_text == "12, 34"
+    assert img_update.get("interactive") is True
+    assert coords_group_update.get("visible") is True

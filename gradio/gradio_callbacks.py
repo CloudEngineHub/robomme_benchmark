@@ -838,7 +838,24 @@ def on_map_click(uid, username, option_value, evt: gr.SelectData):
     return marked_img, coords_str
 
 
-def on_option_select(uid, username, option_value):
+def _is_valid_coords_text(coords_text: str) -> bool:
+    if not isinstance(coords_text, str):
+        return False
+    text = coords_text.strip()
+    if text in {"", "please click the keypoint selection image", "No need for coordinates"}:
+        return False
+    if "," not in text:
+        return False
+    try:
+        x_raw, y_raw = text.split(",", 1)
+        int(x_raw.strip())
+        int(y_raw.strip())
+    except Exception:
+        return False
+    return True
+
+
+def on_option_select(uid, username, option_value, coords_str=None):
     """
     处理选项选择事件，记录用户选择了哪个选项
     """
@@ -886,6 +903,8 @@ def on_option_select(uid, username, option_value):
     if 0 <= option_idx < len(session.raw_solve_options):
         opt = session.raw_solve_options[option_idx]
         if opt.get("available"):
+             if _is_valid_coords_text(coords_str):
+                 return coords_str, gr.update(interactive=True), gr.update(visible=True)
              return "please click the keypoint selection image", gr.update(interactive=True), gr.update(visible=True)
     
     return default_msg, gr.update(interactive=False), gr.update(visible=False)
