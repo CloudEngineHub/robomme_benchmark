@@ -350,6 +350,17 @@ h1, h2, h3, h4, h5, h6, .gr-button, .gr-textbox, .gr-dropdown, .gr-radio {{
 /* 按钮禁用状态 */
 #next_task_btn:disabled, #next_task_btn[disabled] {{ opacity: 0.5 !important; }}
 
+/* Reference Action 按钮改为绿色 */
+#reference_action_btn {{
+    background-color: #22c55e !important;  /* 绿色背景 */
+    border-color: #16a34a !important;
+    color: #ffffff !important;
+}}
+#reference_action_btn:hover {{
+    background-color: #16a34a !important;
+    border-color: #15803d !important;
+}}
+
 /* Loading Overlay */
 .loading-overlay {{
     position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
