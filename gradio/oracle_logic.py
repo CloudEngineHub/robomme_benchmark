@@ -191,22 +191,21 @@ def _iter_env_chain(env, max_depth=16):
         yield current
         current = getattr(current, "env", None)
 
-def _extract_obs_frame_lists(env):
+def _extract_obs_front_frames(env):
     """
-    Prefer latest wrapper-produced obs batch (front_rgb_list/wrist_rgb_list).
-    Returns (front_list, wrist_list, obs_ref_id) or (None, None, None) if unavailable.
+    Strict path: only use wrapper-produced obs batch front_rgb_list.
+    Returns (front_list, obs_ref_id) or (None, None) if unavailable.
     """
     for wrapped in _iter_env_chain(env):
         for attr_name in ("_last_obs", "last_obs"):
             obs_candidate = getattr(wrapped, attr_name, None)
             if not isinstance(obs_candidate, dict):
                 continue
-            if ("front_rgb_list" not in obs_candidate) and ("wrist_rgb_list" not in obs_candidate):
+            if "front_rgb_list" not in obs_candidate:
                 continue
             front_list = _to_frame_list(obs_candidate.get("front_rgb_list"))
-            wrist_list = _to_frame_list(obs_candidate.get("wrist_rgb_list"))
-            return front_list, wrist_list, id(obs_candidate)
-    return None, None, None
+            return front_list, id(obs_candidate)
+    return None, None
 
 def _extract_demonstration_payload(demonstration_data):
     """
@@ -310,7 +309,6 @@ class OracleSession:
         # Track latest obs-batch object and consumed indices to avoid duplicate appends.
         self._last_obs_ref_id = None
         self._last_obs_front_consumed = 0
-        self._last_obs_wrist_consumed = 0
 
     def _resolve_metadata_override_root(self):
         if self.dataset_root:
@@ -392,7 +390,6 @@ class OracleSession:
             self.wrist_frames = []
             self._last_obs_ref_id = None
             self._last_obs_front_consumed = 0
-            self._last_obs_wrist_consumed = 0
             
             # Initial Observation
             return self.update_observation()
@@ -407,34 +404,22 @@ class OracleSession:
         if not self.env:
             return None, "Environment not initialized"
 
-        # 1. Capture Frames (new path: obs_batch front/wrist lists; legacy fallback: env.frames)
-        front_frames, wrist_frames, obs_ref_id = _extract_obs_frame_lists(self.env)
-        if front_frames is not None or wrist_frames is not None:
+        # 1. Capture Frames (strict path: only front_rgb_list from wrapper obs batch)
+        front_frames, obs_ref_id = _extract_obs_front_frames(self.env)
+        self.wrist_frames = []
+        if front_frames is not None:
             front_frames = front_frames or []
-            wrist_frames = wrist_frames or []
             if obs_ref_id != self._last_obs_ref_id:
                 self._last_obs_ref_id = obs_ref_id
                 self._last_obs_front_consumed = 0
-                self._last_obs_wrist_consumed = 0
             new_front = front_frames[self._last_obs_front_consumed:]
-            new_wrist = wrist_frames[self._last_obs_wrist_consumed:]
             self._last_obs_front_consumed = len(front_frames)
-            self._last_obs_wrist_consumed = len(wrist_frames)
             if new_front:
                 self.base_frames.extend(_prepare_frame(frame) for frame in new_front if frame is not None)
-            if new_wrist:
-                self.wrist_frames.extend(_prepare_frame(frame) for frame in new_wrist if frame is not None)
         else:
-            self.base_frames = [
-                _prepare_frame(frame)
-                for frame in (getattr(self.env, "frames", []) or [])
-                if frame is not None
-            ]
-            self.wrist_frames = [
-                _prepare_frame(frame)
-                for frame in (getattr(self.env, "wrist_frames", []) or [])
-                if frame is not None
-            ]
+            self.base_frames = []
+            self._last_obs_ref_id = None
+            self._last_obs_front_consumed = 0
 
         seg_data = _fetch_segmentation(self.env)
         
@@ -474,15 +459,6 @@ class OracleSession:
              else:
                  self.seg_vis = np.zeros((seg_hw[0], seg_hw[1], 3), dtype=np.uint8)
 
-        # 某些环境在 reset/update 后可能暂时拿不到 RGB 列表。
-        # 为了让 Keypoint Selection 和 LiveStream 在首帧就可见，回退使用 seg_vis 生成一帧 RGB。
-        if (not self.base_frames) and (self.seg_vis is not None):
-            try:
-                fallback_rgb = cv2.cvtColor(self.seg_vis, cv2.COLOR_BGR2RGB)
-                self.base_frames = [fallback_rgb]
-            except Exception:
-                self.base_frames = []
-
         # 4. Generate Options
         dummy_target = {"obj": None, "name": None, "seg_id": None, "click_point": None, "centroid_point": None}
         self.raw_solve_options = _build_solve_options(self.env, self.planner, dummy_target, self.env_id)
@@ -517,10 +493,6 @@ class OracleSession:
         else:
             # 返回原图
             if not self.base_frames or len(self.base_frames) == 0:
-                # 回退：没有原始帧时，使用分割视图（转换为 RGB）避免空白图。
-                if self.seg_vis is not None:
-                    rgb = cv2.cvtColor(self.seg_vis, cv2.COLOR_BGR2RGB)
-                    return Image.fromarray(rgb)
                 return Image.new('RGB', (255, 255), color='gray')
             # 获取最后一帧
             frame = self.base_frames[-1]

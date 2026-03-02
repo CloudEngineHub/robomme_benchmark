@@ -58,7 +58,7 @@ def test_available_options_use_label_plus_action(monkeypatch, reload_module):
     assert session.raw_solve_options[0]["label"] == "a"
 
 
-def test_update_observation_uses_seg_vis_as_base_fallback(monkeypatch, reload_module):
+def test_update_observation_no_seg_vis_base_fallback(monkeypatch, reload_module):
     oracle_logic = reload_module("oracle_logic")
 
     seg_vis = np.zeros((6, 6, 3), dtype=np.uint8)
@@ -95,15 +95,13 @@ def test_update_observation_uses_seg_vis_as_base_fallback(monkeypatch, reload_mo
     _img, msg = session.update_observation(use_segmentation=False)
 
     assert msg == "Ready"
-    assert len(session.base_frames) == 1
-    # seg_vis 是 BGR(10,20,30)，fallback base_frame 应转为 RGB(30,20,10)
-    assert session.base_frames[0][0, 0].tolist() == [30, 20, 10]
+    assert len(session.base_frames) == 0
 
     pil_img = session.get_pil_image(use_segmented=False)
-    assert pil_img.size == (6, 6)
+    assert pil_img.size == (255, 255)
 
 
-def test_update_observation_prefers_front_and_wrist_lists(monkeypatch, reload_module):
+def test_update_observation_uses_only_front_rgb_list(monkeypatch, reload_module):
     oracle_logic = reload_module("oracle_logic")
 
     monkeypatch.setattr(
@@ -119,10 +117,9 @@ def test_update_observation_prefers_front_and_wrist_lists(monkeypatch, reload_mo
 
     f1 = np.full((8, 8, 3), 11, dtype=np.uint8)
     f2 = np.full((8, 8, 3), 22, dtype=np.uint8)
-    w1 = np.full((8, 8, 3), 33, dtype=np.uint8)
 
     session = oracle_logic.OracleSession(dataset_root=None, gui_render=False)
-    session.env = _FakeObsWrapperEnv(front_rgb_list=[f1, f2], wrist_rgb_list=[w1])
+    session.env = _FakeObsWrapperEnv(front_rgb_list=[f1, f2], wrist_rgb_list=[])
     session.planner = object()
     session.env_id = "BinFill"
     session.color_map = {}
@@ -131,9 +128,8 @@ def test_update_observation_prefers_front_and_wrist_lists(monkeypatch, reload_mo
 
     assert msg == "Ready"
     assert len(session.base_frames) == 2
-    assert len(session.wrist_frames) == 1
+    assert len(session.wrist_frames) == 0
     assert session.base_frames[-1][0, 0, 0] == 22
-    assert session.wrist_frames[-1][0, 0, 0] == 33
 
 
 def test_update_observation_does_not_duplicate_same_last_obs(monkeypatch, reload_module):
@@ -169,3 +165,32 @@ def test_update_observation_does_not_duplicate_same_last_obs(monkeypatch, reload
     session.update_observation(use_segmentation=False)
     assert len(session.base_frames) == 3
     assert session.base_frames[-1][0, 0, 0] == 30
+
+
+def test_update_observation_does_not_fallback_to_env_frames(monkeypatch, reload_module):
+    oracle_logic = reload_module("oracle_logic")
+
+    monkeypatch.setattr(
+        oracle_logic,
+        "_fetch_segmentation",
+        lambda env: np.zeros((1, 8, 8), dtype=np.int64),
+    )
+    monkeypatch.setattr(
+        oracle_logic,
+        "_build_solve_options",
+        lambda env, planner, selected_target, env_id: [],
+    )
+
+    env = _FakeEnv()
+    env.frames = [np.full((8, 8, 3), 99, dtype=np.uint8)]
+
+    session = oracle_logic.OracleSession(dataset_root=None, gui_render=False)
+    session.env = env
+    session.planner = object()
+    session.env_id = "BinFill"
+    session.color_map = {}
+
+    _img, msg = session.update_observation(use_segmentation=False)
+
+    assert msg == "Ready"
+    assert session.base_frames == []
