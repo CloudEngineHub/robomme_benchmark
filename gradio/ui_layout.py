@@ -4,6 +4,7 @@ Video → Livestream → Action+Keypoint 顺序显示，同一时间只显示一
 三列布局: System Log | Keypoint/Livestream | Control Panel
 """
 import ast
+import html
 import gradio as gr
 from user_manager import user_manager
 from config import (
@@ -296,11 +297,22 @@ h1, h2, h3, h4, h5, h6, .gr-button, .gr-textbox, .gr-dropdown, .gr-radio {{
     border-color: rgba(255, 255, 255, 0.2) !important;
 }}
 
-/* Header task info */
-#header_task_info {{
-    font-size: calc({FONT_SIZE} * 1.1) !important;
-    padding: 4px 0 !important;
+/* Header info (compact stack without blank lines) */
+#header_info {{
+    padding: 2px 0 !important;
     margin: 0 !important;
+    line-height: 1.25 !important;
+}}
+#header_info .header-line {{
+    margin: 0 !important;
+    padding: 0 !important;
+}}
+#header_info .header-title {{
+    font-size: calc({FONT_SIZE} * 1.2) !important;
+    font-weight: 700 !important;
+}}
+#header_info .header-meta, #header_info .header-goal {{
+    font-size: calc({FONT_SIZE} * 1.05) !important;
 }}
 
 /* Livestream image */
@@ -387,31 +399,54 @@ h1, h2, h3, h4, h5, h6, .gr-button, .gr-textbox, .gr-dropdown, .gr-radio {{
 }}
 @keyframes spin {{ from {{ transform: rotate(0deg); }} to {{ transform: rotate(360deg); }} }}
 
-/* Operation hint */
-#operation_hint {{
-    text-align: left !important; font-size: {FONT_SIZE} !important;
-    padding: 0 !important; margin: 0 !important;
+/* Task hint markdown compact spacing */
+#task_hint_display, #task_hint_display .prose {{
+    text-align: left !important;
+    font-size: {FONT_SIZE} !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    line-height: 1.25 !important;
+}}
+#task_hint_display .prose p,
+#task_hint_display .prose li {{
+    margin: 0.15em 0 !important;
+    padding: 0 !important;
+}}
+#task_hint_display .prose ol,
+#task_hint_display .prose ul {{
+    margin: 0.15em 0 !important;
+    padding-left: 1.2em !important;
 }}
 """
 
 
 def create_ui_blocks():
     """创建 Gradio Blocks — 三列布局: System Log | Keypoint/Livestream | Control Panel"""
+    def render_header_info(task_text, goal_text):
+        """Render compact header lines with safe HTML escaping."""
+        clean_task = str(task_text or "").strip()
+        if clean_task.lower().startswith("current task:"):
+            clean_task = clean_task.split(":", 1)[1].strip()
+        clean_task = " ".join(clean_task.splitlines()).strip() or "—"
+        first_goal = extract_first_goal(goal_text or "")
+        task_html = html.escape(clean_task)
+        goal_html = html.escape(first_goal) if first_goal else ""
+
+        parts = [
+            "<div class='header-line header-title'>RoboMME Human Evaluation</div>",
+            f"<div class='header-line header-meta'><strong>Current Task:</strong> {task_html}</div>",
+        ]
+        if goal_html:
+            parts.append(f"<div class='header-line header-goal'><strong>Goal:</strong> {goal_html}</div>")
+        return "".join(parts)
+
     with gr.Blocks(title="Oracle Planner Interface") as demo:
         # =================================================================
         # Header: Title + Current Task + First Goal
         # =================================================================
-        gr.Markdown(
-            "## HistoryBench Human Evaluation",
-            elem_id="operation_hint"
-        )
-        current_task_display = gr.Markdown(
-            value="**Current Task:** —",
-            elem_id="header_task_info"
-        )
-        first_goal_display = gr.Markdown(
-            value="",
-            elem_id="header_goal_info"
+        header_info_display = gr.HTML(
+            value=render_header_info("", ""),
+            elem_id="header_info"
         )
 
         # Loading overlay
@@ -536,32 +571,23 @@ def create_ui_blocks():
         # =====================================================================
 
         # --- Sync hidden textboxes → header Markdown ---
-        def sync_task_info(task_text):
-            """Sync task_info_box value to header current_task_display."""
-            if not task_text:
-                return "**Current Task:** —"
-            clean_text = str(task_text).strip()
-            if clean_text.lower().startswith("current task:"):
-                clean_text = clean_text.split(":", 1)[1].strip()
-            clean_text = " ".join(clean_text.splitlines()).strip()
-            return f"**Current Task:** {clean_text or '—'}"
+        def sync_header_from_task(task_text, goal_text):
+            """Sync task updates into compact header."""
+            return render_header_info(task_text, goal_text)
 
-        def sync_goal_info(goal_text):
-            """Sync goal_box value to header first_goal_display."""
-            first = extract_first_goal(goal_text)
-            if not first:
-                return ""
-            return f"**Goal:** {first}"
+        def sync_header_from_goal(goal_text, task_text):
+            """Sync goal updates into compact header."""
+            return render_header_info(task_text, goal_text)
 
         task_info_box.change(
-            fn=sync_task_info,
-            inputs=[task_info_box],
-            outputs=[current_task_display]
+            fn=sync_header_from_task,
+            inputs=[task_info_box, goal_box],
+            outputs=[header_info_display]
         )
         goal_box.change(
-            fn=sync_goal_info,
-            inputs=[goal_box],
-            outputs=[first_goal_display]
+            fn=sync_header_from_goal,
+            inputs=[goal_box, task_info_box],
+            outputs=[header_info_display]
         )
 
         # --- Login ---
