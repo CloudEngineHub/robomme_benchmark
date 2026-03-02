@@ -30,6 +30,7 @@ from state_manager import (
     set_task_start_time,
     update_session_activity,
     get_session_activity,
+    get_frame_queue_info,
     cleanup_session,
     reset_play_button_clicked,
     GLOBAL_SESSIONS,
@@ -305,6 +306,57 @@ def switch_to_livestream_phase():
 def switch_to_action_phase():
     """Switch display to action phase (hide MJPEG, show action UI)."""
     return gr.update(visible=False), gr.update(visible=True)
+
+
+def _wait_for_livestream_drain(uid, max_wait_sec=12.0, warmup_sec=0.8, empty_grace_sec=0.5, poll_sec=0.05):
+    """
+    等待当前 execute 产生的直播帧基本播放完成后再切回 action phase。
+
+    设计目标：
+    1. 避免 execute 刚结束就立刻切回，导致 livestream 没播完。
+    2. 允许短暂帧同步延迟（warmup），防止“队列暂时为空但后续还有帧”。
+    3. 设置最大等待时间，避免异常情况下无限阻塞 UI。
+    """
+    if not uid:
+        return
+
+    start_time = time.time()
+    empty_since = None
+    seen_non_empty = False
+
+    while True:
+        elapsed = time.time() - start_time
+        if elapsed >= max_wait_sec:
+            break
+
+        queue_info = get_frame_queue_info(uid)
+        if not queue_info:
+            break
+
+        frame_queue = queue_info.get("frame_queue")
+        if frame_queue is None:
+            break
+
+        try:
+            queue_size = frame_queue.qsize()
+        except (NotImplementedError, AttributeError):
+            break
+
+        if queue_size > 0:
+            seen_non_empty = True
+            empty_since = None
+        else:
+            # 执行结束后，给帧同步一点缓冲时间，避免误判“已播完”。
+            if (not seen_non_empty) and elapsed < warmup_sec:
+                time.sleep(poll_sec)
+                continue
+
+            if empty_since is None:
+                empty_since = time.time()
+            elif (time.time() - empty_since) >= empty_grace_sec:
+                break
+
+        time.sleep(poll_sec)
 
 
 def on_video_end_transition(uid):
@@ -1408,10 +1460,9 @@ def execute_step(uid, username, option_idx, coords_str):
             new_count = increment_execute_count(username, session.env_id, session.episode_idx)
             print(f"Execute count for {username}:{session.env_id}:{session.episode_idx} = {new_count}")
     
-    # 给后台线程一点时间开始消费新帧。
-    # 注意：不要在这里主动停止 streaming_active，否则在帧同步稍慢时会被提前截断，
-    # 导致 LiveStream 只显示最后一帧。
-    time.sleep(0.3)
+    # 等待 livestream 基本播放完成后再切回 action phase。
+    # 注意：不要在这里主动停止 streaming_active，否则在帧同步稍慢时会被提前截断。
+    _wait_for_livestream_drain(uid)
     
     # 记录执行操作（包含从上次action到这次action之间的所有coordinate_click）
     if username and session.env_id is not None and session.episode_idx is not None:
