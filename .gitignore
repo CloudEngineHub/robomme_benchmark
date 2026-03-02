@@ -209,3 +209,9 @@ __marimo__/
 # Agent
 .agent/
 .cursor/
+ 
+# Local temp demo files
+temp_demos/
+
+# Gradio user action logs
+gradio/data/user_action_logs/
