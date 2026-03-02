@@ -156,6 +156,58 @@ def _ensure_list(value):
         return list(value)
     return []
 
+def _to_frame_list(frames_like):
+    if frames_like is None:
+        return []
+    if isinstance(frames_like, list):
+        return frames_like
+    if isinstance(frames_like, tuple):
+        return list(frames_like)
+    if isinstance(frames_like, torch.Tensor):
+        arr = frames_like.detach().cpu().numpy()
+        if arr.ndim == 3:
+            return [arr]
+        if arr.ndim == 4:
+            return [x for x in arr]
+        return []
+    if isinstance(frames_like, np.ndarray):
+        if frames_like.ndim == 3:
+            return [frames_like]
+        if frames_like.ndim == 4:
+            return [x for x in frames_like]
+        return []
+    return []
+
+def _iter_env_chain(env, max_depth=16):
+    current = env
+    seen = set()
+    for _ in range(max_depth):
+        if current is None:
+            return
+        env_id = id(current)
+        if env_id in seen:
+            return
+        seen.add(env_id)
+        yield current
+        current = getattr(current, "env", None)
+
+def _extract_obs_frame_lists(env):
+    """
+    Prefer latest wrapper-produced obs batch (front_rgb_list/wrist_rgb_list).
+    Returns (front_list, wrist_list, obs_ref_id) or (None, None, None) if unavailable.
+    """
+    for wrapped in _iter_env_chain(env):
+        for attr_name in ("_last_obs", "last_obs"):
+            obs_candidate = getattr(wrapped, attr_name, None)
+            if not isinstance(obs_candidate, dict):
+                continue
+            if ("front_rgb_list" not in obs_candidate) and ("wrist_rgb_list" not in obs_candidate):
+                continue
+            front_list = _to_frame_list(obs_candidate.get("front_rgb_list"))
+            wrist_list = _to_frame_list(obs_candidate.get("wrist_rgb_list"))
+            return front_list, wrist_list, id(obs_candidate)
+    return None, None, None
+
 def _extract_demonstration_payload(demonstration_data):
     """
     Compatible with both legacy dict payloads and current DemonstrationWrapper tuple batch:
@@ -255,6 +307,10 @@ class OracleSession:
         self.last_base_frame_idx = 0
         self.last_wrist_frame_idx = 0
         self.non_demonstration_task_length = None  # 从 DemonstrationWrapper 读取
+        # Track latest obs-batch object and consumed indices to avoid duplicate appends.
+        self._last_obs_ref_id = None
+        self._last_obs_front_consumed = 0
+        self._last_obs_wrist_consumed = 0
 
     def _resolve_metadata_override_root(self):
         if self.dataset_root:
@@ -332,6 +388,11 @@ class OracleSession:
             # Reset frame indices
             self.last_base_frame_idx = 0
             self.last_wrist_frame_idx = 0
+            self.base_frames = []
+            self.wrist_frames = []
+            self._last_obs_ref_id = None
+            self._last_obs_front_consumed = 0
+            self._last_obs_wrist_consumed = 0
             
             # Initial Observation
             return self.update_observation()
@@ -346,9 +407,35 @@ class OracleSession:
         if not self.env:
             return None, "Environment not initialized"
 
-        # 1. Capture Frames
-        self.base_frames = getattr(self.env, "frames", []) or []
-        self.wrist_frames = getattr(self.env, "wrist_frames", []) or []
+        # 1. Capture Frames (new path: obs_batch front/wrist lists; legacy fallback: env.frames)
+        front_frames, wrist_frames, obs_ref_id = _extract_obs_frame_lists(self.env)
+        if front_frames is not None or wrist_frames is not None:
+            front_frames = front_frames or []
+            wrist_frames = wrist_frames or []
+            if obs_ref_id != self._last_obs_ref_id:
+                self._last_obs_ref_id = obs_ref_id
+                self._last_obs_front_consumed = 0
+                self._last_obs_wrist_consumed = 0
+            new_front = front_frames[self._last_obs_front_consumed:]
+            new_wrist = wrist_frames[self._last_obs_wrist_consumed:]
+            self._last_obs_front_consumed = len(front_frames)
+            self._last_obs_wrist_consumed = len(wrist_frames)
+            if new_front:
+                self.base_frames.extend(_prepare_frame(frame) for frame in new_front if frame is not None)
+            if new_wrist:
+                self.wrist_frames.extend(_prepare_frame(frame) for frame in new_wrist if frame is not None)
+        else:
+            self.base_frames = [
+                _prepare_frame(frame)
+                for frame in (getattr(self.env, "frames", []) or [])
+                if frame is not None
+            ]
+            self.wrist_frames = [
+                _prepare_frame(frame)
+                for frame in (getattr(self.env, "wrist_frames", []) or [])
+                if frame is not None
+            ]
+
         seg_data = _fetch_segmentation(self.env)
         
         # 2. Determine Resolution
@@ -387,7 +474,7 @@ class OracleSession:
              else:
                  self.seg_vis = np.zeros((seg_hw[0], seg_hw[1], 3), dtype=np.uint8)
 
-        # 某些环境不会在 reset/update 后立即填充 env.frames。
+        # 某些环境在 reset/update 后可能暂时拿不到 RGB 列表。
         # 为了让 Keypoint Selection 和 LiveStream 在首帧就可见，回退使用 seg_vis 生成一帧 RGB。
         if (not self.base_frames) and (self.seg_vis is not None):
             try:

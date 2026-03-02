@@ -15,6 +15,15 @@ class _FakeEnv:
         self.wrist_frames = []
 
 
+class _FakeObsWrapperEnv:
+    def __init__(self, front_rgb_list, wrist_rgb_list):
+        self.unwrapped = _FakeUnwrapped()
+        self._last_obs = {
+            "front_rgb_list": front_rgb_list,
+            "wrist_rgb_list": wrist_rgb_list,
+        }
+
+
 
 def test_available_options_use_label_plus_action(monkeypatch, reload_module):
     oracle_logic = reload_module("oracle_logic")
@@ -92,3 +101,71 @@ def test_update_observation_uses_seg_vis_as_base_fallback(monkeypatch, reload_mo
 
     pil_img = session.get_pil_image(use_segmented=False)
     assert pil_img.size == (6, 6)
+
+
+def test_update_observation_prefers_front_and_wrist_lists(monkeypatch, reload_module):
+    oracle_logic = reload_module("oracle_logic")
+
+    monkeypatch.setattr(
+        oracle_logic,
+        "_fetch_segmentation",
+        lambda env: np.zeros((1, 8, 8), dtype=np.int64),
+    )
+    monkeypatch.setattr(
+        oracle_logic,
+        "_build_solve_options",
+        lambda env, planner, selected_target, env_id: [],
+    )
+
+    f1 = np.full((8, 8, 3), 11, dtype=np.uint8)
+    f2 = np.full((8, 8, 3), 22, dtype=np.uint8)
+    w1 = np.full((8, 8, 3), 33, dtype=np.uint8)
+
+    session = oracle_logic.OracleSession(dataset_root=None, gui_render=False)
+    session.env = _FakeObsWrapperEnv(front_rgb_list=[f1, f2], wrist_rgb_list=[w1])
+    session.planner = object()
+    session.env_id = "BinFill"
+    session.color_map = {}
+
+    _img, msg = session.update_observation(use_segmentation=False)
+
+    assert msg == "Ready"
+    assert len(session.base_frames) == 2
+    assert len(session.wrist_frames) == 1
+    assert session.base_frames[-1][0, 0, 0] == 22
+    assert session.wrist_frames[-1][0, 0, 0] == 33
+
+
+def test_update_observation_does_not_duplicate_same_last_obs(monkeypatch, reload_module):
+    oracle_logic = reload_module("oracle_logic")
+
+    monkeypatch.setattr(
+        oracle_logic,
+        "_fetch_segmentation",
+        lambda env: np.zeros((1, 8, 8), dtype=np.int64),
+    )
+    monkeypatch.setattr(
+        oracle_logic,
+        "_build_solve_options",
+        lambda env, planner, selected_target, env_id: [],
+    )
+
+    f1 = np.full((8, 8, 3), 10, dtype=np.uint8)
+    f2 = np.full((8, 8, 3), 20, dtype=np.uint8)
+    env = _FakeObsWrapperEnv(front_rgb_list=[f1, f2], wrist_rgb_list=[])
+
+    session = oracle_logic.OracleSession(dataset_root=None, gui_render=False)
+    session.env = env
+    session.planner = object()
+    session.env_id = "BinFill"
+    session.color_map = {}
+
+    session.update_observation(use_segmentation=False)
+    session.update_observation(use_segmentation=False)
+    assert len(session.base_frames) == 2
+
+    f3 = np.full((8, 8, 3), 30, dtype=np.uint8)
+    env._last_obs = {"front_rgb_list": [f3], "wrist_rgb_list": []}
+    session.update_observation(use_segmentation=False)
+    assert len(session.base_frames) == 3
+    assert session.base_frames[-1][0, 0, 0] == 30
