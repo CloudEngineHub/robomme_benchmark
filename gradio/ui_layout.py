@@ -540,7 +540,11 @@ def create_ui_blocks():
             """Sync task_info_box value to header current_task_display."""
             if not task_text:
                 return "**Current Task:** —"
-            return f"**Current Task:** {task_text}"
+            clean_text = str(task_text).strip()
+            if clean_text.lower().startswith("current task:"):
+                clean_text = clean_text.split(":", 1)[1].strip()
+            clean_text = " ".join(clean_text.splitlines()).strip()
+            return f"**Current Task:** {clean_text or '—'}"
 
         def sync_goal_info(goal_text):
             """Sync goal_box value to header first_goal_display."""

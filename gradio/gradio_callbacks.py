@@ -647,7 +647,7 @@ def login_and_load_task(username, uid):
             "No need for coordinates",
             gr.update(value=combined_html),  # combined_display
             gr.update(value=demo_video_path, visible=True),  # video_display (auto-play)
-            f"Current Task: {actual_env_id}\n(Episode {ep_num})",
+            f"{actual_env_id} (Episode {ep_num})",
             f"Progress: {task_idx + 1}/{total}",
             gr.update(interactive=True),   # login_btn
             gr.update(interactive=False),  # next_task_btn
@@ -721,7 +721,7 @@ def login_and_load_task(username, uid):
             "No need for coordinates",  # coords_box
             gr.update(value=combined_html),  # combined_display
             gr.update(value=None, visible=False),  # video_display (no video)
-            f"Current Task: {actual_env_id}\n(Episode {ep_num})",  # task_info_box
+            f"{actual_env_id} (Episode {ep_num})",  # task_info_box
             f"Progress: {task_idx + 1}/{total}",  # progress_info_box
             gr.update(interactive=True),   # login_btn
             gr.update(interactive=False),  # next_task_btn
