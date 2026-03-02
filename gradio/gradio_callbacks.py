@@ -299,13 +299,25 @@ def on_video_end(uid):
 
 
 def switch_to_livestream_phase():
-    """Switch display to livestream phase (show MJPEG, hide action UI)."""
-    return gr.update(visible=True), gr.update(visible=False)
+    """Switch display to livestream phase and keep control panel as read-only."""
+    return (
+        gr.update(visible=True),   # livestream_phase_group
+        gr.update(visible=False),  # action_phase_group
+        gr.update(interactive=False),  # options_radio
+        gr.update(interactive=False),  # exec_btn
+        gr.update(interactive=False),  # next_task_btn
+    )
 
 
 def switch_to_action_phase():
-    """Switch display to action phase (hide MJPEG, show action UI)."""
-    return gr.update(visible=False), gr.update(visible=True)
+    """Switch display to action phase and restore control panel interactions."""
+    return (
+        gr.update(visible=False),  # livestream_phase_group
+        gr.update(visible=True),   # action_phase_group
+        gr.update(interactive=True),  # options_radio
+        gr.update(),  # exec_btn (keep execute_step result)
+        gr.update(),  # next_task_btn (keep execute_step result)
+    )
 
 
 def _wait_for_livestream_drain(uid, max_wait_sec=12.0, warmup_sec=0.8, empty_grace_sec=0.5, poll_sec=0.05):
@@ -364,6 +376,7 @@ def on_video_end_transition(uid):
     return (
         gr.update(visible=False),  # video_phase_group
         gr.update(visible=True),   # action_phase_group
+        gr.update(visible=True),   # control_panel_group
         format_log_html("please select the action below 👇🏻,\nsome actions also need to select keypoint")
     )
 
@@ -402,6 +415,7 @@ def login_and_load_task(username, uid):
             gr.update(visible=False), # video_phase_group
             gr.update(visible=False), # livestream_phase_group
             gr.update(visible=False), # action_phase_group
+            gr.update(visible=False),  # control_panel_group
             gr.update(visible=False),  # coords_group
             gr.update(value=""),  # task_hint_display
             gr.update(visible=False),  # tutorial_video_group
@@ -424,7 +438,7 @@ def login_and_load_task(username, uid):
         total = task_info["total_tasks"]
         import random
         random_id = random.randint(0, 1000000)
-        combined_html = f'<div id="combined_view_html"><img src="/video_feed/{uid}?r={random_id}" style="max-width: 100%; height: 60vh; width: auto; margin: 0 auto; display: block; border-radius: 8px; object-fit: contain;" alt="Desk View | Robot View" /></div>'
+        combined_html = f'<div id="combined_view_html"><img src="/video_feed/{uid}?r={random_id}" style="max-width: 100%; height: {REFERENCE_VIEW_HEIGHT}; width: auto; margin: 0 auto; display: block; border-radius: 8px; object-fit: contain;" alt="Desk View | Robot View" /></div>'
         set_ui_phase(uid, "executing_task")
         return (
             uid,
@@ -443,6 +457,7 @@ def login_and_load_task(username, uid):
             gr.update(visible=False),  # video_phase_group
             gr.update(visible=False),  # livestream_phase_group
             gr.update(visible=True),   # action_phase_group (show message)
+            gr.update(visible=True),   # control_panel_group
             gr.update(visible=False),  # coords_group
             gr.update(value=""),  # task_hint_display
             gr.update(visible=False),  # tutorial_video_group
@@ -523,6 +538,7 @@ def login_and_load_task(username, uid):
                                 gr.update(visible=False),  # video_phase_group
                                 gr.update(visible=False),  # livestream_phase_group
                                 gr.update(visible=True),   # action_phase_group
+                                gr.update(visible=True),   # control_panel_group
                                 gr.update(visible=False),  # coords_group
                                 gr.update(value=""),       # task_hint_display
                                 gr.update(visible=False),  # tutorial_video_group
@@ -629,6 +645,7 @@ def login_and_load_task(username, uid):
             gr.update(visible=False),  # video_phase_group
             gr.update(visible=False),  # livestream_phase_group
             gr.update(visible=True),   # action_phase_group
+            gr.update(visible=True),   # control_panel_group
             gr.update(visible=False),  # coords_group
             gr.update(value=get_task_hint(env_id) if env_id else ""),  # task_hint_display
             tutorial_video_group_update,
@@ -799,6 +816,7 @@ def login_and_load_task(username, uid):
             gr.update(visible=True),   # video_phase_group (show video first)
             gr.update(visible=False),  # livestream_phase_group
             gr.update(visible=False),  # action_phase_group (hidden until video ends)
+            gr.update(visible=False),  # control_panel_group
             gr.update(visible=False),  # coords_group
             gr.update(value=get_task_hint(actual_env_id)),  # task_hint_display
             tutorial_video_group_update,
@@ -885,6 +903,7 @@ def login_and_load_task(username, uid):
             gr.update(visible=False),  # video_phase_group (no video)
             gr.update(visible=False),  # livestream_phase_group
             gr.update(visible=True),   # action_phase_group (show directly)
+            gr.update(visible=True),   # control_panel_group
             gr.update(visible=False),  # coords_group (hidden until option selected)
             gr.update(value=get_task_hint(actual_env_id)),  # task_hint_display
             tutorial_video_group_update,  # tutorial_video_group
@@ -1125,6 +1144,7 @@ def init_app(request: gr.Request):
         gr.update(visible=False),  # video_phase_group
         gr.update(visible=False),  # livestream_phase_group
         gr.update(visible=False),  # action_phase_group
+        gr.update(visible=False),  # control_panel_group
         gr.update(visible=False),  # coords_group
         gr.update(value=""),  # task_hint_display
         gr.update(visible=False),  # tutorial_video_group
@@ -1145,14 +1165,14 @@ def init_app(request: gr.Request):
             # 调用 login_and_load_task 进行登录和任务加载
             login_results = login_and_load_task(username, uid)
             
-            # login_and_load_task returns 24 values:
+            # login_and_load_task returns 25 values:
             # (uid, login_group, main_interface, login_msg, img_display, log_output,
             #  options_radio, goal_box, coords_box, combined_display, video_display,
             #  task_info_box, progress_info_box, login_btn, next_task_btn, exec_btn,
-            #  video_phase_group, livestream_phase_group, action_phase_group,
+            #  video_phase_group, livestream_phase_group, action_phase_group, control_panel_group,
             #  coords_group, task_hint_display, tutorial_video_group, tutorial_video_display, loading_overlay)
 
-            # init_app needs 25 values: same but with loading_group + username_state, without loading_overlay
+            # init_app needs 26 values: same but with loading_group + username_state, without loading_overlay
             return (
                 login_results[0],                    # uid
                 gr.update(visible=False),            # loading_group
@@ -1175,10 +1195,11 @@ def init_app(request: gr.Request):
                 login_results[16],                   # video_phase_group
                 login_results[17],                   # livestream_phase_group
                 login_results[18],                   # action_phase_group
-                login_results[19],                   # coords_group
-                login_results[20],                   # task_hint_display
-                login_results[21],                   # tutorial_video_group
-                login_results[22],                   # tutorial_video_display
+                login_results[19],                   # control_panel_group
+                login_results[20],                   # coords_group
+                login_results[21],                   # task_hint_display
+                login_results[22],                   # tutorial_video_group
+                login_results[23],                   # tutorial_video_display
             )
         else:
             # 用户名不存在，显示错误消息但仍显示登录界面
@@ -1207,6 +1228,7 @@ def init_app(request: gr.Request):
                 gr.update(visible=False),  # video_phase_group
                 gr.update(visible=False),  # livestream_phase_group
                 gr.update(visible=False),  # action_phase_group
+                gr.update(visible=False),  # control_panel_group
                 gr.update(visible=False),  # coords_group
                 gr.update(value=""),  # task_hint_display
                 gr.update(visible=False),  # tutorial_video_group

@@ -293,7 +293,7 @@ h1, h2, h3, h4, h5, h6, .gr-button, .gr-textbox, .gr-dropdown, .gr-radio {{
 #combined_view_html {{ border: none !important; }}
 #combined_view_html img {{
     max-width: 100%;
-    height: 60vh;
+    height: {REFERENCE_VIEW_HEIGHT};
     width: auto;
     margin: 0 auto;
     display: block;
@@ -306,8 +306,21 @@ h1, h2, h3, h4, h5, h6, .gr-button, .gr-textbox, .gr-dropdown, .gr-radio {{
 #demo_video {{ border: none !important; }}
 #demo_video video {{
     border: none !important;
-    max-height: 60vh !important;
+    height: {DEMO_VIDEO_HEIGHT} !important;
+    max-height: {DEMO_VIDEO_HEIGHT} !important;
     width: 100% !important;
+    object-fit: contain;
+}}
+
+/* Keypoint image */
+#live_obs {{ border: none !important; }}
+#live_obs img {{
+    max-width: 100%;
+    height: {REFERENCE_VIEW_HEIGHT} !important;
+    width: auto;
+    margin: 0 auto;
+    display: block;
+    object-fit: contain;
 }}
 
 /* Action radio - 每行一个选项 */
@@ -461,29 +474,28 @@ def create_ui_blocks():
                         )
 
                     # ============================================
-                    # Phase 3: ACTION + KEYPOINT SELECTION
+                    # Phase 3: KEYPOINT SELECTION
                     # ============================================
                     with gr.Group(visible=False) as action_phase_group:
+                        gr.Markdown("### Keypoint Selection")
+                        img_display = gr.Image(
+                            label="Live Observation", interactive=False,
+                            type="pil", elem_id="live_obs", show_label=False
+                        )
+
+                    # ============================================
+                    # Control Panel (visible in action + livestream)
+                    # ============================================
+                    with gr.Group(visible=False) as control_panel_group:
+                        gr.Markdown("### Control Panel")
                         with gr.Row():
-                            # Action Selection
-                            with gr.Column(scale=ACTION_SCALE):
+                            with gr.Column(scale=1):
                                 gr.Markdown("### Action Selection")
                                 options_radio = gr.Radio(
                                     choices=[], label="Action", type="value",
                                     show_label=False, elem_id="action_radio"
                                 )
-
-                            # Keypoint Selection
-                            with gr.Column(scale=LIVE_OBSERVATION_SCALE):
-                                gr.Markdown("### Keypoint Selection")
-                                img_display = gr.Image(
-                                    label="Live Observation", interactive=False,
-                                    type="pil", elem_id="live_obs", show_label=False
-                                )
-
-                            # Control Panel
-                            with gr.Column(scale=CONTROL_SCALE):
-                                gr.Markdown("### Control Panel")
+                            with gr.Column(scale=1):
                                 with gr.Group(visible=False, elem_id="coords_group") as coords_group:
                                     gr.Markdown("**Coords**")
                                     coords_box = gr.Textbox(
@@ -522,7 +534,7 @@ def create_ui_blocks():
                 img_display, log_output, options_radio, goal_box, coords_box,
                 combined_display, video_display,
                 task_info_box, progress_info_box, login_btn, next_task_btn, exec_btn,
-                video_phase_group, livestream_phase_group, action_phase_group,
+                video_phase_group, livestream_phase_group, action_phase_group, control_panel_group,
                 coords_group, task_hint_display,
                 tutorial_video_group, tutorial_video_display,
                 loading_overlay
@@ -545,7 +557,7 @@ def create_ui_blocks():
                 img_display, log_output, options_radio, goal_box, coords_box,
                 combined_display, video_display,
                 task_info_box, progress_info_box, login_btn, next_task_btn, exec_btn,
-                video_phase_group, livestream_phase_group, action_phase_group,
+                video_phase_group, livestream_phase_group, action_phase_group, control_panel_group,
                 coords_group, task_hint_display,
                 tutorial_video_group, tutorial_video_display,
                 loading_overlay
@@ -556,7 +568,7 @@ def create_ui_blocks():
         video_display.end(
             fn=on_video_end_transition,
             inputs=[uid_state],
-            outputs=[video_phase_group, action_phase_group, log_output]
+            outputs=[video_phase_group, action_phase_group, control_panel_group, log_output]
         )
 
         # --- Image Click (keypoint selection) ---
@@ -576,7 +588,7 @@ def create_ui_blocks():
         # --- Execute: switch to livestream → execute → switch back to action ---
         exec_btn.click(
             fn=switch_to_livestream_phase,
-            outputs=[livestream_phase_group, action_phase_group]
+            outputs=[livestream_phase_group, action_phase_group, options_radio, exec_btn, next_task_btn]
         ).then(
             fn=execute_step,
             inputs=[uid_state, username_state, options_radio, coords_box],
@@ -586,7 +598,7 @@ def create_ui_blocks():
             ]
         ).then(
             fn=switch_to_action_phase,
-            outputs=[livestream_phase_group, action_phase_group]
+            outputs=[livestream_phase_group, action_phase_group, options_radio, exec_btn, next_task_btn]
         )
 
         # --- App Load (init) ---
@@ -599,7 +611,7 @@ def create_ui_blocks():
                 combined_display, video_display,
                 task_info_box, progress_info_box, login_btn, next_task_btn, exec_btn,
                 username_state,
-                video_phase_group, livestream_phase_group, action_phase_group,
+                video_phase_group, livestream_phase_group, action_phase_group, control_panel_group,
                 coords_group, task_hint_display,
                 tutorial_video_group, tutorial_video_display
             ]
