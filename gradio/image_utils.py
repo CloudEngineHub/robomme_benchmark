@@ -12,6 +12,11 @@ from PIL import Image, ImageDraw, ImageFont
 import cv2
 from config import VIDEO_PLAYBACK_FPS
 
+# DEPRECATED: 历史任务特化图像叠加配置，保留仅为兼容旧代码路径。
+# 当前已统一关闭任务特化渲染。
+DEPRECATED_COORDINATE_AXES_ENVS = ["PatternLock", "RouteStick", "InsertPeg", "SwingXtimes"]
+ENABLE_DEPRECATED_COORDINATE_AXES_OVERLAY = False
+
 
 def _video_output_dirs():
     """视频输出目录候选（按优先级）。"""
@@ -154,9 +159,12 @@ def concatenate_frames_horizontally(frames1, frames2=None, env_id=None):
     Returns:
         处理后的帧列表
     """
-    # 需要显示坐标系的任务列表
-    COORDINATE_AXES_ENVS = ["PatternLock", "RouteStick", "InsertPeg", "SwingXtimes"]
-    show_coordinate_axes = env_id in COORDINATE_AXES_ENVS if env_id else False
+    # DEPRECATED: 任务特化图像叠加（坐标系/RouteStick示意图）已关闭。
+    # 保留机制与绘图函数，便于后续按需恢复。
+    show_coordinate_axes = (
+        ENABLE_DEPRECATED_COORDINATE_AXES_OVERLAY
+        and (env_id in DEPRECATED_COORDINATE_AXES_ENVS if env_id else False)
+    )
     if not frames1:
         return []
     
@@ -228,6 +236,8 @@ def concatenate_frames_horizontally(frames1, frames2=None, env_id=None):
 
 def draw_semicircle(draw, center, radius, color, width=2, half="lower", start_pos="left", end_pos="right", arrow_position="end", arrow_size=6):
     """
+    DEPRECATED: 仅供旧版 RouteStick 旋转示意图绘制使用（当前默认不再调用）。
+
     绘制半圆封装函数
     
     Args:
@@ -320,6 +330,8 @@ def draw_semicircle(draw, center, radius, color, width=2, half="lower", start_po
 
 def draw_coordinate_axes(img, position="right", rotate_180=False, env_id=None):
     """
+    DEPRECATED: 历史任务特化图像叠加函数（当前默认不再调用）。
+
     在图片外的黑色区域绘制坐标系，标注 forward/backward/left/right
     
     Args:
