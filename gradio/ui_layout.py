@@ -612,17 +612,20 @@ def create_ui_blocks():
         exec_btn.click(
             fn=switch_to_livestream_phase,
             inputs=[uid_state],
-            outputs=[livestream_phase_group, action_phase_group, options_radio, exec_btn, next_task_btn, combined_display]
+            outputs=[livestream_phase_group, action_phase_group, options_radio, exec_btn, next_task_btn, combined_display],
+            show_progress="hidden"
         ).then(
             fn=execute_step,
             inputs=[uid_state, username_state, options_radio, coords_box],
             outputs=[
                 img_display, log_output, task_info_box, progress_info_box,
                 next_task_btn, exec_btn, coords_group
-            ]
+            ],
+            show_progress="hidden"
         ).then(
             fn=switch_to_action_phase,
-            outputs=[livestream_phase_group, action_phase_group, options_radio, exec_btn, next_task_btn, combined_display]
+            outputs=[livestream_phase_group, action_phase_group, options_radio, exec_btn, next_task_btn, combined_display],
+            show_progress="hidden"
         )
 
         # --- App Load (init) ---
