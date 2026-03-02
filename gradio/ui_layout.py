@@ -1,7 +1,9 @@
 """
 UI布局模块 - 顺序执行界面
 Video → Livestream → Action+Keypoint 顺序显示，同一时间只显示一个
+三列布局: System Log | Keypoint/Livestream | Control Panel
 """
+import ast
 import gradio as gr
 from user_manager import user_manager
 from config import (
@@ -24,6 +26,21 @@ from gradio_callbacks import (
     switch_to_action_phase,
     on_video_end_transition,
 )
+
+
+def extract_first_goal(goal_text):
+    """Extract first goal from goal text that may be a list representation."""
+    if not goal_text:
+        return ""
+    text = goal_text.strip()
+    if text.startswith("[") and text.endswith("]"):
+        try:
+            goals = ast.literal_eval(text)
+            if isinstance(goals, list) and goals:
+                return str(goals[0]).strip()
+        except Exception:
+            pass
+    return text.split("\n")[0].strip()
 
 # ==========================================================================
 # JavaScript - 简化版本（去掉视频播放控制、operation zone overlay等）
@@ -252,7 +269,7 @@ h1, h2, h3, h4, h5, h6, .gr-button, .gr-textbox, .gr-dropdown, .gr-radio {{
 
 /* 日志样式 */
 .compact-log, #log_output {{
-    max-height: 200px !important;
+    max-height: 60vh !important;
     overflow-y: auto !important;
     font-family: monospace !important;
     font-size: calc({FONT_SIZE} * 0.8) !important;
@@ -279,15 +296,11 @@ h1, h2, h3, h4, h5, h6, .gr-button, .gr-textbox, .gr-dropdown, .gr-radio {{
     border-color: rgba(255, 255, 255, 0.2) !important;
 }}
 
-/* Info panel */
-.info-panel {{
-    height: 90vh !important;
-    overflow-y: auto !important;
-}}
-
-/* Main display area */
-.main-display {{
-    min-height: 70vh !important;
+/* Header task info */
+#header_task_info {{
+    font-size: calc({FONT_SIZE} * 1.1) !important;
+    padding: 4px 0 !important;
+    margin: 0 !important;
 }}
 
 /* Livestream image */
@@ -383,17 +396,23 @@ h1, h2, h3, h4, h5, h6, .gr-button, .gr-textbox, .gr-dropdown, .gr-radio {{
 
 
 def create_ui_blocks():
-    """创建 Gradio Blocks — 顺序执行界面"""
+    """创建 Gradio Blocks — 三列布局: System Log | Keypoint/Livestream | Control Panel"""
     with gr.Blocks(title="Oracle Planner Interface") as demo:
-        # 标题
-        with gr.Row():
-            gr.Markdown(
-                """<div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-                    <h2 style="margin: 0;">HistoryBench Human Evaluation</h2>
-                    <h2 style="margin: 0;">Read Task Goal, select Action (and Keypoint) to finish the task</h2>
-                </div>""",
-                elem_id="operation_hint"
-            )
+        # =================================================================
+        # Header: Title + Current Task + First Goal
+        # =================================================================
+        gr.Markdown(
+            "## HistoryBench Human Evaluation",
+            elem_id="operation_hint"
+        )
+        current_task_display = gr.Markdown(
+            value="**Current Task:** —",
+            elem_id="header_task_info"
+        )
+        first_goal_display = gr.Markdown(
+            value="",
+            elem_id="header_goal_info"
+        )
 
         # Loading overlay
         loading_overlay = gr.HTML(value="", elem_id="loading_overlay")
@@ -401,6 +420,11 @@ def create_ui_blocks():
         # State
         uid_state = gr.State(value=None)
         username_state = gr.State(value="")
+
+        # Hidden components — callbacks still output to these, we sync to header via .change()
+        task_info_box = gr.Textbox(visible=False, elem_id="task_info_box")
+        progress_info_box = gr.Textbox(visible=False)
+        goal_box = gr.Textbox(visible=False)
 
         # Loading screen
         with gr.Group(visible=True) as loading_group:
@@ -429,41 +453,22 @@ def create_ui_blocks():
                 gr.HTML('<hr style="border-top: 3px solid #888; margin: 20px 0;">')
                 gr.Markdown("### Finish the task below!")
 
-            # Two-column layout: info panel (left) + main display (right)
+            # =============================================================
+            # Three-column layout: System Log | Phases | Control Panel
+            # =============================================================
             with gr.Row():
-                # Left: Info panel
-                with gr.Column(scale=3):
+                # ---- Left column: System Log ----
+                with gr.Column(scale=2):
                     with gr.Group():
-                        gr.Markdown("### 1. Progress Tracker")
-                        with gr.Row():
-                            task_info_box = gr.Textbox(
-                                label="Current Task", interactive=False,
-                                show_label=False, scale=2, elem_id="task_info_box"
-                            )
-                            progress_info_box = gr.Textbox(
-                                label="Progress", interactive=False,
-                                show_label=False, scale=1
-                            )
-
-                    with gr.Group():
-                        gr.Markdown("### 2. Task Goal")
-                        goal_box = gr.Textbox(
-                            label="Instruction", lines=3,
-                            interactive=False, show_label=False
-                        )
-
-                    with gr.Group():
-                        gr.Markdown("### 3. System Log")
+                        gr.Markdown("### System Log")
                         log_output = gr.HTML(
                             value="", elem_classes="compact-log",
                             elem_id="log_output"
                         )
 
-                # Right: Main display area (phases swap here)
-                with gr.Column(scale=7):
-                    # ============================================
+                # ---- Middle column: Video / Livestream / Keypoint ----
+                with gr.Column(scale=5):
                     # Phase 1: VIDEO (auto-play demo video)
-                    # ============================================
                     with gr.Group(visible=False) as video_phase_group:
                         gr.Markdown("### Watch the demonstration video")
                         video_display = gr.Video(
@@ -475,9 +480,7 @@ def create_ui_blocks():
                             visible=True
                         )
 
-                    # ============================================
                     # Phase 2: LIVESTREAM (MJPEG during execution)
-                    # ============================================
                     with gr.Group(visible=False) as livestream_phase_group:
                         gr.Markdown("### Execution LiveStream (might be delayed)")
                         combined_display = gr.HTML(
@@ -485,9 +488,7 @@ def create_ui_blocks():
                             elem_id="combined_view_html"
                         )
 
-                    # ============================================
                     # Phase 3: KEYPOINT SELECTION
-                    # ============================================
                     with gr.Group(visible=False) as action_phase_group:
                         gr.Markdown("### Keypoint Selection")
                         img_display = gr.Image(
@@ -495,38 +496,34 @@ def create_ui_blocks():
                             type="pil", elem_id="live_obs", show_label=False
                         )
 
-                    # ============================================
-                    # Control Panel (visible in action + livestream)
-                    # ============================================
+                # ---- Right column: Control Panel (vertical) ----
+                with gr.Column(scale=3):
                     with gr.Group(visible=False) as control_panel_group:
                         gr.Markdown("### Control Panel")
-                        with gr.Row():
-                            with gr.Column(scale=1):
-                                gr.Markdown("### Action Selection")
-                                options_radio = gr.Radio(
-                                    choices=[], label="Action", type="value",
-                                    show_label=False, elem_id="action_radio"
-                                )
-                            with gr.Column(scale=1):
-                                with gr.Group(visible=False, elem_id="coords_group") as coords_group:
-                                    gr.Markdown("**Coords**")
-                                    coords_box = gr.Textbox(
-                                        label="Coords", value="",
-                                        interactive=False, show_label=False,
-                                        elem_id="coords_box"
-                                    )
-                                exec_btn = gr.Button(
-                                    "EXECUTE", variant="stop", size="lg",
-                                    elem_id="exec_btn"
-                                )
-                                reference_action_btn = gr.Button(
-                                    "Reference Action", variant="secondary",
-                                    elem_id="reference_action_btn"
-                                )
-                                next_task_btn = gr.Button(
-                                    "Next Task", variant="primary",
-                                    interactive=False, elem_id="next_task_btn"
-                                )
+                        gr.Markdown("**Action Selection**")
+                        options_radio = gr.Radio(
+                            choices=[], label="Action", type="value",
+                            show_label=False, elem_id="action_radio"
+                        )
+                        with gr.Group(visible=False, elem_id="coords_group") as coords_group:
+                            gr.Markdown("**Coords**")
+                            coords_box = gr.Textbox(
+                                label="Coords", value="",
+                                interactive=False, show_label=False,
+                                elem_id="coords_box"
+                            )
+                        exec_btn = gr.Button(
+                            "EXECUTE", variant="stop", size="lg",
+                            elem_id="exec_btn"
+                        )
+                        reference_action_btn = gr.Button(
+                            "Reference Action", variant="secondary",
+                            elem_id="reference_action_btn"
+                        )
+                        next_task_btn = gr.Button(
+                            "Next Task", variant="primary",
+                            interactive=False, elem_id="next_task_btn"
+                        )
 
             # Task Hint
             with gr.Group(visible=True):
@@ -537,6 +534,31 @@ def create_ui_blocks():
         # =====================================================================
         # Event Wiring
         # =====================================================================
+
+        # --- Sync hidden textboxes → header Markdown ---
+        def sync_task_info(task_text):
+            """Sync task_info_box value to header current_task_display."""
+            if not task_text:
+                return "**Current Task:** —"
+            return f"**Current Task:** {task_text}"
+
+        def sync_goal_info(goal_text):
+            """Sync goal_box value to header first_goal_display."""
+            first = extract_first_goal(goal_text)
+            if not first:
+                return ""
+            return f"**Goal:** {first}"
+
+        task_info_box.change(
+            fn=sync_task_info,
+            inputs=[task_info_box],
+            outputs=[current_task_display]
+        )
+        goal_box.change(
+            fn=sync_goal_info,
+            inputs=[goal_box],
+            outputs=[first_goal_display]
+        )
 
         # --- Login ---
         login_btn.click(
