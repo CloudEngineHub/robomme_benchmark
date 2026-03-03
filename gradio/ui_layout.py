@@ -177,14 +177,14 @@ def create_ui_blocks():
 
                     # 系统日志卡片：显示执行过程反馈
                     with gr.Column(elem_classes=["native-card"], elem_id="log_card"):
-                        gr.Markdown("### System Log")
                         log_output = gr.Textbox(
                             value="",
                             lines=8,
                             max_lines=16,
-                            show_label=False,
+                            show_label=True,
                             interactive=False,
                             elem_id="log_output",
+                            label="System Log",
                         )
 
                 with gr.Column(scale=CONTROL_PANEL_SCALE):
@@ -236,12 +236,13 @@ def create_ui_blocks():
 
         # 任务提示卡片：展示当前任务补充提示
         with gr.Column(visible=True, elem_classes=["native-card"], elem_id="task_hint_card"):
-            gr.Markdown("### Task Hint")
+            #gr.Markdown("### Task Hint")
             task_hint_display = gr.Textbox(
                 value="",
                 lines=8,
                 max_lines=16,
-                show_label=False,
+                show_label=True,
+                label="Task Hint",
                 interactive=True,
                 elem_id="task_hint_display",
             )
