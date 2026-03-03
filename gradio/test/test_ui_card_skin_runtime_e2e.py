@@ -29,6 +29,18 @@ def _first_radius_px(value: str | None) -> float | None:
     return None
 
 
+def _is_transparent_color(value: str | None) -> bool:
+    if not value:
+        return False
+    return value in {"transparent", "rgba(0, 0, 0, 0)"}
+
+
+def _is_zero_border(value: str | None) -> bool:
+    if not value:
+        return False
+    return str(value).strip().startswith("0px")
+
+
 def _free_port() -> int:
     with contextlib.closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as sock:
         sock.bind(("127.0.0.1", 0))
@@ -263,6 +275,9 @@ def test_card_shell_hit_works_in_real_browser_runtime(runtime_ui_url):
                 const mediaRect = media ? media.getBoundingClientRect() : null;
                 const actionRect = action ? action.getBoundingClientRect() : null;
                 const radioStyle = radio ? window.getComputedStyle(radio) : null;
+                const radioForm = radio ? radio.closest('.form') : null;
+                const radioFormStyle = radioForm ? window.getComputedStyle(radioForm) : null;
+                const optionWrapStyle = optionWrap ? window.getComputedStyle(optionWrap) : null;
                 const labelStyle = firstLabel ? window.getComputedStyle(firstLabel) : null;
 
                 return {
@@ -276,8 +291,19 @@ def test_card_shell_hit_works_in_real_browser_runtime(runtime_ui_url):
                     mediaHeight: mediaRect ? mediaRect.height : null,
                     actionHeight: actionRect ? actionRect.height : null,
                     radioOverflowY: radioStyle ? radioStyle.overflowY : null,
+                    radioBgColor: radioStyle ? radioStyle.backgroundColor : null,
+                    radioBgImage: radioStyle ? radioStyle.backgroundImage : null,
+                    radioBorder: radioStyle ? radioStyle.border : null,
+                    radioFormBgColor: radioFormStyle ? radioFormStyle.backgroundColor : null,
+                    radioFormBgImage: radioFormStyle ? radioFormStyle.backgroundImage : null,
+                    radioFormBorder: radioFormStyle ? radioFormStyle.border : null,
+                    radioFormShadow: radioFormStyle ? radioFormStyle.boxShadow : null,
                     radioScrollHeight: radio ? radio.scrollHeight : null,
                     radioClientHeight: radio ? radio.clientHeight : null,
+                    optionWrapBgColor: optionWrapStyle ? optionWrapStyle.backgroundColor : null,
+                    optionWrapBgImage: optionWrapStyle ? optionWrapStyle.backgroundImage : null,
+                    optionWrapBorder: optionWrapStyle ? optionWrapStyle.border : null,
+                    optionWrapShadow: optionWrapStyle ? optionWrapStyle.boxShadow : null,
                     optionRadius: labelStyle ? labelStyle.borderRadius : null,
                     inputVisible: !!(firstInput && firstInputRect && firstInputRect.width > 0 && firstInputRect.height > 0),
                 };
@@ -352,6 +378,39 @@ def test_card_shell_hit_works_in_real_browser_runtime(runtime_ui_url):
     assert selection_layout["uniqueTopCount"] >= 2, "action options did not create multiple rows"
     assert selection_layout["radioOverflowY"] in {"auto", "scroll"}, (
         f"unexpected overflow-y for action options: {selection_layout['radioOverflowY']}"
+    )
+    assert _is_transparent_color(selection_layout["radioBgColor"]), (
+        f"action radio background should be transparent: {selection_layout['radioBgColor']}"
+    )
+    assert selection_layout["radioBgImage"] == "none", (
+        f"action radio background image should be none: {selection_layout['radioBgImage']}"
+    )
+    assert _is_zero_border(selection_layout["radioBorder"]), (
+        f"action radio border should be none: {selection_layout['radioBorder']}"
+    )
+    assert _is_transparent_color(selection_layout["radioFormBgColor"]), (
+        f"action radio parent form background should be transparent: {selection_layout['radioFormBgColor']}"
+    )
+    assert selection_layout["radioFormBgImage"] == "none", (
+        f"action radio parent form background image should be none: {selection_layout['radioFormBgImage']}"
+    )
+    assert _is_zero_border(selection_layout["radioFormBorder"]), (
+        f"action radio parent form border should be none: {selection_layout['radioFormBorder']}"
+    )
+    assert selection_layout["radioFormShadow"] == "none", (
+        f"action radio parent form shadow should be none: {selection_layout['radioFormShadow']}"
+    )
+    assert _is_transparent_color(selection_layout["optionWrapBgColor"]), (
+        f"action option wrapper background should be transparent: {selection_layout['optionWrapBgColor']}"
+    )
+    assert selection_layout["optionWrapBgImage"] == "none", (
+        f"action option wrapper background image should be none: {selection_layout['optionWrapBgImage']}"
+    )
+    assert _is_zero_border(selection_layout["optionWrapBorder"]), (
+        f"action option wrapper border should be none: {selection_layout['optionWrapBorder']}"
+    )
+    assert selection_layout["optionWrapShadow"] == "none", (
+        f"action option wrapper shadow should be none: {selection_layout['optionWrapShadow']}"
     )
     assert selection_layout["radioScrollHeight"] is not None and selection_layout["radioClientHeight"] is not None
     assert selection_layout["radioScrollHeight"] > selection_layout["radioClientHeight"], (

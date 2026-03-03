@@ -663,6 +663,27 @@ h1, h2, h3, h4, h5, h6, .gr-button, .gr-textbox, .gr-dropdown, .gr-radio {{
 }}
 
 /* Action options: rounded rectangles + adaptive grid + inner scrolling */
+#action_radio.action-options-grid,
+#action_radio.action-options-grid > div,
+#action_radio.action-options-grid > span,
+#action_radio.action-options-grid > div:last-child {{
+    background: transparent !important;
+    background-color: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    outline: none !important;
+}}
+
+#action_selection_card .form:has(> #action_radio.action-options-grid),
+.floating-card:has(#action_selection_card_anchor) .form:has(> #action_radio.action-options-grid),
+.card-shell-hit:has(#action_selection_card_anchor) .form:has(> #action_radio.action-options-grid) {{
+    background: transparent !important;
+    background-color: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    outline: none !important;
+}}
+
 #action_radio.action-options-grid {{
     width: 100% !important;
     min-height: 0 !important;
