@@ -45,10 +45,33 @@ CSS = f"""
 :root {{
     --panel-gap: 14px;
     --panel-radius: 14px;
+    color-scheme: light;
 }}
 
 body, html, #gradio-app, .gradio-container {{
     font-size: {FONT_SIZE} !important;
+    background: #f6f8fb !important;
+    color: #111827 !important;
+}}
+
+#gradio-app .block,
+#gradio-app .gr-block,
+#gradio-app .gr-box,
+#gradio-app .gr-form {{
+    background: #f6f8fb !important;
+    color: #111827 !important;
+}}
+
+#gradio-app input,
+#gradio-app textarea,
+#gradio-app select,
+#gradio-app .gr-input,
+#gradio-app .gr-textbox,
+#gradio-app .gr-dropdown,
+#gradio-app .gr-radio {{
+    background: #ffffff !important;
+    color: #111827 !important;
+    border-color: #d1d5db !important;
 }}
 
 #main_layout_row {{
@@ -63,10 +86,11 @@ body, html, #gradio-app, .gradio-container {{
 }}
 
 .native-card {{
-    border: 1px solid rgba(120, 120, 120, 0.25);
+    border: 1px solid #d1d5db;
     border-radius: var(--panel-radius);
     padding: 12px;
-    background: rgba(255, 255, 255, 0.02);
+    background: #ffffff;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
 }}
 
 #action_buttons_row {{
@@ -75,7 +99,6 @@ body, html, #gradio-app, .gradio-container {{
     gap: 10px !important;
 }}
 
-#action_buttons_row > .gr-group,
 #action_buttons_row > .gr-column {{
     flex: 1 1 180px !important;
 }}
@@ -138,7 +161,7 @@ body, html, #gradio-app, .gradio-container {{
     left: 0;
     width: 100vw !important;
     height: 100vh !important;
-    background: rgba(0, 0, 0, 0.5) !important;
+    background: rgba(15, 23, 42, 0.2) !important;
     display: flex !important;
     justify-content: center !important;
     align-items: center !important;
@@ -216,7 +239,7 @@ def create_ui_blocks():
         header_goal_md = gr.Markdown(render_header_goal(""), elem_id="header_goal")
 
         # 全屏加载遮罩：执行耗时操作时显示
-        with gr.Group(visible=False, elem_id="loading_overlay_group") as loading_overlay:
+        with gr.Column(visible=False, elem_id="loading_overlay_group") as loading_overlay:
             gr.Markdown("# ⏳\n\n### Loading environment, please wait...")
 
         # 会话级状态：用户 uid、用户名、当前 UI 阶段
@@ -230,11 +253,11 @@ def create_ui_blocks():
         goal_box = gr.Textbox(visible=False)
 
         # 应用初始化阶段的提示区（默认可见）
-        with gr.Group(visible=True) as loading_group:
+        with gr.Column(visible=True) as loading_group:
             gr.Markdown("### Logging in and setting up environment... Please wait.")
 
         # 登录区域（初始化后显示）
-        with gr.Group(visible=False) as login_group:
+        with gr.Column(visible=False) as login_group:
             gr.Markdown("### User Login")
             with gr.Row():
                 # 可登录用户列表来自任务管理器
@@ -244,14 +267,14 @@ def create_ui_blocks():
             login_msg = gr.Markdown("")
 
         # 主交互界面（登录成功后显示）
-        with gr.Group(visible=False, elem_id="main_interface_root") as main_interface:
+        with gr.Column(visible=False, elem_id="main_interface_root") as main_interface:
             # 主体左右布局：左侧媒体与日志，右侧动作控制
             with gr.Row(elem_id="main_layout_row"):
                 with gr.Column(scale=KEYPOINT_SELECTION_SCALE):
                     # 左侧媒体卡片：按阶段切换展示内容
-                    with gr.Group(elem_classes=["native-card"], elem_id="media_card"):
+                    with gr.Column(elem_classes=["native-card"], elem_id="media_card"):
                         # 阶段 1：演示视频
-                        with gr.Group(visible=False, elem_id="video_phase_group") as video_phase_group:
+                        with gr.Column(visible=False, elem_id="video_phase_group") as video_phase_group:
                             gr.Markdown("### Watch the demonstration video")
                             video_display = gr.Video(
                                 label="Demonstration Video",
@@ -263,7 +286,7 @@ def create_ui_blocks():
                             )
 
                         # 阶段 2：执行直播流
-                        with gr.Group(visible=False, elem_id="livestream_phase_group") as livestream_phase_group:
+                        with gr.Column(visible=False, elem_id="livestream_phase_group") as livestream_phase_group:
                             gr.Markdown("### Execution LiveStream (might be delayed)")
                             combined_display = gr.HTML(
                                 value="<div id='combined_view_html'><p>Waiting for video stream...</p></div>",
@@ -271,7 +294,7 @@ def create_ui_blocks():
                             )
 
                         # 阶段 3：关键点选择（图像交互）
-                        with gr.Group(visible=False, elem_id="action_phase_group") as action_phase_group:
+                        with gr.Column(visible=False, elem_id="action_phase_group") as action_phase_group:
                             gr.Markdown("### Keypoint Selection")
                             img_display = gr.Image(
                                 label="Live Observation",
@@ -284,14 +307,14 @@ def create_ui_blocks():
                             )
 
                     # 系统日志卡片：显示执行过程反馈
-                    with gr.Group(elem_classes=["native-card"], elem_id="log_card"):
+                    with gr.Column(elem_classes=["native-card"], elem_id="log_card"):
                         gr.Markdown("### System Log")
                         log_output = gr.Markdown(value="", elem_classes="compact-log", elem_id="log_output")
 
                 with gr.Column(scale=CONTROL_PANEL_SCALE):
                     # 右侧控制面板：动作选择与执行按钮
-                    with gr.Group(visible=False, elem_id="control_panel_group") as control_panel_group:
-                        with gr.Group(elem_classes=["native-card"], elem_id="action_selection_card"):
+                    with gr.Column(visible=False, elem_id="control_panel_group") as control_panel_group:
+                        with gr.Column(elem_classes=["native-card"], elem_id="action_selection_card"):
                             gr.Markdown("### Action Selection")
                             options_radio = gr.Radio(
                                 choices=[],
@@ -301,7 +324,7 @@ def create_ui_blocks():
                                 elem_id="action_radio",
                             )
                             # 坐标输入显示区：仅在需要关键点坐标时展示
-                            with gr.Group(visible=False, elem_id="coords_group") as coords_group:
+                            with gr.Column(visible=False, elem_id="coords_group") as coords_group:
                                 coords_box = gr.Textbox(
                                     label="Coords",
                                     value="",
@@ -313,10 +336,10 @@ def create_ui_blocks():
 
                         # 操作按钮区：执行、参考动作、下一任务
                         with gr.Row(elem_id="action_buttons_row"):
-                            with gr.Group(elem_classes=["native-card", "native-button-card"], elem_id="exec_btn_card"):
+                            with gr.Column(elem_classes=["native-card", "native-button-card"], elem_id="exec_btn_card"):
                                 exec_btn = gr.Button("EXECUTE", variant="stop", size="lg", elem_id="exec_btn")
 
-                            with gr.Group(
+                            with gr.Column(
                                 elem_classes=["native-card", "native-button-card"],
                                 elem_id="reference_btn_card",
                             ):
@@ -326,7 +349,7 @@ def create_ui_blocks():
                                     elem_id="reference_action_btn",
                                 )
 
-                            with gr.Group(
+                            with gr.Column(
                                 elem_classes=["native-card", "native-button-card"],
                                 elem_id="next_task_btn_card",
                             ):
@@ -338,7 +361,7 @@ def create_ui_blocks():
                                 )
 
         # 任务提示卡片：展示当前任务补充提示
-        with gr.Group(visible=True, elem_classes=["native-card"], elem_id="task_hint_card"):
+        with gr.Column(visible=True, elem_classes=["native-card"], elem_id="task_hint_card"):
             gr.Markdown("### Task Hint")
             task_hint_display = gr.Markdown(value="", elem_id="task_hint_display")
 

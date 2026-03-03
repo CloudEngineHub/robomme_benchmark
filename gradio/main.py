@@ -408,7 +408,7 @@ if __name__ == "__main__":
     print("-" * 60)
     for username in sorted(available_users):
         port = user_port_map[username]
-        login_link = f"http://localhost:{port}/?user={username}&__theme=dark"
+        login_link = f"http://localhost:{port}/?user={username}&__theme=light"
         print(f"  {username:20s} -> {login_link}")
     print("-" * 60)
     

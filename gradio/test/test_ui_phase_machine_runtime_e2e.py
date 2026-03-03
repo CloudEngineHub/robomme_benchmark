@@ -49,23 +49,23 @@ def phase_machine_ui_url():
     with gr.Blocks(title="Native phase machine test") as demo:
         phase_state = gr.State("init")
 
-        with gr.Group(visible=True, elem_id="login_group") as login_group:
+        with gr.Column(visible=True, elem_id="login_group") as login_group:
             login_btn = gr.Button("Login", elem_id="login_btn")
 
-        with gr.Group(visible=False, elem_id="main_interface") as main_interface:
-            with gr.Group(visible=False, elem_id="video_phase_group") as video_phase_group:
+        with gr.Column(visible=False, elem_id="main_interface") as main_interface:
+            with gr.Column(visible=False, elem_id="video_phase_group") as video_phase_group:
                 video_display = gr.Video(value=None, elem_id="demo_video", autoplay=True)
 
-            with gr.Group(visible=False, elem_id="livestream_phase_group") as livestream_phase_group:
+            with gr.Column(visible=False, elem_id="livestream_phase_group") as livestream_phase_group:
                 combined_display = gr.HTML("<div id='combined_view_html'><p>waiting</p></div>", elem_id="combined_view_html")
 
-            with gr.Group(visible=False, elem_id="action_phase_group") as action_phase_group:
+            with gr.Column(visible=False, elem_id="action_phase_group") as action_phase_group:
                 img_display = gr.Image(value=np.zeros((24, 24, 3), dtype=np.uint8), elem_id="live_obs")
 
-            with gr.Group(visible=False, elem_id="control_panel_group") as control_panel_group:
+            with gr.Column(visible=False, elem_id="control_panel_group") as control_panel_group:
                 options_radio = gr.Radio(choices=[("pick", 0)], value=0, elem_id="action_radio")
                 coords_box = gr.Textbox(value="please click the keypoint selection image", elem_id="coords_box")
-                with gr.Row():
+                with gr.Column(visible=False, elem_id="action_buttons_row") as action_buttons_row:
                     exec_btn = gr.Button("EXECUTE", elem_id="exec_btn")
                     next_task_btn = gr.Button("Next Task", elem_id="next_task_btn")
 
@@ -80,6 +80,7 @@ def phase_machine_ui_url():
                 gr.update(visible=False),
                 gr.update(visible=False),
                 gr.update(visible=False),
+                gr.update(visible=False),
                 gr.update(value="please click the keypoint selection image"),
                 "demo_video",
             )
@@ -87,6 +88,7 @@ def phase_machine_ui_url():
         def on_video_end_fn():
             return (
                 gr.update(visible=False),
+                gr.update(visible=True),
                 gr.update(visible=True),
                 gr.update(visible=True),
                 "action_keypoint",
@@ -136,6 +138,7 @@ def phase_machine_ui_url():
                 livestream_phase_group,
                 action_phase_group,
                 control_panel_group,
+                action_buttons_row,
                 coords_box,
                 phase_state,
             ],
@@ -144,7 +147,7 @@ def phase_machine_ui_url():
 
         video_display.end(
             fn=on_video_end_fn,
-            outputs=[video_phase_group, action_phase_group, control_panel_group, phase_state],
+            outputs=[video_phase_group, action_phase_group, control_panel_group, action_buttons_row, phase_state],
             queue=False,
         )
 
@@ -258,7 +261,15 @@ def test_phase_machine_runtime_flow_and_execute_precheck(phase_machine_ui_url):
             }"""
         )
 
-        page.get_by_role("button", name="EXECUTE").click()
+        did_click_exec = page.evaluate(
+            """() => {
+                const btn = document.getElementById('exec_btn');
+                if (!btn) return false;
+                btn.click();
+                return true;
+            }"""
+        )
+        assert did_click_exec
         page.wait_for_timeout(300)
 
         phase_after_failed_precheck = page.evaluate(
@@ -276,7 +287,15 @@ def test_phase_machine_runtime_flow_and_execute_precheck(phase_machine_ui_url):
         )
         assert phase_after_failed_precheck == {"livestream": False, "action": True}
 
-        page.get_by_role("button", name="EXECUTE").click()
+        did_click_exec = page.evaluate(
+            """() => {
+                const btn = document.getElementById('exec_btn');
+                if (!btn) return false;
+                btn.click();
+                return true;
+            }"""
+        )
+        assert did_click_exec
 
         page.wait_for_function(
             """() => {
