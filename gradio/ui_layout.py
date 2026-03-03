@@ -447,10 +447,41 @@ body {{
 /* Button cards keep compact height while sharing the same card skin */
 .button-card,
 .card-shell-button {{
-    padding: 16px !important;
+    padding: 0 !important;
     min-height: 86px !important;
     display: flex !important;
-    align-items: center !important;
+    align-items: stretch !important;
+    overflow: hidden !important;
+}}
+
+.button-card > div:has(button),
+.button-card > div:has([role="button"]),
+.card-shell-button > div:has(button),
+.card-shell-button > div:has([role="button"]) {{
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 86px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    display: flex !important;
+    flex: 1 1 auto !important;
+    align-items: stretch !important;
+}}
+
+#exec_btn,
+#reference_action_btn,
+#next_task_btn,
+#exec_btn .gr-button,
+#reference_action_btn .gr-button,
+#next_task_btn .gr-button {{
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 86px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border-radius: 56px !important;
+    flex: 1 1 auto !important;
+    align-self: stretch !important;
 }}
 
 /* Keep inner wrappers flat; exclude coords_group to preserve blue highlight */
@@ -529,13 +560,38 @@ body {{
     border: 0 !important;
 }}
 
+.card-shell-hit .block:has(#media_card_anchor),
+.card-shell-hit .block:has(#log_card_anchor),
+.card-shell-hit .block:has(#action_selection_card_anchor),
+.card-shell-hit .block:has(#exec_btn_card_anchor),
+.card-shell-hit .block:has(#reference_btn_card_anchor),
+.card-shell-hit .block:has(#next_task_btn_card_anchor),
+.card-shell-hit .block:has(#task_hint_card_anchor) {{
+    display: none !important;
+    height: 0 !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+}}
+
 .button-card button,
 #exec_btn_card button,
 #reference_btn_card button,
-#next_task_btn_card button {{
+#next_task_btn_card button,
+#exec_btn,
+#reference_action_btn,
+#next_task_btn,
+#exec_btn_card [role="button"],
+#reference_btn_card [role="button"],
+#next_task_btn_card [role="button"] {{
     width: 100% !important;
-    border-radius: 28px !important;
-    min-height: 56px !important;
+    height: 100% !important;
+    border-radius: 56px !important;
+    min-height: 86px !important;
+    margin: 0 !important;
+    flex: 1 1 auto !important;
+    align-self: stretch !important;
 }}
 
 /* 全局字体 */

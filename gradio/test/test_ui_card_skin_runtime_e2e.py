@@ -19,6 +19,16 @@ from playwright.sync_api import sync_playwright
 import uvicorn
 
 
+def _first_radius_px(value: str | None) -> float | None:
+    if not value:
+        return None
+    for token in str(value).replace("/", " ").split():
+        if token.endswith("px"):
+            with contextlib.suppress(ValueError):
+                return float(token[:-2])
+    return None
+
+
 def _free_port() -> int:
     with contextlib.closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as sock:
         sock.bind(("127.0.0.1", 0))
@@ -116,6 +126,7 @@ def test_card_shell_hit_works_in_real_browser_runtime(runtime_ui_url):
     }
 
     button_shells = {}
+    button_fill_rows = {}
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         page = browser.new_page()
@@ -147,12 +158,75 @@ def test_card_shell_hit_works_in_real_browser_runtime(runtime_ui_url):
         )
         button_shells = page.evaluate(
             """() => {
-                const ids = ['exec_btn_card', 'reference_btn_card', 'next_task_btn_card'];
-                return ids.map((id) => {
-                    const shell = document.getElementById(id);
-                    if (!shell) return { id, found: false };
+                const anchors = ['exec_btn_card_anchor', 'reference_btn_card_anchor', 'next_task_btn_card_anchor'];
+                return anchors.map((anchorId) => {
+                    const anchor = document.getElementById(anchorId);
+                    const shell = anchor ? anchor.closest('.gr-group') : null;
+                    if (!shell) return { id: anchorId, found: false };
                     const rect = shell.getBoundingClientRect();
-                    return { id, found: true, top: rect.top, left: rect.left, width: rect.width };
+                    return {
+                        id: anchorId,
+                        found: true,
+                        top: rect.top,
+                        left: rect.left,
+                        width: rect.width,
+                        height: rect.height,
+                        radius: window.getComputedStyle(shell).borderRadius,
+                    };
+                });
+            }"""
+        )
+        button_fill_rows = page.evaluate(
+            """() => {
+                const pairs = [
+                    { anchorId: 'exec_btn_card_anchor', btnId: 'exec_btn' },
+                    { anchorId: 'reference_btn_card_anchor', btnId: 'reference_action_btn' },
+                    { anchorId: 'next_task_btn_card_anchor', btnId: 'next_task_btn' },
+                ];
+
+                function resolveClickable(shell, btnId) {
+                    const direct = document.getElementById(btnId);
+                    if (direct && (direct.matches('button') || direct.getAttribute('role') === 'button')) {
+                        return direct;
+                    }
+                    if (shell) {
+                        const inShell = shell.querySelector('button, [role="button"]');
+                        if (inShell) return inShell;
+                    }
+                    return (
+                        document.querySelector(`#${btnId} button`) ||
+                        document.querySelector(`#${btnId} [role="button"]`) ||
+                        null
+                    );
+                }
+
+                return pairs.map(({ anchorId, btnId }) => {
+                    const anchor = document.getElementById(anchorId);
+                    const shell = anchor ? anchor.closest('.gr-group') : null;
+                    if (!shell) return { anchorId, btnId, foundShell: false, foundButton: false };
+                    const button = resolveClickable(shell, btnId);
+                    if (!button) return { anchorId, btnId, foundShell: true, foundButton: false };
+
+                    const shellRect = shell.getBoundingClientRect();
+                    const buttonRect = button.getBoundingClientRect();
+                    const shellStyle = window.getComputedStyle(shell);
+                    const buttonStyle = window.getComputedStyle(button);
+                    return {
+                        anchorId,
+                        btnId,
+                        foundShell: true,
+                        foundButton: true,
+                        shellTop: shellRect.top,
+                        shellLeft: shellRect.left,
+                        shellWidth: shellRect.width,
+                        shellHeight: shellRect.height,
+                        shellRadius: shellStyle.borderRadius,
+                        buttonTop: buttonRect.top,
+                        buttonLeft: buttonRect.left,
+                        buttonWidth: buttonRect.width,
+                        buttonHeight: buttonRect.height,
+                        buttonRadius: buttonStyle.borderRadius,
+                    };
                 });
             }"""
         )
@@ -181,6 +255,27 @@ def test_card_shell_hit_works_in_real_browser_runtime(runtime_ui_url):
     assert button_shells[0]["left"] < button_shells[1]["left"] < button_shells[2]["left"]
     assert abs(button_shells[0]["width"] - button_shells[1]["width"]) <= width_tolerance
     assert abs(button_shells[1]["width"] - button_shells[2]["width"]) <= width_tolerance
+
+    assert len(button_fill_rows) == 3
+    geom_tolerance = 2.0
+    radius_tolerance = 2.0
+    for row in button_fill_rows:
+        assert row["foundShell"], f"button shell missing: {row['anchorId']}"
+        assert row["foundButton"], f"clickable element missing for: {row['btnId']}"
+
+        assert abs(row["shellWidth"] - row["buttonWidth"]) <= geom_tolerance, f"width mismatch for {row['btnId']}"
+        assert abs(row["shellHeight"] - row["buttonHeight"]) <= geom_tolerance, f"height mismatch for {row['btnId']}"
+        assert abs(row["shellTop"] - row["buttonTop"]) <= geom_tolerance, f"top mismatch for {row['btnId']}"
+        assert abs(row["shellLeft"] - row["buttonLeft"]) <= geom_tolerance, f"left mismatch for {row['btnId']}"
+
+        shell_radius = _first_radius_px(row["shellRadius"])
+        button_radius = _first_radius_px(row["buttonRadius"])
+        assert shell_radius is not None, f"shell radius parse failed for {row['anchorId']}: {row['shellRadius']}"
+        assert button_radius is not None, f"button radius parse failed for {row['btnId']}: {row['buttonRadius']}"
+        assert abs(shell_radius - 56.0) <= radius_tolerance, f"shell radius mismatch for {row['anchorId']}: {row['shellRadius']}"
+        assert abs(button_radius - shell_radius) <= radius_tolerance, (
+            f"button radius mismatch for {row['btnId']}: shell={row['shellRadius']} button={row['buttonRadius']}"
+        )
 
 
 @pytest.fixture

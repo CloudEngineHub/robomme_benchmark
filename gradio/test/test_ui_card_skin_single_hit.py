@@ -95,8 +95,14 @@ def test_card_shell_hit_css_has_required_visual_tokens(reload_module):
         "border-radius: 56px !important;",
         "box-shadow: 0 26px 58px rgba(0, 0, 0, 0.52) !important;",
         ".card-shell-button {",
+        "padding: 0 !important;",
         "min-height: 86px !important;",
+        "overflow: hidden !important;",
         "#action_buttons_row {",
+        "#exec_btn,",
+        "height: 100% !important;",
+        "#exec_btn_card [role=\"button\"],",
+        "#next_task_btn_card [role=\"button\"]",
         "#media_card_anchor,",
     ]
     for token in required_css_tokens:
