@@ -96,6 +96,7 @@ def test_card_shell_hit_css_has_required_visual_tokens(reload_module):
         "box-shadow: 0 26px 58px rgba(0, 0, 0, 0.52) !important;",
         ".card-shell-button {",
         "min-height: 86px !important;",
+        "#action_buttons_row {",
         "#media_card_anchor,",
     ]
     for token in required_css_tokens:

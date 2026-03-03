@@ -393,6 +393,31 @@ body {{
     margin: 0 !important;
 }}
 
+/* Three button cards in one horizontal row (single-line, equal width) */
+#action_buttons_row {{
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    gap: 16px !important;
+    width: 100% !important;
+    min-width: 0 !important;
+}}
+
+#action_buttons_row > .gr-group,
+#action_buttons_row > .gr-column,
+#action_buttons_row #exec_btn_card,
+#action_buttons_row #reference_btn_card,
+#action_buttons_row #next_task_btn_card {{
+    flex: 1 1 0 !important;
+    min-width: 0 !important;
+}}
+
+#action_buttons_row .floating-card,
+#action_buttons_row .card-shell-hit,
+#action_buttons_row .button-card,
+#action_buttons_row .card-shell-button {{
+    margin-bottom: 0 !important;
+}}
+
 /* Card skin: single source of truth via explicit card id -> shell mapping once */
 .floating-card,
 .card-shell-hit {{
@@ -816,26 +841,27 @@ def create_ui_blocks():
                                     elem_id="coords_box"
                                 )
 
-                        with gr.Group(elem_classes=["floating-card", "button-card"], elem_id="exec_btn_card"):
-                            gr.HTML("<div id='exec_btn_card_anchor'></div>")
-                            exec_btn = gr.Button(
-                                "EXECUTE", variant="stop", size="lg",
-                                elem_id="exec_btn"
-                            )
+                        with gr.Row(elem_id="action_buttons_row"):
+                            with gr.Group(elem_classes=["floating-card", "button-card"], elem_id="exec_btn_card"):
+                                gr.HTML("<div id='exec_btn_card_anchor'></div>")
+                                exec_btn = gr.Button(
+                                    "EXECUTE", variant="stop", size="lg",
+                                    elem_id="exec_btn"
+                                )
 
-                        with gr.Group(elem_classes=["floating-card", "button-card"], elem_id="reference_btn_card"):
-                            gr.HTML("<div id='reference_btn_card_anchor'></div>")
-                            reference_action_btn = gr.Button(
-                                "Ground Truth Action", variant="secondary",
-                                elem_id="reference_action_btn"
-                            )
+                            with gr.Group(elem_classes=["floating-card", "button-card"], elem_id="reference_btn_card"):
+                                gr.HTML("<div id='reference_btn_card_anchor'></div>")
+                                reference_action_btn = gr.Button(
+                                    "Ground Truth Action", variant="secondary",
+                                    elem_id="reference_action_btn"
+                                )
 
-                        with gr.Group(elem_classes=["floating-card", "button-card"], elem_id="next_task_btn_card"):
-                            gr.HTML("<div id='next_task_btn_card_anchor'></div>")
-                            next_task_btn = gr.Button(
-                                "Next Task", variant="primary",
-                                interactive=False, elem_id="next_task_btn"
-                            )
+                            with gr.Group(elem_classes=["floating-card", "button-card"], elem_id="next_task_btn_card"):
+                                gr.HTML("<div id='next_task_btn_card_anchor'></div>")
+                                next_task_btn = gr.Button(
+                                    "Next Task", variant="primary",
+                                    interactive=False, elem_id="next_task_btn"
+                                )
 
             # Task Hint
             with gr.Group(visible=True, elem_classes="floating-card", elem_id="task_hint_card"):

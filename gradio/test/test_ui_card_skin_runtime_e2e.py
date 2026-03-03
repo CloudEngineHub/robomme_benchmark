@@ -47,28 +47,34 @@ def runtime_ui_url(reload_module):
     root_url = f"http://{host}:{port}/"
 
     with gr.Blocks() as demo:
-        with gr.Row():
-            with gr.Group(elem_classes="floating-card", elem_id="media_card"):
-                gr.HTML("<div id='media_card_anchor'></div>")
-                gr.Markdown("media", elem_id="live_obs")
-            with gr.Group(elem_classes="floating-card", elem_id="log_card"):
-                gr.HTML("<div id='log_card_anchor'></div>")
-                gr.Markdown("log", elem_id="log_output")
-            with gr.Group(elem_classes="floating-card", elem_id="action_selection_card"):
-                gr.HTML("<div id='action_selection_card_anchor'></div>")
-                gr.Radio(choices=["a", "b"], value="a", elem_id="action_radio")
-            with gr.Group(elem_classes=["floating-card", "button-card"], elem_id="exec_btn_card"):
-                gr.HTML("<div id='exec_btn_card_anchor'></div>")
-                gr.Button("EXECUTE", elem_id="exec_btn")
-            with gr.Group(elem_classes=["floating-card", "button-card"], elem_id="reference_btn_card"):
-                gr.HTML("<div id='reference_btn_card_anchor'></div>")
-                gr.Button("Ground Truth Action", elem_id="reference_action_btn")
-            with gr.Group(elem_classes=["floating-card", "button-card"], elem_id="next_task_btn_card"):
-                gr.HTML("<div id='next_task_btn_card_anchor'></div>")
-                gr.Button("Next Task", elem_id="next_task_btn")
-            with gr.Group(elem_classes="floating-card", elem_id="task_hint_card"):
-                gr.HTML("<div id='task_hint_card_anchor'></div>")
-                gr.Markdown("hint", elem_id="task_hint_display")
+        with gr.Row(elem_id="main_layout_row"):
+            with gr.Column():
+                with gr.Group(elem_classes="floating-card", elem_id="media_card"):
+                    gr.HTML("<div id='media_card_anchor'></div>")
+                    gr.Markdown("media", elem_id="live_obs")
+                with gr.Group(elem_classes="floating-card", elem_id="log_card"):
+                    gr.HTML("<div id='log_card_anchor'></div>")
+                    gr.Markdown("log", elem_id="log_output")
+
+            with gr.Column():
+                with gr.Group(elem_classes="floating-card", elem_id="action_selection_card"):
+                    gr.HTML("<div id='action_selection_card_anchor'></div>")
+                    gr.Radio(choices=["a", "b"], value="a", elem_id="action_radio")
+
+                with gr.Row(elem_id="action_buttons_row"):
+                    with gr.Group(elem_classes=["floating-card", "button-card"], elem_id="exec_btn_card"):
+                        gr.HTML("<div id='exec_btn_card_anchor'></div>")
+                        gr.Button("EXECUTE", elem_id="exec_btn")
+                    with gr.Group(elem_classes=["floating-card", "button-card"], elem_id="reference_btn_card"):
+                        gr.HTML("<div id='reference_btn_card_anchor'></div>")
+                        gr.Button("Ground Truth Action", elem_id="reference_action_btn")
+                    with gr.Group(elem_classes=["floating-card", "button-card"], elem_id="next_task_btn_card"):
+                        gr.HTML("<div id='next_task_btn_card_anchor'></div>")
+                        gr.Button("Next Task", elem_id="next_task_btn")
+
+        with gr.Group(elem_classes="floating-card", elem_id="task_hint_card"):
+            gr.HTML("<div id='task_hint_card_anchor'></div>")
+            gr.Markdown("hint", elem_id="task_hint_display")
 
     app = FastAPI(title="card-shell-runtime-test")
     app = gr.mount_gradio_app(
@@ -109,6 +115,7 @@ def test_card_shell_hit_works_in_real_browser_runtime(runtime_ui_url):
         "next_task_btn_card_anchor",
     }
 
+    button_shells = {}
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         page = browser.new_page()
@@ -138,6 +145,17 @@ def test_card_shell_hit_works_in_real_browser_runtime(runtime_ui_url):
             }""",
             anchor_ids,
         )
+        button_shells = page.evaluate(
+            """() => {
+                const ids = ['exec_btn_card', 'reference_btn_card', 'next_task_btn_card'];
+                return ids.map((id) => {
+                    const shell = document.getElementById(id);
+                    if (!shell) return { id, found: false };
+                    const rect = shell.getBoundingClientRect();
+                    return { id, found: true, top: rect.top, left: rect.left, width: rect.width };
+                });
+            }"""
+        )
         browser.close()
 
     assert len(rows) == len(anchor_ids)
@@ -150,6 +168,19 @@ def test_card_shell_hit_works_in_real_browser_runtime(runtime_ui_url):
             assert row["buttonHit"], f"card-shell-button missing: {row['id']}"
         else:
             assert not row["buttonHit"], f"card-shell-button should not exist: {row['id']}"
+
+    assert len(button_shells) == 3
+    for shell in button_shells:
+        assert shell["found"], f"button shell missing: {shell['id']}"
+
+    # The three button cards should be in one horizontal row, left-to-right, with near-equal widths.
+    top_tolerance = 2.0
+    width_tolerance = 2.0
+    assert abs(button_shells[0]["top"] - button_shells[1]["top"]) <= top_tolerance
+    assert abs(button_shells[1]["top"] - button_shells[2]["top"]) <= top_tolerance
+    assert button_shells[0]["left"] < button_shells[1]["left"] < button_shells[2]["left"]
+    assert abs(button_shells[0]["width"] - button_shells[1]["width"]) <= width_tolerance
+    assert abs(button_shells[1]["width"] - button_shells[2]["width"]) <= width_tolerance
 
 
 @pytest.fixture
