@@ -29,18 +29,16 @@ from state_manager import (
     set_task_start_time,
     update_session_activity,
     get_session_activity,
-    get_frame_queue_info,
     cleanup_session,
     reset_play_button_clicked,
     GLOBAL_SESSIONS,
     SESSION_LAST_ACTIVITY,
     _state_lock,
 )
-from streaming_service import FrameQueueManager, cleanup_frame_queue
 from image_utils import draw_marker, save_video, concatenate_frames_horizontally
 from user_manager import user_manager, LeaseLost
 from logger import log_user_action, create_new_attempt, has_existing_actions
-from config import USE_SEGMENTED_VIEW, DEMO_VIDEO_HEIGHT, should_show_demo_video, SESSION_TIMEOUT, EXECUTE_LIMIT_OFFSET
+from config import USE_SEGMENTED_VIEW, should_show_demo_video, SESSION_TIMEOUT, EXECUTE_LIMIT_OFFSET
 from process_session import ScrewPlanFailureError, ProcessSessionProxy
 from note_content import get_task_hint
 
@@ -96,22 +94,6 @@ def _ui_option_label(session, opt_label: str, opt_idx: int) -> str:
         }
         return routestick_map.get(int(opt_idx), opt_label)
     return opt_label
-
-
-def _mjpeg_stream_html(uid):
-    """Generate MJPEG stream HTML for the livestream display."""
-    random_id = int(time.time() * 1000)
-    return (
-        f'<div id="combined_view_html">'
-        f'<img src="/video_feed/{uid}?r={random_id}" '
-        f'style="max-width:100%;width:100%;height:auto;margin:0 auto;'
-        f'display:block;border-radius:8px;object-fit:contain;" '
-        f'alt="Desk View | Robot View" /></div>'
-    )
-
-
-MJPEG_WAITING_HTML = "<div id='combined_view_html'><p>Waiting for video stream...</p></div>"
-MJPEG_PAUSED_HTML = "<div id='combined_view_html'><p>Stream paused.</p></div>"
 
 
 def format_log_markdown(log_message):
@@ -201,8 +183,8 @@ def on_video_end(uid):
     return format_log_markdown("please select the action below 👇🏻,\nsome actions also need to select keypoint")
 
 
-def switch_to_livestream_phase(uid):
-    """Keep live_obs visible during execute and disable interactions while refreshing."""
+def switch_to_execute_phase(uid):
+    """Disable controls and keypoint clicking during execute playback."""
     if uid:
         session = get_session(uid)
         base_count = len(getattr(session, "base_frames", []) or []) if session else 0
@@ -213,12 +195,9 @@ def switch_to_livestream_phase(uid):
                 "take_next": True,  # downsample x2 by enqueueing every other frame
             }
     return (
-        gr.update(visible=False),  # livestream_phase_group
-        gr.update(visible=True),   # action_phase_group
         gr.update(interactive=False),  # options_radio
         gr.update(interactive=False),  # exec_btn
         gr.update(interactive=False),  # next_task_btn
-        gr.update(value=MJPEG_PAUSED_HTML),  # combined_display
         gr.update(interactive=False),  # img_display
     )
 
@@ -229,12 +208,9 @@ def switch_to_action_phase(uid=None):
         with _LIVE_OBS_REFRESH_LOCK:
             _LIVE_OBS_REFRESH.pop(uid, None)
     return (
-        gr.update(visible=False),  # livestream_phase_group
-        gr.update(visible=True),   # action_phase_group
         gr.update(interactive=True),  # options_radio
         gr.update(),  # exec_btn (keep execute_step result)
         gr.update(),  # next_task_btn (keep execute_step result)
-        gr.update(value=MJPEG_PAUSED_HTML),  # combined_display
         gr.update(interactive=True),  # img_display
     )
 
@@ -341,9 +317,9 @@ def _prepare_refresh_frame(frame):
 def refresh_live_obs(uid, ui_phase):
     """
     Poll latest cached frame during execute phase.
-    Replaces MJPEG-based livestream by updating live_obs every 0.1s via gr.Timer.
+    Updates live_obs every 0.1s via gr.Timer.
     """
-    if ui_phase != "execution_livestream":
+    if ui_phase != "execution_playback":
         return gr.update()
     session = get_session(uid)
     if not session:
@@ -372,58 +348,6 @@ def refresh_live_obs(uid, ui_phase):
     return gr.update(value=img, interactive=False)
 
 
-def _wait_for_livestream_drain(uid, max_wait_sec=12.0, warmup_sec=0.8, empty_grace_sec=0.5, poll_sec=0.05):
-    """
-    等待当前 execute 产生的直播帧基本播放完成后再切回 action phase。
-
-    设计目标：
-    1. 避免 execute 刚结束就立刻切回，导致 livestream 没播完。
-    2. 允许短暂帧同步延迟（warmup），防止“队列暂时为空但后续还有帧”。
-    3. 设置最大等待时间，避免异常情况下无限阻塞 UI。
-    """
-    if not uid:
-        return
-
-    start_time = time.time()
-    empty_since = None
-    seen_non_empty = False
-    loop_count = 0
-
-    while True:
-        loop_count += 1
-        elapsed = time.time() - start_time
-        if elapsed >= max_wait_sec:
-            break
-
-        queue_info = get_frame_queue_info(uid)
-        if not queue_info:
-            break
-
-        frame_queue = queue_info.get("frame_queue")
-        if frame_queue is None:
-            break
-
-        try:
-            queue_size = frame_queue.qsize()
-        except (NotImplementedError, AttributeError):
-            break
-
-        if queue_size > 0:
-            seen_non_empty = True
-            empty_since = None
-        else:
-            # 执行结束后，给帧同步一点缓冲时间，避免误判“已播完”。
-            if (not seen_non_empty) and elapsed < warmup_sec:
-                time.sleep(poll_sec)
-                continue
-
-            if empty_since is None:
-                empty_since = time.time()
-            elif (time.time() - empty_since) >= empty_grace_sec:
-                break
-
-        time.sleep(poll_sec)
-
 def on_video_end_transition(uid):
     """Called when demo video finishes. Transition from video to action phase."""
     return (
@@ -443,14 +367,12 @@ def _login_failed_response(uid, message):
         gr.update(value=None, interactive=False), format_log_markdown(""),  # img, log_output
         gr.update(choices=[], value=None),  # options
         "", "No need for coordinates",  # goal, coords
-        gr.update(value=MJPEG_WAITING_HTML),  # combined_display
         gr.update(value=None, visible=False),  # video_display
         "", "",  # task_info, progress_info
         gr.update(interactive=True),  # login_btn
         gr.update(interactive=False),  # next_task_btn
         gr.update(interactive=False),  # exec_btn
         gr.update(visible=False),  # video_phase_group
-        gr.update(visible=False),  # livestream_phase_group
         gr.update(visible=False),  # action_phase_group
         gr.update(visible=False),  # control_panel_group
         gr.update(value=""),  # task_hint_display
@@ -486,7 +408,8 @@ def _load_status_task(username, uid, status, login_message=None):
 
     print(f"Loading {env_id} Ep {ep_num} for {uid} (User: {username})")
 
-    cleanup_frame_queue(uid)
+    with _LIVE_OBS_REFRESH_LOCK:
+        _LIVE_OBS_REFRESH.pop(uid, None)
     clear_coordinate_clicks(uid)
     clear_option_selects(uid)
     reset_play_button_clicked(uid)
@@ -500,7 +423,6 @@ def _load_status_task(username, uid, status, login_message=None):
         set_task_start_time(username, env_id, int(ep_num), start_time)
 
     if img is None:
-        combined_html = _mjpeg_stream_html(uid)
         set_ui_phase(uid, "executing_task")
         return (
             uid,
@@ -510,14 +432,12 @@ def _load_status_task(username, uid, status, login_message=None):
             gr.update(value=None, interactive=False), format_log_markdown(f"Error: {load_msg}"),
             gr.update(choices=[], value=None),
             "", "No need for coordinates",
-            gr.update(value=combined_html),  # combined_display
             gr.update(value=None, visible=False),  # video_display
             f"{actual_env_id} (Episode {ep_num})", progress_text,
             gr.update(interactive=True),  # login_btn
             gr.update(interactive=False),  # next_task_btn
             gr.update(interactive=False),  # exec_btn
             gr.update(visible=False),  # video_phase_group
-            gr.update(visible=False),  # livestream_phase_group
             gr.update(visible=True),  # action_phase_group
             gr.update(visible=True),  # control_panel_group
             gr.update(value=get_task_hint(env_id) if env_id else ""),  # task_hint_display
@@ -563,7 +483,6 @@ def _load_status_task(username, uid, status, login_message=None):
                 demo_video_path = None
 
     img = session.get_pil_image(use_segmented=USE_SEGMENTED_VIEW)
-    combined_html = _mjpeg_stream_html(uid)
     ui_login_msg = login_message if login_message else f"Logged in as {username}"
 
     if has_demo_video:
@@ -579,7 +498,6 @@ def _load_status_task(username, uid, status, login_message=None):
             gr.update(choices=radio_choices, value=None),
             goal_text,
             "No need for coordinates",
-            gr.update(value=combined_html),  # combined_display
             gr.update(value=demo_video_path, visible=True),  # video_display
             f"{actual_env_id} (Episode {ep_num})",
             progress_text,
@@ -587,7 +505,6 @@ def _load_status_task(username, uid, status, login_message=None):
             gr.update(interactive=False),  # next_task_btn
             gr.update(interactive=True),  # exec_btn
             gr.update(visible=True),  # video_phase_group
-            gr.update(visible=False),  # livestream_phase_group
             gr.update(visible=False),  # action_phase_group
             gr.update(visible=False),  # control_panel_group
             gr.update(value=get_task_hint(actual_env_id)),  # task_hint_display
@@ -606,7 +523,6 @@ def _load_status_task(username, uid, status, login_message=None):
         gr.update(choices=radio_choices, value=None),  # options_radio
         goal_text,  # goal_box
         "No need for coordinates",  # coords_box
-        gr.update(value=combined_html),  # combined_display
         gr.update(value=None, visible=False),  # video_display (no video)
         f"{actual_env_id} (Episode {ep_num})",  # task_info_box
         progress_text,  # progress_info_box
@@ -614,7 +530,6 @@ def _load_status_task(username, uid, status, login_message=None):
         gr.update(interactive=False),  # next_task_btn
         gr.update(interactive=True),  # exec_btn
         gr.update(visible=False),  # video_phase_group
-        gr.update(visible=False),  # livestream_phase_group
         gr.update(visible=True),  # action_phase_group
         gr.update(visible=True),  # control_panel_group
         gr.update(value=get_task_hint(actual_env_id)),  # task_hint_display
@@ -968,7 +883,6 @@ def init_app(request: gr.Request):
         gr.update(choices=[], value=None),  # options_radio
         "",  # goal_box
         "No need for coordinates",  # coords_box
-        gr.update(value=MJPEG_WAITING_HTML),  # combined_display
         gr.update(value=None, visible=False),  # video_display
         "",  # task_info_box
         "",  # progress_info_box
@@ -977,7 +891,6 @@ def init_app(request: gr.Request):
         gr.update(interactive=False),  # exec_btn
         "",  # username_state
         gr.update(visible=False),  # video_phase_group
-        gr.update(visible=False),  # livestream_phase_group
         gr.update(visible=False),  # action_phase_group
         gr.update(visible=False),  # control_panel_group
         gr.update(value=""),  # task_hint_display
@@ -997,14 +910,14 @@ def init_app(request: gr.Request):
             # 调用 login_and_load_task 进行登录和任务加载
             login_results = login_and_load_task(username, uid)
             
-            # login_and_load_task returns 22 values:
+            # login_and_load_task returns 20 values:
             # (uid, login_group, main_interface, login_msg, img_display, log_output,
-            #  options_radio, goal_box, coords_box, combined_display, video_display,
-            #  task_info_box, progress_info_box, login_btn, next_task_btn, exec_btn,
-            #  video_phase_group, livestream_phase_group, action_phase_group, control_panel_group,
+            #  options_radio, goal_box, coords_box, video_display, task_info_box,
+            #  progress_info_box, login_btn, next_task_btn, exec_btn,
+            #  video_phase_group, action_phase_group, control_panel_group,
             #  task_hint_display, loading_overlay)
 
-            # init_app needs 24 values: same but with loading_group + username_state, without loading_overlay
+            # init_app needs 21 values: same but with loading_group + username_state, without loading_overlay
             return (
                 login_results[0],                    # uid
                 gr.update(visible=False),            # loading_group
@@ -1016,19 +929,17 @@ def init_app(request: gr.Request):
                 login_results[6],                    # options_radio
                 login_results[7],                    # goal_box
                 login_results[8],                    # coords_box
-                login_results[9],                    # combined_display
-                login_results[10],                   # video_display
-                login_results[11],                   # task_info_box
-                login_results[12],                   # progress_info_box
-                login_results[13],                   # login_btn
-                login_results[14],                   # next_task_btn
-                login_results[15],                   # exec_btn
+                login_results[9],                    # video_display
+                login_results[10],                   # task_info_box
+                login_results[11],                   # progress_info_box
+                login_results[12],                   # login_btn
+                login_results[13],                   # next_task_btn
+                login_results[14],                   # exec_btn
                 username,                            # username_state
-                login_results[16],                   # video_phase_group
-                login_results[17],                   # livestream_phase_group
-                login_results[18],                   # action_phase_group
-                login_results[19],                   # control_panel_group
-                login_results[20],                   # task_hint_display
+                login_results[15],                   # video_phase_group
+                login_results[16],                   # action_phase_group
+                login_results[17],                   # control_panel_group
+                login_results[18],                   # task_hint_display
             )
         else:
             # 用户名不存在，显示错误消息但仍显示登录界面
@@ -1046,7 +957,6 @@ def init_app(request: gr.Request):
                 gr.update(choices=[], value=None),  # options_radio
                 "",  # goal_box
                 "No need for coordinates",  # coords_box
-                gr.update(value=MJPEG_WAITING_HTML),  # combined_display
                 gr.update(value=None, visible=False),  # video_display
                 "",  # task_info_box
                 "",  # progress_info_box
@@ -1055,7 +965,6 @@ def init_app(request: gr.Request):
                 gr.update(interactive=False),  # exec_btn
                 "",  # username_state
                 gr.update(visible=False),  # video_phase_group
-                gr.update(visible=False),  # livestream_phase_group
                 gr.update(visible=False),  # action_phase_group
                 gr.update(visible=False),  # control_panel_group
                 gr.update(value=""),  # task_hint_display
@@ -1128,7 +1037,7 @@ def execute_step(uid, username, option_idx, coords_str):
     
     session = get_session(uid)
     if not session:
-        return None, format_log_markdown("Session Error"), gr.update(), gr.update(), gr.update(interactive=False), gr.update(interactive=False), gr.update(visible=False)
+        return None, format_log_markdown("Session Error"), gr.update(), gr.update(), gr.update(interactive=False), gr.update(interactive=False)
     
     # 检查 execute 次数限制（在执行前检查，如果达到限制则模拟失败状态）
     execute_limit_reached = False
@@ -1148,7 +1057,7 @@ def execute_step(uid, username, option_idx, coords_str):
         session.update_observation(use_segmentation=USE_SEGMENTED_VIEW)
     
     if option_idx is None:
-        return session.get_pil_image(use_segmented=USE_SEGMENTED_VIEW), format_log_markdown("Error: No action selected"), gr.update(), gr.update(), gr.update(interactive=False), gr.update(interactive=True), gr.update(visible=False)
+        return session.get_pil_image(use_segmented=USE_SEGMENTED_VIEW), format_log_markdown("Error: No action selected"), gr.update(), gr.update(), gr.update(interactive=False), gr.update(interactive=True)
 
     # 检查当前选项是否需要坐标
     needs_coords = False
@@ -1176,7 +1085,7 @@ def execute_step(uid, username, option_idx, coords_str):
         if not is_valid_coords:
             current_img = session.get_pil_image(use_segmented=USE_SEGMENTED_VIEW)
             error_msg = "please click the keypoint selection image before execute!"
-            return current_img, format_log_markdown(error_msg), gr.update(), gr.update(), gr.update(interactive=False), gr.update(interactive=True), gr.update(visible=False)
+            return current_img, format_log_markdown(error_msg), gr.update(), gr.update(), gr.update(interactive=False), gr.update(interactive=True)
 
     # Parse coords
     click_coords = None
@@ -1337,7 +1246,7 @@ def execute_step(uid, username, option_idx, coords_str):
             print(f"Error logging action execute: {e}")
             traceback.print_exc()
     
-    # 注意：执行阶段画面由 live_obs 的 0.1s 轮询刷新，不在这里更新 combined_display。
+    # 注意：执行阶段画面由 live_obs 的 0.1s 轮询刷新。
     
     progress_update = gr.update()  # 默认不更新 progress
     task_update = gr.update()

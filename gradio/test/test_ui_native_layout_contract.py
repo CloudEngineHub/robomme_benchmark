@@ -43,10 +43,8 @@ def test_native_ui_config_contains_phase_machine_and_precheck_chain(reload_modul
             "log_card",
             "control_panel_group",
             "video_phase_group",
-            "livestream_phase_group",
             "action_phase_group",
             "demo_video",
-            "combined_view_html",
             "live_obs",
             "action_radio",
             "coords_box",
@@ -66,7 +64,7 @@ def test_native_ui_config_contains_phase_machine_and_precheck_chain(reload_modul
 
         api_names = [dep.get("api_name") for dep in cfg.get("dependencies", [])]
         assert "precheck_execute_inputs" in api_names
-        assert "switch_to_livestream_phase" in api_names
+        assert "switch_to_execute_phase" in api_names
         assert "execute_step" in api_names
         assert "switch_to_action_phase" in api_names
     finally:

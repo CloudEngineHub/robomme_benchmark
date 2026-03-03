@@ -8,7 +8,7 @@
 
 本模块是整个应用的入口点，负责：
 1. 创建 FastAPI 应用实例
-2. 注册视频流路由（MJPEG流式传输）
+2. 创建 Gradio UI 界面
 3. 创建 Gradio UI 界面
 4. 将 Gradio 应用挂载到 FastAPI
 5. 启动 uvicorn 服务器
@@ -16,11 +16,6 @@
 模块依赖关系及功能说明：
 
 main.py (本模块 - 主进程)
-  ├── streaming_service.py
-  │   └── 功能：注册 FastAPI 路由 /video_feed/{uid}，提供 MJPEG 流式视频端点
-  │       负责处理实时视频流的生成和传输
-  │       从 ProcessSessionProxy 的本地缓存读取视频帧
-  │
   └── ui_layout.py
       └── 功能：创建 Gradio Blocks 界面，定义所有 UI 组件和事件绑定
            返回配置好的 demo 对象供挂载使用
@@ -43,7 +38,7 @@ ui_layout.py (视图层 - 主进程)
   ├── config.py
   │   └── 功能：应用配置常量
   │       - USE_SEGMENTED_VIEW: 是否使用分割视图
-  │       - ENV_IDS: 环境ID列表
+  │       - DEMO_VIDEO_ENV_IDS: 需要展示演示视频的环境ID列表
   │       - KEYPOINT_SELECTION_SCALE / CONTROL_PANEL_SCALE: 两列宽度比例
   │
   └── state_manager.py
@@ -57,7 +52,7 @@ gradio_callbacks.py (控制层 - 主进程)
   │       - TASK_INDEX_MAP: 存储任务索引和进度信息
   │       - COORDINATE_CLICKS: 跟踪坐标点击事件
   │       - OPTION_SELECTS: 跟踪选项选择事件
-  │       - FRAME_QUEUES: 管理视频帧队列（用于流式传输）
+  │       - UI 交互中间状态与会话生命周期
   │       提供线程安全的访问方法
   │
   ├── process_session.py
@@ -66,13 +61,6 @@ gradio_callbacks.py (控制层 - 主进程)
   │       - session_worker_loop: 工作进程中的循环，运行实际的 OracleSession
   │       - 通过 multiprocessing.Queue 进行进程间通信
   │       - 后台线程实时同步视频帧到主进程缓存
-  │
-  ├── streaming_service.py
-  │   └── 功能：流媒体服务管理
-  │       - FrameQueueManager: 管理帧队列的初始化和清理
-  │       - 启动/停止后台监控线程
-  │       - 从 ProcessSessionProxy 的本地缓存读取帧并加入队列
-  │       - 处理实时帧的入队和出队
   │
   ├── image_utils.py
   │   └── 功能：图像处理工具函数（纯函数，无状态）
@@ -97,18 +85,6 @@ gradio_callbacks.py (控制层 - 主进程)
           - log_user_action: 记录用户操作
           - create_new_attempt: 创建新的尝试记录
           - has_existing_actions: 检查是否存在已有操作
-
-streaming_service.py (流媒体服务层 - 主进程)
-  ├── state_manager.py
-  │   └── 功能：获取 Session 和队列信息
-  │       - 通过 get_session() 获取 ProcessSessionProxy（代理对象）
-  │       - 通过 FRAME_QUEUES 访问帧队列
-  │       - 监控 ProcessSessionProxy.base_frames 的变化
-  │       - 这些帧数据由后台同步线程从工作进程实时更新到主进程缓存
-  │
-  └── image_utils.py
-      └── 功能：使用 concatenate_frames_horizontally 函数
-            处理 base_frames 并添加标注和坐标系
 
 image_utils.py (工具层)
   └── 功能：纯工具函数库，无业务逻辑依赖
@@ -144,7 +120,6 @@ config.py (配置层)
 4. 数据同步：
    - ProcessSessionProxy 维护本地状态缓存（base_frames 等）
    - 后台同步线程持续从 stream_queue 接收新帧并更新缓存
-   - streaming_service 从代理的本地缓存读取帧数据，无需直接访问工作进程
 
 架构设计原则：
 1. 关注点分离：每个模块只负责一个明确的功能领域
@@ -160,7 +135,6 @@ import socket
 import uvicorn
 import gradio as gr
 from fastapi import FastAPI
-from streaming_service import create_video_feed_route
 from ui_layout import create_ui_blocks
 from state_manager import start_timeout_monitor
 from user_manager import user_manager
@@ -288,9 +262,6 @@ def start_user_server(username, port, gpu_id):
     # 创建独立的 FastAPI 应用实例
     fastapi_app = FastAPI(title=f"HistoryBench Oracle Planner - {username}")
 
-    # 注册视频流路由
-    create_video_feed_route(fastapi_app)
-    
     # 创建 Gradio UI
     demo = create_ui_blocks()
     
@@ -410,14 +381,6 @@ if __name__ == "__main__":
         port = user_port_map[username]
         login_link = f"http://localhost:{port}/?user={username}&__theme=light"
         print(f"  {username:20s} -> {login_link}")
-    print("-" * 60)
-    
-    print("\nMJPEG 流媒体端点:")
-    print("-" * 60)
-    for username in sorted(available_users):
-        port = user_port_map[username]
-        stream_endpoint = f"http://localhost:{port}/video_feed/{{uid}}"
-        print(f"  {username:20s} -> {stream_endpoint}")
     print("-" * 60)
     
     print("="*60)

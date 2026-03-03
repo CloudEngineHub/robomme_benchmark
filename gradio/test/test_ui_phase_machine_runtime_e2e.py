@@ -56,9 +56,6 @@ def phase_machine_ui_url():
             with gr.Column(visible=False, elem_id="video_phase_group") as video_phase_group:
                 video_display = gr.Video(value=None, elem_id="demo_video", autoplay=True)
 
-            with gr.Column(visible=False, elem_id="livestream_phase_group") as livestream_phase_group:
-                combined_display = gr.HTML("<div id='combined_view_html'><p>waiting</p></div>", elem_id="combined_view_html")
-
             with gr.Column(visible=False, elem_id="action_phase_group") as action_phase_group:
                 img_display = gr.Image(value=np.zeros((24, 24, 3), dtype=np.uint8), elem_id="live_obs")
 
@@ -80,7 +77,6 @@ def phase_machine_ui_url():
                 gr.update(visible=False),
                 gr.update(visible=False),
                 gr.update(visible=False),
-                gr.update(visible=False),
                 gr.update(value="please click the keypoint selection image"),
                 "demo_video",
             )
@@ -99,15 +95,13 @@ def phase_machine_ui_url():
             if state["precheck_calls"] == 1:
                 raise gr.Error("please click the keypoint selection image before execute!")
 
-        def to_livestream_fn():
+        def to_execute_fn():
             return (
-                gr.update(visible=True),
-                gr.update(visible=False),
                 gr.update(interactive=False),
                 gr.update(interactive=False),
                 gr.update(interactive=False),
-                gr.update(value="<div id='combined_view_html'><p>live</p></div>"),
-                "execution_livestream",
+                gr.update(interactive=False),
+                "execution_playback",
             )
 
         def execute_fn():
@@ -120,8 +114,7 @@ def phase_machine_ui_url():
 
         def to_action_fn():
             return (
-                gr.update(visible=False),
-                gr.update(visible=True),
+                gr.update(interactive=True),
                 gr.update(interactive=True),
                 gr.update(interactive=True),
                 gr.update(interactive=True),
@@ -135,7 +128,6 @@ def phase_machine_ui_url():
                 main_interface,
                 video_phase_group,
                 video_display,
-                livestream_phase_group,
                 action_phase_group,
                 control_panel_group,
                 action_buttons_row,
@@ -157,14 +149,12 @@ def phase_machine_ui_url():
             outputs=[],
             queue=False,
         ).then(
-            fn=to_livestream_fn,
+            fn=to_execute_fn,
             outputs=[
-                livestream_phase_group,
-                action_phase_group,
                 options_radio,
                 exec_btn,
                 next_task_btn,
-                combined_display,
+                img_display,
                 phase_state,
             ],
             queue=False,
@@ -174,7 +164,7 @@ def phase_machine_ui_url():
             queue=False,
         ).then(
             fn=to_action_fn,
-            outputs=[livestream_phase_group, action_phase_group, options_radio, exec_btn, next_task_btn, phase_state],
+            outputs=[options_radio, exec_btn, next_task_btn, img_display, phase_state],
             queue=False,
         )
 
@@ -228,7 +218,6 @@ def test_phase_machine_runtime_flow_and_execute_precheck(phase_machine_ui_url):
                 };
                 return {
                     video: visible('demo_video'),
-                    livestream: visible('combined_view_html'),
                     action: visible('live_obs'),
                     control: visible('action_radio'),
                 };
@@ -236,7 +225,6 @@ def test_phase_machine_runtime_flow_and_execute_precheck(phase_machine_ui_url):
         )
         assert phase_after_login == {
             "video": True,
-            "livestream": False,
             "action": False,
             "control": False,
         }
@@ -280,12 +268,11 @@ def test_phase_machine_runtime_flow_and_execute_precheck(phase_machine_ui_url):
                     return getComputedStyle(el).display !== 'none';
                 };
                 return {
-                    livestream: visible('combined_view_html'),
                     action: visible('live_obs'),
                 };
             }"""
         )
-        assert phase_after_failed_precheck == {"livestream": False, "action": True}
+        assert phase_after_failed_precheck == {"action": True}
 
         did_click_exec = page.evaluate(
             """() => {
@@ -299,8 +286,12 @@ def test_phase_machine_runtime_flow_and_execute_precheck(phase_machine_ui_url):
 
         page.wait_for_function(
             """() => {
-                const live = document.getElementById('combined_view_html');
-                return !!live && getComputedStyle(live).display !== 'none';
+                const resolveButton = (id) => {
+                    return document.querySelector(`#${id} button`) || document.querySelector(`button#${id}`);
+                };
+                const execBtn = resolveButton('exec_btn');
+                const nextBtn = resolveButton('next_task_btn');
+                return !!execBtn && !!nextBtn && execBtn.disabled === true && nextBtn.disabled === true;
             }"""
         )
 

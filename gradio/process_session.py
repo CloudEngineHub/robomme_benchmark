@@ -300,7 +300,7 @@ class ProcessSessionProxy:
         
         此线程持续运行，实时接收工作进程推送的新视频帧，
         并将其追加到本地的 base_frames 和 wrist_frames 列表中。
-        这样 streaming_service 就可以直接从代理的本地缓存读取帧数据。
+        UI 刷新逻辑会直接从代理的本地缓存读取帧数据。
         """
         while not self.stop_sync:
             try:

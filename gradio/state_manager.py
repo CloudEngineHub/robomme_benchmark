@@ -5,9 +5,8 @@
 本模块负责：
 1. 创建和管理 ProcessSessionProxy 实例（每个用户一个）
 2. 存储任务索引、坐标点击、选项选择等UI状态
-3. 管理视频帧队列（用于MJPEG流式传输）
-4. 提供线程安全的访问接口
-5. 清理会话资源（当用户重复登录时，自动清理旧会话的进程和状态）
+3. 提供线程安全的访问接口
+4. 清理会话资源（当用户重复登录时，自动清理旧会话的进程和状态）
 
 注意：GLOBAL_SESSIONS 中存储的是 ProcessSessionProxy 对象，而不是 OracleSession。
 实际的 OracleSession 运行在独立的工作进程中，通过代理对象进行通信。
@@ -16,7 +15,6 @@
 import uuid
 import threading
 import traceback
-import queue
 import time
 from process_session import ProcessSessionProxy
 
@@ -36,11 +34,6 @@ COORDINATE_CLICKS = {}  # {uid: [{"coordinates": {"x": x, "y": y}, "coords_str":
 # --- 选项选择跟踪（两次动作之间） ---
 # 跟踪每个session从上次action_execute到现在的所有option_select
 OPTION_SELECTS = {}  # {uid: [{"option_idx": idx, "option_label": label, "timestamp": "..."}, ...]}
-
-# --- 视频帧队列存储（用于流式传输） ---
-# 全局队列存储：{uid: {"frame_queue": queue.Queue, "last_base_count": int, "last_wrist_count": int, "streaming_active": bool}}
-# 注意：帧数据来自 ProcessSessionProxy 的本地缓存，由后台同步线程从工作进程实时更新
-FRAME_QUEUES = {}
 
 # --- UI阶段存储 ---
 # 存储每个session的UI阶段："watching_demo" 或 "executing_task"
@@ -161,12 +154,6 @@ def add_option_select(uid, select_data):
         if uid not in OPTION_SELECTS:
             OPTION_SELECTS[uid] = []
         OPTION_SELECTS[uid].append(select_data)
-
-
-def get_frame_queue_info(uid):
-    """获取帧队列信息"""
-    with _state_lock:
-        return FRAME_QUEUES.get(uid)
 
 
 def get_ui_phase(uid):
@@ -339,41 +326,13 @@ def cleanup_session(uid):
     此函数会清理与指定 uid 相关的所有资源：
     1. 关闭 ProcessSessionProxy（会终止工作进程，释放 RAM/VRAM）
     2. 从 GLOBAL_SESSIONS 中移除
-    3. 清理所有相关的状态数据（任务索引、坐标点击、选项选择、帧队列、UI阶段）
-    4. 清理流生成ID（用于终止旧的MJPEG流）
+    3. 清理所有相关的状态数据（任务索引、坐标点击、选项选择、UI阶段）
     
     Args:
         uid: 要清理的会话ID
     """
     if not uid:
         return
-    
-    # 先获取需要清理的帧队列信息（在锁外，避免死锁）
-    frame_queue_info = None
-    with _state_lock:
-        if uid in FRAME_QUEUES:
-            frame_queue_info = FRAME_QUEUES[uid]
-    
-    # 在锁外停止帧队列的流式传输（避免死锁）
-    if frame_queue_info:
-        try:
-            frame_queue_info["streaming_active"] = False
-            # 清空队列中的所有帧
-            while not frame_queue_info["frame_queue"].empty():
-                try:
-                    frame_queue_info["frame_queue"].get_nowait()
-                except queue.Empty:
-                    break
-        except Exception as e:
-            print(f"Error stopping frame queue for {uid}: {e}")
-    
-    # 清理流生成ID（在锁外，因为它在 streaming_service 模块中）
-    try:
-        from streaming_service import STREAM_GENERATIONS
-        if uid in STREAM_GENERATIONS:
-            STREAM_GENERATIONS[uid] = STREAM_GENERATIONS.get(uid, 0) + 1
-    except Exception as e:
-        print(f"Error updating stream generation for {uid}: {e}")
     
     with _state_lock:
         # 1. 关闭 ProcessSessionProxy（终止工作进程）
@@ -392,27 +351,22 @@ def cleanup_session(uid):
             del GLOBAL_SESSIONS[uid]
             print(f"Session {uid}: removed from GLOBAL_SESSIONS")
         
-        # 3. 清理帧队列
-        if uid in FRAME_QUEUES:
-            del FRAME_QUEUES[uid]
-            print(f"Session {uid}: frame queue cleaned up")
-        
-        # 4. 清理任务索引
+        # 3. 清理任务索引
         if uid in TASK_INDEX_MAP:
             del TASK_INDEX_MAP[uid]
             print(f"Session {uid}: task index cleaned up")
         
-        # 5. 清理坐标点击
+        # 4. 清理坐标点击
         if uid in COORDINATE_CLICKS:
             del COORDINATE_CLICKS[uid]
             print(f"Session {uid}: coordinate clicks cleaned up")
         
-        # 6. 清理选项选择
+        # 5. 清理选项选择
         if uid in OPTION_SELECTS:
             del OPTION_SELECTS[uid]
             print(f"Session {uid}: option selects cleaned up")
         
-        # 7. 清理UI阶段
+        # 6. 清理UI阶段
         if uid in UI_PHASE_MAP:
             del UI_PHASE_MAP[uid]
         
@@ -421,12 +375,12 @@ def cleanup_session(uid):
             del PLAY_BUTTON_CLICKED[uid]
             print(f"Session {uid}: UI phase cleaned up")
         
-        # 8. 清理活动时间跟踪
+        # 7. 清理活动时间跟踪
         if uid in SESSION_LAST_ACTIVITY:
             del SESSION_LAST_ACTIVITY[uid]
             print(f"Session {uid}: last activity time cleaned up")
         
-        # 9. 清理超时警告标志
+        # 8. 清理超时警告标志
         if uid in SESSION_TIMEOUT_WARNED:
             del SESSION_TIMEOUT_WARNED[uid]
             print(f"Session {uid}: timeout warning flag cleaned up")

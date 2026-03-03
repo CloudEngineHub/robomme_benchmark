@@ -1,6 +1,6 @@
 """
 Native Gradio UI layout.
-Sequential media phases: Demo Video -> Livestream -> Action+Keypoint.
+Sequential media phases: Demo Video -> Action+Keypoint.
 Two-column layout: Media/Log | Control Panel.
 """
 
@@ -10,8 +10,6 @@ import gradio as gr
 
 from config import (
     CONTROL_PANEL_SCALE,
-    DEMO_VIDEO_HEIGHT,
-    FONT_SIZE,
     KEYPOINT_SELECTION_SCALE,
 )
 from gradio_callbacks import (
@@ -27,7 +25,7 @@ from gradio_callbacks import (
     refresh_live_obs,
     show_loading_info,
     switch_to_action_phase,
-    switch_to_livestream_phase,
+    switch_to_execute_phase,
     switch_env_wrapper,
 )
 from user_manager import user_manager
@@ -36,7 +34,7 @@ from user_manager import user_manager
 PHASE_INIT = "init"
 PHASE_DEMO_VIDEO = "demo_video"
 PHASE_ACTION_KEYPOINT = "action_keypoint"
-PHASE_EXECUTION_LIVESTREAM = "execution_livestream"
+PHASE_EXECUTION_PLAYBACK = "execution_playback"
 
 
 # Deprecated: no runtime JS logic in native Gradio mode.
@@ -73,12 +71,12 @@ def _phase_from_updates(main_interface_update, video_phase_update):
 
 
 def _with_phase_from_login(load_result):
-    phase = _phase_from_updates(load_result[2], load_result[16])
+    phase = _phase_from_updates(load_result[2], load_result[15])
     return (*load_result, phase)
 
 
 def _with_phase_from_init(init_result):
-    phase = _phase_from_updates(init_result[3], init_result[18])
+    phase = _phase_from_updates(init_result[3], init_result[17])
     return (*init_result, phase)
 
 
@@ -177,15 +175,6 @@ def create_ui_blocks():
                                 autoplay=True,
                                 show_label=True,
                                     visible=True,
-                            )
-
-                        with gr.Column(visible=False, elem_id="livestream_phase_group") as livestream_phase_group:
-                           #gr.Markdown("### Execution LiveStream (might be delayed)")
-                            combined_display = gr.HTML(
-                                value="<div id='combined_view_html'><p>Waiting for video stream...</p></div>",
-                                elem_id="combined_view_html",
-                                label="Execution LiveStream (might be delayed)",
-                                show_label=True,
                             )
 
                         # 阶段 3：关键点选择（图像交互）
@@ -321,7 +310,6 @@ def create_ui_blocks():
                 options_radio,
                 goal_box,
                 coords_box,
-                combined_display,
                 video_display,
                 task_info_box,
                 progress_info_box,
@@ -329,7 +317,6 @@ def create_ui_blocks():
                 next_task_btn,
                 exec_btn,
                 video_phase_group,
-                livestream_phase_group,
                 action_phase_group,
                 control_panel_group,
                 task_hint_display,
@@ -352,7 +339,6 @@ def create_ui_blocks():
                 options_radio,
                 goal_box,
                 coords_box,
-                combined_display,
                 video_display,
                 task_info_box,
                 progress_info_box,
@@ -360,7 +346,6 @@ def create_ui_blocks():
                 next_task_btn,
                 exec_btn,
                 video_phase_group,
-                livestream_phase_group,
                 action_phase_group,
                 control_panel_group,
                 task_hint_display,
@@ -383,7 +368,6 @@ def create_ui_blocks():
                 options_radio,
                 goal_box,
                 coords_box,
-                combined_display,
                 video_display,
                 task_info_box,
                 progress_info_box,
@@ -391,7 +375,6 @@ def create_ui_blocks():
                 next_task_btn,
                 exec_btn,
                 video_phase_group,
-                livestream_phase_group,
                 action_phase_group,
                 control_panel_group,
                 task_hint_display,
@@ -426,27 +409,24 @@ def create_ui_blocks():
             outputs=[img_display, options_radio, coords_box, log_output],
         )
 
-        # 执行动作链路：校验输入 -> 切到直播阶段 -> 执行 -> 回到动作选择阶段
+        # 执行动作链路：校验输入 -> 切到执行播放阶段 -> 执行 -> 回到动作选择阶段
         exec_btn.click(
             fn=precheck_execute_inputs,
             inputs=[uid_state, username_state, options_radio, coords_box],
             outputs=[],
             show_progress="hidden",
         ).then(
-            fn=switch_to_livestream_phase,
+            fn=switch_to_execute_phase,
             inputs=[uid_state],
             outputs=[
-                livestream_phase_group,
-                action_phase_group,
                 options_radio,
                 exec_btn,
                 next_task_btn,
-                combined_display,
                 img_display,
             ],
             show_progress="hidden",
         ).then(
-            fn=lambda: PHASE_EXECUTION_LIVESTREAM,
+            fn=lambda: PHASE_EXECUTION_PLAYBACK,
             outputs=[ui_phase_state],
             show_progress="hidden",
         ).then(
@@ -458,12 +438,9 @@ def create_ui_blocks():
             fn=switch_to_action_phase,
             inputs=[uid_state],
             outputs=[
-                livestream_phase_group,
-                action_phase_group,
                 options_radio,
                 exec_btn,
                 next_task_btn,
-                combined_display,
                 img_display,
             ],
             show_progress="hidden",
@@ -496,7 +473,6 @@ def create_ui_blocks():
                 options_radio,
                 goal_box,
                 coords_box,
-                combined_display,
                 video_display,
                 task_info_box,
                 progress_info_box,
@@ -505,7 +481,6 @@ def create_ui_blocks():
                 exec_btn,
                 username_state,
                 video_phase_group,
-                livestream_phase_group,
                 action_phase_group,
                 control_panel_group,
                 task_hint_display,

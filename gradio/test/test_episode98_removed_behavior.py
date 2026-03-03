@@ -82,8 +82,6 @@ def test_execute_step_failed_episode98_still_advances(monkeypatch, reload_module
     monkeypatch.setattr(callbacks, "update_session_activity", lambda uid: None)
     monkeypatch.setattr(callbacks.user_manager, "assert_lease", lambda username, uid: None)
     monkeypatch.setattr(callbacks, "get_session", lambda uid: fake_session)
-    monkeypatch.setattr(callbacks.FrameQueueManager, "init_queue", lambda uid, count: None)
-    monkeypatch.setattr(callbacks, "_wait_for_livestream_drain", lambda uid: None)
     monkeypatch.setattr(callbacks, "get_option_selects", lambda uid: [])
     monkeypatch.setattr(callbacks, "clear_option_selects", lambda uid: None)
     monkeypatch.setattr(callbacks, "get_coordinate_clicks", lambda uid: [])

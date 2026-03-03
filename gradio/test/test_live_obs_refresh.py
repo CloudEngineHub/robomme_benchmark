@@ -31,13 +31,13 @@ def test_refresh_live_obs_updates_image_from_latest_frame(monkeypatch, reload_mo
     monkeypatch.setattr(callbacks, "get_session", lambda uid: session)
 
     # Reset queue state at execute start (cursor anchored at current base_frames length).
-    callbacks.switch_to_livestream_phase("uid-2")
+    callbacks.switch_to_execute_phase("uid-2")
     session.base_frames.extend([frame1, frame2, frame3, frame4])
 
     # Downsample x2 + FIFO => first frame1, then frame3.
-    update1 = callbacks.refresh_live_obs("uid-2", "execution_livestream")
-    update2 = callbacks.refresh_live_obs("uid-2", "execution_livestream")
-    update3 = callbacks.refresh_live_obs("uid-2", "execution_livestream")
+    update1 = callbacks.refresh_live_obs("uid-2", "execution_playback")
+    update2 = callbacks.refresh_live_obs("uid-2", "execution_playback")
+    update3 = callbacks.refresh_live_obs("uid-2", "execution_playback")
 
     assert update1.get("__type__") == "update"
     assert update1.get("interactive") is False
@@ -57,16 +57,12 @@ def test_refresh_live_obs_updates_image_from_latest_frame(monkeypatch, reload_mo
 def test_switch_phase_keeps_live_obs_visible_and_toggles_interactive(reload_module):
     callbacks = reload_module("gradio_callbacks")
 
-    to_exec = callbacks.switch_to_livestream_phase("uid-3")
-    assert len(to_exec) == 7
-    assert to_exec[0].get("visible") is False
-    assert to_exec[1].get("visible") is True
-    assert to_exec[2].get("interactive") is False
-    assert to_exec[6].get("interactive") is False
+    to_exec = callbacks.switch_to_execute_phase("uid-3")
+    assert len(to_exec) == 4
+    assert to_exec[0].get("interactive") is False
+    assert to_exec[3].get("interactive") is False
 
     to_action = callbacks.switch_to_action_phase()
-    assert len(to_action) == 7
-    assert to_action[0].get("visible") is False
-    assert to_action[1].get("visible") is True
-    assert to_action[2].get("interactive") is True
-    assert to_action[6].get("interactive") is True
+    assert len(to_action) == 4
+    assert to_action[0].get("interactive") is True
+    assert to_action[3].get("interactive") is True
