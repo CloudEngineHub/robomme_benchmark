@@ -259,6 +259,55 @@ SYNC_JS = """
 # CSS
 # ==========================================================================
 CSS = f"""
+/* Dark card theme tokens */
+:root {{
+    --app-bg: #0b1120;
+    --surface-bg: #121a2a;
+    --card-bg: #162033;
+    --card-border: rgba(148, 163, 184, 0.25);
+    --text-primary: #e5e7eb;
+    --shadow-soft: 0 10px 30px rgba(2, 6, 23, 0.35);
+    --radius-card: 15px;
+    --gap-card: 14px;
+}}
+
+/* App dark shell fallback (works even without theme query) */
+html, body, #gradio-app, .gradio-container {{
+    background: var(--app-bg) !important;
+    color: var(--text-primary) !important;
+}}
+
+/* Rounded dark cards */
+.round-card {{
+    background: var(--card-bg) !important;
+    border: 1px solid var(--card-border) !important;
+    border-radius: var(--radius-card) !important;
+    padding: var(--gap-card) !important;
+    box-shadow: var(--shadow-soft) !important;
+}}
+
+/* Nested cards for grouped regions inside round-card */
+.round-card .gr-group {{
+    background: var(--surface-bg) !important;
+    border: 1px solid rgba(148, 163, 184, 0.2) !important;
+    border-radius: 12px !important;
+    padding: 12px !important;
+}}
+
+.round-card .prose,
+.round-card h1,
+.round-card h2,
+.round-card h3,
+.round-card h4,
+.round-card h5,
+.round-card h6,
+.round-card p,
+.round-card label,
+.round-card span,
+.round-card div {{
+    color: var(--text-primary) !important;
+}}
+
 /* 全局字体 */
 body, html {{ font-size: {FONT_SIZE} !important; }}
 .gradio-container, #gradio-app {{ font-size: {FONT_SIZE} !important; }}
@@ -441,7 +490,13 @@ def create_ui_blocks():
         first_goal = extract_first_goal(goal_text or "")
         return f"**Goal:** {first_goal}" if first_goal else ""
 
-    with gr.Blocks(title="Oracle Planner Interface") as demo:
+    blocks_kwargs = {"title": "Oracle Planner Interface"}
+    try:
+        blocks_kwargs["theme"] = gr.themes.Monochrome()
+    except Exception:
+        pass
+
+    with gr.Blocks(**blocks_kwargs) as demo:
         # =================================================================
         # Header: Title + Current Task + First Goal
         # =================================================================
@@ -495,44 +550,45 @@ def create_ui_blocks():
             with gr.Row():
                 # ---- Left column: Video / Livestream / Keypoint + System Log ----
                 with gr.Column(scale=KEYPOINT_SELECTION_SCALE):
-                    # Phase 1: VIDEO (auto-play demo video)
-                    with gr.Group(visible=False) as video_phase_group:
-                        gr.Markdown("### Watch the demonstration video")
-                        video_display = gr.Video(
-                            label="Demonstration Video",
-                            interactive=False,
-                            elem_id="demo_video",
-                            autoplay=True,
-                            show_label=False,
-                            visible=True
-                        )
+                    with gr.Group(elem_classes="round-card"):
+                        # Phase 1: VIDEO (auto-play demo video)
+                        with gr.Group(visible=False) as video_phase_group:
+                            gr.Markdown("### Watch the demonstration video")
+                            video_display = gr.Video(
+                                label="Demonstration Video",
+                                interactive=False,
+                                elem_id="demo_video",
+                                autoplay=True,
+                                show_label=False,
+                                visible=True
+                            )
 
-                    # Phase 2: LIVESTREAM (MJPEG during execution)
-                    with gr.Group(visible=False) as livestream_phase_group:
-                        gr.Markdown("### Execution LiveStream (might be delayed)")
-                        combined_display = gr.HTML(
-                            value="<div id='combined_view_html'><p>Waiting for video stream...</p></div>",
-                            elem_id="combined_view_html"
-                        )
+                        # Phase 2: LIVESTREAM (MJPEG during execution)
+                        with gr.Group(visible=False) as livestream_phase_group:
+                            gr.Markdown("### Execution LiveStream (might be delayed)")
+                            combined_display = gr.HTML(
+                                value="<div id='combined_view_html'><p>Waiting for video stream...</p></div>",
+                                elem_id="combined_view_html"
+                            )
 
-                    # Phase 3: KEYPOINT SELECTION
-                    with gr.Group(visible=False) as action_phase_group:
-                        gr.Markdown("### Keypoint Selection")
-                        img_display = gr.Image(
-                            label="Live Observation", interactive=False,
-                            type="pil", elem_id="live_obs", show_label=False
-                        )
+                        # Phase 3: KEYPOINT SELECTION
+                        with gr.Group(visible=False) as action_phase_group:
+                            gr.Markdown("### Keypoint Selection")
+                            img_display = gr.Image(
+                                label="Live Observation", interactive=False,
+                                type="pil", elem_id="live_obs", show_label=False
+                            )
 
-                    with gr.Group():
-                        gr.Markdown("### System Log")
-                        log_output = gr.Markdown(
-                            value="", elem_classes="compact-log",
-                            elem_id="log_output"
-                        )
+                        with gr.Group():
+                            gr.Markdown("### System Log")
+                            log_output = gr.Markdown(
+                                value="", elem_classes="compact-log",
+                                elem_id="log_output"
+                            )
 
                 # ---- Right column: Control Panel (vertical) ----
                 with gr.Column(scale=CONTROL_PANEL_SCALE):
-                    with gr.Group(visible=False) as control_panel_group:
+                    with gr.Group(visible=False, elem_classes="round-card") as control_panel_group:
                         gr.Markdown("### Control Panel")
                         gr.Markdown("**Action Selection**")
                         options_radio = gr.Radio(
@@ -560,7 +616,7 @@ def create_ui_blocks():
                         )
 
             # Task Hint
-            with gr.Group(visible=True):
+            with gr.Group(visible=True, elem_classes="round-card"):
                 gr.Markdown("---")
                 gr.Markdown("### Task Hint")
                 task_hint_display = gr.Markdown(value="", elem_id="task_hint_display")
