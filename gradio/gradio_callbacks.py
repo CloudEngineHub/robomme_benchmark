@@ -353,7 +353,6 @@ def login_and_load_task(username, uid):
             gr.update(visible=False), # livestream_phase_group
             gr.update(visible=False), # action_phase_group
             gr.update(visible=False),  # control_panel_group
-            gr.update(visible=False),  # coords_group
             gr.update(value=""),  # task_hint_display
             gr.update(visible=False)  # loading_overlay
         )
@@ -383,7 +382,6 @@ def login_and_load_task(username, uid):
             gr.update(visible=False),  # livestream_phase_group
             gr.update(visible=True),   # action_phase_group (show message)
             gr.update(visible=True),   # control_panel_group
-            gr.update(visible=False),  # coords_group
             gr.update(value=""),  # task_hint_display
             gr.update(visible=False)  # loading_overlay
         )
@@ -466,7 +464,6 @@ def login_and_load_task(username, uid):
             gr.update(visible=False),  # livestream_phase_group
             gr.update(visible=True),   # action_phase_group
             gr.update(visible=True),   # control_panel_group
-            gr.update(visible=False),  # coords_group
             gr.update(value=get_task_hint(env_id) if env_id else ""),  # task_hint_display
             gr.update(visible=False)  # loading_overlay
         )
@@ -606,7 +603,6 @@ def login_and_load_task(username, uid):
             gr.update(visible=False),  # livestream_phase_group
             gr.update(visible=False),  # action_phase_group (hidden until video ends)
             gr.update(visible=False),  # control_panel_group
-            gr.update(visible=False),  # coords_group
             gr.update(value=get_task_hint(actual_env_id)),  # task_hint_display
             gr.update(visible=False)  # loading_overlay
         )
@@ -675,7 +671,6 @@ def login_and_load_task(username, uid):
             gr.update(visible=False),  # livestream_phase_group
             gr.update(visible=True),   # action_phase_group (show directly)
             gr.update(visible=True),   # control_panel_group
-            gr.update(visible=False),  # coords_group (hidden until option selected)
             gr.update(value=get_task_hint(actual_env_id)),  # task_hint_display
             gr.update(visible=False)  # loading_overlay
         )
@@ -811,7 +806,7 @@ def on_option_select(uid, username, option_value, coords_str=None):
     default_msg = "No need for coordinates"
     
     if option_value is None:
-        return default_msg, gr.update(interactive=False), gr.update(visible=False)
+        return default_msg, gr.update(interactive=False)
     
     # Check lease
     if username:
@@ -826,7 +821,7 @@ def on_option_select(uid, username, option_value, coords_str=None):
     
     session = get_session(uid)
     if not session:
-        return default_msg, gr.update(interactive=False), gr.update(visible=False)
+        return default_msg, gr.update(interactive=False)
     
     # option_value 是 (label, idx) 元组或直接是 idx
     if isinstance(option_value, tuple):
@@ -853,10 +848,10 @@ def on_option_select(uid, username, option_value, coords_str=None):
         opt = session.raw_solve_options[option_idx]
         if opt.get("available"):
              if _is_valid_coords_text(coords_str):
-                 return coords_str, gr.update(interactive=True), gr.update(visible=False)
-             return "please click the keypoint selection image", gr.update(interactive=True), gr.update(visible=False)
+                 return coords_str, gr.update(interactive=True)
+             return "please click the keypoint selection image", gr.update(interactive=True)
     
-    return default_msg, gr.update(interactive=False), gr.update(visible=False)
+    return default_msg, gr.update(interactive=False)
 
 
 def on_reference_action(uid, username):
@@ -882,7 +877,6 @@ def on_reference_action(uid, username):
             None,
             gr.update(),
             "No need for coordinates",
-            gr.update(visible=False),
             format_log_markdown("Session Error"),
         )
 
@@ -893,7 +887,6 @@ def on_reference_action(uid, username):
     except Exception as exc:
         return (
             current_img,
-            gr.update(),
             gr.update(),
             gr.update(),
             format_log_markdown(f"Ground Truth Action Error: {exc}"),
@@ -907,7 +900,6 @@ def on_reference_action(uid, username):
             current_img,
             gr.update(),
             gr.update(),
-            gr.update(),
             format_log_markdown(f"Ground Truth Action: {message}"),
         )
 
@@ -919,7 +911,6 @@ def on_reference_action(uid, username):
 
     updated_img = current_img
     coords_text = "No need for coordinates"
-    coords_group_update = gr.update(visible=False)
     log_text = f"Ground Truth Action: {option_label}. {option_action}".strip()
 
     if need_coords and isinstance(coords_xy, (list, tuple)) and len(coords_xy) >= 2:
@@ -927,14 +918,12 @@ def on_reference_action(uid, username):
         y = int(coords_xy[1])
         updated_img = draw_marker(current_img, x, y)
         coords_text = f"{x}, {y}"
-        coords_group_update = gr.update(visible=False)
         log_text = f"Ground Truth Action: {option_label}. {option_action} | coords: {coords_text}"
 
     return (
         updated_img,
         gr.update(value=option_idx),
         coords_text,
-        coords_group_update,
         format_log_markdown(log_text),
     )
 
@@ -990,7 +979,6 @@ def init_app(request: gr.Request):
         gr.update(visible=False),  # livestream_phase_group
         gr.update(visible=False),  # action_phase_group
         gr.update(visible=False),  # control_panel_group
-        gr.update(visible=False),  # coords_group
         gr.update(value=""),  # task_hint_display
     )
     
@@ -1008,12 +996,12 @@ def init_app(request: gr.Request):
             # 调用 login_and_load_task 进行登录和任务加载
             login_results = login_and_load_task(username, uid)
             
-            # login_and_load_task returns 23 values:
+            # login_and_load_task returns 22 values:
             # (uid, login_group, main_interface, login_msg, img_display, log_output,
             #  options_radio, goal_box, coords_box, combined_display, video_display,
             #  task_info_box, progress_info_box, login_btn, next_task_btn, exec_btn,
             #  video_phase_group, livestream_phase_group, action_phase_group, control_panel_group,
-            #  coords_group, task_hint_display, loading_overlay)
+            #  task_hint_display, loading_overlay)
 
             # init_app needs 24 values: same but with loading_group + username_state, without loading_overlay
             return (
@@ -1039,8 +1027,7 @@ def init_app(request: gr.Request):
                 login_results[17],                   # livestream_phase_group
                 login_results[18],                   # action_phase_group
                 login_results[19],                   # control_panel_group
-                login_results[20],                   # coords_group
-                login_results[21],                   # task_hint_display
+                login_results[20],                   # task_hint_display
             )
         else:
             # 用户名不存在，显示错误消息但仍显示登录界面
@@ -1070,7 +1057,6 @@ def init_app(request: gr.Request):
                 gr.update(visible=False),  # livestream_phase_group
                 gr.update(visible=False),  # action_phase_group
                 gr.update(visible=False),  # control_panel_group
-                gr.update(visible=False),  # coords_group
                 gr.update(value=""),  # task_hint_display
             )
     
@@ -1490,10 +1476,7 @@ def execute_step(uid, username, option_idx, coords_str):
     next_task_update = gr.update(interactive=True) if done else gr.update(interactive=False)
     exec_btn_update = gr.update(interactive=False) if done else gr.update(interactive=True)
     
-    # 执行后隐藏Coords区域
-    coords_group_update = gr.update(visible=False)
-    
     # 格式化日志消息为 HTML 格式（支持颜色显示）
     formatted_status = format_log_markdown(status)
     
-    return img, formatted_status, task_update, progress_update, next_task_update, exec_btn_update, coords_group_update
+    return img, formatted_status, task_update, progress_update, next_task_update, exec_btn_update

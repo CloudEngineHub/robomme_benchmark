@@ -40,7 +40,7 @@ def test_on_reference_action_success_updates_option_and_coords(monkeypatch, relo
     monkeypatch.setattr(callbacks, "update_session_activity", lambda uid: None)
     monkeypatch.setattr(callbacks, "get_session", lambda uid: session)
 
-    img, option_update, coords_text, coords_group_update, log_html = callbacks.on_reference_action(
+    img, option_update, coords_text, log_html = callbacks.on_reference_action(
         "uid-1", "user1"
     )
 
@@ -48,7 +48,6 @@ def test_on_reference_action_success_updates_option_and_coords(monkeypatch, relo
     assert img.getpixel((5, 6)) != (0, 0, 0)
     assert option_update.get("value") == 2
     assert coords_text == "5, 6"
-    assert coords_group_update.get("visible") is False
     assert "Ground Truth Action" in log_html
 
 
@@ -58,14 +57,13 @@ def test_on_reference_action_session_missing(monkeypatch, reload_module):
     monkeypatch.setattr(callbacks, "update_session_activity", lambda uid: None)
     monkeypatch.setattr(callbacks, "get_session", lambda uid: None)
 
-    img, option_update, coords_text, coords_group_update, log_html = callbacks.on_reference_action(
+    img, option_update, coords_text, log_html = callbacks.on_reference_action(
         "uid-missing", None
     )
 
     assert img is None
     assert option_update.get("__type__") == "update"
     assert coords_text == "No need for coordinates"
-    assert coords_group_update.get("visible") is False
     assert "Session Error" in log_html
 
 
@@ -92,10 +90,9 @@ def test_on_option_select_keeps_valid_coords_when_option_needs_coords(monkeypatc
     monkeypatch.setattr(callbacks, "get_session", lambda uid: session)
     monkeypatch.setattr(callbacks, "add_option_select", lambda uid, payload: None)
 
-    coords_text, img_update, coords_group_update = callbacks.on_option_select(
+    coords_text, img_update = callbacks.on_option_select(
         "uid-1", "user1", 0, "12, 34"
     )
 
     assert coords_text == "12, 34"
     assert img_update.get("interactive") is True
-    assert coords_group_update.get("visible") is False

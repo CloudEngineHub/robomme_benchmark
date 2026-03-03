@@ -323,16 +323,14 @@ def create_ui_blocks():
                                 show_label=False,
                                 elem_id="action_radio",
                             )
-                            # 坐标输入显示区：仅在需要关键点坐标时展示
-                            with gr.Column(visible=False, elem_id="coords_group") as coords_group:
-                                coords_box = gr.Textbox(
-                                    label="Coords",
-                                    value="",
-                                    interactive=False,
-                                    show_label=False,
-                                    visible=False,
-                                    elem_id="coords_box",
-                                )
+                            coords_box = gr.Textbox(
+                                label="Coords",
+                                value="",
+                                interactive=False,
+                                show_label=False,
+                                visible=False,
+                                elem_id="coords_box",
+                            )
 
                         # 操作按钮区：执行、参考动作、下一任务
                         with gr.Row(elem_id="action_buttons_row"):
@@ -418,7 +416,6 @@ def create_ui_blocks():
                 livestream_phase_group,
                 action_phase_group,
                 control_panel_group,
-                coords_group,
                 task_hint_display,
                 loading_overlay,
                 ui_phase_state,
@@ -450,7 +447,6 @@ def create_ui_blocks():
                 livestream_phase_group,
                 action_phase_group,
                 control_panel_group,
-                coords_group,
                 task_hint_display,
                 loading_overlay,
                 ui_phase_state,
@@ -474,13 +470,13 @@ def create_ui_blocks():
         options_radio.change(
             fn=on_option_select,
             inputs=[uid_state, username_state, options_radio, coords_box],
-            outputs=[coords_box, img_display, coords_group],
+            outputs=[coords_box, img_display],
         )
 
         reference_action_btn.click(
             fn=on_reference_action,
             inputs=[uid_state, username_state],
-            outputs=[img_display, options_radio, coords_box, coords_group, log_output],
+            outputs=[img_display, options_radio, coords_box, log_output],
         )
 
         # 执行动作链路：校验输入 -> 切到直播阶段 -> 执行 -> 回到动作选择阶段
@@ -508,7 +504,7 @@ def create_ui_blocks():
         ).then(
             fn=execute_step,
             inputs=[uid_state, username_state, options_radio, coords_box],
-            outputs=[img_display, log_output, task_info_box, progress_info_box, next_task_btn, exec_btn, coords_group],
+            outputs=[img_display, log_output, task_info_box, progress_info_box, next_task_btn, exec_btn],
             show_progress="hidden",
         ).then(
             fn=switch_to_action_phase,
@@ -554,7 +550,6 @@ def create_ui_blocks():
                 livestream_phase_group,
                 action_phase_group,
                 control_panel_group,
-                coords_group,
                 task_hint_display,
                 ui_phase_state,
             ],
