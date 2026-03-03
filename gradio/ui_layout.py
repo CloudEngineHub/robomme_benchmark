@@ -242,40 +242,153 @@ SYNC_JS = """
     // Runtime card enforcer (DOM-driven inline style, robust against Gradio DOM changes)
     // ========================================================================
     function initFloatingCardEnforcer() {
-        // Lightweight mode only: avoid expensive observers/loops that can freeze UI.
         function setImportant(el, prop, value) {
             if (!el) return;
             el.style.setProperty(prop, value, 'important');
         }
 
-        function nearestGroup(el) {
+        function clearCardSkin(node) {
+            if (!node) return;
+            node.classList.remove('runtime-card');
+            node.style.removeProperty('background');
+            node.style.removeProperty('border');
+            node.style.removeProperty('border-radius');
+            node.style.removeProperty('box-shadow');
+            node.style.removeProperty('overflow');
+            node.style.removeProperty('margin-bottom');
+            node.style.removeProperty('padding');
+        }
+
+        function nearestCardContainer(el) {
             let cur = el;
             for (let i = 0; i < 12 && cur && cur !== document.body; i += 1) {
-                if (cur.classList && cur.classList.contains('gr-group')) return cur;
+                if (cur.classList) {
+                    const id = cur.id || '';
+                    if (
+                        cur.classList.contains('floating-card') ||
+                        cur.classList.contains('runtime-card') ||
+                        id.endsWith('_card')
+                    ) {
+                        return cur;
+                    }
+                }
                 cur = cur.parentElement;
             }
             return null;
         }
 
+        function findByElemId(elemId) {
+            if (!elemId) return null;
+            const direct =
+                document.getElementById(elemId) ||
+                document.querySelector(`#${elemId}`) ||
+                document.querySelector(`[id*="${elemId}"]`);
+            if (direct) return direct;
+
+            const comps = (window.gradio_config && window.gradio_config.components) || [];
+            for (const comp of comps) {
+                if (comp && comp.props && comp.props.elem_id === elemId) {
+                    const cid = comp.id;
+                    const node =
+                        document.getElementById(`component-${cid}`) ||
+                        document.querySelector(`#component-${cid}`) ||
+                        document.querySelector(`[id*="component-${cid}"]`);
+                    if (node) return node;
+                }
+            }
+            return null;
+        }
+
+        function getCardRootById(cardId) {
+            return findByElemId(cardId);
+        }
+
+        function findBySelectorOrElemId(selector) {
+            if (!selector) return null;
+            const trimmed = String(selector).trim();
+            if (trimmed.startsWith('#')) {
+                const elemId = trimmed.slice(1);
+                const byElemId = findByElemId(elemId);
+                if (byElemId) return byElemId;
+            }
+            return document.querySelector(trimmed);
+        }
+
         function firstExisting(selectorList) {
             for (const selector of selectorList) {
-                const node = document.querySelector(selector);
+                const node = findBySelectorOrElemId(selector);
                 if (node) return node;
             }
             return null;
         }
 
-        function resolveCardNode(idSelectors, anchorSelectors) {
-            const idNode = firstExisting(idSelectors);
-            if (idNode) return idNode;
+        function pushUnique(list, node) {
+            if (!node) return;
+            if (!list.includes(node)) list.push(node);
+        }
+
+        function isVisibleNode(node) {
+            if (!node || !node.getBoundingClientRect) return false;
+            const style = window.getComputedStyle(node);
+            if (!style || style.display === 'none' || style.visibility === 'hidden') return false;
+            if (node.offsetParent === null && style.position !== 'fixed') return false;
+            const rect = node.getBoundingClientRect();
+            return rect.width > 0 && rect.height > 0;
+        }
+
+        function collectCardCandidates(cardId, anchorSelectors) {
+            const candidates = [];
+            const root = getCardRootById(cardId);
+            pushUnique(candidates, root);
+            if (root && root.firstElementChild) {
+                pushUnique(candidates, root.firstElementChild);
+            }
+
             const anchor = firstExisting(anchorSelectors);
-            if (!anchor) return null;
-            return nearestGroup(anchor) || anchor;
+            const anchorCard = anchor ? nearestCardContainer(anchor) : null;
+            pushUnique(candidates, anchorCard);
+            if (anchorCard && anchorCard.firstElementChild) {
+                pushUnique(candidates, anchorCard.firstElementChild);
+            }
+            if (anchor) {
+                pushUnique(candidates, anchor.closest('.gr-group'));
+                pushUnique(candidates, anchor.closest('.gr-block'));
+            }
+
+            return candidates;
+        }
+
+        function pickCardTarget(cardId, candidates) {
+            const root = getCardRootById(cardId);
+            if (root && isVisibleNode(root)) {
+                return root;
+            }
+
+            if (root && root.firstElementChild && isVisibleNode(root.firstElementChild)) {
+                return root.firstElementChild;
+            }
+
+            for (const node of candidates) {
+                if (!node || !node.classList) continue;
+                if (!isVisibleNode(node)) continue;
+                if (
+                    node.classList.contains('gr-block') ||
+                    node.classList.contains('gr-form') ||
+                    node.classList.contains('block')
+                ) {
+                    return node;
+                }
+            }
+            for (const node of candidates) {
+                if (isVisibleNode(node)) return node;
+            }
+            return null;
         }
 
         function paintCard(node, isButtonCard) {
             if (!node) return;
             node.classList.add('runtime-card');
+            setImportant(node, 'display', 'block');
             setImportant(node, 'background', 'linear-gradient(180deg, rgba(118,126,146,0.96) 0%, rgba(82,90,108,0.97) 100%)');
             setImportant(node, 'border', '1px solid rgba(255,255,255,0.24)');
             setImportant(node, 'border-radius', '56px');
@@ -314,59 +427,83 @@ SYNC_JS = """
                 setImportant(controlShell, 'flex-direction', 'column');
                 setImportant(controlShell, 'gap', '36px');
                 Array.from(controlShell.children || []).forEach((child) => {
-                    setImportant(child, 'margin-bottom', '36px');
+                    setImportant(child, 'margin-bottom', '0');
                 });
-                if (controlShell.lastElementChild) {
-                    setImportant(controlShell.lastElementChild, 'margin-bottom', '0');
-                }
             }
         }
 
+        const cardConfigs = [
+            {
+                id: 'media_card',
+                anchorSelectors: ['#live_obs', '#demo_video', '#combined_view_html'],
+                isButtonCard: false,
+            },
+            {
+                id: 'log_card',
+                anchorSelectors: ['#log_output'],
+                isButtonCard: false,
+            },
+            {
+                id: 'action_selection_card',
+                anchorSelectors: ['#action_radio'],
+                isButtonCard: false,
+            },
+            {
+                id: 'exec_btn_card',
+                anchorSelectors: ['#exec_btn'],
+                isButtonCard: true,
+            },
+            {
+                id: 'reference_btn_card',
+                anchorSelectors: ['#reference_action_btn'],
+                isButtonCard: true,
+            },
+            {
+                id: 'next_task_btn_card',
+                anchorSelectors: ['#next_task_btn'],
+                isButtonCard: true,
+            },
+            {
+                id: 'task_hint_card',
+                anchorSelectors: ['#task_hint_display'],
+                isButtonCard: false,
+            },
+        ];
+
         function applyCardsOnce() {
             clearOuterShell();
+            for (const config of cardConfigs) {
+                const candidates = collectCardCandidates(config.id, config.anchorSelectors);
+                candidates.forEach((node) => clearCardSkin(node));
+                const target = pickCardTarget(config.id, candidates);
+                paintCard(target, config.isButtonCard);
+            }
+        }
 
-            const mediaCard = resolveCardNode(
-                ['#media_card'],
-                ['#live_obs', '#demo_video', '#combined_view_html']
-            );
-            const logCard = resolveCardNode(
-                ['#log_card'],
-                ['#log_output']
-            );
-            const actionCard = resolveCardNode(
-                ['#action_selection_card'],
-                ['#action_radio']
-            );
-            const execCard = resolveCardNode(
-                ['#exec_btn_card'],
-                ['#exec_btn']
-            );
-            const refCard = resolveCardNode(
-                ['#reference_btn_card'],
-                ['#reference_action_btn']
-            );
-            const nextCard = resolveCardNode(
-                ['#next_task_btn_card'],
-                ['#next_task_btn']
-            );
-            const hintCard = resolveCardNode(
-                ['#task_hint_card'],
-                ['#task_hint_display']
-            );
-
-            paintCard(mediaCard, false);
-            paintCard(logCard, false);
-            paintCard(actionCard, false);
-            paintCard(execCard, true);
-            paintCard(refCard, true);
-            paintCard(nextCard, true);
-            paintCard(hintCard, false);
+        let applyScheduled = false;
+        function scheduleApply() {
+            if (applyScheduled) return;
+            applyScheduled = true;
+            setTimeout(() => {
+                applyScheduled = false;
+                try { applyCardsOnce(); } catch (_) {}
+            }, 80);
         }
 
         setTimeout(applyCardsOnce, 200);
         setTimeout(applyCardsOnce, 1000);
         setTimeout(applyCardsOnce, 2500);
         setTimeout(applyCardsOnce, 4500);
+
+        const observer = new MutationObserver(() => scheduleApply());
+        observer.observe(document.body, { childList: true, subtree: true });
+
+        // Keep applying after delayed login/phase transitions.
+        setInterval(() => {
+            try { applyCardsOnce(); } catch (_) {}
+        }, 1500);
+
+        window.__robomme_card_enforcer_active = true;
     }
 
     // ========================================================================
@@ -445,92 +582,14 @@ body {{
     padding: 12px 16px 20px !important;
 }}
 
-/* Remove all wrapper visuals inside main interface (cards will be restored by ID selectors below) */
+/* Transparent shells only */
 #main_interface_root,
-#main_interface_root .gr-block,
-#main_interface_root .gr-form,
-#main_interface_root .gr-box,
-#main_interface_root .gr-panel,
-#main_interface_root .gr-row,
-#main_interface_root .gr-column,
-#main_interface_root .block {{
+#main_layout_row,
+#control_panel_group {{
     background: transparent !important;
     background-color: transparent !important;
     border: none !important;
     box-shadow: none !important;
-}}
-
-/* Keep non-card groups transparent, but do NOT wipe card groups */
-#main_interface_root .gr-group:not(#media_card):not(#log_card):not(#action_selection_card):not(#exec_btn_card):not(#reference_btn_card):not(#next_task_btn_card):not(#task_hint_card) {{
-    background: transparent !important;
-    background-color: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
-}}
-
-/* Floating islands (force on ID and first child wrapper to survive DOM nesting differences) */
-:is(#media_card, #log_card, #action_selection_card, #exec_btn_card, #reference_btn_card, #next_task_btn_card, #task_hint_card),
-:is(#media_card, #log_card, #action_selection_card, #exec_btn_card, #reference_btn_card, #next_task_btn_card, #task_hint_card) > div:first-child,
-.floating-card {{
-    background:
-        linear-gradient(180deg, rgba(102, 112, 132, 0.92) 0%, var(--card-bg) 100%) !important;
-    border: 1px solid var(--card-border) !important;
-    border-radius: var(--radius-card) !important;
-    padding: var(--card-padding) !important;
-    box-shadow:
-        var(--shadow-float),
-        inset 0 1px 0 rgba(255, 255, 255, 0.12) !important;
-    margin-bottom: var(--card-gap) !important;
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    overflow: hidden !important;
-}}
-
-/* Highest-priority card skin */
-#main_interface_root #media_card,
-#main_interface_root #log_card,
-#main_interface_root #action_selection_card,
-#main_interface_root #exec_btn_card,
-#main_interface_root #reference_btn_card,
-#main_interface_root #next_task_btn_card,
-#main_interface_root #task_hint_card,
-#main_interface_root #media_card > div:first-child,
-#main_interface_root #log_card > div:first-child,
-#main_interface_root #action_selection_card > div:first-child,
-#main_interface_root #exec_btn_card > div:first-child,
-#main_interface_root #reference_btn_card > div:first-child,
-#main_interface_root #next_task_btn_card > div:first-child,
-#main_interface_root #task_hint_card > div:first-child {{
-    background:
-        linear-gradient(180deg, rgba(108, 116, 136, 0.95) 0%, rgba(78, 87, 106, 0.96) 100%) !important;
-    border: 1px solid rgba(255, 255, 255, 0.22) !important;
-    border-radius: 52px !important;
-    box-shadow: 0 24px 54px rgba(0, 0, 0, 0.5) !important;
-    margin-bottom: 34px !important;
-}}
-
-/* Ensure outer control panel shell is always transparent */
-#control_panel_group,
-#control_panel_group > div,
-#control_panel_group > div > div {{
-    background: transparent !important;
-    background-color: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
-}}
-
-.floating-card .prose,
-.floating-card h1,
-.floating-card h2,
-.floating-card h3,
-.floating-card h4,
-.floating-card h5,
-.floating-card h6,
-.floating-card p,
-.floating-card label,
-.floating-card span,
-.floating-card div {{
-    color: var(--text-primary) !important;
 }}
 
 .main-layout-row {{
@@ -552,26 +611,261 @@ body {{
     margin: 0 !important;
 }}
 
-/* Keep inner groups transparent even inside cards unless explicitly highlighted */
-.floating-card .gr-group {{
+/* Authoritative 7-card outer shell with robust DOM matching */
+#media_card,
+[id*="media_card"],
+#log_card,
+[id*="log_card"],
+#action_selection_card,
+[id*="action_selection_card"],
+#exec_btn_card,
+[id*="exec_btn_card"],
+#reference_btn_card,
+[id*="reference_btn_card"],
+#next_task_btn_card,
+[id*="next_task_btn_card"],
+#task_hint_card,
+[id*="task_hint_card"],
+.floating-card,
+.runtime-card {{
+    display: block !important;
+    background:
+        linear-gradient(180deg, rgba(118, 126, 146, 0.96) 0%, rgba(82, 90, 108, 0.97) 100%) !important;
+    border: 1px solid rgba(255, 255, 255, 0.24) !important;
+    border-radius: 56px !important;
+    padding: 24px !important;
+    box-shadow: 0 26px 58px rgba(0, 0, 0, 0.52) !important;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    overflow: hidden !important;
+    margin-bottom: var(--card-gap) !important;
+}}
+
+#media_card > div:first-child,
+[id*="media_card"] > div:first-child,
+#log_card > div:first-child,
+[id*="log_card"] > div:first-child,
+#action_selection_card > div:first-child,
+[id*="action_selection_card"] > div:first-child,
+#exec_btn_card > div:first-child,
+[id*="exec_btn_card"] > div:first-child,
+#reference_btn_card > div:first-child,
+[id*="reference_btn_card"] > div:first-child,
+#next_task_btn_card > div:first-child,
+[id*="next_task_btn_card"] > div:first-child,
+#task_hint_card > div:first-child,
+[id*="task_hint_card"] > div:first-child,
+.floating-card > div:first-child,
+.runtime-card > div:first-child {{
     background: transparent !important;
+    background-color: transparent !important;
     border: none !important;
     box-shadow: none !important;
+    border-radius: 0 !important;
     padding: 0 !important;
 }}
 
-/* Button islands */
-.button-card {{
-    padding: 14px !important;
-}}
-
 #exec_btn_card,
+[id*="exec_btn_card"],
 #reference_btn_card,
-#next_task_btn_card {{
+[id*="reference_btn_card"],
+#next_task_btn_card,
+[id*="next_task_btn_card"] {{
     padding: 16px !important;
     min-height: 86px !important;
     display: flex !important;
     align-items: center !important;
+}}
+
+/* Keep inner wrappers flat; exclude coords_group to preserve blue highlight */
+#media_card > div:first-child .gr-group:not(#coords_group),
+[id*="media_card"] > div:first-child .gr-group:not(#coords_group),
+#log_card > div:first-child .gr-group:not(#coords_group),
+[id*="log_card"] > div:first-child .gr-group:not(#coords_group),
+#action_selection_card > div:first-child .gr-group:not(#coords_group),
+[id*="action_selection_card"] > div:first-child .gr-group:not(#coords_group),
+#exec_btn_card > div:first-child .gr-group:not(#coords_group),
+[id*="exec_btn_card"] > div:first-child .gr-group:not(#coords_group),
+#reference_btn_card > div:first-child .gr-group:not(#coords_group),
+[id*="reference_btn_card"] > div:first-child .gr-group:not(#coords_group),
+#next_task_btn_card > div:first-child .gr-group:not(#coords_group),
+[id*="next_task_btn_card"] > div:first-child .gr-group:not(#coords_group),
+#task_hint_card > div:first-child .gr-group:not(#coords_group),
+[id*="task_hint_card"] > div:first-child .gr-group:not(#coords_group),
+.floating-card > div:first-child .gr-group:not(#coords_group),
+.runtime-card > div:first-child .gr-group:not(#coords_group),
+#media_card > div:first-child .gr-form:not(#coords_group),
+[id*="media_card"] > div:first-child .gr-form:not(#coords_group),
+#log_card > div:first-child .gr-form:not(#coords_group),
+[id*="log_card"] > div:first-child .gr-form:not(#coords_group),
+#action_selection_card > div:first-child .gr-form:not(#coords_group),
+[id*="action_selection_card"] > div:first-child .gr-form:not(#coords_group),
+#exec_btn_card > div:first-child .gr-form:not(#coords_group),
+[id*="exec_btn_card"] > div:first-child .gr-form:not(#coords_group),
+#reference_btn_card > div:first-child .gr-form:not(#coords_group),
+[id*="reference_btn_card"] > div:first-child .gr-form:not(#coords_group),
+#next_task_btn_card > div:first-child .gr-form:not(#coords_group),
+[id*="next_task_btn_card"] > div:first-child .gr-form:not(#coords_group),
+#task_hint_card > div:first-child .gr-form:not(#coords_group),
+[id*="task_hint_card"] > div:first-child .gr-form:not(#coords_group),
+.floating-card > div:first-child .gr-form:not(#coords_group),
+.runtime-card > div:first-child .gr-form:not(#coords_group),
+#media_card > div:first-child .gr-box:not(#coords_group),
+[id*="media_card"] > div:first-child .gr-box:not(#coords_group),
+#log_card > div:first-child .gr-box:not(#coords_group),
+[id*="log_card"] > div:first-child .gr-box:not(#coords_group),
+#action_selection_card > div:first-child .gr-box:not(#coords_group),
+[id*="action_selection_card"] > div:first-child .gr-box:not(#coords_group),
+#exec_btn_card > div:first-child .gr-box:not(#coords_group),
+[id*="exec_btn_card"] > div:first-child .gr-box:not(#coords_group),
+#reference_btn_card > div:first-child .gr-box:not(#coords_group),
+[id*="reference_btn_card"] > div:first-child .gr-box:not(#coords_group),
+#next_task_btn_card > div:first-child .gr-box:not(#coords_group),
+[id*="next_task_btn_card"] > div:first-child .gr-box:not(#coords_group),
+#task_hint_card > div:first-child .gr-box:not(#coords_group),
+[id*="task_hint_card"] > div:first-child .gr-box:not(#coords_group),
+.floating-card > div:first-child .gr-box:not(#coords_group),
+.runtime-card > div:first-child .gr-box:not(#coords_group),
+#media_card > div:first-child .gr-panel:not(#coords_group),
+[id*="media_card"] > div:first-child .gr-panel:not(#coords_group),
+#log_card > div:first-child .gr-panel:not(#coords_group),
+[id*="log_card"] > div:first-child .gr-panel:not(#coords_group),
+#action_selection_card > div:first-child .gr-panel:not(#coords_group),
+[id*="action_selection_card"] > div:first-child .gr-panel:not(#coords_group),
+#exec_btn_card > div:first-child .gr-panel:not(#coords_group),
+[id*="exec_btn_card"] > div:first-child .gr-panel:not(#coords_group),
+#reference_btn_card > div:first-child .gr-panel:not(#coords_group),
+[id*="reference_btn_card"] > div:first-child .gr-panel:not(#coords_group),
+#next_task_btn_card > div:first-child .gr-panel:not(#coords_group),
+[id*="next_task_btn_card"] > div:first-child .gr-panel:not(#coords_group),
+#task_hint_card > div:first-child .gr-panel:not(#coords_group),
+[id*="task_hint_card"] > div:first-child .gr-panel:not(#coords_group),
+.floating-card > div:first-child .gr-panel:not(#coords_group),
+.runtime-card > div:first-child .gr-panel:not(#coords_group),
+#media_card > div:first-child .block:not(#coords_group),
+[id*="media_card"] > div:first-child .block:not(#coords_group),
+#log_card > div:first-child .block:not(#coords_group),
+[id*="log_card"] > div:first-child .block:not(#coords_group),
+#action_selection_card > div:first-child .block:not(#coords_group),
+[id*="action_selection_card"] > div:first-child .block:not(#coords_group),
+#exec_btn_card > div:first-child .block:not(#coords_group),
+[id*="exec_btn_card"] > div:first-child .block:not(#coords_group),
+#reference_btn_card > div:first-child .block:not(#coords_group),
+[id*="reference_btn_card"] > div:first-child .block:not(#coords_group),
+#next_task_btn_card > div:first-child .block:not(#coords_group),
+[id*="next_task_btn_card"] > div:first-child .block:not(#coords_group),
+#task_hint_card > div:first-child .block:not(#coords_group),
+[id*="task_hint_card"] > div:first-child .block:not(#coords_group),
+.floating-card > div:first-child .block:not(#coords_group),
+.runtime-card > div:first-child .block:not(#coords_group) {{
+    background: transparent !important;
+    background-color: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+}}
+
+/* Avoid inner rounded cards in content components */
+#live_obs,
+#live_obs > div,
+#live_obs > div > div,
+#demo_video,
+#demo_video > div,
+#demo_video > div > div,
+#combined_view_html,
+#combined_view_html > div,
+#combined_view_html > div > div,
+#log_output,
+#log_output > div,
+#log_output > div > div,
+#action_radio,
+#action_radio > div,
+#action_radio > div > div,
+#task_hint_display,
+#task_hint_display > div,
+#task_hint_display > div > div {{
+    background: transparent !important;
+    background-color: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+}}
+
+/* Keep titles visually inside the outer card */
+#media_card .prose,
+[id*="media_card"] .prose,
+#log_card .prose,
+[id*="log_card"] .prose,
+#action_selection_card .prose,
+[id*="action_selection_card"] .prose,
+#exec_btn_card .prose,
+[id*="exec_btn_card"] .prose,
+#reference_btn_card .prose,
+[id*="reference_btn_card"] .prose,
+#next_task_btn_card .prose,
+[id*="next_task_btn_card"] .prose,
+#task_hint_card .prose,
+[id*="task_hint_card"] .prose,
+.floating-card .prose,
+.runtime-card .prose,
+#media_card h1, #media_card h2, #media_card h3, #media_card h4, #media_card h5, #media_card h6,
+#media_card p, #media_card label, #media_card span, #media_card div, #media_card li, #media_card ol, #media_card ul,
+[id*="media_card"] h1, [id*="media_card"] h2, [id*="media_card"] h3, [id*="media_card"] h4, [id*="media_card"] h5, [id*="media_card"] h6,
+[id*="media_card"] p, [id*="media_card"] label, [id*="media_card"] span, [id*="media_card"] div, [id*="media_card"] li, [id*="media_card"] ol, [id*="media_card"] ul,
+#log_card h1, #log_card h2, #log_card h3, #log_card h4, #log_card h5, #log_card h6,
+#log_card p, #log_card label, #log_card span, #log_card div, #log_card li, #log_card ol, #log_card ul,
+[id*="log_card"] h1, [id*="log_card"] h2, [id*="log_card"] h3, [id*="log_card"] h4, [id*="log_card"] h5, [id*="log_card"] h6,
+[id*="log_card"] p, [id*="log_card"] label, [id*="log_card"] span, [id*="log_card"] div, [id*="log_card"] li, [id*="log_card"] ol, [id*="log_card"] ul,
+#action_selection_card h1, #action_selection_card h2, #action_selection_card h3, #action_selection_card h4, #action_selection_card h5, #action_selection_card h6,
+#action_selection_card p, #action_selection_card label, #action_selection_card span, #action_selection_card div, #action_selection_card li, #action_selection_card ol, #action_selection_card ul,
+[id*="action_selection_card"] h1, [id*="action_selection_card"] h2, [id*="action_selection_card"] h3, [id*="action_selection_card"] h4, [id*="action_selection_card"] h5, [id*="action_selection_card"] h6,
+[id*="action_selection_card"] p, [id*="action_selection_card"] label, [id*="action_selection_card"] span, [id*="action_selection_card"] div, [id*="action_selection_card"] li, [id*="action_selection_card"] ol, [id*="action_selection_card"] ul,
+#exec_btn_card h1, #exec_btn_card h2, #exec_btn_card h3, #exec_btn_card h4, #exec_btn_card h5, #exec_btn_card h6,
+#exec_btn_card p, #exec_btn_card label, #exec_btn_card span, #exec_btn_card div, #exec_btn_card li, #exec_btn_card ol, #exec_btn_card ul,
+[id*="exec_btn_card"] h1, [id*="exec_btn_card"] h2, [id*="exec_btn_card"] h3, [id*="exec_btn_card"] h4, [id*="exec_btn_card"] h5, [id*="exec_btn_card"] h6,
+[id*="exec_btn_card"] p, [id*="exec_btn_card"] label, [id*="exec_btn_card"] span, [id*="exec_btn_card"] div, [id*="exec_btn_card"] li, [id*="exec_btn_card"] ol, [id*="exec_btn_card"] ul,
+#reference_btn_card h1, #reference_btn_card h2, #reference_btn_card h3, #reference_btn_card h4, #reference_btn_card h5, #reference_btn_card h6,
+#reference_btn_card p, #reference_btn_card label, #reference_btn_card span, #reference_btn_card div, #reference_btn_card li, #reference_btn_card ol, #reference_btn_card ul,
+[id*="reference_btn_card"] h1, [id*="reference_btn_card"] h2, [id*="reference_btn_card"] h3, [id*="reference_btn_card"] h4, [id*="reference_btn_card"] h5, [id*="reference_btn_card"] h6,
+[id*="reference_btn_card"] p, [id*="reference_btn_card"] label, [id*="reference_btn_card"] span, [id*="reference_btn_card"] div, [id*="reference_btn_card"] li, [id*="reference_btn_card"] ol, [id*="reference_btn_card"] ul,
+#next_task_btn_card h1, #next_task_btn_card h2, #next_task_btn_card h3, #next_task_btn_card h4, #next_task_btn_card h5, #next_task_btn_card h6,
+#next_task_btn_card p, #next_task_btn_card label, #next_task_btn_card span, #next_task_btn_card div, #next_task_btn_card li, #next_task_btn_card ol, #next_task_btn_card ul,
+[id*="next_task_btn_card"] h1, [id*="next_task_btn_card"] h2, [id*="next_task_btn_card"] h3, [id*="next_task_btn_card"] h4, [id*="next_task_btn_card"] h5, [id*="next_task_btn_card"] h6,
+[id*="next_task_btn_card"] p, [id*="next_task_btn_card"] label, [id*="next_task_btn_card"] span, [id*="next_task_btn_card"] div, [id*="next_task_btn_card"] li, [id*="next_task_btn_card"] ol, [id*="next_task_btn_card"] ul,
+#task_hint_card h1, #task_hint_card h2, #task_hint_card h3, #task_hint_card h4, #task_hint_card h5, #task_hint_card h6,
+#task_hint_card p, #task_hint_card label, #task_hint_card span, #task_hint_card div, #task_hint_card li, #task_hint_card ol, #task_hint_card ul,
+[id*="task_hint_card"] h1, [id*="task_hint_card"] h2, [id*="task_hint_card"] h3, [id*="task_hint_card"] h4, [id*="task_hint_card"] h5, [id*="task_hint_card"] h6,
+[id*="task_hint_card"] p, [id*="task_hint_card"] label, [id*="task_hint_card"] span, [id*="task_hint_card"] div, [id*="task_hint_card"] li, [id*="task_hint_card"] ol, [id*="task_hint_card"] ul,
+.floating-card h1, .floating-card h2, .floating-card h3, .floating-card h4, .floating-card h5, .floating-card h6,
+.floating-card p, .floating-card label, .floating-card span, .floating-card div, .floating-card li, .floating-card ol, .floating-card ul,
+.runtime-card h1, .runtime-card h2, .runtime-card h3, .runtime-card h4, .runtime-card h5, .runtime-card h6,
+.runtime-card p, .runtime-card label, .runtime-card span, .runtime-card div, .runtime-card li, .runtime-card ol, .runtime-card ul {{
+    color: var(--text-primary) !important;
+}}
+
+#media_card h1, #media_card h2, #media_card h3, #media_card h4,
+[id*="media_card"] h1, [id*="media_card"] h2, [id*="media_card"] h3, [id*="media_card"] h4,
+#log_card h1, #log_card h2, #log_card h3, #log_card h4,
+[id*="log_card"] h1, [id*="log_card"] h2, [id*="log_card"] h3, [id*="log_card"] h4,
+#action_selection_card h1, #action_selection_card h2, #action_selection_card h3, #action_selection_card h4,
+[id*="action_selection_card"] h1, [id*="action_selection_card"] h2, [id*="action_selection_card"] h3, [id*="action_selection_card"] h4,
+#exec_btn_card h1, #exec_btn_card h2, #exec_btn_card h3, #exec_btn_card h4,
+[id*="exec_btn_card"] h1, [id*="exec_btn_card"] h2, [id*="exec_btn_card"] h3, [id*="exec_btn_card"] h4,
+#reference_btn_card h1, #reference_btn_card h2, #reference_btn_card h3, #reference_btn_card h4,
+[id*="reference_btn_card"] h1, [id*="reference_btn_card"] h2, [id*="reference_btn_card"] h3, [id*="reference_btn_card"] h4,
+#next_task_btn_card h1, #next_task_btn_card h2, #next_task_btn_card h3, #next_task_btn_card h4,
+[id*="next_task_btn_card"] h1, [id*="next_task_btn_card"] h2, [id*="next_task_btn_card"] h3, [id*="next_task_btn_card"] h4,
+#task_hint_card h1, #task_hint_card h2, #task_hint_card h3, #task_hint_card h4,
+[id*="task_hint_card"] h1, [id*="task_hint_card"] h2, [id*="task_hint_card"] h3, [id*="task_hint_card"] h4,
+.floating-card h1, .floating-card h2, .floating-card h3, .floating-card h4,
+.runtime-card h1, .runtime-card h2, .runtime-card h3, .runtime-card h4 {{
+    margin-top: 0 !important;
+}}
+
+/* Button */
+.button-card {{
+    padding: 0 !important;
 }}
 
 .button-card button,
@@ -579,7 +873,8 @@ body {{
 #reference_btn_card button,
 #next_task_btn_card button {{
     width: 100% !important;
-    border-radius: 24px !important;
+    border-radius: 28px !important;
+    min-height: 56px !important;
 }}
 
 /* 全局字体 */
@@ -598,7 +893,7 @@ h1, h2, h3, h4, h5, h6, .gr-button, .gr-textbox, .gr-dropdown, .gr-radio {{
     font-size: calc({FONT_SIZE} * 0.8) !important;
     padding: 8px !important;
     border: 1px solid rgba(204, 204, 204, 0.3) !important;
-    border-radius: 4px !important;
+    border-radius: 0 !important;
     background-color: transparent !important;
     line-height: 1.4 !important;
 }}
@@ -637,7 +932,7 @@ h1, h2, h3, h4, h5, h6, .gr-button, .gr-textbox, .gr-dropdown, .gr-radio {{
     margin: 0 auto;
     display: block;
     border: none !important;
-    border-radius: 8px;
+    border-radius: 0 !important;
     object-fit: contain;
 }}
 
@@ -747,108 +1042,99 @@ h1, h2, h3, h4, h5, h6, .gr-button, .gr-textbox, .gr-dropdown, .gr-radio {{
     padding-left: 1.2em !important;
 }}
 
-/* ========================================================================
-   Hard Override: enforce gray floating cards + huge radius + vertical gaps
-   ======================================================================== */
-
-/* 1) wipe non-card shells */
-#main_interface_root, [id*="main_interface_root"],
-#main_layout_row, [id*="main_layout_row"],
-#main_layout_row > div, [id*="main_layout_row"] > div,
-#control_panel_group, [id*="control_panel_group"] {{
-    background: transparent !important;
-    background-color: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
+/* Final guard: force card skin at the very end (highest local precedence) */
+#main_interface_root #media_card,
+#main_interface_root [id*="media_card"],
+#main_interface_root #log_card,
+#main_interface_root [id*="log_card"],
+#main_interface_root #action_selection_card,
+#main_interface_root [id*="action_selection_card"],
+#main_interface_root #exec_btn_card,
+#main_interface_root [id*="exec_btn_card"],
+#main_interface_root #reference_btn_card,
+#main_interface_root [id*="reference_btn_card"],
+#main_interface_root #next_task_btn_card,
+#main_interface_root [id*="next_task_btn_card"],
+#main_interface_root #task_hint_card,
+#main_interface_root [id*="task_hint_card"],
+#main_interface_root .floating-card,
+#main_interface_root .runtime-card {{
+    display: block !important;
+    background: linear-gradient(180deg, rgba(118, 126, 146, 0.96) 0%, rgba(82, 90, 108, 0.97) 100%) !important;
+    border: 1px solid rgba(255, 255, 255, 0.24) !important;
+    border-radius: 56px !important;
+    padding: 24px !important;
+    box-shadow: 0 26px 58px rgba(0, 0, 0, 0.52) !important;
+    overflow: hidden !important;
+    margin-bottom: var(--card-gap) !important;
 }}
 
-/* 2) apply card skin directly to 7 target cards (id and fuzzy-id fallback) */
-#media_card, [id*="media_card"],
-#log_card, [id*="log_card"],
-#action_selection_card, [id*="action_selection_card"],
-#exec_btn_card, [id*="exec_btn_card"],
-#reference_btn_card, [id*="reference_btn_card"],
-#next_task_btn_card, [id*="next_task_btn_card"],
-#task_hint_card, [id*="task_hint_card"],
-#media_card > div:first-child, [id*="media_card"] > div:first-child,
-#log_card > div:first-child, [id*="log_card"] > div:first-child,
-#action_selection_card > div:first-child, [id*="action_selection_card"] > div:first-child,
-#exec_btn_card > div:first-child, [id*="exec_btn_card"] > div:first-child,
-#reference_btn_card > div:first-child, [id*="reference_btn_card"] > div:first-child,
-#next_task_btn_card > div:first-child, [id*="next_task_btn_card"] > div:first-child,
-#task_hint_card > div:first-child, [id*="task_hint_card"] > div:first-child {{
+#main_interface_root #exec_btn_card,
+#main_interface_root [id*="exec_btn_card"],
+#main_interface_root #reference_btn_card,
+#main_interface_root [id*="reference_btn_card"],
+#main_interface_root #next_task_btn_card,
+#main_interface_root [id*="next_task_btn_card"] {{
+    padding: 16px !important;
+    min-height: 86px !important;
+    display: flex !important;
+    align-items: center !important;
+}}
+
+/* Component-id fallback (Gradio v6 root nodes) */
+#component-28,
+#component-38,
+#component-43,
+#component-51,
+#component-53,
+#component-55,
+#component-57,
+[id*="component-28"],
+[id*="component-38"],
+[id*="component-43"],
+[id*="component-51"],
+[id*="component-53"],
+[id*="component-55"],
+[id*="component-57"] {{
+    display: block !important;
+    background: linear-gradient(180deg, rgba(118, 126, 146, 0.96) 0%, rgba(82, 90, 108, 0.97) 100%) !important;
+    border: 1px solid rgba(255, 255, 255, 0.24) !important;
+    border-radius: 56px !important;
+    padding: 24px !important;
+    box-shadow: 0 26px 58px rgba(0, 0, 0, 0.52) !important;
+    overflow: hidden !important;
+    margin-bottom: var(--card-gap) !important;
+}}
+
+#component-51,
+#component-53,
+#component-55,
+[id*="component-51"],
+[id*="component-53"],
+[id*="component-55"] {{
+    padding: 16px !important;
+    min-height: 86px !important;
+    display: flex !important;
+    align-items: center !important;
+}}
+
+/* Absolute fallback for Gradio component wrappers (when elem_id is not on visible layer) */
+#main_interface_root [id^="component-"]:has(#live_obs):not(:has([id^="component-"]:has(#live_obs))),
+#main_interface_root [id^="component-"]:has(#demo_video):not(:has([id^="component-"]:has(#demo_video))),
+#main_interface_root [id^="component-"]:has(#combined_view_html):not(:has([id^="component-"]:has(#combined_view_html))),
+#main_interface_root [id^="component-"]:has(#log_output):not(:has([id^="component-"]:has(#log_output))),
+#main_interface_root [id^="component-"]:has(#action_radio):not(:has([id^="component-"]:has(#action_radio))),
+#main_interface_root [id^="component-"]:has(#task_hint_display):not(:has([id^="component-"]:has(#task_hint_display))),
+#main_interface_root [id^="component-"]:has(#exec_btn):not(:has([id^="component-"]:has(#exec_btn))),
+#main_interface_root [id^="component-"]:has(#reference_action_btn):not(:has([id^="component-"]:has(#reference_action_btn))),
+#main_interface_root [id^="component-"]:has(#next_task_btn):not(:has([id^="component-"]:has(#next_task_btn))) {{
     background: linear-gradient(180deg, rgba(118, 126, 146, 0.96) 0%, rgba(82, 90, 108, 0.97) 100%) !important;
     border: 1px solid rgba(255, 255, 255, 0.24) !important;
     border-radius: 56px !important;
     box-shadow: 0 26px 58px rgba(0, 0, 0, 0.52) !important;
-    padding: 24px !important;
     overflow: hidden !important;
 }}
 
-/* 3) strong vertical spacing between cards */
-#media_card, [id*="media_card"],
-#log_card, [id*="log_card"],
-#action_selection_card, [id*="action_selection_card"],
-#exec_btn_card, [id*="exec_btn_card"],
-#reference_btn_card, [id*="reference_btn_card"],
-#next_task_btn_card, [id*="next_task_btn_card"],
-#task_hint_card, [id*="task_hint_card"] {{
-    margin-bottom: 36px !important;
-}}
-
-/* right-column card stack spacing */
-#control_panel_group > :not(style):not(script),
-[id*="control_panel_group"] > :not(style):not(script) {{
-    margin-bottom: 36px !important;
-}}
-#control_panel_group > :last-child,
-[id*="control_panel_group"] > :last-child {{
-    margin-bottom: 0 !important;
-}}
-
-/* button card: rounded interior button */
-#exec_btn_card button, [id*="exec_btn_card"] button,
-#reference_btn_card button, [id*="reference_btn_card"] button,
-#next_task_btn_card button, [id*="next_task_btn_card"] button {{
-    border-radius: 28px !important;
-    min-height: 56px !important;
-}}
-
-/* Direct component fallback: style the component blocks themselves */
-#live_obs, [id*="live_obs"],
-#demo_video, [id*="demo_video"],
-#combined_view_html, [id*="combined_view_html"],
-#log_output, [id*="log_output"],
-#action_radio, [id*="action_radio"],
-#task_hint_display, [id*="task_hint_display"],
-#live_obs > div, [id*="live_obs"] > div,
-#demo_video > div, [id*="demo_video"] > div,
-#combined_view_html > div, [id*="combined_view_html"] > div,
-#log_output > div, [id*="log_output"] > div,
-#action_radio > div, [id*="action_radio"] > div,
-#task_hint_display > div, [id*="task_hint_display"] > div,
-#live_obs > div > div, [id*="live_obs"] > div > div,
-#demo_video > div > div, [id*="demo_video"] > div > div,
-#combined_view_html > div > div, [id*="combined_view_html"] > div > div,
-#log_output > div > div, [id*="log_output"] > div > div,
-#action_radio > div > div, [id*="action_radio"] > div > div,
-#task_hint_display > div > div, [id*="task_hint_display"] > div > div {{
-    background: linear-gradient(180deg, rgba(118,126,146,0.96) 0%, rgba(82,90,108,0.97) 100%) !important;
-    border: 1px solid rgba(255, 255, 255, 0.24) !important;
-    border-radius: 56px !important;
-    box-shadow: 0 26px 58px rgba(0, 0, 0, 0.52) !important;
-    padding: 18px !important;
-    margin-bottom: 36px !important;
-    overflow: hidden !important;
-}}
-
-#exec_btn, [id*="exec_btn"],
-#reference_action_btn, [id*="reference_action_btn"],
-#next_task_btn, [id*="next_task_btn"] {{
-    border-radius: 28px !important;
-    min-height: 56px !important;
-    margin-bottom: 24px !important;
-}}
 """
 
 
