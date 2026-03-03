@@ -239,12 +239,144 @@ SYNC_JS = """
     }
 
     // ========================================================================
+    // Runtime card enforcer (DOM-driven inline style, robust against Gradio DOM changes)
+    // ========================================================================
+    function initFloatingCardEnforcer() {
+        // Lightweight mode only: avoid expensive observers/loops that can freeze UI.
+        function setImportant(el, prop, value) {
+            if (!el) return;
+            el.style.setProperty(prop, value, 'important');
+        }
+
+        function nearestGroup(el) {
+            let cur = el;
+            for (let i = 0; i < 12 && cur && cur !== document.body; i += 1) {
+                if (cur.classList && cur.classList.contains('gr-group')) return cur;
+                cur = cur.parentElement;
+            }
+            return null;
+        }
+
+        function firstExisting(selectorList) {
+            for (const selector of selectorList) {
+                const node = document.querySelector(selector);
+                if (node) return node;
+            }
+            return null;
+        }
+
+        function resolveCardNode(idSelectors, anchorSelectors) {
+            const idNode = firstExisting(idSelectors);
+            if (idNode) return idNode;
+            const anchor = firstExisting(anchorSelectors);
+            if (!anchor) return null;
+            return nearestGroup(anchor) || anchor;
+        }
+
+        function paintCard(node, isButtonCard) {
+            if (!node) return;
+            node.classList.add('runtime-card');
+            setImportant(node, 'background', 'linear-gradient(180deg, rgba(118,126,146,0.96) 0%, rgba(82,90,108,0.97) 100%)');
+            setImportant(node, 'border', '1px solid rgba(255,255,255,0.24)');
+            setImportant(node, 'border-radius', '56px');
+            setImportant(node, 'box-shadow', '0 26px 58px rgba(0,0,0,0.52)');
+            setImportant(node, 'overflow', 'hidden');
+            setImportant(node, 'margin-bottom', '36px');
+            setImportant(node, 'padding', isButtonCard ? '16px' : '24px');
+
+            if (isButtonCard) {
+                const btn = node.querySelector('button');
+                if (btn) {
+                    setImportant(btn, 'border-radius', '28px');
+                    setImportant(btn, 'min-height', '56px');
+                    setImportant(btn, 'width', '100%');
+                }
+            }
+        }
+
+        function clearOuterShell() {
+            const shellSelectors = [
+                '#main_interface_root',
+                '#main_layout_row',
+                '#control_panel_group'
+            ];
+            for (const selector of shellSelectors) {
+                document.querySelectorAll(selector).forEach((el) => {
+                    setImportant(el, 'background', 'transparent');
+                    setImportant(el, 'background-color', 'transparent');
+                    setImportant(el, 'border', 'none');
+                    setImportant(el, 'box-shadow', 'none');
+                });
+            }
+            const controlShell = firstExisting(['#control_panel_group']);
+            if (controlShell) {
+                setImportant(controlShell, 'display', 'flex');
+                setImportant(controlShell, 'flex-direction', 'column');
+                setImportant(controlShell, 'gap', '36px');
+                Array.from(controlShell.children || []).forEach((child) => {
+                    setImportant(child, 'margin-bottom', '36px');
+                });
+                if (controlShell.lastElementChild) {
+                    setImportant(controlShell.lastElementChild, 'margin-bottom', '0');
+                }
+            }
+        }
+
+        function applyCardsOnce() {
+            clearOuterShell();
+
+            const mediaCard = resolveCardNode(
+                ['#media_card'],
+                ['#live_obs', '#demo_video', '#combined_view_html']
+            );
+            const logCard = resolveCardNode(
+                ['#log_card'],
+                ['#log_output']
+            );
+            const actionCard = resolveCardNode(
+                ['#action_selection_card'],
+                ['#action_radio']
+            );
+            const execCard = resolveCardNode(
+                ['#exec_btn_card'],
+                ['#exec_btn']
+            );
+            const refCard = resolveCardNode(
+                ['#reference_btn_card'],
+                ['#reference_action_btn']
+            );
+            const nextCard = resolveCardNode(
+                ['#next_task_btn_card'],
+                ['#next_task_btn']
+            );
+            const hintCard = resolveCardNode(
+                ['#task_hint_card'],
+                ['#task_hint_display']
+            );
+
+            paintCard(mediaCard, false);
+            paintCard(logCard, false);
+            paintCard(actionCard, false);
+            paintCard(execCard, true);
+            paintCard(refCard, true);
+            paintCard(nextCard, true);
+            paintCard(hintCard, false);
+        }
+
+        setTimeout(applyCardsOnce, 200);
+        setTimeout(applyCardsOnce, 1000);
+        setTimeout(applyCardsOnce, 2500);
+        setTimeout(applyCardsOnce, 4500);
+    }
+
+    // ========================================================================
     // 初始化
     // ========================================================================
     function initializeAll() {
         initExecuteButtonListener();
         initLeaseLostHandler();
         setTimeout(() => { applyCoordsGroupHighlight(); }, 2000);
+        initFloatingCardEnforcer();
     }
 
     if (document.readyState === 'loading') {
@@ -264,13 +396,13 @@ CSS = f"""
     --wallpaper-base: #04070f;
     --wallpaper-mid: #0b1224;
     --wallpaper-glow: #1e2f59;
-    --card-bg: rgba(20, 30, 50, 0.88);
-    --card-border: rgba(255, 255, 255, 0.12);
+    --card-bg: rgba(76, 84, 101, 0.95);
+    --card-border: rgba(255, 255, 255, 0.18);
     --text-primary: #e5e7eb;
-    --radius-card: 30px;
+    --radius-card: 52px;
     --card-padding: 24px;
-    --card-gap: 22px;
-    --shadow-float: 0 22px 50px rgba(0, 0, 0, 0.55);
+    --card-gap: 34px;
+    --shadow-float: 0 24px 54px rgba(0, 0, 0, 0.52);
 }}
 
 /* Wallpaper canvas */
@@ -321,7 +453,6 @@ body {{
 #main_interface_root .gr-panel,
 #main_interface_root .gr-row,
 #main_interface_root .gr-column,
-#main_interface_root .gr-group,
 #main_interface_root .block {{
     background: transparent !important;
     background-color: transparent !important;
@@ -329,26 +460,63 @@ body {{
     box-shadow: none !important;
 }}
 
-/* Floating islands (ID-level to avoid theme override) */
-#media_card,
-#log_card,
-#action_selection_card,
-#exec_btn_card,
-#reference_btn_card,
-#next_task_btn_card,
-#task_hint_card,
+/* Keep non-card groups transparent, but do NOT wipe card groups */
+#main_interface_root .gr-group:not(#media_card):not(#log_card):not(#action_selection_card):not(#exec_btn_card):not(#reference_btn_card):not(#next_task_btn_card):not(#task_hint_card) {{
+    background: transparent !important;
+    background-color: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}}
+
+/* Floating islands (force on ID and first child wrapper to survive DOM nesting differences) */
+:is(#media_card, #log_card, #action_selection_card, #exec_btn_card, #reference_btn_card, #next_task_btn_card, #task_hint_card),
+:is(#media_card, #log_card, #action_selection_card, #exec_btn_card, #reference_btn_card, #next_task_btn_card, #task_hint_card) > div:first-child,
 .floating-card {{
-    background: var(--card-bg) !important;
+    background:
+        linear-gradient(180deg, rgba(102, 112, 132, 0.92) 0%, var(--card-bg) 100%) !important;
     border: 1px solid var(--card-border) !important;
     border-radius: var(--radius-card) !important;
     padding: var(--card-padding) !important;
     box-shadow:
-        0 22px 50px rgba(0, 0, 0, 0.55),
-        inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+        var(--shadow-float),
+        inset 0 1px 0 rgba(255, 255, 255, 0.12) !important;
     margin-bottom: var(--card-gap) !important;
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
     overflow: hidden !important;
+}}
+
+/* Highest-priority card skin */
+#main_interface_root #media_card,
+#main_interface_root #log_card,
+#main_interface_root #action_selection_card,
+#main_interface_root #exec_btn_card,
+#main_interface_root #reference_btn_card,
+#main_interface_root #next_task_btn_card,
+#main_interface_root #task_hint_card,
+#main_interface_root #media_card > div:first-child,
+#main_interface_root #log_card > div:first-child,
+#main_interface_root #action_selection_card > div:first-child,
+#main_interface_root #exec_btn_card > div:first-child,
+#main_interface_root #reference_btn_card > div:first-child,
+#main_interface_root #next_task_btn_card > div:first-child,
+#main_interface_root #task_hint_card > div:first-child {{
+    background:
+        linear-gradient(180deg, rgba(108, 116, 136, 0.95) 0%, rgba(78, 87, 106, 0.96) 100%) !important;
+    border: 1px solid rgba(255, 255, 255, 0.22) !important;
+    border-radius: 52px !important;
+    box-shadow: 0 24px 54px rgba(0, 0, 0, 0.5) !important;
+    margin-bottom: 34px !important;
+}}
+
+/* Ensure outer control panel shell is always transparent */
+#control_panel_group,
+#control_panel_group > div,
+#control_panel_group > div > div {{
+    background: transparent !important;
+    background-color: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
 }}
 
 .floating-card .prose,
@@ -369,6 +537,21 @@ body {{
     gap: 24px !important;
 }}
 
+/* Enforce vertical spacing between cards in each column */
+#main_layout_row .gr-column {{
+    display: flex !important;
+    flex-direction: column !important;
+    gap: var(--card-gap) !important;
+}}
+
+#control_panel_group {{
+    display: flex !important;
+    flex-direction: column !important;
+    gap: var(--card-gap) !important;
+    padding: 0 !important;
+    margin: 0 !important;
+}}
+
 /* Keep inner groups transparent even inside cards unless explicitly highlighted */
 .floating-card .gr-group {{
     background: transparent !important;
@@ -385,7 +568,10 @@ body {{
 #exec_btn_card,
 #reference_btn_card,
 #next_task_btn_card {{
-    padding: 14px !important;
+    padding: 16px !important;
+    min-height: 86px !important;
+    display: flex !important;
+    align-items: center !important;
 }}
 
 .button-card button,
@@ -393,7 +579,7 @@ body {{
 #reference_btn_card button,
 #next_task_btn_card button {{
     width: 100% !important;
-    border-radius: 18px !important;
+    border-radius: 24px !important;
 }}
 
 /* 全局字体 */
@@ -560,6 +746,109 @@ h1, h2, h3, h4, h5, h6, .gr-button, .gr-textbox, .gr-dropdown, .gr-radio {{
     margin: 0.15em 0 !important;
     padding-left: 1.2em !important;
 }}
+
+/* ========================================================================
+   Hard Override: enforce gray floating cards + huge radius + vertical gaps
+   ======================================================================== */
+
+/* 1) wipe non-card shells */
+#main_interface_root, [id*="main_interface_root"],
+#main_layout_row, [id*="main_layout_row"],
+#main_layout_row > div, [id*="main_layout_row"] > div,
+#control_panel_group, [id*="control_panel_group"] {{
+    background: transparent !important;
+    background-color: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}}
+
+/* 2) apply card skin directly to 7 target cards (id and fuzzy-id fallback) */
+#media_card, [id*="media_card"],
+#log_card, [id*="log_card"],
+#action_selection_card, [id*="action_selection_card"],
+#exec_btn_card, [id*="exec_btn_card"],
+#reference_btn_card, [id*="reference_btn_card"],
+#next_task_btn_card, [id*="next_task_btn_card"],
+#task_hint_card, [id*="task_hint_card"],
+#media_card > div:first-child, [id*="media_card"] > div:first-child,
+#log_card > div:first-child, [id*="log_card"] > div:first-child,
+#action_selection_card > div:first-child, [id*="action_selection_card"] > div:first-child,
+#exec_btn_card > div:first-child, [id*="exec_btn_card"] > div:first-child,
+#reference_btn_card > div:first-child, [id*="reference_btn_card"] > div:first-child,
+#next_task_btn_card > div:first-child, [id*="next_task_btn_card"] > div:first-child,
+#task_hint_card > div:first-child, [id*="task_hint_card"] > div:first-child {{
+    background: linear-gradient(180deg, rgba(118, 126, 146, 0.96) 0%, rgba(82, 90, 108, 0.97) 100%) !important;
+    border: 1px solid rgba(255, 255, 255, 0.24) !important;
+    border-radius: 56px !important;
+    box-shadow: 0 26px 58px rgba(0, 0, 0, 0.52) !important;
+    padding: 24px !important;
+    overflow: hidden !important;
+}}
+
+/* 3) strong vertical spacing between cards */
+#media_card, [id*="media_card"],
+#log_card, [id*="log_card"],
+#action_selection_card, [id*="action_selection_card"],
+#exec_btn_card, [id*="exec_btn_card"],
+#reference_btn_card, [id*="reference_btn_card"],
+#next_task_btn_card, [id*="next_task_btn_card"],
+#task_hint_card, [id*="task_hint_card"] {{
+    margin-bottom: 36px !important;
+}}
+
+/* right-column card stack spacing */
+#control_panel_group > :not(style):not(script),
+[id*="control_panel_group"] > :not(style):not(script) {{
+    margin-bottom: 36px !important;
+}}
+#control_panel_group > :last-child,
+[id*="control_panel_group"] > :last-child {{
+    margin-bottom: 0 !important;
+}}
+
+/* button card: rounded interior button */
+#exec_btn_card button, [id*="exec_btn_card"] button,
+#reference_btn_card button, [id*="reference_btn_card"] button,
+#next_task_btn_card button, [id*="next_task_btn_card"] button {{
+    border-radius: 28px !important;
+    min-height: 56px !important;
+}}
+
+/* Direct component fallback: style the component blocks themselves */
+#live_obs, [id*="live_obs"],
+#demo_video, [id*="demo_video"],
+#combined_view_html, [id*="combined_view_html"],
+#log_output, [id*="log_output"],
+#action_radio, [id*="action_radio"],
+#task_hint_display, [id*="task_hint_display"],
+#live_obs > div, [id*="live_obs"] > div,
+#demo_video > div, [id*="demo_video"] > div,
+#combined_view_html > div, [id*="combined_view_html"] > div,
+#log_output > div, [id*="log_output"] > div,
+#action_radio > div, [id*="action_radio"] > div,
+#task_hint_display > div, [id*="task_hint_display"] > div,
+#live_obs > div > div, [id*="live_obs"] > div > div,
+#demo_video > div > div, [id*="demo_video"] > div > div,
+#combined_view_html > div > div, [id*="combined_view_html"] > div > div,
+#log_output > div > div, [id*="log_output"] > div > div,
+#action_radio > div > div, [id*="action_radio"] > div > div,
+#task_hint_display > div > div, [id*="task_hint_display"] > div > div {{
+    background: linear-gradient(180deg, rgba(118,126,146,0.96) 0%, rgba(82,90,108,0.97) 100%) !important;
+    border: 1px solid rgba(255, 255, 255, 0.24) !important;
+    border-radius: 56px !important;
+    box-shadow: 0 26px 58px rgba(0, 0, 0, 0.52) !important;
+    padding: 18px !important;
+    margin-bottom: 36px !important;
+    overflow: hidden !important;
+}}
+
+#exec_btn, [id*="exec_btn"],
+#reference_action_btn, [id*="reference_action_btn"],
+#next_task_btn, [id*="next_task_btn"] {{
+    border-radius: 28px !important;
+    min-height: 56px !important;
+    margin-bottom: 24px !important;
+}}
 """
 
 
@@ -579,10 +868,6 @@ def create_ui_blocks():
         return f"**Goal:** {first_goal}" if first_goal else ""
 
     blocks_kwargs = {"title": "Oracle Planner Interface"}
-    try:
-        blocks_kwargs["theme"] = gr.themes.Monochrome()
-    except Exception:
-        pass
 
     with gr.Blocks(**blocks_kwargs) as demo:
         # =================================================================
