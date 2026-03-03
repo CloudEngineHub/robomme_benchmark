@@ -606,6 +606,13 @@ h1, h2, h3, h4, h5, h6, .gr-button, .gr-textbox, .gr-dropdown, .gr-radio {{
     object-fit: contain !important;
 }}
 
+/* Hide keypoint image toolbars/buttons (top + bottom actions) */
+#live_obs .icon-button-wrapper,
+#live_obs [data-testid="source-select"],
+#live_obs .source-selection {{
+    display: none !important;
+}}
+
 /* Action radio - 每行一个选项 */
 #action_radio .form-radio {{ display: block !important; width: 100% !important; margin-bottom: 8px !important; }}
 #action_radio .form-radio label {{ width: 100% !important; display: block !important; }}
@@ -779,7 +786,8 @@ def create_ui_blocks():
                             gr.Markdown("### Keypoint Selection")
                             img_display = gr.Image(
                                 label="Live Observation", interactive=False,
-                                type="pil", elem_id="live_obs", show_label=False
+                                type="pil", elem_id="live_obs", show_label=False,
+                                buttons=[], sources=[]
                             )
 
                     with gr.Group(elem_classes="floating-card", elem_id="log_card"):
