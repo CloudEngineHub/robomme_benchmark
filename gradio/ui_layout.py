@@ -239,271 +239,38 @@ SYNC_JS = """
     }
 
     // ========================================================================
-    // Runtime card enforcer (DOM-driven inline style, robust against Gradio DOM changes)
+    // Card shell single-hit mapping
     // ========================================================================
-    function initFloatingCardEnforcer() {
-        function setImportant(el, prop, value) {
-            if (!el) return;
-            el.style.setProperty(prop, value, 'important');
-        }
-
-        function clearCardSkin(node) {
-            if (!node) return;
-            node.classList.remove('runtime-card');
-            node.style.removeProperty('background');
-            node.style.removeProperty('border');
-            node.style.removeProperty('border-radius');
-            node.style.removeProperty('box-shadow');
-            node.style.removeProperty('overflow');
-            node.style.removeProperty('margin-bottom');
-            node.style.removeProperty('padding');
-        }
-
-        function nearestCardContainer(el) {
-            let cur = el;
-            for (let i = 0; i < 12 && cur && cur !== document.body; i += 1) {
-                if (cur.classList) {
-                    const id = cur.id || '';
-                    if (
-                        cur.classList.contains('floating-card') ||
-                        cur.classList.contains('runtime-card') ||
-                        id.endsWith('_card')
-                    ) {
-                        return cur;
-                    }
-                }
-                cur = cur.parentElement;
-            }
-            return null;
-        }
-
-        function findByElemId(elemId) {
-            if (!elemId) return null;
-            const direct =
-                document.getElementById(elemId) ||
-                document.querySelector(`#${elemId}`) ||
-                document.querySelector(`[id*="${elemId}"]`);
-            if (direct) return direct;
-
-            const comps = (window.gradio_config && window.gradio_config.components) || [];
-            for (const comp of comps) {
-                if (comp && comp.props && comp.props.elem_id === elemId) {
-                    const cid = comp.id;
-                    const node =
-                        document.getElementById(`component-${cid}`) ||
-                        document.querySelector(`#component-${cid}`) ||
-                        document.querySelector(`[id*="component-${cid}"]`);
-                    if (node) return node;
-                }
-            }
-            return null;
-        }
-
-        function getCardRootById(cardId) {
-            return findByElemId(cardId);
-        }
-
-        function findBySelectorOrElemId(selector) {
-            if (!selector) return null;
-            const trimmed = String(selector).trim();
-            if (trimmed.startsWith('#')) {
-                const elemId = trimmed.slice(1);
-                const byElemId = findByElemId(elemId);
-                if (byElemId) return byElemId;
-            }
-            return document.querySelector(trimmed);
-        }
-
-        function firstExisting(selectorList) {
-            for (const selector of selectorList) {
-                const node = findBySelectorOrElemId(selector);
-                if (node) return node;
-            }
-            return null;
-        }
-
-        function pushUnique(list, node) {
-            if (!node) return;
-            if (!list.includes(node)) list.push(node);
-        }
-
-        function isVisibleNode(node) {
-            if (!node || !node.getBoundingClientRect) return false;
-            const style = window.getComputedStyle(node);
-            if (!style || style.display === 'none' || style.visibility === 'hidden') return false;
-            if (node.offsetParent === null && style.position !== 'fixed') return false;
-            const rect = node.getBoundingClientRect();
-            return rect.width > 0 && rect.height > 0;
-        }
-
-        function collectCardCandidates(cardId, anchorSelectors) {
-            const candidates = [];
-            const root = getCardRootById(cardId);
-            pushUnique(candidates, root);
-            if (root && root.firstElementChild) {
-                pushUnique(candidates, root.firstElementChild);
-            }
-
-            const anchor = firstExisting(anchorSelectors);
-            const anchorCard = anchor ? nearestCardContainer(anchor) : null;
-            pushUnique(candidates, anchorCard);
-            if (anchorCard && anchorCard.firstElementChild) {
-                pushUnique(candidates, anchorCard.firstElementChild);
-            }
-            if (anchor) {
-                pushUnique(candidates, anchor.closest('.gr-group'));
-                pushUnique(candidates, anchor.closest('.gr-block'));
-            }
-
-            return candidates;
-        }
-
-        function pickCardTarget(cardId, candidates) {
-            const root = getCardRootById(cardId);
-            if (root && isVisibleNode(root)) {
-                return root;
-            }
-
-            if (root && root.firstElementChild && isVisibleNode(root.firstElementChild)) {
-                return root.firstElementChild;
-            }
-
-            for (const node of candidates) {
-                if (!node || !node.classList) continue;
-                if (!isVisibleNode(node)) continue;
-                if (
-                    node.classList.contains('gr-block') ||
-                    node.classList.contains('gr-form') ||
-                    node.classList.contains('block')
-                ) {
-                    return node;
-                }
-            }
-            for (const node of candidates) {
-                if (isVisibleNode(node)) return node;
-            }
-            return null;
-        }
-
-        function paintCard(node, isButtonCard) {
-            if (!node) return;
-            node.classList.add('runtime-card');
-            setImportant(node, 'display', 'block');
-            setImportant(node, 'background', 'linear-gradient(180deg, rgba(118,126,146,0.96) 0%, rgba(82,90,108,0.97) 100%)');
-            setImportant(node, 'border', '1px solid rgba(255,255,255,0.24)');
-            setImportant(node, 'border-radius', '56px');
-            setImportant(node, 'box-shadow', '0 26px 58px rgba(0,0,0,0.52)');
-            setImportant(node, 'overflow', 'hidden');
-            setImportant(node, 'margin-bottom', '36px');
-            setImportant(node, 'padding', isButtonCard ? '16px' : '24px');
-
-            if (isButtonCard) {
-                const btn = node.querySelector('button');
-                if (btn) {
-                    setImportant(btn, 'border-radius', '28px');
-                    setImportant(btn, 'min-height', '56px');
-                    setImportant(btn, 'width', '100%');
-                }
-            }
-        }
-
-        function clearOuterShell() {
-            const shellSelectors = [
-                '#main_interface_root',
-                '#main_layout_row',
-                '#control_panel_group'
-            ];
-            for (const selector of shellSelectors) {
-                document.querySelectorAll(selector).forEach((el) => {
-                    setImportant(el, 'background', 'transparent');
-                    setImportant(el, 'background-color', 'transparent');
-                    setImportant(el, 'border', 'none');
-                    setImportant(el, 'box-shadow', 'none');
-                });
-            }
-            const controlShell = firstExisting(['#control_panel_group']);
-            if (controlShell) {
-                setImportant(controlShell, 'display', 'flex');
-                setImportant(controlShell, 'flex-direction', 'column');
-                setImportant(controlShell, 'gap', '36px');
-                Array.from(controlShell.children || []).forEach((child) => {
-                    setImportant(child, 'margin-bottom', '0');
-                });
-            }
-        }
-
+    function applyCardShellOnce() {
         const cardConfigs = [
-            {
-                id: 'media_card',
-                anchorSelectors: ['#live_obs', '#demo_video', '#combined_view_html'],
-                isButtonCard: false,
-            },
-            {
-                id: 'log_card',
-                anchorSelectors: ['#log_output'],
-                isButtonCard: false,
-            },
-            {
-                id: 'action_selection_card',
-                anchorSelectors: ['#action_radio'],
-                isButtonCard: false,
-            },
-            {
-                id: 'exec_btn_card',
-                anchorSelectors: ['#exec_btn'],
-                isButtonCard: true,
-            },
-            {
-                id: 'reference_btn_card',
-                anchorSelectors: ['#reference_action_btn'],
-                isButtonCard: true,
-            },
-            {
-                id: 'next_task_btn_card',
-                anchorSelectors: ['#next_task_btn'],
-                isButtonCard: true,
-            },
-            {
-                id: 'task_hint_card',
-                anchorSelectors: ['#task_hint_display'],
-                isButtonCard: false,
-            },
+            { anchor: '#media_card_anchor', isButton: false },
+            { anchor: '#log_card_anchor', isButton: false },
+            { anchor: '#action_selection_card_anchor', isButton: false },
+            { anchor: '#exec_btn_card_anchor', isButton: true },
+            { anchor: '#reference_btn_card_anchor', isButton: true },
+            { anchor: '#next_task_btn_card_anchor', isButton: true },
+            { anchor: '#task_hint_card_anchor', isButton: false },
         ];
 
-        function applyCardsOnce() {
-            clearOuterShell();
-            for (const config of cardConfigs) {
-                const candidates = collectCardCandidates(config.id, config.anchorSelectors);
-                candidates.forEach((node) => clearCardSkin(node));
-                const target = pickCardTarget(config.id, candidates);
-                paintCard(target, config.isButtonCard);
+        function resolveShellByAnchor(anchorSelector) {
+            const anchor = document.querySelector(anchorSelector);
+            if (!anchor) return null;
+            return anchor.closest('.gr-group');
+        }
+
+        let unresolved = 0;
+        for (const config of cardConfigs) {
+            const shell = resolveShellByAnchor(config.anchor);
+            if (!shell) {
+                unresolved += 1;
+                continue;
+            }
+            shell.classList.add('card-shell-hit');
+            if (config.isButton) {
+                shell.classList.add('card-shell-button');
             }
         }
-
-        let applyScheduled = false;
-        function scheduleApply() {
-            if (applyScheduled) return;
-            applyScheduled = true;
-            setTimeout(() => {
-                applyScheduled = false;
-                try { applyCardsOnce(); } catch (_) {}
-            }, 80);
-        }
-
-        setTimeout(applyCardsOnce, 200);
-        setTimeout(applyCardsOnce, 1000);
-        setTimeout(applyCardsOnce, 2500);
-        setTimeout(applyCardsOnce, 4500);
-
-        const observer = new MutationObserver(() => scheduleApply());
-        observer.observe(document.body, { childList: true, subtree: true });
-
-        // Keep applying after delayed login/phase transitions.
-        setInterval(() => {
-            try { applyCardsOnce(); } catch (_) {}
-        }, 1500);
-
-        window.__robomme_card_enforcer_active = true;
+        return unresolved;
     }
 
     // ========================================================================
@@ -513,7 +280,22 @@ SYNC_JS = """
         initExecuteButtonListener();
         initLeaseLostHandler();
         setTimeout(() => { applyCoordsGroupHighlight(); }, 2000);
-        initFloatingCardEnforcer();
+
+        setTimeout(() => {
+            let unresolved = applyCardShellOnce();
+            if (unresolved === 0) return;
+
+            const observer = new MutationObserver(() => {
+                unresolved = applyCardShellOnce();
+                if (unresolved === 0) {
+                    observer.disconnect();
+                }
+            });
+            observer.observe(document.body, {
+                childList: true,
+                subtree: true,
+            });
+        }, 1200);
     }
 
     if (document.readyState === 'loading') {
@@ -611,23 +393,9 @@ body {{
     margin: 0 !important;
 }}
 
-/* Authoritative 7-card outer shell with robust DOM matching */
-#media_card,
-[id*="media_card"],
-#log_card,
-[id*="log_card"],
-#action_selection_card,
-[id*="action_selection_card"],
-#exec_btn_card,
-[id*="exec_btn_card"],
-#reference_btn_card,
-[id*="reference_btn_card"],
-#next_task_btn_card,
-[id*="next_task_btn_card"],
-#task_hint_card,
-[id*="task_hint_card"],
+/* Card skin: single source of truth via explicit card id -> shell mapping once */
 .floating-card,
-.runtime-card {{
+.card-shell-hit {{
     display: block !important;
     background:
         linear-gradient(180deg, rgba(118, 126, 146, 0.96) 0%, rgba(82, 90, 108, 0.97) 100%) !important;
@@ -641,22 +409,8 @@ body {{
     margin-bottom: var(--card-gap) !important;
 }}
 
-#media_card > div:first-child,
-[id*="media_card"] > div:first-child,
-#log_card > div:first-child,
-[id*="log_card"] > div:first-child,
-#action_selection_card > div:first-child,
-[id*="action_selection_card"] > div:first-child,
-#exec_btn_card > div:first-child,
-[id*="exec_btn_card"] > div:first-child,
-#reference_btn_card > div:first-child,
-[id*="reference_btn_card"] > div:first-child,
-#next_task_btn_card > div:first-child,
-[id*="next_task_btn_card"] > div:first-child,
-#task_hint_card > div:first-child,
-[id*="task_hint_card"] > div:first-child,
 .floating-card > div:first-child,
-.runtime-card > div:first-child {{
+.card-shell-hit > div:first-child {{
     background: transparent !important;
     background-color: transparent !important;
     border: none !important;
@@ -665,12 +419,9 @@ body {{
     padding: 0 !important;
 }}
 
-#exec_btn_card,
-[id*="exec_btn_card"],
-#reference_btn_card,
-[id*="reference_btn_card"],
-#next_task_btn_card,
-[id*="next_task_btn_card"] {{
+/* Button cards keep compact height while sharing the same card skin */
+.button-card,
+.card-shell-button {{
     padding: 16px !important;
     min-height: 86px !important;
     display: flex !important;
@@ -678,86 +429,16 @@ body {{
 }}
 
 /* Keep inner wrappers flat; exclude coords_group to preserve blue highlight */
-#media_card > div:first-child .gr-group:not(#coords_group),
-[id*="media_card"] > div:first-child .gr-group:not(#coords_group),
-#log_card > div:first-child .gr-group:not(#coords_group),
-[id*="log_card"] > div:first-child .gr-group:not(#coords_group),
-#action_selection_card > div:first-child .gr-group:not(#coords_group),
-[id*="action_selection_card"] > div:first-child .gr-group:not(#coords_group),
-#exec_btn_card > div:first-child .gr-group:not(#coords_group),
-[id*="exec_btn_card"] > div:first-child .gr-group:not(#coords_group),
-#reference_btn_card > div:first-child .gr-group:not(#coords_group),
-[id*="reference_btn_card"] > div:first-child .gr-group:not(#coords_group),
-#next_task_btn_card > div:first-child .gr-group:not(#coords_group),
-[id*="next_task_btn_card"] > div:first-child .gr-group:not(#coords_group),
-#task_hint_card > div:first-child .gr-group:not(#coords_group),
-[id*="task_hint_card"] > div:first-child .gr-group:not(#coords_group),
 .floating-card > div:first-child .gr-group:not(#coords_group),
-.runtime-card > div:first-child .gr-group:not(#coords_group),
-#media_card > div:first-child .gr-form:not(#coords_group),
-[id*="media_card"] > div:first-child .gr-form:not(#coords_group),
-#log_card > div:first-child .gr-form:not(#coords_group),
-[id*="log_card"] > div:first-child .gr-form:not(#coords_group),
-#action_selection_card > div:first-child .gr-form:not(#coords_group),
-[id*="action_selection_card"] > div:first-child .gr-form:not(#coords_group),
-#exec_btn_card > div:first-child .gr-form:not(#coords_group),
-[id*="exec_btn_card"] > div:first-child .gr-form:not(#coords_group),
-#reference_btn_card > div:first-child .gr-form:not(#coords_group),
-[id*="reference_btn_card"] > div:first-child .gr-form:not(#coords_group),
-#next_task_btn_card > div:first-child .gr-form:not(#coords_group),
-[id*="next_task_btn_card"] > div:first-child .gr-form:not(#coords_group),
-#task_hint_card > div:first-child .gr-form:not(#coords_group),
-[id*="task_hint_card"] > div:first-child .gr-form:not(#coords_group),
 .floating-card > div:first-child .gr-form:not(#coords_group),
-.runtime-card > div:first-child .gr-form:not(#coords_group),
-#media_card > div:first-child .gr-box:not(#coords_group),
-[id*="media_card"] > div:first-child .gr-box:not(#coords_group),
-#log_card > div:first-child .gr-box:not(#coords_group),
-[id*="log_card"] > div:first-child .gr-box:not(#coords_group),
-#action_selection_card > div:first-child .gr-box:not(#coords_group),
-[id*="action_selection_card"] > div:first-child .gr-box:not(#coords_group),
-#exec_btn_card > div:first-child .gr-box:not(#coords_group),
-[id*="exec_btn_card"] > div:first-child .gr-box:not(#coords_group),
-#reference_btn_card > div:first-child .gr-box:not(#coords_group),
-[id*="reference_btn_card"] > div:first-child .gr-box:not(#coords_group),
-#next_task_btn_card > div:first-child .gr-box:not(#coords_group),
-[id*="next_task_btn_card"] > div:first-child .gr-box:not(#coords_group),
-#task_hint_card > div:first-child .gr-box:not(#coords_group),
-[id*="task_hint_card"] > div:first-child .gr-box:not(#coords_group),
 .floating-card > div:first-child .gr-box:not(#coords_group),
-.runtime-card > div:first-child .gr-box:not(#coords_group),
-#media_card > div:first-child .gr-panel:not(#coords_group),
-[id*="media_card"] > div:first-child .gr-panel:not(#coords_group),
-#log_card > div:first-child .gr-panel:not(#coords_group),
-[id*="log_card"] > div:first-child .gr-panel:not(#coords_group),
-#action_selection_card > div:first-child .gr-panel:not(#coords_group),
-[id*="action_selection_card"] > div:first-child .gr-panel:not(#coords_group),
-#exec_btn_card > div:first-child .gr-panel:not(#coords_group),
-[id*="exec_btn_card"] > div:first-child .gr-panel:not(#coords_group),
-#reference_btn_card > div:first-child .gr-panel:not(#coords_group),
-[id*="reference_btn_card"] > div:first-child .gr-panel:not(#coords_group),
-#next_task_btn_card > div:first-child .gr-panel:not(#coords_group),
-[id*="next_task_btn_card"] > div:first-child .gr-panel:not(#coords_group),
-#task_hint_card > div:first-child .gr-panel:not(#coords_group),
-[id*="task_hint_card"] > div:first-child .gr-panel:not(#coords_group),
 .floating-card > div:first-child .gr-panel:not(#coords_group),
-.runtime-card > div:first-child .gr-panel:not(#coords_group),
-#media_card > div:first-child .block:not(#coords_group),
-[id*="media_card"] > div:first-child .block:not(#coords_group),
-#log_card > div:first-child .block:not(#coords_group),
-[id*="log_card"] > div:first-child .block:not(#coords_group),
-#action_selection_card > div:first-child .block:not(#coords_group),
-[id*="action_selection_card"] > div:first-child .block:not(#coords_group),
-#exec_btn_card > div:first-child .block:not(#coords_group),
-[id*="exec_btn_card"] > div:first-child .block:not(#coords_group),
-#reference_btn_card > div:first-child .block:not(#coords_group),
-[id*="reference_btn_card"] > div:first-child .block:not(#coords_group),
-#next_task_btn_card > div:first-child .block:not(#coords_group),
-[id*="next_task_btn_card"] > div:first-child .block:not(#coords_group),
-#task_hint_card > div:first-child .block:not(#coords_group),
-[id*="task_hint_card"] > div:first-child .block:not(#coords_group),
 .floating-card > div:first-child .block:not(#coords_group),
-.runtime-card > div:first-child .block:not(#coords_group) {{
+.card-shell-hit > div:first-child .gr-group:not(#coords_group),
+.card-shell-hit > div:first-child .gr-form:not(#coords_group),
+.card-shell-hit > div:first-child .gr-box:not(#coords_group),
+.card-shell-hit > div:first-child .gr-panel:not(#coords_group),
+.card-shell-hit > div:first-child .block:not(#coords_group) {{
     background: transparent !important;
     background-color: transparent !important;
     border: none !important;
@@ -793,79 +474,34 @@ body {{
 }}
 
 /* Keep titles visually inside the outer card */
-#media_card .prose,
-[id*="media_card"] .prose,
-#log_card .prose,
-[id*="log_card"] .prose,
-#action_selection_card .prose,
-[id*="action_selection_card"] .prose,
-#exec_btn_card .prose,
-[id*="exec_btn_card"] .prose,
-#reference_btn_card .prose,
-[id*="reference_btn_card"] .prose,
-#next_task_btn_card .prose,
-[id*="next_task_btn_card"] .prose,
-#task_hint_card .prose,
-[id*="task_hint_card"] .prose,
 .floating-card .prose,
-.runtime-card .prose,
-#media_card h1, #media_card h2, #media_card h3, #media_card h4, #media_card h5, #media_card h6,
-#media_card p, #media_card label, #media_card span, #media_card div, #media_card li, #media_card ol, #media_card ul,
-[id*="media_card"] h1, [id*="media_card"] h2, [id*="media_card"] h3, [id*="media_card"] h4, [id*="media_card"] h5, [id*="media_card"] h6,
-[id*="media_card"] p, [id*="media_card"] label, [id*="media_card"] span, [id*="media_card"] div, [id*="media_card"] li, [id*="media_card"] ol, [id*="media_card"] ul,
-#log_card h1, #log_card h2, #log_card h3, #log_card h4, #log_card h5, #log_card h6,
-#log_card p, #log_card label, #log_card span, #log_card div, #log_card li, #log_card ol, #log_card ul,
-[id*="log_card"] h1, [id*="log_card"] h2, [id*="log_card"] h3, [id*="log_card"] h4, [id*="log_card"] h5, [id*="log_card"] h6,
-[id*="log_card"] p, [id*="log_card"] label, [id*="log_card"] span, [id*="log_card"] div, [id*="log_card"] li, [id*="log_card"] ol, [id*="log_card"] ul,
-#action_selection_card h1, #action_selection_card h2, #action_selection_card h3, #action_selection_card h4, #action_selection_card h5, #action_selection_card h6,
-#action_selection_card p, #action_selection_card label, #action_selection_card span, #action_selection_card div, #action_selection_card li, #action_selection_card ol, #action_selection_card ul,
-[id*="action_selection_card"] h1, [id*="action_selection_card"] h2, [id*="action_selection_card"] h3, [id*="action_selection_card"] h4, [id*="action_selection_card"] h5, [id*="action_selection_card"] h6,
-[id*="action_selection_card"] p, [id*="action_selection_card"] label, [id*="action_selection_card"] span, [id*="action_selection_card"] div, [id*="action_selection_card"] li, [id*="action_selection_card"] ol, [id*="action_selection_card"] ul,
-#exec_btn_card h1, #exec_btn_card h2, #exec_btn_card h3, #exec_btn_card h4, #exec_btn_card h5, #exec_btn_card h6,
-#exec_btn_card p, #exec_btn_card label, #exec_btn_card span, #exec_btn_card div, #exec_btn_card li, #exec_btn_card ol, #exec_btn_card ul,
-[id*="exec_btn_card"] h1, [id*="exec_btn_card"] h2, [id*="exec_btn_card"] h3, [id*="exec_btn_card"] h4, [id*="exec_btn_card"] h5, [id*="exec_btn_card"] h6,
-[id*="exec_btn_card"] p, [id*="exec_btn_card"] label, [id*="exec_btn_card"] span, [id*="exec_btn_card"] div, [id*="exec_btn_card"] li, [id*="exec_btn_card"] ol, [id*="exec_btn_card"] ul,
-#reference_btn_card h1, #reference_btn_card h2, #reference_btn_card h3, #reference_btn_card h4, #reference_btn_card h5, #reference_btn_card h6,
-#reference_btn_card p, #reference_btn_card label, #reference_btn_card span, #reference_btn_card div, #reference_btn_card li, #reference_btn_card ol, #reference_btn_card ul,
-[id*="reference_btn_card"] h1, [id*="reference_btn_card"] h2, [id*="reference_btn_card"] h3, [id*="reference_btn_card"] h4, [id*="reference_btn_card"] h5, [id*="reference_btn_card"] h6,
-[id*="reference_btn_card"] p, [id*="reference_btn_card"] label, [id*="reference_btn_card"] span, [id*="reference_btn_card"] div, [id*="reference_btn_card"] li, [id*="reference_btn_card"] ol, [id*="reference_btn_card"] ul,
-#next_task_btn_card h1, #next_task_btn_card h2, #next_task_btn_card h3, #next_task_btn_card h4, #next_task_btn_card h5, #next_task_btn_card h6,
-#next_task_btn_card p, #next_task_btn_card label, #next_task_btn_card span, #next_task_btn_card div, #next_task_btn_card li, #next_task_btn_card ol, #next_task_btn_card ul,
-[id*="next_task_btn_card"] h1, [id*="next_task_btn_card"] h2, [id*="next_task_btn_card"] h3, [id*="next_task_btn_card"] h4, [id*="next_task_btn_card"] h5, [id*="next_task_btn_card"] h6,
-[id*="next_task_btn_card"] p, [id*="next_task_btn_card"] label, [id*="next_task_btn_card"] span, [id*="next_task_btn_card"] div, [id*="next_task_btn_card"] li, [id*="next_task_btn_card"] ol, [id*="next_task_btn_card"] ul,
-#task_hint_card h1, #task_hint_card h2, #task_hint_card h3, #task_hint_card h4, #task_hint_card h5, #task_hint_card h6,
-#task_hint_card p, #task_hint_card label, #task_hint_card span, #task_hint_card div, #task_hint_card li, #task_hint_card ol, #task_hint_card ul,
-[id*="task_hint_card"] h1, [id*="task_hint_card"] h2, [id*="task_hint_card"] h3, [id*="task_hint_card"] h4, [id*="task_hint_card"] h5, [id*="task_hint_card"] h6,
-[id*="task_hint_card"] p, [id*="task_hint_card"] label, [id*="task_hint_card"] span, [id*="task_hint_card"] div, [id*="task_hint_card"] li, [id*="task_hint_card"] ol, [id*="task_hint_card"] ul,
 .floating-card h1, .floating-card h2, .floating-card h3, .floating-card h4, .floating-card h5, .floating-card h6,
 .floating-card p, .floating-card label, .floating-card span, .floating-card div, .floating-card li, .floating-card ol, .floating-card ul,
-.runtime-card h1, .runtime-card h2, .runtime-card h3, .runtime-card h4, .runtime-card h5, .runtime-card h6,
-.runtime-card p, .runtime-card label, .runtime-card span, .runtime-card div, .runtime-card li, .runtime-card ol, .runtime-card ul {{
+.card-shell-hit .prose,
+.card-shell-hit h1, .card-shell-hit h2, .card-shell-hit h3, .card-shell-hit h4, .card-shell-hit h5, .card-shell-hit h6,
+.card-shell-hit p, .card-shell-hit label, .card-shell-hit span, .card-shell-hit div, .card-shell-hit li, .card-shell-hit ol, .card-shell-hit ul {{
     color: var(--text-primary) !important;
 }}
 
-#media_card h1, #media_card h2, #media_card h3, #media_card h4,
-[id*="media_card"] h1, [id*="media_card"] h2, [id*="media_card"] h3, [id*="media_card"] h4,
-#log_card h1, #log_card h2, #log_card h3, #log_card h4,
-[id*="log_card"] h1, [id*="log_card"] h2, [id*="log_card"] h3, [id*="log_card"] h4,
-#action_selection_card h1, #action_selection_card h2, #action_selection_card h3, #action_selection_card h4,
-[id*="action_selection_card"] h1, [id*="action_selection_card"] h2, [id*="action_selection_card"] h3, [id*="action_selection_card"] h4,
-#exec_btn_card h1, #exec_btn_card h2, #exec_btn_card h3, #exec_btn_card h4,
-[id*="exec_btn_card"] h1, [id*="exec_btn_card"] h2, [id*="exec_btn_card"] h3, [id*="exec_btn_card"] h4,
-#reference_btn_card h1, #reference_btn_card h2, #reference_btn_card h3, #reference_btn_card h4,
-[id*="reference_btn_card"] h1, [id*="reference_btn_card"] h2, [id*="reference_btn_card"] h3, [id*="reference_btn_card"] h4,
-#next_task_btn_card h1, #next_task_btn_card h2, #next_task_btn_card h3, #next_task_btn_card h4,
-[id*="next_task_btn_card"] h1, [id*="next_task_btn_card"] h2, [id*="next_task_btn_card"] h3, [id*="next_task_btn_card"] h4,
-#task_hint_card h1, #task_hint_card h2, #task_hint_card h3, #task_hint_card h4,
-[id*="task_hint_card"] h1, [id*="task_hint_card"] h2, [id*="task_hint_card"] h3, [id*="task_hint_card"] h4,
 .floating-card h1, .floating-card h2, .floating-card h3, .floating-card h4,
-.runtime-card h1, .runtime-card h2, .runtime-card h3, .runtime-card h4 {{
+.card-shell-hit h1, .card-shell-hit h2, .card-shell-hit h3, .card-shell-hit h4 {{
     margin-top: 0 !important;
 }}
 
-/* Button */
-.button-card {{
+/* Runtime card-shell anchors (used for single-hit mapping only) */
+#media_card_anchor,
+#log_card_anchor,
+#action_selection_card_anchor,
+#exec_btn_card_anchor,
+#reference_btn_card_anchor,
+#next_task_btn_card_anchor,
+#task_hint_card_anchor {{
+    display: none !important;
+    height: 0 !important;
+    min-height: 0 !important;
+    margin: 0 !important;
     padding: 0 !important;
+    border: 0 !important;
 }}
 
 .button-card button,
@@ -1042,99 +678,6 @@ h1, h2, h3, h4, h5, h6, .gr-button, .gr-textbox, .gr-dropdown, .gr-radio {{
     padding-left: 1.2em !important;
 }}
 
-/* Final guard: force card skin at the very end (highest local precedence) */
-#main_interface_root #media_card,
-#main_interface_root [id*="media_card"],
-#main_interface_root #log_card,
-#main_interface_root [id*="log_card"],
-#main_interface_root #action_selection_card,
-#main_interface_root [id*="action_selection_card"],
-#main_interface_root #exec_btn_card,
-#main_interface_root [id*="exec_btn_card"],
-#main_interface_root #reference_btn_card,
-#main_interface_root [id*="reference_btn_card"],
-#main_interface_root #next_task_btn_card,
-#main_interface_root [id*="next_task_btn_card"],
-#main_interface_root #task_hint_card,
-#main_interface_root [id*="task_hint_card"],
-#main_interface_root .floating-card,
-#main_interface_root .runtime-card {{
-    display: block !important;
-    background: linear-gradient(180deg, rgba(118, 126, 146, 0.96) 0%, rgba(82, 90, 108, 0.97) 100%) !important;
-    border: 1px solid rgba(255, 255, 255, 0.24) !important;
-    border-radius: 56px !important;
-    padding: 24px !important;
-    box-shadow: 0 26px 58px rgba(0, 0, 0, 0.52) !important;
-    overflow: hidden !important;
-    margin-bottom: var(--card-gap) !important;
-}}
-
-#main_interface_root #exec_btn_card,
-#main_interface_root [id*="exec_btn_card"],
-#main_interface_root #reference_btn_card,
-#main_interface_root [id*="reference_btn_card"],
-#main_interface_root #next_task_btn_card,
-#main_interface_root [id*="next_task_btn_card"] {{
-    padding: 16px !important;
-    min-height: 86px !important;
-    display: flex !important;
-    align-items: center !important;
-}}
-
-/* Component-id fallback (Gradio v6 root nodes) */
-#component-28,
-#component-38,
-#component-43,
-#component-51,
-#component-53,
-#component-55,
-#component-57,
-[id*="component-28"],
-[id*="component-38"],
-[id*="component-43"],
-[id*="component-51"],
-[id*="component-53"],
-[id*="component-55"],
-[id*="component-57"] {{
-    display: block !important;
-    background: linear-gradient(180deg, rgba(118, 126, 146, 0.96) 0%, rgba(82, 90, 108, 0.97) 100%) !important;
-    border: 1px solid rgba(255, 255, 255, 0.24) !important;
-    border-radius: 56px !important;
-    padding: 24px !important;
-    box-shadow: 0 26px 58px rgba(0, 0, 0, 0.52) !important;
-    overflow: hidden !important;
-    margin-bottom: var(--card-gap) !important;
-}}
-
-#component-51,
-#component-53,
-#component-55,
-[id*="component-51"],
-[id*="component-53"],
-[id*="component-55"] {{
-    padding: 16px !important;
-    min-height: 86px !important;
-    display: flex !important;
-    align-items: center !important;
-}}
-
-/* Absolute fallback for Gradio component wrappers (when elem_id is not on visible layer) */
-#main_interface_root [id^="component-"]:has(#live_obs):not(:has([id^="component-"]:has(#live_obs))),
-#main_interface_root [id^="component-"]:has(#demo_video):not(:has([id^="component-"]:has(#demo_video))),
-#main_interface_root [id^="component-"]:has(#combined_view_html):not(:has([id^="component-"]:has(#combined_view_html))),
-#main_interface_root [id^="component-"]:has(#log_output):not(:has([id^="component-"]:has(#log_output))),
-#main_interface_root [id^="component-"]:has(#action_radio):not(:has([id^="component-"]:has(#action_radio))),
-#main_interface_root [id^="component-"]:has(#task_hint_display):not(:has([id^="component-"]:has(#task_hint_display))),
-#main_interface_root [id^="component-"]:has(#exec_btn):not(:has([id^="component-"]:has(#exec_btn))),
-#main_interface_root [id^="component-"]:has(#reference_action_btn):not(:has([id^="component-"]:has(#reference_action_btn))),
-#main_interface_root [id^="component-"]:has(#next_task_btn):not(:has([id^="component-"]:has(#next_task_btn))) {{
-    background: linear-gradient(180deg, rgba(118, 126, 146, 0.96) 0%, rgba(82, 90, 108, 0.97) 100%) !important;
-    border: 1px solid rgba(255, 255, 255, 0.24) !important;
-    border-radius: 56px !important;
-    box-shadow: 0 26px 58px rgba(0, 0, 0, 0.52) !important;
-    overflow: hidden !important;
-}}
-
 """
 
 
@@ -1210,6 +753,7 @@ def create_ui_blocks():
                 # ---- Left column: Media card + System log card ----
                 with gr.Column(scale=KEYPOINT_SELECTION_SCALE):
                     with gr.Group(elem_classes="floating-card", elem_id="media_card"):
+                        gr.HTML("<div id='media_card_anchor'></div>")
                         # Phase 1: VIDEO (auto-play demo video)
                         with gr.Group(visible=False) as video_phase_group:
                             gr.Markdown("### Watch the demonstration video")
@@ -1239,6 +783,7 @@ def create_ui_blocks():
                             )
 
                     with gr.Group(elem_classes="floating-card", elem_id="log_card"):
+                        gr.HTML("<div id='log_card_anchor'></div>")
                         gr.Markdown("### System Log")
                         log_output = gr.Markdown(
                             value="", elem_classes="compact-log",
@@ -1249,6 +794,7 @@ def create_ui_blocks():
                 with gr.Column(scale=CONTROL_PANEL_SCALE):
                     with gr.Group(visible=False, elem_id="control_panel_group") as control_panel_group:
                         with gr.Group(elem_classes="floating-card", elem_id="action_selection_card"):
+                            gr.HTML("<div id='action_selection_card_anchor'></div>")
                             gr.Markdown("### Action Selection")
                             options_radio = gr.Radio(
                                 choices=[], label="Action", type="value",
@@ -1263,18 +809,21 @@ def create_ui_blocks():
                                 )
 
                         with gr.Group(elem_classes=["floating-card", "button-card"], elem_id="exec_btn_card"):
+                            gr.HTML("<div id='exec_btn_card_anchor'></div>")
                             exec_btn = gr.Button(
                                 "EXECUTE", variant="stop", size="lg",
                                 elem_id="exec_btn"
                             )
 
                         with gr.Group(elem_classes=["floating-card", "button-card"], elem_id="reference_btn_card"):
+                            gr.HTML("<div id='reference_btn_card_anchor'></div>")
                             reference_action_btn = gr.Button(
                                 "Ground Truth Action", variant="secondary",
                                 elem_id="reference_action_btn"
                             )
 
                         with gr.Group(elem_classes=["floating-card", "button-card"], elem_id="next_task_btn_card"):
+                            gr.HTML("<div id='next_task_btn_card_anchor'></div>")
                             next_task_btn = gr.Button(
                                 "Next Task", variant="primary",
                                 interactive=False, elem_id="next_task_btn"
@@ -1282,6 +831,7 @@ def create_ui_blocks():
 
             # Task Hint
             with gr.Group(visible=True, elem_classes="floating-card", elem_id="task_hint_card"):
+                gr.HTML("<div id='task_hint_card_anchor'></div>")
                 gr.Markdown("### Task Hint")
                 task_hint_display = gr.Markdown(value="", elem_id="task_hint_display")
 
