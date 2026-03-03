@@ -712,7 +712,7 @@ h1, h2, h3, h4, h5, h6, .gr-button, .gr-textbox, .gr-dropdown, .gr-radio {{
     border-radius: var(--action-option-radius) !important;
     border: 1px solid rgba(255, 255, 255, 0.26) !important;
     background: linear-gradient(180deg, rgba(128, 136, 156, 0.45) 0%, rgba(88, 96, 114, 0.45) 100%) !important;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16) !important;
+    box-shadow: none !important;
 }}
 
 #action_radio.action-options-grid label:hover {{
@@ -723,7 +723,7 @@ h1, h2, h3, h4, h5, h6, .gr-button, .gr-textbox, .gr-dropdown, .gr-radio {{
 #action_radio.action-options-grid label.selected {{
     border-color: rgba(236, 249, 255, 0.96) !important;
     background: linear-gradient(180deg, rgba(112, 160, 208, 0.58) 0%, rgba(82, 120, 160, 0.66) 100%) !important;
-    box-shadow: 0 10px 22px rgba(8, 20, 43, 0.38) !important;
+    box-shadow: none !important;
 }}
 
 #action_radio.action-options-grid label input[type="radio"] {{

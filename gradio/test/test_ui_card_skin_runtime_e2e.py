@@ -305,6 +305,7 @@ def test_card_shell_hit_works_in_real_browser_runtime(runtime_ui_url):
                     optionWrapBorder: optionWrapStyle ? optionWrapStyle.border : null,
                     optionWrapShadow: optionWrapStyle ? optionWrapStyle.boxShadow : null,
                     optionRadius: labelStyle ? labelStyle.borderRadius : null,
+                    optionShadow: labelStyle ? labelStyle.boxShadow : null,
                     inputVisible: !!(firstInput && firstInputRect && firstInputRect.width > 0 && firstInputRect.height > 0),
                 };
             }"""
@@ -371,6 +372,9 @@ def test_card_shell_hit_works_in_real_browser_runtime(runtime_ui_url):
     option_radius = _first_radius_px(selection_layout["optionRadius"])
     assert option_radius is not None and option_radius >= 20.0, (
         f"option radius is not rounded rectangle style: {selection_layout['optionRadius']}"
+    )
+    assert selection_layout["optionShadow"] == "none", (
+        f"action option shadow should be none: {selection_layout['optionShadow']}"
     )
     assert selection_layout["uniqueLeftCount"] >= 2, (
         f"action options did not auto-wrap into multiple columns: left groups={selection_layout['uniqueLeftCount']}"
