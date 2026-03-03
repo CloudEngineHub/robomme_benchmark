@@ -6,6 +6,8 @@ import gradio as gr
 import numpy as np
 import time
 import traceback
+import threading
+import queue
 import os
 import re
 from datetime import datetime
@@ -41,6 +43,12 @@ from logger import log_user_action, create_new_attempt, has_existing_actions
 from config import USE_SEGMENTED_VIEW, DEMO_VIDEO_HEIGHT, should_show_demo_video, SESSION_TIMEOUT, EXECUTE_LIMIT_OFFSET
 from process_session import ScrewPlanFailureError, ProcessSessionProxy
 from note_content import get_task_hint
+
+
+# --- live_obs refresh queue state ---
+# Each uid keeps its own FIFO queue and sampling cursor.
+_LIVE_OBS_REFRESH = {}
+_LIVE_OBS_REFRESH_LOCK = threading.Lock()
 
 
 def capitalize_first_letter(text: str) -> str:
@@ -195,6 +203,15 @@ def on_video_end(uid):
 
 def switch_to_livestream_phase(uid):
     """Keep live_obs visible during execute and disable interactions while refreshing."""
+    if uid:
+        session = get_session(uid)
+        base_count = len(getattr(session, "base_frames", []) or []) if session else 0
+        with _LIVE_OBS_REFRESH_LOCK:
+            _LIVE_OBS_REFRESH[uid] = {
+                "frame_queue": queue.Queue(),
+                "last_base_count": base_count,
+                "take_next": True,  # downsample x2 by enqueueing every other frame
+            }
     return (
         gr.update(visible=False),  # livestream_phase_group
         gr.update(visible=True),   # action_phase_group
@@ -206,8 +223,11 @@ def switch_to_livestream_phase(uid):
     )
 
 
-def switch_to_action_phase():
+def switch_to_action_phase(uid=None):
     """Switch display to action phase and restore control panel interactions."""
+    if uid:
+        with _LIVE_OBS_REFRESH_LOCK:
+            _LIVE_OBS_REFRESH.pop(uid, None)
     return (
         gr.update(visible=False),  # livestream_phase_group
         gr.update(visible=True),   # action_phase_group
@@ -217,6 +237,87 @@ def switch_to_action_phase():
         gr.update(value=MJPEG_PAUSED_HTML),  # combined_display
         gr.update(interactive=True),  # img_display
     )
+
+
+def _get_live_obs_refresh_state(uid, base_count=0):
+    with _LIVE_OBS_REFRESH_LOCK:
+        if uid not in _LIVE_OBS_REFRESH:
+            _LIVE_OBS_REFRESH[uid] = {
+                "frame_queue": queue.Queue(),
+                "last_base_count": int(base_count),
+                "take_next": True,  # downsample x2 by enqueueing every other frame
+            }
+        return _LIVE_OBS_REFRESH[uid]
+
+
+def _enqueue_live_obs_frames(uid, base_frames):
+    """
+    Push newly appended base_frames into per-uid FIFO queue with x2 downsampling.
+    """
+    if not uid:
+        return 0
+    frames = base_frames or []
+    state = _get_live_obs_refresh_state(uid, base_count=len(frames))
+    frame_queue = state["frame_queue"]
+    current_count = len(frames)
+    last_count = int(state.get("last_base_count", 0))
+
+    # Session/task reset: history shrank.
+    if current_count < last_count:
+        with _LIVE_OBS_REFRESH_LOCK:
+            state["frame_queue"] = queue.Queue()
+            state["last_base_count"] = current_count
+            state["take_next"] = True
+        return 0
+
+    if current_count <= last_count:
+        return frame_queue.qsize()
+
+    new_frames = frames[last_count:current_count]
+    take_next = bool(state.get("take_next", True))
+    for frame in new_frames:
+        if take_next and frame is not None:
+            frame_queue.put(frame)
+        take_next = not take_next
+
+    with _LIVE_OBS_REFRESH_LOCK:
+        state["last_base_count"] = current_count
+        state["take_next"] = take_next
+    return frame_queue.qsize()
+
+
+def _wait_for_live_obs_queue_drain(uid, max_wait_sec=None, empty_grace_sec=0.2, poll_sec=0.05):
+    """
+    Wait for timer-driven live_obs refresh to consume queued frames before phase switch.
+    """
+    if not uid:
+        return
+    with _LIVE_OBS_REFRESH_LOCK:
+        state0 = _LIVE_OBS_REFRESH.get(uid)
+        queue0 = state0.get("frame_queue") if state0 else None
+        initial_qsize = int(queue0.qsize()) if queue0 is not None else 0
+    if max_wait_sec is None:
+        # 0.1s tick playback + small buffer, capped to keep UI responsive.
+        max_wait_sec = min(30.0, max(2.0, initial_qsize * 0.12 + 1.0))
+
+    start = time.time()
+    empty_since = None
+    while True:
+        if (time.time() - start) >= max_wait_sec:
+            break
+        with _LIVE_OBS_REFRESH_LOCK:
+            state = _LIVE_OBS_REFRESH.get(uid)
+            frame_queue = state.get("frame_queue") if state else None
+        if frame_queue is None:
+            break
+        if frame_queue.qsize() > 0:
+            empty_since = None
+        else:
+            if empty_since is None:
+                empty_since = time.time()
+            elif (time.time() - empty_since) >= empty_grace_sec:
+                break
+        time.sleep(poll_sec)
 
 
 def _prepare_refresh_frame(frame):
@@ -247,11 +348,19 @@ def refresh_live_obs(uid, ui_phase):
     session = get_session(uid)
     if not session:
         return gr.update()
-    base_frames = getattr(session, "base_frames", None)
+
+    base_frames = getattr(session, "base_frames", None) or []
     if not base_frames:
         return gr.update()
 
-    latest = base_frames[-1]
+    _enqueue_live_obs_frames(uid, base_frames)
+    state = _get_live_obs_refresh_state(uid, base_count=len(base_frames))
+    frame_queue = state["frame_queue"]
+
+    if frame_queue.empty():
+        return gr.update()
+
+    latest = frame_queue.get()
     env_id = getattr(session, "env_id", None)
     stitched = concatenate_frames_horizontally([latest], env_id=env_id)
     if stitched:
@@ -1146,6 +1255,11 @@ def execute_step(uid, username, option_idx, coords_str):
         if username and session.env_id is not None and session.episode_idx is not None:
             new_count = increment_execute_count(username, session.env_id, session.episode_idx)
             print(f"Execute count for {username}:{session.env_id}:{session.episode_idx} = {new_count}")
+
+    # Execute frames are produced in batch when execute_action returns from worker process.
+    # Enqueue them now, then wait briefly for the 0.1s timer to drain FIFO playback.
+    _enqueue_live_obs_frames(uid, getattr(session, "base_frames", None))
+    _wait_for_live_obs_queue_drain(uid)
     
     # 记录执行操作（包含从上次action到这次action之间的所有coordinate_click）
     if username and session.env_id is not None and session.episode_idx is not None:

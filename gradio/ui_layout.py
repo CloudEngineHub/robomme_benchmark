@@ -456,6 +456,7 @@ def create_ui_blocks():
             show_progress="hidden",
         ).then(
             fn=switch_to_action_phase,
+            inputs=[uid_state],
             outputs=[
                 livestream_phase_group,
                 action_phase_group,

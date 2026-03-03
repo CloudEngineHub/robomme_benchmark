@@ -901,14 +901,25 @@ class OracleSession:
         # can show the full execution process instead of only the final frame.
         original_step = self.env.step
         captured_front_frames = []
+        stream_frame_callback = getattr(self, "stream_frame_callback", None)
+        self._execute_streamed_frame_count = 0
 
         def _step_with_capture(action):
             step_output = original_step(action)
             step_front_frames = _collect_front_frames_from_step_output(step_output)
             if step_front_frames:
-                captured_front_frames.extend(
+                prepared_frames = [
                     _prepare_frame(frame) for frame in step_front_frames if frame is not None
-                )
+                ]
+                if prepared_frames:
+                    captured_front_frames.extend(prepared_frames)
+                    if callable(stream_frame_callback):
+                        try:
+                            stream_frame_callback(prepared_frames)
+                            self._execute_streamed_frame_count += len(prepared_frames)
+                        except Exception:
+                            # Keep solve path robust even if streaming callback fails.
+                            pass
             return step_output
 
         self.env.step = _step_with_capture

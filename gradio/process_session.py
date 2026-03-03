@@ -95,6 +95,7 @@ def session_worker_loop(cmd_queue, result_queue, stream_queue, dataset_root, gui
     session = None
     try:
         session = OracleSession(dataset_root=dataset_root, gui_render=gui_render)
+        session.stream_frame_callback = lambda frames: stream_queue.put({"base": frames, "wrist": []})
         
         while True:
             try:
@@ -159,6 +160,13 @@ def session_worker_loop(cmd_queue, result_queue, stream_queue, dataset_root, gui
                 # 增量帧同步：只发送新增的帧
                 new_base = session.base_frames[session.last_base_frame_idx:]
                 new_wrist = session.wrist_frames[session.last_wrist_frame_idx:]
+                streamed_count = int(getattr(session, "_execute_streamed_frame_count", 0) or 0)
+                # Frames already pushed by stream_frame_callback during solve() should not be sent twice.
+                if streamed_count > 0 and new_base:
+                    if streamed_count >= len(new_base):
+                        new_base = []
+                    else:
+                        new_base = new_base[streamed_count:]
                 
                 # 更新帧索引
                 session.last_base_frame_idx = len(session.base_frames)
