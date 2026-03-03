@@ -82,18 +82,17 @@ def _with_phase_from_init(init_result):
 def create_ui_blocks():
     """构建 Gradio Blocks，并完成页面阶段状态（phase）的联动绑定。"""
 
-    # 统一格式化顶部任务文案
+    # 统一格式化顶部任务文案（仅保留文本内容，label 由 Textbox 提供）
     def render_header_task(task_text):
         clean_task = str(task_text or "").strip()
         if clean_task.lower().startswith("current task:"):
             clean_task = clean_task.split(":", 1)[1].strip()
-        clean_task = " ".join(clean_task.splitlines()).strip() or "—"
-        return f"**Current Task:** {clean_task}"
+        return " ".join(clean_task.splitlines()).strip() or "—"
 
-    # 从目标文本中提取并渲染首个目标
+    # 从目标文本中提取并渲染首个目标（仅文本内容）
     def render_header_goal(goal_text):
         first_goal = extract_first_goal(goal_text or "")
-        return f"**Goal:** {first_goal}" if first_goal else ""
+        return first_goal if first_goal else "—"
 
     # 页面主体结构：头部、登录区、主交互区、任务提示区
     with gr.Blocks(title="Oracle Planner Interface") as demo:
@@ -103,8 +102,25 @@ def create_ui_blocks():
 
         # 顶部信息栏：标题、当前任务、当前目标
         header_title_md = gr.Markdown("## RoboMME Human Evaluation", elem_id="header_title")
-        header_task_md = gr.Markdown(render_header_task(""), elem_id="header_task")
-        header_goal_md = gr.Markdown(render_header_goal(""), elem_id="header_goal")
+        with gr.Row():
+            with gr.Column(scale=1):
+                header_task_box = gr.Textbox(
+                    value=render_header_task(""),
+                    label="Current Task",
+                    show_label=True,
+                    interactive=False,
+                    lines=1,
+                    elem_id="header_task",
+                )
+            with gr.Column(scale=2):
+                header_goal_box = gr.Textbox(
+                    value=render_header_goal(""),
+                    label="Goal",
+                    show_label=True,
+                    interactive=False,
+                    lines=2,
+                    elem_id="header_goal",
+                )
 
     
         # 全屏加载遮罩：执行耗时操作时显示
@@ -144,33 +160,34 @@ def create_ui_blocks():
                     with gr.Column(elem_classes=["native-card"], elem_id="media_card"):
                         # 阶段 1：演示视频
                         with gr.Column(visible=False, elem_id="video_phase_group") as video_phase_group:
-                            gr.Markdown("### Watch the demonstration video")
+                            #gr.Markdown("### Watch the demonstration video")
                             video_display = gr.Video(
                                 label="Demonstration Video",
                                 interactive=False,
                                 elem_id="demo_video",
                                 autoplay=True,
-                                show_label=False,
-                                visible=True,
+                                show_label=True,
+                                    visible=True,
                             )
 
-                        # 阶段 2：执行直播流
                         with gr.Column(visible=False, elem_id="livestream_phase_group") as livestream_phase_group:
-                            gr.Markdown("### Execution LiveStream (might be delayed)")
+                           #gr.Markdown("### Execution LiveStream (might be delayed)")
                             combined_display = gr.HTML(
                                 value="<div id='combined_view_html'><p>Waiting for video stream...</p></div>",
                                 elem_id="combined_view_html",
+                                label="Execution LiveStream (might be delayed)",
+                                show_label=True,
                             )
 
                         # 阶段 3：关键点选择（图像交互）
                         with gr.Column(visible=False, elem_id="action_phase_group") as action_phase_group:
-                            gr.Markdown("### Keypoint Selection")
+                            #gr.Markdown("### Keypoint Selection")
                             img_display = gr.Image(
-                                label="Live Observation",
+                                label="Keypoint Selection",
                                 interactive=False,
                                 type="pil",
                                 elem_id="live_obs",
-                                show_label=False,
+                                show_label=True,
                                 buttons=[],
                                 sources=[],
                             )
@@ -191,12 +208,12 @@ def create_ui_blocks():
                     # 右侧控制面板：动作选择与执行按钮
                     with gr.Column(visible=False, elem_id="control_panel_group") as control_panel_group:
                         with gr.Column(elem_classes=["native-card"], elem_id="action_selection_card"):
-                            gr.Markdown("### Action Selection")
+                            #gr.Markdown("### Action Selection")
                             options_radio = gr.Radio(
                                 choices=[],
-                                label="Action",
+                                label=" Action Selection",
                                 type="value",
-                                show_label=False,
+                                show_label=True,
                                 elem_id="action_radio",
                             )
                             coords_box = gr.Textbox(
@@ -267,12 +284,12 @@ def create_ui_blocks():
         task_info_box.change(
             fn=sync_header_from_task,
             inputs=[task_info_box, goal_box],
-            outputs=[header_task_md, header_goal_md],
+            outputs=[header_task_box, header_goal_box],
         )
         goal_box.change(
             fn=sync_header_from_goal,
             inputs=[goal_box, task_info_box],
-            outputs=[header_task_md, header_goal_md],
+            outputs=[header_task_box, header_goal_box],
         )
 
         # 登录并加载任务
