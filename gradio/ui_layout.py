@@ -576,15 +576,26 @@ h1, h2, h3, h4, h5, h6, .gr-button, .gr-textbox, .gr-dropdown, .gr-radio {{
     overflow-y: auto !important;
     font-family: monospace !important;
     font-size: calc({FONT_SIZE} * 0.8) !important;
-    padding: 8px !important;
-    border: 1px solid rgba(204, 204, 204, 0.3) !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
     border-radius: 0 !important;
     background-color: transparent !important;
-    line-height: 1.4 !important;
+    line-height: 1.25 !important;
 }}
 .compact-log .prose *, #log_output .prose * {{
     font-size: calc({FONT_SIZE} * 0.8) !important;
     font-family: monospace !important;
+}}
+#log_output .prose p,
+#log_output .prose li {{
+    margin: 0.15em 0 !important;
+    padding: 0 !important;
+}}
+#log_output .prose ol,
+#log_output .prose ul {{
+    margin: 0.15em 0 !important;
+    padding-left: 1.2em !important;
 }}
 
 /* 暗色模式 */
@@ -593,10 +604,6 @@ h1, h2, h3, h4, h5, h6, .gr-button, .gr-textbox, .gr-dropdown, .gr-radio {{
 [data-theme="dark"] .compact-log .prose, [data-theme="dark"] #log_output .prose,
 [data-theme="dark"] .compact-log .prose *, [data-theme="dark"] #log_output .prose * {{
     color: #ffffff !important;
-}}
-.dark .compact-log .prose, .dark #log_output .prose,
-[data-theme="dark"] .compact-log .prose, [data-theme="dark"] #log_output .prose {{
-    border-color: rgba(255, 255, 255, 0.2) !important;
 }}
 
 /* Header compact spacing */

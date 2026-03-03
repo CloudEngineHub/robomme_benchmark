@@ -41,6 +41,15 @@ def _is_zero_border(value: str | None) -> bool:
     return str(value).strip().startswith("0px")
 
 
+def _is_zero_spacing(value: str | None) -> bool:
+    if not value:
+        return False
+    tokens = str(value).strip().split()
+    if not tokens:
+        return False
+    return all(token == "0px" for token in tokens)
+
+
 def _free_port() -> int:
     with contextlib.closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as sock:
         sock.bind(("127.0.0.1", 0))
@@ -151,6 +160,7 @@ def test_card_shell_hit_works_in_real_browser_runtime(runtime_ui_url):
     button_shells = {}
     button_fill_rows = {}
     selection_layout = {}
+    log_hint_layout = {}
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         page = browser.new_page(viewport={"width": 1440, "height": 900})
@@ -310,6 +320,41 @@ def test_card_shell_hit_works_in_real_browser_runtime(runtime_ui_url):
                 };
             }"""
         )
+        log_hint_layout = page.evaluate(
+            """() => {
+                const logAnchor = document.getElementById('log_card_anchor');
+                const taskHintAnchor = document.getElementById('task_hint_card_anchor');
+                const logShell = logAnchor ? logAnchor.closest('.gr-group') : null;
+                const taskHintShell = taskHintAnchor ? taskHintAnchor.closest('.gr-group') : null;
+                const logProse = document.querySelector('#log_output .prose');
+                const taskHintProse = document.querySelector('#task_hint_display .prose');
+                const logStyle = logProse ? window.getComputedStyle(logProse) : null;
+                const taskHintStyle = taskHintProse ? window.getComputedStyle(taskHintProse) : null;
+
+                const logShellRect = logShell ? logShell.getBoundingClientRect() : null;
+                const taskHintShellRect = taskHintShell ? taskHintShell.getBoundingClientRect() : null;
+                const logProseRect = logProse ? logProse.getBoundingClientRect() : null;
+                const taskHintProseRect = taskHintProse ? taskHintProse.getBoundingClientRect() : null;
+
+                return {
+                    hasLogShell: !!logShell,
+                    hasTaskHintShell: !!taskHintShell,
+                    hasLogProse: !!logProse,
+                    hasTaskHintProse: !!taskHintProse,
+                    logBorder: logStyle ? logStyle.border : null,
+                    logPadding: logStyle ? logStyle.padding : null,
+                    logMargin: logStyle ? logStyle.margin : null,
+                    logLineHeight: logStyle ? logStyle.lineHeight : null,
+                    logFontSize: logStyle ? logStyle.fontSize : null,
+                    taskHintLineHeight: taskHintStyle ? taskHintStyle.lineHeight : null,
+                    taskHintFontSize: taskHintStyle ? taskHintStyle.fontSize : null,
+                    logInsetLeft: (logShellRect && logProseRect) ? (logProseRect.left - logShellRect.left) : null,
+                    taskHintInsetLeft: (taskHintShellRect && taskHintProseRect)
+                        ? (taskHintProseRect.left - taskHintShellRect.left)
+                        : null,
+                };
+            }"""
+        )
         browser.close()
 
     assert len(rows) == len(anchor_ids)
@@ -421,6 +466,37 @@ def test_card_shell_hit_works_in_real_browser_runtime(runtime_ui_url):
         "action options should overflow internally and be scrollable"
     )
     assert selection_layout["inputVisible"], "radio indicator should remain visible"
+
+    assert log_hint_layout["hasLogShell"], "log_card shell missing in runtime DOM"
+    assert log_hint_layout["hasTaskHintShell"], "task_hint_card shell missing in runtime DOM"
+    assert log_hint_layout["hasLogProse"], "log prose missing in runtime DOM"
+    assert log_hint_layout["hasTaskHintProse"], "task hint prose missing in runtime DOM"
+    assert _is_zero_border(log_hint_layout["logBorder"]), (
+        f"log prose border should be none: {log_hint_layout['logBorder']}"
+    )
+    assert _is_zero_spacing(log_hint_layout["logPadding"]), (
+        f"log prose padding should be zero: {log_hint_layout['logPadding']}"
+    )
+    assert _is_zero_spacing(log_hint_layout["logMargin"]), (
+        f"log prose margin should be zero: {log_hint_layout['logMargin']}"
+    )
+    assert log_hint_layout["logInsetLeft"] is not None and log_hint_layout["taskHintInsetLeft"] is not None
+    assert abs(log_hint_layout["logInsetLeft"] - log_hint_layout["taskHintInsetLeft"]) <= 2.0, (
+        "log prose left inset should align with task hint prose"
+    )
+
+    log_line_height = _first_radius_px(log_hint_layout["logLineHeight"])
+    log_font_size = _first_radius_px(log_hint_layout["logFontSize"])
+    task_hint_line_height = _first_radius_px(log_hint_layout["taskHintLineHeight"])
+    task_hint_font_size = _first_radius_px(log_hint_layout["taskHintFontSize"])
+    assert log_line_height is not None and log_font_size is not None
+    assert task_hint_line_height is not None and task_hint_font_size is not None
+
+    log_line_ratio = log_line_height / log_font_size
+    task_hint_line_ratio = task_hint_line_height / task_hint_font_size
+    assert abs(log_line_ratio - task_hint_line_ratio) <= 0.03, (
+        f"log/task-hint line-height ratio mismatch: log={log_line_ratio} hint={task_hint_line_ratio}"
+    )
 
 
 @pytest.fixture
