@@ -24,6 +24,7 @@ from gradio_callbacks import (
     on_reference_action,
     on_video_end_transition,
     precheck_execute_inputs,
+    refresh_live_obs,
     show_loading_info,
     switch_to_action_phase,
     switch_to_livestream_phase,
@@ -138,6 +139,7 @@ def create_ui_blocks():
         uid_state = gr.State(value=None)
         username_state = gr.State(value="")
         ui_phase_state = gr.State(value=PHASE_INIT)
+        live_obs_timer = gr.Timer(value=0.1, active=True)
 
         # 隐藏数据组件：用于在回调间传递任务/进度/目标信息
         task_info_box = gr.Textbox(visible=False, elem_id="task_info_box")
@@ -440,6 +442,7 @@ def create_ui_blocks():
                 exec_btn,
                 next_task_btn,
                 combined_display,
+                img_display,
             ],
             show_progress="hidden",
         ).then(
@@ -460,11 +463,20 @@ def create_ui_blocks():
                 exec_btn,
                 next_task_btn,
                 combined_display,
+                img_display,
             ],
             show_progress="hidden",
         ).then(
             fn=lambda: PHASE_ACTION_KEYPOINT,
             outputs=[ui_phase_state],
+            show_progress="hidden",
+        )
+
+        live_obs_timer.tick(
+            fn=refresh_live_obs,
+            inputs=[uid_state, ui_phase_state],
+            outputs=[img_display],
+            queue=False,
             show_progress="hidden",
         )
 

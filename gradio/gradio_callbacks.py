@@ -6,10 +6,10 @@ import gradio as gr
 import numpy as np
 import time
 import traceback
-import queue
 import os
 import re
 from datetime import datetime
+from PIL import Image
 from state_manager import (
     get_session,
     create_session,
@@ -194,21 +194,20 @@ def on_video_end(uid):
 
 
 def switch_to_livestream_phase(uid):
-    """Switch display to livestream phase and keep control panel as read-only."""
-    stream_html = _mjpeg_stream_html(uid) if uid else MJPEG_WAITING_HTML
+    """Keep live_obs visible during execute and disable interactions while refreshing."""
     return (
-        gr.update(visible=True),   # livestream_phase_group
-        gr.update(visible=False),  # action_phase_group
+        gr.update(visible=False),  # livestream_phase_group
+        gr.update(visible=True),   # action_phase_group
         gr.update(interactive=False),  # options_radio
         gr.update(interactive=False),  # exec_btn
         gr.update(interactive=False),  # next_task_btn
-        gr.update(value=stream_html),  # combined_display
+        gr.update(value=MJPEG_PAUSED_HTML),  # combined_display
+        gr.update(interactive=False),  # img_display
     )
 
 
 def switch_to_action_phase():
     """Switch display to action phase and restore control panel interactions."""
-    # 强制移除 <img>，让浏览器主动关闭旧的 /video_feed 长连接
     return (
         gr.update(visible=False),  # livestream_phase_group
         gr.update(visible=True),   # action_phase_group
@@ -216,7 +215,52 @@ def switch_to_action_phase():
         gr.update(),  # exec_btn (keep execute_step result)
         gr.update(),  # next_task_btn (keep execute_step result)
         gr.update(value=MJPEG_PAUSED_HTML),  # combined_display
+        gr.update(interactive=True),  # img_display
     )
+
+
+def _prepare_refresh_frame(frame):
+    """Normalize cached frame to an RGB uint8 PIL image for gr.Image."""
+    if frame is None:
+        return None
+    frame_arr = np.asarray(frame)
+    if frame_arr.dtype != np.uint8:
+        max_val = float(np.max(frame_arr)) if frame_arr.size else 0.0
+        if max_val <= 1.0:
+            frame_arr = (frame_arr * 255.0).clip(0, 255).astype(np.uint8)
+        else:
+            frame_arr = frame_arr.clip(0, 255).astype(np.uint8)
+    if frame_arr.ndim == 2:
+        frame_arr = np.stack([frame_arr] * 3, axis=-1)
+    elif frame_arr.ndim == 3 and frame_arr.shape[2] == 4:
+        frame_arr = frame_arr[:, :, :3]
+    return Image.fromarray(frame_arr)
+
+
+def refresh_live_obs(uid, ui_phase):
+    """
+    Poll latest cached frame during execute phase.
+    Replaces MJPEG-based livestream by updating live_obs every 0.1s via gr.Timer.
+    """
+    if ui_phase != "execution_livestream":
+        return gr.update()
+    session = get_session(uid)
+    if not session:
+        return gr.update()
+    base_frames = getattr(session, "base_frames", None)
+    if not base_frames:
+        return gr.update()
+
+    latest = base_frames[-1]
+    env_id = getattr(session, "env_id", None)
+    stitched = concatenate_frames_horizontally([latest], env_id=env_id)
+    if stitched:
+        latest = stitched[-1]
+
+    img = _prepare_refresh_frame(latest)
+    if img is None:
+        return gr.update()
+    return gr.update(value=img, interactive=False)
 
 
 def _wait_for_livestream_drain(uid, max_wait_sec=12.0, warmup_sec=0.8, empty_grace_sec=0.5, poll_sec=0.05):
@@ -415,24 +459,6 @@ def _load_status_task(username, uid, status, login_message=None):
 
     if has_demo_video:
         set_ui_phase(uid, "executing_task")
-        if session.base_frames:
-            from state_manager import FRAME_QUEUES
-            current_base_count = len(session.base_frames) if session.base_frames else 0
-            if uid not in FRAME_QUEUES:
-                FrameQueueManager.init_queue(uid, current_base_count)
-            last_base_frame = session.base_frames[-1] if session.base_frames else None
-            if last_base_frame is not None:
-                env_id_for_concat = getattr(session, 'env_id', None)
-                last_frames = concatenate_frames_horizontally([last_base_frame], env_id=env_id_for_concat)
-                queue_info = FRAME_QUEUES.get(uid)
-                if queue_info and last_frames:
-                    last_frame = last_frames[0]
-                    for _ in range(10):
-                        try:
-                            frame_copy = np.copy(last_frame) if isinstance(last_frame, np.ndarray) else last_frame
-                            queue_info["frame_queue"].put(frame_copy, block=False)
-                        except queue.Full:
-                            break
 
         return (
             uid,
@@ -460,24 +486,6 @@ def _load_status_task(username, uid, status, login_message=None):
         )
 
     set_ui_phase(uid, "executing_task")
-    if session.base_frames:
-        from state_manager import FRAME_QUEUES
-        current_base_count = len(session.base_frames) if session.base_frames else 0
-        if uid not in FRAME_QUEUES:
-            FrameQueueManager.init_queue(uid, current_base_count)
-        last_base_frame = session.base_frames[-1] if session.base_frames else None
-        if last_base_frame is not None:
-            env_id_for_concat = getattr(session, 'env_id', None)
-            last_frames = concatenate_frames_horizontally([last_base_frame], env_id=env_id_for_concat)
-            queue_info = FRAME_QUEUES.get(uid)
-            if queue_info and last_frames:
-                last_frame = last_frames[0]
-                for _ in range(10):
-                    try:
-                        frame_copy = np.copy(last_frame) if isinstance(last_frame, np.ndarray) else last_frame
-                        queue_info["frame_queue"].put(frame_copy, block=False)
-                    except queue.Full:
-                        break
 
     return (
         uid,
@@ -1026,82 +1034,9 @@ def execute_step(uid, username, option_idx, coords_str):
             if current_count >= max_execute:
                 execute_limit_reached = True
     
-    # 检查并初始化Reference Views（如果frames为空或队列不存在）
-    from state_manager import FRAME_QUEUES
-    frames_exist = session.base_frames
-    queue_exists = uid in FRAME_QUEUES
-    
-    if not frames_exist:
-        # 从环境中读取初始frames
+    # Ensure at least one cached frame exists for timer-based refresh.
+    if not session.base_frames:
         session.update_observation(use_segmentation=USE_SEGMENTED_VIEW)
-        
-        # 如果有frames了，将最后一帧加入队列
-        if session.base_frames:
-            
-            # 初始化队列（如果还没有）
-            # 传入当前frames数量，这样监控线程就知道这些frames已存在，不会将它们作为"新"frames加入队列
-            current_base_count = len(session.base_frames) if session.base_frames else 0
-            env_id_for_concat = getattr(session, 'env_id', None)
-            
-            if uid not in FRAME_QUEUES:
-                FrameQueueManager.init_queue(uid, current_base_count)
-            
-            # 只获取最后一帧并处理
-            last_base_frame = session.base_frames[-1] if session.base_frames else None
-            
-            if last_base_frame is not None:
-                # 使用concatenate_frames_horizontally处理单帧（传入只包含最后一帧的列表）
-                last_frames = concatenate_frames_horizontally(
-                    [last_base_frame],
-                    env_id=env_id_for_concat
-                )
-                
-                # 只加入最后一帧（重复多次以确保持续显示）
-                queue_info = FRAME_QUEUES.get(uid)
-                if queue_info and last_frames:
-                    last_frame = last_frames[0]
-                    # 重复加入最后一帧10次，确保即使被快速消费也能持续显示
-                    frames_added = 0
-                    for _ in range(10):
-                        try:
-                            # 复制帧以避免引用问题
-                            frame_copy = np.copy(last_frame) if isinstance(last_frame, np.ndarray) else last_frame
-                            queue_info["frame_queue"].put(frame_copy, block=False)
-                            frames_added += 1
-                        except queue.Full:
-                            break
-    elif frames_exist and not queue_exists:
-        # frames存在但队列不存在，初始化队列并加入最后一帧
-        # 初始化队列（传入当前frames数量，这样监控线程就知道这些frames已存在）
-        current_base_count = len(session.base_frames) if session.base_frames else 0
-        
-        FrameQueueManager.init_queue(uid, current_base_count)
-        
-        # 只获取最后一帧并处理
-        last_base_frame = session.base_frames[-1] if session.base_frames else None
-        env_id_for_concat = getattr(session, 'env_id', None)
-        
-        if last_base_frame is not None:
-            # 使用concatenate_frames_horizontally处理单帧（传入只包含最后一帧的列表）
-            last_frames = concatenate_frames_horizontally(
-                [last_base_frame],
-                env_id=env_id_for_concat
-            )
-            
-            # 只加入最后一帧（重复多次以确保持续显示）
-            queue_info = FRAME_QUEUES.get(uid)
-            if queue_info and last_frames:
-                last_frame = last_frames[0]
-                # 重复加入最后一帧10次，确保即使被快速消费也能持续显示
-                frames_added = 0
-                for _ in range(10):
-                    try:
-                        # 复制帧以避免引用问题
-                        frame_copy = np.copy(last_frame) if isinstance(last_frame, np.ndarray) else last_frame
-                        queue_info["frame_queue"].put(frame_copy, block=False)
-                        frames_added += 1
-                    except queue.Full:
-                        break
     
     if option_idx is None:
         return session.get_pil_image(use_segmented=USE_SEGMENTED_VIEW), format_log_markdown("Error: No action selected"), gr.update(), gr.update(), gr.update(interactive=False), gr.update(interactive=True), gr.update(visible=False)
@@ -1142,26 +1077,6 @@ def execute_step(uid, username, option_idx, coords_str):
             click_coords = (int(parts[0].strip()), int(parts[1].strip()))
         except:
             pass
-    
-    # 在执行 action 之前记录当前帧数
-    # 这些帧数将作为监控线程的起始点，确保只监控新产生的帧
-    pre_base_frame_count = len(session.base_frames)
-    
-    # 【重要修复】清空队列中的旧帧，确保从当前execute的第一个frame开始播放
-    # 修复问题：当第一个任务执行完毕但livestream还没播放完时，直接执行下一个任务
-    # 会导致livestream跳回开头重新播放。通过清空队列，确保每次execute都从新帧开始
-    if uid in FRAME_QUEUES:
-        queue_info = FRAME_QUEUES.get(uid)
-        if queue_info:
-            while not queue_info["frame_queue"].empty():
-                try:
-                    queue_info["frame_queue"].get_nowait()
-                except queue.Empty:
-                    break
-    
-    # 初始化队列和启动监控线程（用于流式输出）
-    # 使用当前帧数作为起始点，这样监控线程只会添加execute后新产生的帧
-    FrameQueueManager.init_queue(uid, pre_base_frame_count)
     
     # 在执行前获取当前图片（用于记录最后执行的坐标对应的图片）
     pre_execute_image = None
@@ -1231,10 +1146,6 @@ def execute_step(uid, username, option_idx, coords_str):
         if username and session.env_id is not None and session.episode_idx is not None:
             new_count = increment_execute_count(username, session.env_id, session.episode_idx)
             print(f"Execute count for {username}:{session.env_id}:{session.episode_idx} = {new_count}")
-    
-    # 等待 livestream 基本播放完成后再切回 action phase。
-    # 注意：不要在这里主动停止 streaming_active，否则在帧同步稍慢时会被提前截断。
-    _wait_for_livestream_drain(uid)
     
     # 记录执行操作（包含从上次action到这次action之间的所有coordinate_click）
     if username and session.env_id is not None and session.episode_idx is not None:
@@ -1312,9 +1223,7 @@ def execute_step(uid, username, option_idx, coords_str):
             print(f"Error logging action execute: {e}")
             traceback.print_exc()
     
-    # 注意：不再在这里生成完整视频，而是通过 MJPEG 流式输出
-    # combined_display 现在使用 HTML + MJPEG 流，不需要手动更新
-    # 不再返回 combined_display 的更新，避免显示加载动画
+    # 注意：执行阶段画面由 live_obs 的 0.1s 轮询刷新，不在这里更新 combined_display。
     
     progress_update = gr.update()  # 默认不更新 progress
     task_update = gr.update()
