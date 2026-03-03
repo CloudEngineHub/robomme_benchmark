@@ -189,8 +189,9 @@ def _with_phase_from_init(init_result):
 
 
 def create_ui_blocks():
-    """Create Gradio Blocks with native phase-state wiring."""
+    """构建 Gradio Blocks，并完成页面阶段状态（phase）的联动绑定。"""
 
+    # 统一格式化顶部任务文案
     def render_header_task(task_text):
         clean_task = str(task_text or "").strip()
         if clean_task.lower().startswith("current task:"):
@@ -198,55 +199,58 @@ def create_ui_blocks():
         clean_task = " ".join(clean_task.splitlines()).strip() or "—"
         return f"**Current Task:** {clean_task}"
 
+    # 从目标文本中提取并渲染首个目标
     def render_header_goal(goal_text):
         first_goal = extract_first_goal(goal_text or "")
         return f"**Goal:** {first_goal}" if first_goal else ""
 
+    # 页面主体结构：头部、登录区、主交互区、任务提示区
     with gr.Blocks(title="Oracle Planner Interface") as demo:
+        # 设置全局主题和样式
         demo.theme = gr.themes.Soft()
         demo.css = CSS
+
+        # 顶部信息栏：标题、当前任务、当前目标
         header_title_md = gr.Markdown("## RoboMME Human Evaluation", elem_id="header_title")
         header_task_md = gr.Markdown(render_header_task(""), elem_id="header_task")
         header_goal_md = gr.Markdown(render_header_goal(""), elem_id="header_goal")
 
+        # 全屏加载遮罩：执行耗时操作时显示
         with gr.Group(visible=False, elem_id="loading_overlay_group") as loading_overlay:
             gr.Markdown("# ⏳\n\n### Loading environment, please wait...")
 
+        # 会话级状态：用户 uid、用户名、当前 UI 阶段
         uid_state = gr.State(value=None)
         username_state = gr.State(value="")
         ui_phase_state = gr.State(value=PHASE_INIT)
 
+        # 隐藏数据组件：用于在回调间传递任务/进度/目标信息
         task_info_box = gr.Textbox(visible=False, elem_id="task_info_box")
         progress_info_box = gr.Textbox(visible=False)
         goal_box = gr.Textbox(visible=False)
 
+        # 应用初始化阶段的提示区（默认可见）
         with gr.Group(visible=True) as loading_group:
             gr.Markdown("### Logging in and setting up environment... Please wait.")
 
+        # 登录区域（初始化后显示）
         with gr.Group(visible=False) as login_group:
             gr.Markdown("### User Login")
             with gr.Row():
+                # 可登录用户列表来自任务管理器
                 available_users = list(user_manager.user_tasks.keys())
                 username_input = gr.Dropdown(choices=available_users, label="Username", value=None)
                 login_btn = gr.Button("Login", variant="primary")
             login_msg = gr.Markdown("")
 
+        # 主交互界面（登录成功后显示）
         with gr.Group(visible=False, elem_id="main_interface_root") as main_interface:
-            with gr.Group(visible=False) as tutorial_video_group:
-                gr.Markdown("### Tutorial Video - Watch and scroll down to finish the task below!")
-                tutorial_video_display = gr.Video(
-                    label="Tutorial Video",
-                    value=None,
-                    visible=False,
-                    interactive=True,
-                    show_label=False,
-                )
-                gr.Markdown("---")
-                gr.Markdown("### Finish the task below!")
-
+            # 主体左右布局：左侧媒体与日志，右侧动作控制
             with gr.Row(elem_id="main_layout_row"):
                 with gr.Column(scale=KEYPOINT_SELECTION_SCALE):
+                    # 左侧媒体卡片：按阶段切换展示内容
                     with gr.Group(elem_classes=["native-card"], elem_id="media_card"):
+                        # 阶段 1：演示视频
                         with gr.Group(visible=False, elem_id="video_phase_group") as video_phase_group:
                             gr.Markdown("### Watch the demonstration video")
                             video_display = gr.Video(
@@ -258,6 +262,7 @@ def create_ui_blocks():
                                 visible=True,
                             )
 
+                        # 阶段 2：执行直播流
                         with gr.Group(visible=False, elem_id="livestream_phase_group") as livestream_phase_group:
                             gr.Markdown("### Execution LiveStream (might be delayed)")
                             combined_display = gr.HTML(
@@ -265,6 +270,7 @@ def create_ui_blocks():
                                 elem_id="combined_view_html",
                             )
 
+                        # 阶段 3：关键点选择（图像交互）
                         with gr.Group(visible=False, elem_id="action_phase_group") as action_phase_group:
                             gr.Markdown("### Keypoint Selection")
                             img_display = gr.Image(
@@ -277,11 +283,13 @@ def create_ui_blocks():
                                 sources=[],
                             )
 
+                    # 系统日志卡片：显示执行过程反馈
                     with gr.Group(elem_classes=["native-card"], elem_id="log_card"):
                         gr.Markdown("### System Log")
                         log_output = gr.Markdown(value="", elem_classes="compact-log", elem_id="log_output")
 
                 with gr.Column(scale=CONTROL_PANEL_SCALE):
+                    # 右侧控制面板：动作选择与执行按钮
                     with gr.Group(visible=False, elem_id="control_panel_group") as control_panel_group:
                         with gr.Group(elem_classes=["native-card"], elem_id="action_selection_card"):
                             gr.Markdown("### Action Selection")
@@ -292,6 +300,7 @@ def create_ui_blocks():
                                 show_label=False,
                                 elem_id="action_radio",
                             )
+                            # 坐标输入显示区：仅在需要关键点坐标时展示
                             with gr.Group(visible=False, elem_id="coords_group") as coords_group:
                                 coords_box = gr.Textbox(
                                     label="Coords",
@@ -302,6 +311,7 @@ def create_ui_blocks():
                                     elem_id="coords_box",
                                 )
 
+                        # 操作按钮区：执行、参考动作、下一任务
                         with gr.Row(elem_id="action_buttons_row"):
                             with gr.Group(elem_classes=["native-card", "native-button-card"], elem_id="exec_btn_card"):
                                 exec_btn = gr.Button("EXECUTE", variant="stop", size="lg", elem_id="exec_btn")
@@ -327,16 +337,19 @@ def create_ui_blocks():
                                     elem_id="next_task_btn",
                                 )
 
-            with gr.Group(visible=True, elem_classes=["native-card"], elem_id="task_hint_card"):
-                gr.Markdown("### Task Hint")
-                task_hint_display = gr.Markdown(value="", elem_id="task_hint_display")
+        # 任务提示卡片：展示当前任务补充提示
+        with gr.Group(visible=True, elem_classes=["native-card"], elem_id="task_hint_card"):
+            gr.Markdown("### Task Hint")
+            task_hint_display = gr.Markdown(value="", elem_id="task_hint_display")
 
+        # 头部任务/目标信息同步逻辑
         def sync_header_from_task(task_text, goal_text):
             return render_header_task(task_text), render_header_goal(goal_text)
 
         def sync_header_from_goal(goal_text, task_text):
             return render_header_task(task_text), render_header_goal(goal_text)
 
+        # 为初始化和切换任务追加 ui phase，保证前端阶段状态一致
         def login_and_load_task_with_phase(username, uid):
             return _with_phase_from_login(login_and_load_task(username, uid))
 
@@ -357,6 +370,7 @@ def create_ui_blocks():
             outputs=[header_task_md, header_goal_md],
         )
 
+        # 登录并加载任务
         login_btn.click(fn=show_loading_info, outputs=[loading_overlay]).then(
             fn=login_and_load_task_with_phase,
             inputs=[username_input, uid_state],
@@ -383,13 +397,12 @@ def create_ui_blocks():
                 control_panel_group,
                 coords_group,
                 task_hint_display,
-                tutorial_video_group,
-                tutorial_video_display,
                 loading_overlay,
                 ui_phase_state,
             ],
         ).then(fn=lambda u: u, inputs=[username_input], outputs=[username_state])
 
+        # 切换到下一任务
         next_task_btn.click(fn=show_loading_info, outputs=[loading_overlay]).then(
             fn=load_next_task_with_phase,
             inputs=[username_state, uid_state],
@@ -416,19 +429,19 @@ def create_ui_blocks():
                 control_panel_group,
                 coords_group,
                 task_hint_display,
-                tutorial_video_group,
-                tutorial_video_display,
                 loading_overlay,
                 ui_phase_state,
             ],
         )
 
+        # 演示视频播放结束后，从视频阶段切到关键点选择阶段
         video_display.end(
             fn=on_video_end_transition,
             inputs=[uid_state],
             outputs=[video_phase_group, action_phase_group, control_panel_group, log_output],
         ).then(fn=lambda: PHASE_ACTION_KEYPOINT, outputs=[ui_phase_state])
 
+        # 关键点点击与动作选择联动
         img_display.select(
             fn=on_map_click,
             inputs=[uid_state, username_state, options_radio],
@@ -447,6 +460,7 @@ def create_ui_blocks():
             outputs=[img_display, options_radio, coords_box, coords_group, log_output],
         )
 
+        # 执行动作链路：校验输入 -> 切到直播阶段 -> 执行 -> 回到动作选择阶段
         exec_btn.click(
             fn=precheck_execute_inputs,
             inputs=[uid_state, username_state, options_radio, coords_box],
@@ -490,6 +504,7 @@ def create_ui_blocks():
             show_progress="hidden",
         )
 
+        # 页面首次加载初始化
         demo.load(
             fn=init_app_with_phase,
             inputs=[],
@@ -518,8 +533,6 @@ def create_ui_blocks():
                 control_panel_group,
                 coords_group,
                 task_hint_display,
-                tutorial_video_group,
-                tutorial_video_display,
                 ui_phase_state,
             ],
         )

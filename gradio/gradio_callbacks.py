@@ -355,8 +355,6 @@ def login_and_load_task(username, uid):
             gr.update(visible=False),  # control_panel_group
             gr.update(visible=False),  # coords_group
             gr.update(value=""),  # task_hint_display
-            gr.update(visible=False),  # tutorial_video_group
-            gr.update(value=None, visible=False),  # tutorial_video_display
             gr.update(visible=False)  # loading_overlay
         )
     
@@ -387,8 +385,6 @@ def login_and_load_task(username, uid):
             gr.update(visible=True),   # control_panel_group
             gr.update(visible=False),  # coords_group
             gr.update(value=""),  # task_hint_display
-            gr.update(visible=False),  # tutorial_video_group
-            gr.update(value=None, visible=False),  # tutorial_video_display
             gr.update(visible=False)  # loading_overlay
         )
         
@@ -452,9 +448,6 @@ def login_and_load_task(username, uid):
         # 加载失败，直接进入执行阶段
         set_ui_phase(uid, "executing_task")
         
-        tutorial_video_group_update = gr.update(visible=False)
-        tutorial_video_update = gr.update(value=None, visible=False)
-
         return (
             uid,
             gr.update(visible=False), # login_group
@@ -475,8 +468,6 @@ def login_and_load_task(username, uid):
             gr.update(visible=True),   # control_panel_group
             gr.update(visible=False),  # coords_group
             gr.update(value=get_task_hint(env_id) if env_id else ""),  # task_hint_display
-            tutorial_video_group_update,
-            tutorial_video_update,
             gr.update(visible=False)  # loading_overlay
         )
         
@@ -594,9 +585,6 @@ def login_and_load_task(username, uid):
                             break
         
         
-        tutorial_video_group_update = gr.update(visible=False)
-        tutorial_video_update = gr.update(value=None, visible=False)
-        
         return (
             uid,
             gr.update(visible=False), # login_group
@@ -620,8 +608,6 @@ def login_and_load_task(username, uid):
             gr.update(visible=False),  # control_panel_group
             gr.update(visible=False),  # coords_group
             gr.update(value=get_task_hint(actual_env_id)),  # task_hint_display
-            tutorial_video_group_update,
-            tutorial_video_update,
             gr.update(visible=False)  # loading_overlay
         )
     else:
@@ -668,9 +654,6 @@ def login_and_load_task(username, uid):
         
         # No demo video - skip directly to action phase
 
-        tutorial_video_group_update = gr.update(visible=False)
-        tutorial_video_update = gr.update(value=None, visible=False)
-
         return (
             uid,
             gr.update(visible=False),  # login_group
@@ -694,8 +677,6 @@ def login_and_load_task(username, uid):
             gr.update(visible=True),   # control_panel_group
             gr.update(visible=False),  # coords_group (hidden until option selected)
             gr.update(value=get_task_hint(actual_env_id)),  # task_hint_display
-            tutorial_video_group_update,  # tutorial_video_group
-            tutorial_video_update,  # tutorial_video_display
             gr.update(visible=False)  # loading_overlay
         )
 
@@ -1011,8 +992,6 @@ def init_app(request: gr.Request):
         gr.update(visible=False),  # control_panel_group
         gr.update(visible=False),  # coords_group
         gr.update(value=""),  # task_hint_display
-        gr.update(visible=False),  # tutorial_video_group
-        gr.update(value=None, visible=False)  # tutorial_video_display
     )
     
     if username:
@@ -1029,14 +1008,14 @@ def init_app(request: gr.Request):
             # 调用 login_and_load_task 进行登录和任务加载
             login_results = login_and_load_task(username, uid)
             
-            # login_and_load_task returns 25 values:
+            # login_and_load_task returns 23 values:
             # (uid, login_group, main_interface, login_msg, img_display, log_output,
             #  options_radio, goal_box, coords_box, combined_display, video_display,
             #  task_info_box, progress_info_box, login_btn, next_task_btn, exec_btn,
             #  video_phase_group, livestream_phase_group, action_phase_group, control_panel_group,
-            #  coords_group, task_hint_display, tutorial_video_group, tutorial_video_display, loading_overlay)
+            #  coords_group, task_hint_display, loading_overlay)
 
-            # init_app needs 26 values: same but with loading_group + username_state, without loading_overlay
+            # init_app needs 24 values: same but with loading_group + username_state, without loading_overlay
             return (
                 login_results[0],                    # uid
                 gr.update(visible=False),            # loading_group
@@ -1062,8 +1041,6 @@ def init_app(request: gr.Request):
                 login_results[19],                   # control_panel_group
                 login_results[20],                   # coords_group
                 login_results[21],                   # task_hint_display
-                login_results[22],                   # tutorial_video_group
-                login_results[23],                   # tutorial_video_display
             )
         else:
             # 用户名不存在，显示错误消息但仍显示登录界面
@@ -1095,8 +1072,6 @@ def init_app(request: gr.Request):
                 gr.update(visible=False),  # control_panel_group
                 gr.update(visible=False),  # coords_group
                 gr.update(value=""),  # task_hint_display
-                gr.update(visible=False),  # tutorial_video_group
-                gr.update(value=None, visible=False)  # tutorial_video_display
             )
     
     return default_outputs
