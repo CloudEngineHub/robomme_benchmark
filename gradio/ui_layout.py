@@ -259,53 +259,141 @@ SYNC_JS = """
 # CSS
 # ==========================================================================
 CSS = f"""
-/* Dark card theme tokens */
+/* Immersive wallpaper + floating island tokens */
 :root {{
-    --app-bg: #0b1120;
-    --surface-bg: #121a2a;
-    --card-bg: #162033;
-    --card-border: rgba(148, 163, 184, 0.25);
+    --wallpaper-base: #04070f;
+    --wallpaper-mid: #0b1224;
+    --wallpaper-glow: #1e2f59;
+    --card-bg: rgba(20, 30, 50, 0.88);
+    --card-border: rgba(255, 255, 255, 0.12);
     --text-primary: #e5e7eb;
-    --shadow-soft: 0 10px 30px rgba(2, 6, 23, 0.35);
-    --radius-card: 15px;
-    --gap-card: 14px;
+    --radius-card: 30px;
+    --card-padding: 24px;
+    --card-gap: 22px;
+    --shadow-float: 0 22px 50px rgba(0, 0, 0, 0.55);
 }}
 
-/* App dark shell fallback (works even without theme query) */
-html, body, #gradio-app, .gradio-container {{
-    background: var(--app-bg) !important;
+/* Wallpaper canvas */
+html, body {{
+    min-height: 100%;
+}}
+
+body, #gradio-app {{
+    background:
+        radial-gradient(circle at 14% 18%, rgba(70, 112, 198, 0.28), transparent 40%),
+        radial-gradient(circle at 82% 10%, rgba(43, 110, 180, 0.2), transparent 34%),
+        radial-gradient(circle at 50% 78%, rgba(97, 54, 170, 0.14), transparent 45%),
+        linear-gradient(165deg, var(--wallpaper-mid) 0%, var(--wallpaper-base) 68%);
     color: var(--text-primary) !important;
 }}
 
-/* Rounded dark cards */
-.round-card {{
+/* Force root shell transparent so wallpaper is visible */
+.gradio-container,
+#gradio-app,
+#gradio-app > .gradio-container {{
+    background: transparent !important;
+    background-color: transparent !important;
+}}
+
+/* Override gradio theme tokens that create gray wrappers */
+.gradio-container,
+body {{
+    --body-background-fill: transparent;
+    --background-fill-primary: transparent;
+    --background-fill-secondary: transparent;
+    --block-background-fill: transparent;
+    --block-border-color: transparent;
+    --block-border-width: 0px;
+    --block-label-background-fill: transparent;
+    --block-shadow: none;
+}}
+
+.gradio-container {{
+    max-width: 100% !important;
+    padding: 12px 16px 20px !important;
+}}
+
+/* Remove all wrapper visuals inside main interface (cards will be restored by ID selectors below) */
+#main_interface_root,
+#main_interface_root .gr-block,
+#main_interface_root .gr-form,
+#main_interface_root .gr-box,
+#main_interface_root .gr-panel,
+#main_interface_root .gr-row,
+#main_interface_root .gr-column,
+#main_interface_root .gr-group,
+#main_interface_root .block {{
+    background: transparent !important;
+    background-color: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}}
+
+/* Floating islands (ID-level to avoid theme override) */
+#media_card,
+#log_card,
+#action_selection_card,
+#exec_btn_card,
+#reference_btn_card,
+#next_task_btn_card,
+#task_hint_card,
+.floating-card {{
     background: var(--card-bg) !important;
     border: 1px solid var(--card-border) !important;
     border-radius: var(--radius-card) !important;
-    padding: var(--gap-card) !important;
-    box-shadow: var(--shadow-soft) !important;
+    padding: var(--card-padding) !important;
+    box-shadow:
+        0 22px 50px rgba(0, 0, 0, 0.55),
+        inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+    margin-bottom: var(--card-gap) !important;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    overflow: hidden !important;
 }}
 
-/* Nested cards for grouped regions inside round-card */
-.round-card .gr-group {{
-    background: var(--surface-bg) !important;
-    border: 1px solid rgba(148, 163, 184, 0.2) !important;
-    border-radius: 12px !important;
-    padding: 12px !important;
-}}
-
-.round-card .prose,
-.round-card h1,
-.round-card h2,
-.round-card h3,
-.round-card h4,
-.round-card h5,
-.round-card h6,
-.round-card p,
-.round-card label,
-.round-card span,
-.round-card div {{
+.floating-card .prose,
+.floating-card h1,
+.floating-card h2,
+.floating-card h3,
+.floating-card h4,
+.floating-card h5,
+.floating-card h6,
+.floating-card p,
+.floating-card label,
+.floating-card span,
+.floating-card div {{
     color: var(--text-primary) !important;
+}}
+
+.main-layout-row {{
+    gap: 24px !important;
+}}
+
+/* Keep inner groups transparent even inside cards unless explicitly highlighted */
+.floating-card .gr-group {{
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+}}
+
+/* Button islands */
+.button-card {{
+    padding: 14px !important;
+}}
+
+#exec_btn_card,
+#reference_btn_card,
+#next_task_btn_card {{
+    padding: 14px !important;
+}}
+
+.button-card button,
+#exec_btn_card button,
+#reference_btn_card button,
+#next_task_btn_card button {{
+    width: 100% !important;
+    border-radius: 18px !important;
 }}
 
 /* 全局字体 */
@@ -533,7 +621,7 @@ def create_ui_blocks():
         # =====================================================================
         # Main Interface
         # =====================================================================
-        with gr.Group(visible=False) as main_interface:
+        with gr.Group(visible=False, elem_id="main_interface_root") as main_interface:
             # Tutorial video (currently disabled by callbacks)
             with gr.Group(visible=False) as tutorial_video_group:
                 gr.Markdown("### Tutorial Video - Watch and scroll down to finish the task below!")
@@ -547,10 +635,10 @@ def create_ui_blocks():
             # =============================================================
             # Two-column layout: Phases(+System Log) | Control Panel
             # =============================================================
-            with gr.Row():
-                # ---- Left column: Video / Livestream / Keypoint + System Log ----
+            with gr.Row(elem_classes="main-layout-row", elem_id="main_layout_row"):
+                # ---- Left column: Media card + System log card ----
                 with gr.Column(scale=KEYPOINT_SELECTION_SCALE):
-                    with gr.Group(elem_classes="round-card"):
+                    with gr.Group(elem_classes="floating-card", elem_id="media_card"):
                         # Phase 1: VIDEO (auto-play demo video)
                         with gr.Group(visible=False) as video_phase_group:
                             gr.Markdown("### Watch the demonstration video")
@@ -579,45 +667,50 @@ def create_ui_blocks():
                                 type="pil", elem_id="live_obs", show_label=False
                             )
 
-                        with gr.Group():
-                            gr.Markdown("### System Log")
-                            log_output = gr.Markdown(
-                                value="", elem_classes="compact-log",
-                                elem_id="log_output"
+                    with gr.Group(elem_classes="floating-card", elem_id="log_card"):
+                        gr.Markdown("### System Log")
+                        log_output = gr.Markdown(
+                            value="", elem_classes="compact-log",
+                            elem_id="log_output"
+                        )
+
+                # ---- Right column: Action card + 3 independent button cards ----
+                with gr.Column(scale=CONTROL_PANEL_SCALE):
+                    with gr.Group(visible=False, elem_id="control_panel_group") as control_panel_group:
+                        with gr.Group(elem_classes="floating-card", elem_id="action_selection_card"):
+                            gr.Markdown("### Action Selection")
+                            options_radio = gr.Radio(
+                                choices=[], label="Action", type="value",
+                                show_label=False, elem_id="action_radio"
+                            )
+                            with gr.Group(visible=False, elem_id="coords_group") as coords_group:
+                                gr.Markdown("**Coords**")
+                                coords_box = gr.Textbox(
+                                    label="Coords", value="",
+                                    interactive=False, show_label=False,
+                                    elem_id="coords_box"
+                                )
+
+                        with gr.Group(elem_classes=["floating-card", "button-card"], elem_id="exec_btn_card"):
+                            exec_btn = gr.Button(
+                                "EXECUTE", variant="stop", size="lg",
+                                elem_id="exec_btn"
                             )
 
-                # ---- Right column: Control Panel (vertical) ----
-                with gr.Column(scale=CONTROL_PANEL_SCALE):
-                    with gr.Group(visible=False, elem_classes="round-card") as control_panel_group:
-                        gr.Markdown("### Control Panel")
-                        gr.Markdown("**Action Selection**")
-                        options_radio = gr.Radio(
-                            choices=[], label="Action", type="value",
-                            show_label=False, elem_id="action_radio"
-                        )
-                        with gr.Group(visible=False, elem_id="coords_group") as coords_group:
-                            gr.Markdown("**Coords**")
-                            coords_box = gr.Textbox(
-                                label="Coords", value="",
-                                interactive=False, show_label=False,
-                                elem_id="coords_box"
+                        with gr.Group(elem_classes=["floating-card", "button-card"], elem_id="reference_btn_card"):
+                            reference_action_btn = gr.Button(
+                                "Ground Truth Action", variant="secondary",
+                                elem_id="reference_action_btn"
                             )
-                        exec_btn = gr.Button(
-                            "EXECUTE", variant="stop", size="lg",
-                            elem_id="exec_btn"
-                        )
-                        reference_action_btn = gr.Button(
-                            "Ground Truth Action", variant="secondary",
-                            elem_id="reference_action_btn"
-                        )
-                        next_task_btn = gr.Button(
-                            "Next Task", variant="primary",
-                            interactive=False, elem_id="next_task_btn"
-                        )
+
+                        with gr.Group(elem_classes=["floating-card", "button-card"], elem_id="next_task_btn_card"):
+                            next_task_btn = gr.Button(
+                                "Next Task", variant="primary",
+                                interactive=False, elem_id="next_task_btn"
+                            )
 
             # Task Hint
-            with gr.Group(visible=True, elem_classes="round-card"):
-                gr.Markdown("---")
+            with gr.Group(visible=True, elem_classes="floating-card", elem_id="task_hint_card"):
                 gr.Markdown("### Task Hint")
                 task_hint_display = gr.Markdown(value="", elem_id="task_hint_display")
 
