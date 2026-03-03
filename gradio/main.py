@@ -161,7 +161,7 @@ import uvicorn
 import gradio as gr
 from fastapi import FastAPI
 from streaming_service import create_video_feed_route
-from ui_layout import create_ui_blocks, CSS, SYNC_JS
+from ui_layout import create_ui_blocks
 from state_manager import start_timeout_monitor
 from user_manager import user_manager
 
@@ -300,8 +300,6 @@ def start_user_server(username, port, gpu_id):
         demo,
         path="/",
         allowed_paths=allowed_paths,
-        css=CSS,
-        js=SYNC_JS
     )
     
     # 使用 uvicorn 运行 FastAPI 应用

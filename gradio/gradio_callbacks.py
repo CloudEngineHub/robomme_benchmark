@@ -1102,6 +1102,47 @@ def init_app(request: gr.Request):
     return default_outputs
 
 
+def precheck_execute_inputs(uid, username, option_idx, coords_str):
+    """
+    Native precheck for execute action.
+    Replaces frontend JS interception by validating inputs server-side before phase switch.
+    """
+    # Lease check first for a consistent error surface.
+    if username:
+        try:
+            user_manager.assert_lease(username, uid)
+        except LeaseLost as e:
+            raise gr.Error(
+                "You have been logged in elsewhere. This page is no longer valid. "
+                f"Please refresh the page to log in again.\n{str(e)}"
+            )
+
+    if uid:
+        update_session_activity(uid)
+
+    session = get_session(uid)
+    if not session:
+        raise gr.Error("Session Error")
+
+    parsed_option_idx = option_idx
+    if isinstance(option_idx, tuple):
+        _, parsed_option_idx = option_idx
+
+    if parsed_option_idx is None:
+        raise gr.Error("Error: No action selected")
+
+    needs_coords = False
+    if (
+        isinstance(parsed_option_idx, int)
+        and 0 <= parsed_option_idx < len(session.raw_solve_options)
+    ):
+        opt = session.raw_solve_options[parsed_option_idx]
+        needs_coords = bool(opt.get("available"))
+
+    if needs_coords and not _is_valid_coords_text(coords_str):
+        raise gr.Error("please click the keypoint selection image before execute!")
+
+
 def execute_step(uid, username, option_idx, coords_str):
     # 记录用户按下 execute 按钮的瞬间时间戳
     execute_timestamp = datetime.now().isoformat()
