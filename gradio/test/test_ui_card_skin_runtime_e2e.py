@@ -55,12 +55,17 @@ def runtime_ui_url(reload_module):
     port = _free_port()
     host = "127.0.0.1"
     root_url = f"http://{host}:{port}/"
+    radio_choices = [
+        (f"{i}. action option with longer text for runtime layout validation", i)
+        for i in range(1, 13)
+    ]
 
     with gr.Blocks() as demo:
         with gr.Row(elem_id="main_layout_row"):
             with gr.Column():
                 with gr.Group(elem_classes="floating-card", elem_id="media_card"):
                     gr.HTML("<div id='media_card_anchor'></div>")
+                    gr.Markdown("### Keypoint Selection")
                     gr.Markdown("media", elem_id="live_obs")
                 with gr.Group(elem_classes="floating-card", elem_id="log_card"):
                     gr.HTML("<div id='log_card_anchor'></div>")
@@ -69,7 +74,13 @@ def runtime_ui_url(reload_module):
             with gr.Column():
                 with gr.Group(elem_classes="floating-card", elem_id="action_selection_card"):
                     gr.HTML("<div id='action_selection_card_anchor'></div>")
-                    gr.Radio(choices=["a", "b"], value="a", elem_id="action_radio")
+                    gr.Markdown("### Action Selection")
+                    gr.Radio(
+                        choices=radio_choices,
+                        value=1,
+                        elem_id="action_radio",
+                        elem_classes=["action-options-grid"],
+                    )
 
                 with gr.Row(elem_id="action_buttons_row"):
                     with gr.Group(elem_classes=["floating-card", "button-card"], elem_id="exec_btn_card"):
@@ -127,9 +138,10 @@ def test_card_shell_hit_works_in_real_browser_runtime(runtime_ui_url):
 
     button_shells = {}
     button_fill_rows = {}
+    selection_layout = {}
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
-        page = browser.new_page()
+        page = browser.new_page(viewport={"width": 1440, "height": 900})
         page.goto(runtime_ui_url, wait_until="domcontentloaded")
         page.wait_for_timeout(2600)
 
@@ -230,6 +242,47 @@ def test_card_shell_hit_works_in_real_browser_runtime(runtime_ui_url):
                 });
             }"""
         )
+        selection_layout = page.evaluate(
+            """() => {
+                const mediaAnchor = document.getElementById('media_card_anchor');
+                const actionAnchor = document.getElementById('action_selection_card_anchor');
+                const media = mediaAnchor ? mediaAnchor.closest('.gr-group') : null;
+                const action = actionAnchor ? actionAnchor.closest('.gr-group') : null;
+                const radio = document.getElementById('action_radio');
+                const optionWrap = radio ? radio.lastElementChild : null;
+                const labels = optionWrap ? Array.from(optionWrap.querySelectorAll('label')) : [];
+                const lefts = labels.map((label) => label.getBoundingClientRect().left);
+                const tops = labels.map((label) => label.getBoundingClientRect().top);
+                const round = (value) => Math.round(value / 4) * 4;
+                const uniqueLeftCount = new Set(lefts.map(round)).size;
+                const uniqueTopCount = new Set(tops.map(round)).size;
+
+                const firstLabel = labels.length > 0 ? labels[0] : null;
+                const firstInput = firstLabel ? firstLabel.querySelector('input[type=\"radio\"]') : null;
+                const firstInputRect = firstInput ? firstInput.getBoundingClientRect() : null;
+                const mediaRect = media ? media.getBoundingClientRect() : null;
+                const actionRect = action ? action.getBoundingClientRect() : null;
+                const radioStyle = radio ? window.getComputedStyle(radio) : null;
+                const labelStyle = firstLabel ? window.getComputedStyle(firstLabel) : null;
+
+                return {
+                    hasMedia: !!media,
+                    hasAction: !!action,
+                    hasRadio: !!radio,
+                    hasOptionWrap: !!optionWrap,
+                    optionCount: labels.length,
+                    uniqueLeftCount,
+                    uniqueTopCount,
+                    mediaHeight: mediaRect ? mediaRect.height : null,
+                    actionHeight: actionRect ? actionRect.height : null,
+                    radioOverflowY: radioStyle ? radioStyle.overflowY : null,
+                    radioScrollHeight: radio ? radio.scrollHeight : null,
+                    radioClientHeight: radio ? radio.clientHeight : null,
+                    optionRadius: labelStyle ? labelStyle.borderRadius : null,
+                    inputVisible: !!(firstInput && firstInputRect && firstInputRect.width > 0 && firstInputRect.height > 0),
+                };
+            }"""
+        )
         browser.close()
 
     assert len(rows) == len(anchor_ids)
@@ -276,6 +329,35 @@ def test_card_shell_hit_works_in_real_browser_runtime(runtime_ui_url):
         assert abs(button_radius - shell_radius) <= radius_tolerance, (
             f"button radius mismatch for {row['btnId']}: shell={row['shellRadius']} button={row['buttonRadius']}"
         )
+
+    assert selection_layout["hasMedia"], "media_card missing in runtime DOM"
+    assert selection_layout["hasAction"], "action_selection_card missing in runtime DOM"
+    assert selection_layout["hasRadio"], "action_radio missing in runtime DOM"
+    assert selection_layout["hasOptionWrap"], "action options wrapper missing in runtime DOM"
+    assert selection_layout["optionCount"] >= 8, "insufficient options for grid/scroll runtime validation"
+
+    panel_tolerance = 2.0
+    assert selection_layout["mediaHeight"] is not None and selection_layout["actionHeight"] is not None
+    assert abs(selection_layout["mediaHeight"] - selection_layout["actionHeight"]) <= panel_tolerance, (
+        f"panel height mismatch: media={selection_layout['mediaHeight']} action={selection_layout['actionHeight']}"
+    )
+
+    option_radius = _first_radius_px(selection_layout["optionRadius"])
+    assert option_radius is not None and option_radius >= 20.0, (
+        f"option radius is not rounded rectangle style: {selection_layout['optionRadius']}"
+    )
+    assert selection_layout["uniqueLeftCount"] >= 2, (
+        f"action options did not auto-wrap into multiple columns: left groups={selection_layout['uniqueLeftCount']}"
+    )
+    assert selection_layout["uniqueTopCount"] >= 2, "action options did not create multiple rows"
+    assert selection_layout["radioOverflowY"] in {"auto", "scroll"}, (
+        f"unexpected overflow-y for action options: {selection_layout['radioOverflowY']}"
+    )
+    assert selection_layout["radioScrollHeight"] is not None and selection_layout["radioClientHeight"] is not None
+    assert selection_layout["radioScrollHeight"] > selection_layout["radioClientHeight"], (
+        "action options should overflow internally and be scrollable"
+    )
+    assert selection_layout["inputVisible"], "radio indicator should remain visible"
 
 
 @pytest.fixture

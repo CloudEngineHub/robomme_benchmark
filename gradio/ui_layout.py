@@ -9,6 +9,7 @@ from user_manager import user_manager
 from config import (
     DEMO_VIDEO_HEIGHT,
     FONT_SIZE,
+    REFERENCE_VIEW_HEIGHT,
     KEYPOINT_SELECTION_SCALE,
     CONTROL_PANEL_SCALE,
 )
@@ -243,6 +244,9 @@ CSS = f"""
     --card-padding: 24px;
     --card-gap: 34px;
     --shadow-float: 0 24px 54px rgba(0, 0, 0, 0.52);
+    --selection-panel-body-height: {REFERENCE_VIEW_HEIGHT};
+    --selection-panel-height: calc(var(--selection-panel-body-height) + 160px);
+    --action-option-radius: 28px;
 }}
 
 /* Wallpaper canvas */
@@ -363,6 +367,49 @@ body {{
     box-shadow: none !important;
     border-radius: 0 !important;
     padding: 0 !important;
+}}
+
+/* Keep Keypoint and Action card height aligned */
+#media_card,
+#action_selection_card,
+.floating-card:has(#media_card_anchor),
+.floating-card:has(#action_selection_card_anchor),
+.card-shell-hit:has(#media_card_anchor),
+.card-shell-hit:has(#action_selection_card_anchor) {{
+    height: var(--selection-panel-height) !important;
+    min-height: var(--selection-panel-height) !important;
+    max-height: var(--selection-panel-height) !important;
+    display: flex !important;
+    flex-direction: column !important;
+}}
+
+#media_card > div:first-child,
+#action_selection_card > div:first-child,
+.floating-card:has(#media_card_anchor) > div:first-child,
+.floating-card:has(#action_selection_card_anchor) > div:first-child,
+.card-shell-hit:has(#media_card_anchor) > div:first-child,
+.card-shell-hit:has(#action_selection_card_anchor) > div:first-child {{
+    height: 100% !important;
+    min-height: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 12px !important;
+}}
+
+#media_card #live_obs,
+#media_card #combined_view_html,
+#media_card #demo_video,
+.floating-card:has(#media_card_anchor) #live_obs,
+.floating-card:has(#media_card_anchor) #combined_view_html,
+.floating-card:has(#media_card_anchor) #demo_video,
+.card-shell-hit:has(#media_card_anchor) #live_obs,
+.card-shell-hit:has(#media_card_anchor) #combined_view_html,
+.card-shell-hit:has(#media_card_anchor) #demo_video,
+.floating-card:has(#action_selection_card_anchor) #action_radio,
+.card-shell-hit:has(#action_selection_card_anchor) #action_radio,
+#action_selection_card #action_radio {{
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
 }}
 
 /* Button cards keep compact height while sharing the same card skin */
@@ -615,10 +662,70 @@ h1, h2, h3, h4, h5, h6, .gr-button, .gr-textbox, .gr-dropdown, .gr-radio {{
     display: none !important;
 }}
 
-/* Action radio - 每行一个选项 */
-#action_radio .form-radio {{ display: block !important; width: 100% !important; margin-bottom: 8px !important; }}
-#action_radio .form-radio label {{ width: 100% !important; display: block !important; }}
-#action_radio label {{ display: block !important; width: 100% !important; margin-bottom: 8px !important; }}
+/* Action options: rounded rectangles + adaptive grid + inner scrolling */
+#action_radio.action-options-grid {{
+    width: 100% !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    overflow-y: auto !important;
+}}
+
+#action_radio.action-options-grid > div:last-child {{
+    display: grid !important;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)) !important;
+    gap: 12px !important;
+    width: 100% !important;
+    align-content: start !important;
+    padding-right: 4px !important;
+}}
+
+#action_radio.action-options-grid label {{
+    width: 100% !important;
+    margin: 0 !important;
+    display: flex !important;
+    align-items: flex-start !important;
+    gap: 12px !important;
+    padding: 12px 14px !important;
+    border-radius: var(--action-option-radius) !important;
+    border: 1px solid rgba(255, 255, 255, 0.26) !important;
+    background: linear-gradient(180deg, rgba(128, 136, 156, 0.45) 0%, rgba(88, 96, 114, 0.45) 100%) !important;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16) !important;
+}}
+
+#action_radio.action-options-grid label:hover {{
+    border-color: rgba(255, 255, 255, 0.44) !important;
+    background: linear-gradient(180deg, rgba(146, 154, 174, 0.55) 0%, rgba(102, 110, 128, 0.55) 100%) !important;
+}}
+
+#action_radio.action-options-grid label.selected {{
+    border-color: rgba(236, 249, 255, 0.96) !important;
+    background: linear-gradient(180deg, rgba(112, 160, 208, 0.58) 0%, rgba(82, 120, 160, 0.66) 100%) !important;
+    box-shadow: 0 10px 22px rgba(8, 20, 43, 0.38) !important;
+}}
+
+#action_radio.action-options-grid label input[type="radio"] {{
+    display: inline-block !important;
+    width: 20px !important;
+    height: 20px !important;
+    margin: 2px 0 0 0 !important;
+    opacity: 1 !important;
+    flex: 0 0 auto !important;
+}}
+
+#action_radio.action-options-grid label span {{
+    flex: 1 1 auto !important;
+    white-space: normal !important;
+    word-break: break-word !important;
+    line-height: 1.25 !important;
+}}
+
+@media (max-width: 980px) {{
+    #action_radio.action-options-grid > div:last-child {{
+        grid-template-columns: 1fr !important;
+    }}
+}}
 
 /* 按钮禁用状态 */
 #next_task_btn:disabled, #next_task_btn[disabled] {{ opacity: 0.5 !important; }}
@@ -790,7 +897,8 @@ def create_ui_blocks():
                             gr.Markdown("### Action Selection")
                             options_radio = gr.Radio(
                                 choices=[], label="Action", type="value",
-                                show_label=False, elem_id="action_radio"
+                                show_label=False, elem_id="action_radio",
+                                elem_classes=["action-options-grid"]
                             )
                             with gr.Group(visible=False, elem_id="coords_group") as coords_group:
                                 coords_box = gr.Textbox(

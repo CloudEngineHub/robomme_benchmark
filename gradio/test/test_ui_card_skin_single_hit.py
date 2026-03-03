@@ -104,6 +104,15 @@ def test_card_shell_hit_css_has_required_visual_tokens(reload_module):
         "#exec_btn_card [role=\"button\"],",
         "#next_task_btn_card [role=\"button\"]",
         "#media_card_anchor,",
+        "--selection-panel-height: calc(var(--selection-panel-body-height) + 160px);",
+        "#media_card,",
+        "#action_selection_card,",
+        "#action_radio.action-options-grid {",
+        "grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)) !important;",
+        "overflow-y: auto !important;",
+        "border-radius: var(--action-option-radius) !important;",
+        "#action_radio.action-options-grid label input[type=\"radio\"] {",
+        "@media (max-width: 980px) {",
     ]
     for token in required_css_tokens:
         assert token in css
