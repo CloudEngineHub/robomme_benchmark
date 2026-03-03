@@ -161,84 +161,6 @@ SYNC_JS = """
     }
 
     // ========================================================================
-    // 坐标组高亮动画
-    // ========================================================================
-    function applyCoordsGroupHighlight() {
-        function removeHighlightStyles(group) {
-            group.style.removeProperty('border');
-            group.style.removeProperty('border-radius');
-            group.style.removeProperty('padding');
-            group.style.removeProperty('animation');
-            group.classList.remove('coords-group-highlight');
-        }
-
-        function removeLiveObsHighlight(liveObs) {
-            if (liveObs) {
-                liveObs.style.removeProperty('border');
-                liveObs.style.removeProperty('border-radius');
-                liveObs.style.removeProperty('animation');
-                liveObs.classList.remove('live-obs-highlight');
-            }
-        }
-
-        function checkForCoordsGroup() {
-            const coordsBox = document.querySelector('[id*="coords_box"]');
-            const liveObs = document.querySelector('#live_obs');
-            let targetGroup = null;
-            let shouldHighlightLiveObs = false;
-
-            if (coordsBox) {
-                const coordsTextarea = coordsBox.querySelector('textarea') || coordsBox;
-                const coordsValue = (coordsTextarea.value || '').trim();
-                const isCoordsSelected = coordsValue !== 'please click the keypoint selection image';
-
-                let parentGroup = coordsBox.parentElement;
-                while (parentGroup && !parentGroup.classList.contains('gr-group')) {
-                    parentGroup = parentGroup.parentElement;
-                }
-
-                if (parentGroup && parentGroup.querySelector('[id*="exec_btn"]') !== null) {
-                    const allGroups = document.querySelectorAll('.gr-group');
-                    for (let group of allGroups) {
-                        if (group.contains(coordsBox) && !group.querySelector('[id*="exec_btn"]')) {
-                            parentGroup = group;
-                            break;
-                        }
-                    }
-                }
-
-                if (parentGroup && !parentGroup.querySelector('[id*="exec_btn"]')) {
-                    const computedStyle = window.getComputedStyle(parentGroup);
-                    const isVisible = parentGroup.offsetParent !== null && computedStyle.display !== 'none';
-
-                    if (!isVisible || isCoordsSelected) {
-                        removeHighlightStyles(parentGroup);
-                        removeLiveObsHighlight(liveObs);
-                    } else {
-                        targetGroup = parentGroup;
-                        shouldHighlightLiveObs = true;
-                        parentGroup.classList.add('coords-group-highlight');
-                        parentGroup.style.setProperty('border', '3px solid #3b82f6', 'important');
-                        parentGroup.style.setProperty('border-radius', '8px', 'important');
-                        parentGroup.style.setProperty('padding', '15px', 'important');
-                        parentGroup.style.setProperty('animation', 'bluePulse 1s ease-in-out infinite', 'important');
-                    }
-                }
-            }
-
-            if (shouldHighlightLiveObs && liveObs) {
-                liveObs.classList.add('live-obs-highlight');
-                liveObs.style.setProperty('border', '3px solid #3b82f6', 'important');
-                liveObs.style.setProperty('border-radius', '8px', 'important');
-                liveObs.style.setProperty('animation', 'bluePulse 1s ease-in-out infinite', 'important');
-            } else {
-                removeLiveObsHighlight(liveObs);
-            }
-        }
-        setInterval(checkForCoordsGroup, 500);
-    }
-
-    // ========================================================================
     // Card shell single-hit mapping
     // ========================================================================
     function applyCardShellOnce() {
@@ -279,7 +201,6 @@ SYNC_JS = """
     function initializeAll() {
         initExecuteButtonListener();
         initLeaseLostHandler();
-        setTimeout(() => { applyCoordsGroupHighlight(); }, 2000);
 
         setTimeout(() => {
             let unresolved = applyCardShellOnce();
@@ -484,17 +405,17 @@ body {{
     align-self: stretch !important;
 }}
 
-/* Keep inner wrappers flat; exclude coords_group to preserve blue highlight */
-.floating-card > div:first-child .gr-group:not(#coords_group),
-.floating-card > div:first-child .gr-form:not(#coords_group),
-.floating-card > div:first-child .gr-box:not(#coords_group),
-.floating-card > div:first-child .gr-panel:not(#coords_group),
-.floating-card > div:first-child .block:not(#coords_group),
-.card-shell-hit > div:first-child .gr-group:not(#coords_group),
-.card-shell-hit > div:first-child .gr-form:not(#coords_group),
-.card-shell-hit > div:first-child .gr-box:not(#coords_group),
-.card-shell-hit > div:first-child .gr-panel:not(#coords_group),
-.card-shell-hit > div:first-child .block:not(#coords_group) {{
+/* Keep inner wrappers flat */
+.floating-card > div:first-child .gr-group,
+.floating-card > div:first-child .gr-form,
+.floating-card > div:first-child .gr-box,
+.floating-card > div:first-child .gr-panel,
+.floating-card > div:first-child .block,
+.card-shell-hit > div:first-child .gr-group,
+.card-shell-hit > div:first-child .gr-form,
+.card-shell-hit > div:first-child .gr-box,
+.card-shell-hit > div:first-child .gr-panel,
+.card-shell-hit > div:first-child .block {{
     background: transparent !important;
     background-color: transparent !important;
     border: none !important;
@@ -699,24 +620,6 @@ h1, h2, h3, h4, h5, h6, .gr-button, .gr-textbox, .gr-dropdown, .gr-radio {{
 #action_radio .form-radio label {{ width: 100% !important; display: block !important; }}
 #action_radio label {{ display: block !important; width: 100% !important; margin-bottom: 8px !important; }}
 
-/* 高亮动画 */
-#coords_group.coords-group-highlight,
-.gr-group.coords-group-highlight:has([id*="coords_box"]):not(:has([id*="exec_btn"])) {{
-    border: 3px solid #3b82f6 !important;
-    border-radius: 8px;
-    padding: 15px;
-    animation: bluePulse 1s ease-in-out infinite;
-}}
-#live_obs.live-obs-highlight {{
-    border: 3px solid #3b82f6 !important;
-    border-radius: 8px;
-    animation: bluePulse 1s ease-in-out infinite;
-}}
-@keyframes bluePulse {{
-    0%, 100% {{ border-color: #3b82f6; box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.8); }}
-    50% {{ border-color: #2563eb; box-shadow: 0 0 20px 8px rgba(59, 130, 246, 0.6); }}
-}}
-
 /* 按钮禁用状态 */
 #next_task_btn:disabled, #next_task_btn[disabled] {{ opacity: 0.5 !important; }}
 
@@ -890,10 +793,9 @@ def create_ui_blocks():
                                 show_label=False, elem_id="action_radio"
                             )
                             with gr.Group(visible=False, elem_id="coords_group") as coords_group:
-                                gr.Markdown("**Coords**")
                                 coords_box = gr.Textbox(
                                     label="Coords", value="",
-                                    interactive=False, show_label=False,
+                                    interactive=False, show_label=False, visible=False,
                                     elem_id="coords_box"
                                 )
 

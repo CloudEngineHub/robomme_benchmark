@@ -872,8 +872,8 @@ def on_option_select(uid, username, option_value, coords_str=None):
         opt = session.raw_solve_options[option_idx]
         if opt.get("available"):
              if _is_valid_coords_text(coords_str):
-                 return coords_str, gr.update(interactive=True), gr.update(visible=True)
-             return "please click the keypoint selection image", gr.update(interactive=True), gr.update(visible=True)
+                 return coords_str, gr.update(interactive=True), gr.update(visible=False)
+             return "please click the keypoint selection image", gr.update(interactive=True), gr.update(visible=False)
     
     return default_msg, gr.update(interactive=False), gr.update(visible=False)
 
@@ -946,7 +946,7 @@ def on_reference_action(uid, username):
         y = int(coords_xy[1])
         updated_img = draw_marker(current_img, x, y)
         coords_text = f"{x}, {y}"
-        coords_group_update = gr.update(visible=True)
+        coords_group_update = gr.update(visible=False)
         log_text = f"Ground Truth Action: {option_label}. {option_action} | coords: {coords_text}"
 
     return (
@@ -1246,7 +1246,7 @@ def execute_step(uid, username, option_idx, coords_str):
         if not is_valid_coords:
             current_img = session.get_pil_image(use_segmented=USE_SEGMENTED_VIEW)
             error_msg = "please click the keypoint selection image before execute!"
-            return current_img, format_log_markdown(error_msg), gr.update(), gr.update(), gr.update(interactive=False), gr.update(interactive=True), gr.update(visible=True)
+            return current_img, format_log_markdown(error_msg), gr.update(), gr.update(), gr.update(interactive=False), gr.update(interactive=True), gr.update(visible=False)
 
     # Parse coords
     click_coords = None

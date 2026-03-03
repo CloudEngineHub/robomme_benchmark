@@ -48,7 +48,7 @@ def test_on_reference_action_success_updates_option_and_coords(monkeypatch, relo
     assert img.getpixel((5, 6)) != (0, 0, 0)
     assert option_update.get("value") == 2
     assert coords_text == "5, 6"
-    assert coords_group_update.get("visible") is True
+    assert coords_group_update.get("visible") is False
     assert "Ground Truth Action" in log_html
 
 
@@ -98,4 +98,4 @@ def test_on_option_select_keeps_valid_coords_when_option_needs_coords(monkeypatc
 
     assert coords_text == "12, 34"
     assert img_update.get("interactive") is True
-    assert coords_group_update.get("visible") is True
+    assert coords_group_update.get("visible") is False
