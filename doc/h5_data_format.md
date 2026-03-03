@@ -36,9 +36,9 @@ Each episode contains:
 
 | Field | Type / shape | Description |
 |-------|---------------|-------------|
-| `front_rgb` | `uint8 (256, 256, 3)` | Front camera RGB |
+| `front_rgb` | `uint8 (512, 512, 3)` | Front camera RGB |
 | `wrist_rgb` | `uint8 (256, 256, 3)` | Wrist camera RGB |
-| `front_depth` | `int16 (256, 256, 1)` | Front camera depth (mm) |
+| `front_depth` | `int16 (512, 512, 1)` | Front camera depth (mm) |
 | `wrist_depth` | `int16 (256, 256, 1)` | Wrist camera depth (mm) |
 | `joint_state` | `float32 (7,)` | Joint positions (7 joints) |
 | `eef_state` | `float32 (6,)` | End-effector pose `[x, y, z, roll, pitch, yaw]` |
