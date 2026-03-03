@@ -1,7 +1,10 @@
+import datetime
 import json
 import os
-import datetime
+import random
 import threading
+from pathlib import Path
+
 from state_manager import cleanup_session, get_task_start_time, clear_task_start_time
 
 
@@ -9,76 +12,129 @@ class LeaseLost(Exception):
     """Exception raised when a session loses its lease (logged out elsewhere)."""
     pass
 
+
+FIXED_USERS = ["user1", "user2", "user3", "user4", "user5"]
+METADATA_FILE_GLOB = "record_dataset_*_metadata.json"
+
 class UserManager:
-    def __init__(self, tasks_file="user_tasks.json", progress_dir="user_progress"):
-        self.base_dir = os.path.dirname(os.path.abspath(__file__))
-        self.tasks_file = os.path.join(self.base_dir, tasks_file)
-        self.progress_dir = os.path.join(self.base_dir, progress_dir)
+    def __init__(self, progress_dir="user_progress"):
+        self.base_dir = Path(__file__).resolve().parent
+        progress_path = Path(progress_dir)
+        if not progress_path.is_absolute():
+            progress_path = self.base_dir / progress_path
+        self.progress_dir = progress_path
         self.lock = threading.Lock()
-        
+
         # 创建进度目录（如果不存在）
         os.makedirs(self.progress_dir, exist_ok=True)
-        
-        # In-memory cache for tasks and progress
-        self.user_tasks = {}
-        self.user_progress = {}
-        
-        # 会话管理：跟踪每个用户名的活跃 uid
-        # {username: active_uid} - 将用户名映射到当前拥有租约的 uid
-        # 当同一用户重复登录时，旧会话会被自动清理
-        self.active_uid = {}  # {username: uid}
-        
-        self.load_tasks()
-        self.load_progress()
-        
-    def load_tasks(self):
-        """Load user tasks from JSON file."""
-        if not os.path.exists(self.tasks_file):
-            print(f"Warning: Tasks file {self.tasks_file} not found.")
-            return
 
-        try:
-            with open(self.tasks_file, 'r', encoding='utf-8') as f:
-                self.user_tasks = json.load(f)
-            print(f"Loaded tasks for {len(self.user_tasks)} users.")
-        except Exception as e:
-            print(f"Error loading tasks file: {e}")
+        # In-memory cache for fixed users and random progress
+        self.available_users = list(FIXED_USERS)
+        self.user_tasks = {user: [] for user in self.available_users}  # compatibility field
+        self.user_progress = {}
+        self.env_to_episodes = self._load_env_episode_pool()
+        self.env_choices = sorted(self.env_to_episodes.keys())
+
+        # 会话管理：跟踪每个用户名的活跃 uid
+        self.active_uid = {}  # {username: uid}
+
+        self.load_progress()
+
+    def _resolve_metadata_root(self) -> Path:
+        env_root = os.environ.get("ROBOMME_METADATA_ROOT")
+        if env_root:
+            return Path(env_root)
+        return self.base_dir.parent / "src" / "robomme" / "env_metadata" / "train"
+
+    def _load_env_episode_pool(self):
+        env_to_episode_set = {}
+        metadata_root = self._resolve_metadata_root()
+        if not metadata_root.exists():
+            print(f"Warning: metadata root not found: {metadata_root}")
+            return {}
+
+        for metadata_path in sorted(metadata_root.glob(METADATA_FILE_GLOB)):
+            try:
+                payload = json.loads(metadata_path.read_text(encoding="utf-8"))
+            except Exception as exc:
+                print(f"Warning: failed to read metadata file {metadata_path}: {exc}")
+                continue
+
+            fallback_env = str(payload.get("env_id") or "").strip()
+            for record in payload.get("records", []):
+                env_id = str(record.get("task") or fallback_env or "").strip()
+                episode = record.get("episode")
+                if not env_id or episode is None:
+                    continue
+                try:
+                    episode_idx = int(episode)
+                except (TypeError, ValueError):
+                    continue
+                env_to_episode_set.setdefault(env_id, set()).add(episode_idx)
+
+        env_to_episodes = {
+            env_id: sorted(episodes)
+            for env_id, episodes in env_to_episode_set.items()
+            if episodes
+        }
+        print(f"Loaded random env pool: {len(env_to_episodes)} envs from metadata root {metadata_root}")
+        return env_to_episodes
+
+    def _ensure_progress_entry(self, username):
+        if username not in self.user_progress:
+            self.user_progress[username] = {
+                "completed_count": 0,
+                "current_env_id": None,
+                "current_episode_idx": None,
+            }
+
+    def _set_current_random_task(self, username, preferred_env=None):
+        if not self.env_choices:
+            return False
+        self._ensure_progress_entry(username)
+        env_id = preferred_env if preferred_env in self.env_to_episodes else random.choice(self.env_choices)
+        episodes = self.env_to_episodes.get(env_id, [])
+        if not episodes:
+            return False
+        episode_idx = int(random.choice(episodes))
+        self.user_progress[username]["current_env_id"] = env_id
+        self.user_progress[username]["current_episode_idx"] = episode_idx
+        return True
 
     def _get_user_progress_file(self, username):
         """获取用户特定的进度文件路径"""
         safe_username = username.replace("/", "_").replace("\\", "_")
-        return os.path.join(self.progress_dir, f"{safe_username}.jsonl")
-    
+        return str(self.progress_dir / f"{safe_username}.jsonl")
+
     def load_progress(self):
-        """Load user progress from individual JSONL files. 
-        Reconstructs the latest state by reading all user files."""
+        """Load user progress from individual JSONL files."""
         if not os.path.exists(self.progress_dir):
             return
 
         try:
-            # 遍历进度目录中的所有用户文件
             for filename in os.listdir(self.progress_dir):
                 if not filename.endswith('.jsonl'):
                     continue
-                
+
                 user_file = os.path.join(self.progress_dir, filename)
                 try:
                     with open(user_file, 'r', encoding='utf-8') as f:
-                        # 读取该用户文件的所有记录，保留最新的状态
                         for line in f:
                             if not line.strip():
                                 continue
                             try:
                                 record = json.loads(line)
                                 username = record.get("username")
-                                if username:
-                                    # 只更新包含 current_task_index 的记录，避免用默认值0覆盖
-                                    if "current_task_index" in record:
-                                        # Update in-memory state with latest record that has current_task_index
-                                        self.user_progress[username] = {
-                                            "current_task_index": record.get("current_task_index", 0),
-                                            "completed_tasks": set(record.get("completed_tasks", []))
-                                        }
+                                if username not in self.available_users:
+                                    continue
+                                self._ensure_progress_entry(username)
+
+                                count_raw = record.get("completed_count", record.get("current_task_index", 0))
+                                try:
+                                    completed_count = max(0, int(count_raw))
+                                except (TypeError, ValueError):
+                                    completed_count = 0
+                                self.user_progress[username]["completed_count"] = completed_count
                             except json.JSONDecodeError:
                                 continue
                 except Exception as e:
@@ -86,7 +142,7 @@ class UserManager:
         except Exception as e:
             print(f"Error loading progress directory: {e}")
 
-    def save_progress_record(self, username, current_index, completed_tasks, 
+    def save_progress_record(self, username, current_index, completed_tasks,
                             env_id=None, episode_idx=None, status=None, 
                             difficulty=None, language_goal=None, seed=None,
                             start_time=None, end_time=None, timestamp=None):
@@ -94,18 +150,8 @@ class UserManager:
         Append a progress record to the user-specific JSONL file.
         
         Args:
-            username: 用户名
-            current_index: 当前任务索引
-            completed_tasks: 已完成任务集合
-            env_id: 环境ID（可选）
-            episode_idx: Episode索引（可选）
-            status: 任务状态（可选）
-            difficulty: 难度（可选）
-            language_goal: 语言目标（可选）
-            seed: 随机种子（可选）
-            start_time: 任务开始时间，ISO格式字符串（可选）
-            end_time: 任务结束时间，ISO格式字符串（可选）
-            timestamp: 向后兼容参数，如果提供且start_time/end_time为None，则同时设置为start_time和end_time
+            current_index: 兼容字段，表示累计完成数 completed_count
+            completed_tasks: 兼容字段（当前随机模式不使用）
         """
         
         record = {
@@ -143,22 +189,24 @@ class UserManager:
         if seed is not None:
             record["seed"] = seed
         
-        # 【修复】保存 current_task_index 和 completed_tasks 到 JSONL 文件
-        # 这样 load_progress 才能正确恢复任务索引
-        record["current_task_index"] = current_index
-        record["completed_tasks"] = list(completed_tasks) if isinstance(completed_tasks, set) else completed_tasks
-        
+        try:
+            completed_count = max(0, int(current_index))
+        except (TypeError, ValueError):
+            completed_count = 0
+
+        # 兼容旧结构：current_task_index 沿用为累计完成数
+        record["current_task_index"] = completed_count
+        record["completed_count"] = completed_count
+        record["completed_tasks"] = []
+
         with self.lock:
             try:
                 user_progress_file = self._get_user_progress_file(username)
                 with open(user_progress_file, 'a', encoding='utf-8') as f:
                     f.write(json.dumps(record) + "\n")
-                
-                # Update cache
-                self.user_progress[username] = {
-                    "current_task_index": current_index,
-                    "completed_tasks": set(completed_tasks)
-                }
+
+                self._ensure_progress_entry(username)
+                self.user_progress[username]["completed_count"] = completed_count
             except Exception as e:
                 print(f"Error saving progress for {username}: {e}")
 
@@ -180,19 +228,15 @@ class UserManager:
         """
         if not username:
             return False, "Username cannot be empty", None
-        
-        if username not in self.user_tasks:
-            return False, f"User '{username}' not found in task configuration.", None
-            
-        # Ensure progress entry exists
-        if username not in self.user_progress:
-            self.user_progress[username] = {
-                "current_task_index": 0,
-                "completed_tasks": set()
-            }
-        
-        # 强制接管：如果用户名已被另一个 uid 使用，覆盖它并清理旧会话资源
-        # 清理旧会话的工作进程（释放 RAM/VRAM）和所有状态数据
+
+        if username not in self.available_users:
+            return False, f"User '{username}' not found. Available users: {', '.join(self.available_users)}.", None
+
+        if not self.env_choices:
+            return False, "No available environments found in metadata.", None
+
+        self._ensure_progress_entry(username)
+
         if uid:
             with self.lock:
                 old_uid = self.active_uid.get(username)
@@ -202,7 +246,10 @@ class UserManager:
                     print(f"正在清理用户 {username} 的旧会话 {old_uid}...")
                     cleanup_session(old_uid)
                 self.active_uid[username] = uid
-            
+
+        if not self._set_current_random_task(username):
+            return False, "Failed to assign random task from metadata.", None
+
         return True, f"Welcome, {username}!", self.get_user_status(username)
     
     def assert_lease(self, username, uid):
@@ -227,60 +274,52 @@ class UserManager:
 
     def get_user_status(self, username):
         """Get current status for a user."""
-        if username not in self.user_tasks:
+        if username not in self.available_users:
             return None
-            
-        tasks = self.user_tasks[username]
-        progress = self.user_progress.get(username, {"current_task_index": 0, "completed_tasks": set()})
-        
-        current_idx = progress["current_task_index"]
-        completed = progress["completed_tasks"]
-        
-        # Ensure index is within bounds
-        if current_idx >= len(tasks):
-            current_task = None
-            is_done_all = True
-        else:
-            current_task = tasks[current_idx]
-            is_done_all = False
-            
+
+        self._ensure_progress_entry(username)
+        progress = self.user_progress[username]
+        if (progress.get("current_env_id") is None or progress.get("current_episode_idx") is None) and self.env_choices:
+            self._set_current_random_task(username)
+            progress = self.user_progress[username]
+
+        current_task = None
+        if progress.get("current_env_id") is not None and progress.get("current_episode_idx") is not None:
+            current_task = {
+                "env_id": progress["current_env_id"],
+                "episode_idx": int(progress["current_episode_idx"]),
+            }
+
+        completed_count = int(progress.get("completed_count", 0))
         return {
             "username": username,
-            "total_tasks": len(tasks),
-            "current_index": current_idx,
-            "completed_count": len(completed),
+            "total_tasks": len(self.env_choices),  # compatibility only
+            "current_index": completed_count,  # compatibility only
+            "completed_count": completed_count,
             "current_task": current_task,
-            "is_done_all": is_done_all,
-            "tasks": tasks
+            "is_done_all": False,
+            "tasks": [],  # compatibility only
+            "env_choices": list(self.env_choices),
         }
 
     def complete_current_task(self, username, env_id=None, episode_idx=None, 
                              status=None, difficulty=None, language_goal=None, seed=None):
-        """Mark current task as complete and move to next."""
-        user_status = self.get_user_status(username)
-        if not user_status or user_status["is_done_all"]:
+        """Mark current task as complete and increment completed counter."""
+        if username not in self.available_users:
             return None
-            
-        current_idx = user_status["current_index"]
-        completed = self.user_progress[username]["completed_tasks"]
-        
-        # Mark as completed
-        completed.add(current_idx)
-        
-        # Move to next task
-        next_idx = current_idx + 1
-        
-        # 获取任务开始时间（如果存在）
+
+        self._ensure_progress_entry(username)
+        self.user_progress[username]["completed_count"] = int(self.user_progress[username]["completed_count"]) + 1
+        completed_count = self.user_progress[username]["completed_count"]
+
         start_time = None
         if env_id is not None and episode_idx is not None:
             start_time = get_task_start_time(username, env_id, episode_idx)
-        
-        # 获取任务结束时间
+
         end_time = datetime.datetime.now().isoformat()
-        
-        # Save persistence with episode information
+
         self.save_progress_record(
-            username, next_idx, completed,
+            username, completed_count, None,
             env_id=env_id,
             episode_idx=episode_idx,
             status=status,
@@ -290,26 +329,47 @@ class UserManager:
             start_time=start_time,
             end_time=end_time
         )
-        
-        # 清理任务开始时间记录（避免内存泄漏）
+
         if env_id is not None and episode_idx is not None:
             clear_task_start_time(username, env_id, episode_idx)
-        
+
         return self.get_user_status(username)
 
+    def switch_env_and_random_episode(self, username, env_id):
+        """Switch to the given env and randomly assign an episode from that env."""
+        if username not in self.available_users:
+            return None
+        if env_id not in self.env_to_episodes:
+            return None
+        if not self._set_current_random_task(username, preferred_env=env_id):
+            return None
+        return self.get_user_status(username)
 
+    def next_episode_same_env(self, username):
+        """Randomly assign another episode in the current env (repetition allowed)."""
+        if username not in self.available_users:
+            return None
+        self._ensure_progress_entry(username)
+        current_env = self.user_progress[username].get("current_env_id")
+        if current_env not in self.env_to_episodes:
+            if not self._set_current_random_task(username):
+                return None
+        else:
+            if not self._set_current_random_task(username, preferred_env=current_env):
+                return None
+        return self.get_user_status(username)
 
     def set_task_index(self, username, index):
-        """Manually set task index (if needed)."""
-        if username not in self.user_tasks:
+        """Compatibility helper: set completed counter directly."""
+        if username not in self.available_users:
             return False
-            
-        tasks = self.user_tasks[username]
-        if 0 <= index <= len(tasks):
-             progress = self.user_progress.get(username, {"current_task_index": 0, "completed_tasks": set()})
-             self.save_progress_record(username, index, progress["completed_tasks"])
-             return True
-        return False
+
+        try:
+            value = max(0, int(index))
+        except (TypeError, ValueError):
+            return False
+        self.save_progress_record(username, value, None)
+        return True
 
 # Global instance for simplicity in app.py
 user_manager = UserManager()

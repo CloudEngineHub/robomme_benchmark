@@ -1,6 +1,10 @@
 import json
 import random
 
+# Deprecated runtime path:
+# This script is only for offline generation experiments and is not used by
+# the current Gradio runtime task assignment flow.
+
 ENVS = [
     # Counting
     "BinFill",

@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """
 验证和修复视频文件名，确保与 env_id 正确对应
+
+注意：该脚本是离线校验工具，不参与当前 Gradio 运行时任务分配逻辑。
 """
 import json
 import os

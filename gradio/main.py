@@ -320,7 +320,7 @@ if __name__ == "__main__":
     start_timeout_monitor()
     
     # 获取所有用户列表
-    available_users = list(user_manager.user_tasks.keys())
+    available_users = list(user_manager.available_users)
     
     if not available_users:
         print("\n⚠️  警告: 未找到任何用户配置")

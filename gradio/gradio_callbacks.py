@@ -13,8 +13,6 @@ from datetime import datetime
 from state_manager import (
     get_session,
     create_session,
-    get_task_index,
-    set_task_index,
     get_coordinate_clicks,
     clear_coordinate_clicks,
     add_coordinate_click,
@@ -283,6 +281,230 @@ def on_video_end_transition(uid):
     )
 
 
+def _login_failed_response(uid, message):
+    return (
+        uid,
+        gr.update(visible=True),  # login_group
+        gr.update(visible=False),  # main_interface
+        message,  # login_message
+        gr.update(value=None, interactive=False), format_log_markdown(""),  # img, log_output
+        gr.update(choices=[], value=None),  # options
+        "", "No need for coordinates",  # goal, coords
+        gr.update(value=MJPEG_WAITING_HTML),  # combined_display
+        gr.update(value=None, visible=False),  # video_display
+        "", "",  # task_info, progress_info
+        gr.update(interactive=True),  # login_btn
+        gr.update(interactive=False),  # next_task_btn
+        gr.update(interactive=False),  # exec_btn
+        gr.update(visible=False),  # video_phase_group
+        gr.update(visible=False),  # livestream_phase_group
+        gr.update(visible=False),  # action_phase_group
+        gr.update(visible=False),  # control_panel_group
+        gr.update(value=""),  # task_hint_display
+        gr.update(visible=False),  # loading_overlay
+    )
+
+
+def _load_status_task(username, uid, status, login_message=None):
+    """Load status.current_task to session and build the standard UI update tuple."""
+    current_task = status.get("current_task") if isinstance(status, dict) else None
+    if not current_task:
+        return _login_failed_response(uid, f"Error loading task for {username}: missing current_task")
+
+    env_id = current_task.get("env_id")
+    ep_num = current_task.get("episode_idx")
+    if env_id is None or ep_num is None:
+        return _login_failed_response(uid, f"Error loading task for {username}: invalid task payload")
+
+    try:
+        completed_count = int(status.get("completed_count", 0))
+    except (TypeError, ValueError):
+        completed_count = 0
+    progress_text = f"Completed: {completed_count}"
+
+    session = get_session(uid)
+    if session is None:
+        print(f"Session {uid} not found, creating new session for {username}")
+        session = ProcessSessionProxy()
+        with _state_lock:
+            GLOBAL_SESSIONS[uid] = session
+            SESSION_LAST_ACTIVITY[uid] = time.time()
+        print(f"New session created for {uid} (User: {username})")
+
+    print(f"Loading {env_id} Ep {ep_num} for {uid} (User: {username})")
+
+    cleanup_frame_queue(uid)
+    clear_coordinate_clicks(uid)
+    clear_option_selects(uid)
+    reset_play_button_clicked(uid)
+    reset_execute_count(username, env_id, int(ep_num))
+
+    img, load_msg = session.load_episode(env_id, int(ep_num))
+    actual_env_id = getattr(session, 'env_id', None) or env_id
+
+    if img is not None:
+        start_time = datetime.now().isoformat()
+        set_task_start_time(username, env_id, int(ep_num), start_time)
+
+    if img is None:
+        combined_html = _mjpeg_stream_html(uid)
+        set_ui_phase(uid, "executing_task")
+        return (
+            uid,
+            gr.update(visible=False),  # login_group
+            gr.update(visible=True),  # main_interface
+            f"Error loading task for {username}",
+            gr.update(value=None, interactive=False), format_log_markdown(f"Error: {load_msg}"),
+            gr.update(choices=[], value=None),
+            "", "No need for coordinates",
+            gr.update(value=combined_html),  # combined_display
+            gr.update(value=None, visible=False),  # video_display
+            f"{actual_env_id} (Episode {ep_num})", progress_text,
+            gr.update(interactive=True),  # login_btn
+            gr.update(interactive=False),  # next_task_btn
+            gr.update(interactive=False),  # exec_btn
+            gr.update(visible=False),  # video_phase_group
+            gr.update(visible=False),  # livestream_phase_group
+            gr.update(visible=True),  # action_phase_group
+            gr.update(visible=True),  # control_panel_group
+            gr.update(value=get_task_hint(env_id) if env_id else ""),  # task_hint_display
+            gr.update(visible=False),  # loading_overlay
+        )
+
+    if session.env_id == "VideoPlaceButton" and session.language_goal:
+        goal_text = get_videoplacebutton_goal(session.language_goal)
+    else:
+        goal_text = capitalize_first_letter(session.language_goal) if session.language_goal else ""
+
+    options = session.available_options
+    radio_choices = []
+    for opt_label, opt_idx in options:
+        opt_label = _ui_option_label(session, opt_label, opt_idx)
+        if 0 <= opt_idx < len(session.raw_solve_options):
+            opt = session.raw_solve_options[opt_idx]
+            if opt.get("available"):
+                opt_label_with_hint = f"{opt_label} (click mouse 🖱️ to select 🎯)"
+            else:
+                opt_label_with_hint = opt_label
+        else:
+            opt_label_with_hint = opt_label
+        radio_choices.append((opt_label_with_hint, opt_idx))
+
+    demo_video_path = None
+    has_demo_video = False
+    should_show = should_show_demo_video(actual_env_id) if actual_env_id else False
+    initial_log_msg = format_log_markdown("please select the action below 👇🏻,\nsome actions also need to select keypoint")
+
+    if should_show:
+        has_demo_video = True
+        initial_log_msg = format_log_markdown('press "Watch Video Input🎬" to watch a video\nNote: you can only watch the video once')
+        if session.demonstration_frames:
+            try:
+                demo_video_path = save_video(session.demonstration_frames, "demo")
+                if demo_video_path:
+                    file_exists = os.path.exists(demo_video_path)
+                    file_size = os.path.getsize(demo_video_path) if file_exists else 0
+                    if not (file_exists and file_size > 0):
+                        demo_video_path = None
+            except Exception:
+                demo_video_path = None
+
+    img = session.get_pil_image(use_segmented=USE_SEGMENTED_VIEW)
+    combined_html = _mjpeg_stream_html(uid)
+    ui_login_msg = login_message if login_message else f"Logged in as {username}"
+
+    if has_demo_video:
+        set_ui_phase(uid, "executing_task")
+        if session.base_frames:
+            from state_manager import FRAME_QUEUES
+            current_base_count = len(session.base_frames) if session.base_frames else 0
+            if uid not in FRAME_QUEUES:
+                FrameQueueManager.init_queue(uid, current_base_count)
+            last_base_frame = session.base_frames[-1] if session.base_frames else None
+            if last_base_frame is not None:
+                env_id_for_concat = getattr(session, 'env_id', None)
+                last_frames = concatenate_frames_horizontally([last_base_frame], env_id=env_id_for_concat)
+                queue_info = FRAME_QUEUES.get(uid)
+                if queue_info and last_frames:
+                    last_frame = last_frames[0]
+                    for _ in range(10):
+                        try:
+                            frame_copy = np.copy(last_frame) if isinstance(last_frame, np.ndarray) else last_frame
+                            queue_info["frame_queue"].put(frame_copy, block=False)
+                        except queue.Full:
+                            break
+
+        return (
+            uid,
+            gr.update(visible=False),  # login_group
+            gr.update(visible=True),  # main_interface
+            ui_login_msg,
+            gr.update(value=img, interactive=False),
+            initial_log_msg,
+            gr.update(choices=radio_choices, value=None),
+            goal_text,
+            "No need for coordinates",
+            gr.update(value=combined_html),  # combined_display
+            gr.update(value=demo_video_path, visible=True),  # video_display
+            f"{actual_env_id} (Episode {ep_num})",
+            progress_text,
+            gr.update(interactive=True),  # login_btn
+            gr.update(interactive=False),  # next_task_btn
+            gr.update(interactive=True),  # exec_btn
+            gr.update(visible=True),  # video_phase_group
+            gr.update(visible=False),  # livestream_phase_group
+            gr.update(visible=False),  # action_phase_group
+            gr.update(visible=False),  # control_panel_group
+            gr.update(value=get_task_hint(actual_env_id)),  # task_hint_display
+            gr.update(visible=False),  # loading_overlay
+        )
+
+    set_ui_phase(uid, "executing_task")
+    if session.base_frames:
+        from state_manager import FRAME_QUEUES
+        current_base_count = len(session.base_frames) if session.base_frames else 0
+        if uid not in FRAME_QUEUES:
+            FrameQueueManager.init_queue(uid, current_base_count)
+        last_base_frame = session.base_frames[-1] if session.base_frames else None
+        if last_base_frame is not None:
+            env_id_for_concat = getattr(session, 'env_id', None)
+            last_frames = concatenate_frames_horizontally([last_base_frame], env_id=env_id_for_concat)
+            queue_info = FRAME_QUEUES.get(uid)
+            if queue_info and last_frames:
+                last_frame = last_frames[0]
+                for _ in range(10):
+                    try:
+                        frame_copy = np.copy(last_frame) if isinstance(last_frame, np.ndarray) else last_frame
+                        queue_info["frame_queue"].put(frame_copy, block=False)
+                    except queue.Full:
+                        break
+
+    return (
+        uid,
+        gr.update(visible=False),  # login_group
+        gr.update(visible=True),  # main_interface
+        ui_login_msg,
+        gr.update(value=img, interactive=False),  # img_display
+        initial_log_msg,  # log_output
+        gr.update(choices=radio_choices, value=None),  # options_radio
+        goal_text,  # goal_box
+        "No need for coordinates",  # coords_box
+        gr.update(value=combined_html),  # combined_display
+        gr.update(value=None, visible=False),  # video_display (no video)
+        f"{actual_env_id} (Episode {ep_num})",  # task_info_box
+        progress_text,  # progress_info_box
+        gr.update(interactive=True),  # login_btn
+        gr.update(interactive=False),  # next_task_btn
+        gr.update(interactive=True),  # exec_btn
+        gr.update(visible=False),  # video_phase_group
+        gr.update(visible=False),  # livestream_phase_group
+        gr.update(visible=True),  # action_phase_group
+        gr.update(visible=True),  # control_panel_group
+        gr.update(value=get_task_hint(actual_env_id)),  # task_hint_display
+        gr.update(visible=False),  # loading_overlay
+    )
+
+
 def login_and_load_task(username, uid):
     """
     Handle user login and load their current task.
@@ -297,380 +519,77 @@ def login_and_load_task(username, uid):
     # 更新session活动时间（登录操作）
     if uid:
         update_session_activity(uid)
-    
+
     if not success:
-        # Login failed
-        return (
-            uid,
-            gr.update(visible=True), # login_group
-            gr.update(visible=False), # main_interface
-            msg, # login_message
-            gr.update(value=None, interactive=False), format_log_markdown(""), # img, log_output
-            gr.update(choices=[], value=None), # options
-            "", "No need for coordinates", # goal, coords
-            gr.update(value=MJPEG_WAITING_HTML),  # combined_display
-            gr.update(value=None, visible=False),  # video_display
-            "", "",  # task_info, progress_info
-            gr.update(interactive=True), # login_btn
-            gr.update(interactive=False), # next_task_btn
-            gr.update(interactive=False), # exec_btn
-            gr.update(visible=False), # video_phase_group
-            gr.update(visible=False), # livestream_phase_group
-            gr.update(visible=False), # action_phase_group
-            gr.update(visible=False),  # control_panel_group
-            gr.update(value=""),  # task_hint_display
-            gr.update(visible=False)  # loading_overlay
-        )
-    
-    # Login success - Load current task
-    if status["is_done_all"]:
-        set_task_index(uid, status['total_tasks'] - 1, status['total_tasks'])
-        task_info = get_task_index(uid)
-        total = task_info["total_tasks"]
-        combined_html = _mjpeg_stream_html(uid)
-        set_ui_phase(uid, "executing_task")
-        return (
-            uid,
-            gr.update(visible=False), # login_group
-            gr.update(visible=True), # main_interface
-            f"Welcome {username}. You have completed all tasks!",
-            gr.update(value=None, interactive=False), format_log_markdown("All tasks completed! Thank you."),
-            gr.update(choices=[], value=None),
-            "All tasks completed.", "No need for coordinates",
-            gr.update(value=combined_html),  # combined_display
-            gr.update(value=None, visible=False),  # video_display
-            "No active task", f"Progress: {total}/{total}",
-            gr.update(interactive=True),  # login_btn
-            gr.update(interactive=False),  # next_task_btn
-            gr.update(interactive=False),  # exec_btn
-            gr.update(visible=False),  # video_phase_group
-            gr.update(visible=False),  # livestream_phase_group
-            gr.update(visible=True),   # action_phase_group (show message)
-            gr.update(visible=True),   # control_panel_group
-            gr.update(value=""),  # task_hint_display
-            gr.update(visible=False)  # loading_overlay
-        )
-        
-    current_task = status["current_task"]
-    env_id = current_task["env_id"]
-    ep_num = current_task["episode_idx"]
-    
-    # Load the environment
-    session = get_session(uid)
-
-
-    # 【修复】如果session不存在（可能被free try mode销毁了），创建一个新的session
-    # 场景：用户在free try mode下点击"Back to Mode Selection"时，session会被销毁
-    # 当用户切换到Record Mode时，需要重新创建session才能正常加载环境
-    if session is None:
-        print(f"Session {uid} not found, creating new session for {username}")
-        # 创建新的ProcessSessionProxy实例（会启动独立的工作进程）
-        session = ProcessSessionProxy()
-        # 使用线程锁保护全局状态，将新session注册到全局会话存储中
-        with _state_lock:
-            GLOBAL_SESSIONS[uid] = session
-            SESSION_LAST_ACTIVITY[uid] = time.time()  # 更新最后活动时间
-        print(f"New session created for {uid} (User: {username})")
-    
-    print(f"Loading {env_id} Ep {ep_num} for {uid} (User: {username})")
-    
-    # 清理帧队列（新episode开始）
-    cleanup_frame_queue(uid)
-    
-    # 清空该session的coordinate_clicks和option_selects（新episode开始）
-    clear_coordinate_clicks(uid)
-    clear_option_selects(uid)
-    
-    # 重置播放按钮点击状态（新任务开始）
-    reset_play_button_clicked(uid)
-    
-    # 重置该任务的 execute 计数（新任务开始）
-    reset_execute_count(username, env_id, int(ep_num))
-    
-    
-    img, load_msg = session.load_episode(env_id, int(ep_num))
-    
-    
-    # 【修复】在load_episode之后，使用session.env_id来判断是否显示视频
-    # 这样可以确保使用的是实际加载的环境ID，而不是可能过时的局部变量
-    actual_env_id = getattr(session, 'env_id', None) or env_id  # 如果session.env_id不存在，回退到局部变量
-    
-    # 成功加载 episode 后，记录任务开始时间
-    if img is not None:
-        start_time = datetime.now().isoformat()
-        set_task_start_time(username, env_id, int(ep_num), start_time)
-    
-    if img is None:
-        # 即使加载失败，也保存任务索引
-        set_task_index(uid, status['current_index'], status['total_tasks'])
-        task_info = get_task_index(uid)
-        task_idx = task_info["task_index"]
-        total = task_info["total_tasks"]
-        # 生成 HTML 内容，包含 MJPEG 流
-        combined_html = _mjpeg_stream_html(uid)
-        # 加载失败，直接进入执行阶段
-        set_ui_phase(uid, "executing_task")
-        
-        return (
-            uid,
-            gr.update(visible=False), # login_group
-            gr.update(visible=True),  # main_interface
-            f"Error loading task for {username}",
-            gr.update(value=None, interactive=False), format_log_markdown(f"Error: {load_msg}"),
-            gr.update(choices=[], value=None),
-            "", "No need for coordinates",
-            gr.update(value=combined_html),  # combined_display
-            gr.update(value=None, visible=False),  # video_display
-            f"Task: {actual_env_id} (Ep {ep_num})", f"Progress: {task_idx + 1}/{total}",
-            gr.update(interactive=True),   # login_btn
-            gr.update(interactive=False),  # next_task_btn
-            gr.update(interactive=False),  # exec_btn
-            gr.update(visible=False),  # video_phase_group
-            gr.update(visible=False),  # livestream_phase_group
-            gr.update(visible=True),   # action_phase_group
-            gr.update(visible=True),   # control_panel_group
-            gr.update(value=get_task_hint(env_id) if env_id else ""),  # task_hint_display
-            gr.update(visible=False)  # loading_overlay
-        )
-        
-    # Success loading
-    # 如果是 VideoPlaceButton 任务，使用特殊的任务目标格式
-    if session.env_id == "VideoPlaceButton" and session.language_goal:
-        goal_text = get_videoplacebutton_goal(session.language_goal)
-    else:
-        goal_text = capitalize_first_letter(session.language_goal) if session.language_goal else ""
-    
-    options = session.available_options
-    # 生成选项列表，如果选项需要坐标选择，在标签后添加提示  
-    radio_choices = []
-    for opt_label, opt_idx in options:
-        opt_label = _ui_option_label(session, opt_label, opt_idx)
-        # 检查该选项是否需要坐标
-        if 0 <= opt_idx < len(session.raw_solve_options):
-            opt = session.raw_solve_options[opt_idx]
-            if opt.get("available"):
-                # 需要坐标，在英文标签后添加提示
-                opt_label_with_hint = f"{opt_label} (click mouse 🖱️ to select 🎯)"
-            else:
-                opt_label_with_hint = opt_label
-        else:
-            opt_label_with_hint = opt_label
-        radio_choices.append((opt_label_with_hint, opt_idx))
-    
-    # 保存任务索引到全局映射，供Progress直接读取
-    set_task_index(uid, status['current_index'], status['total_tasks'])
-    
-    demo_video_path = None
-    has_demo_video = False
-    # 只用环境是否在 DEMO_VIDEO_ENV_IDS 中判断是否显示演示视频
-    # 【修复】使用actual_env_id（从session.env_id获取）而不是局部变量env_id
-    # 这样可以确保使用的是实际加载的环境ID，而不是可能过时的局部变量
-    should_show = should_show_demo_video(actual_env_id) if actual_env_id else False
-    
-    # Set initial log message based on whether video is shown
-    initial_log_msg = format_log_markdown("please select the action below 👇🏻,\nsome actions also need to select keypoint")
-    
-    if should_show:
-        has_demo_video = True  # 环境在列表中，标记为需要显示视频
-        initial_log_msg = format_log_markdown('press "Watch Video Input🎬" to watch a video\nNote: you can only watch the video once') # Show Watch Video prompt
-        # 尝试生成视频（即使没有 demonstration_frames 也尝试）
-        if session.demonstration_frames:
-            try:
-                demo_video_path = save_video(session.demonstration_frames, "demo")
-                
-                
-                # 验证视频文件是否真实存在且有效
-                if demo_video_path:
-                    file_exists = os.path.exists(demo_video_path)
-                    file_size = os.path.getsize(demo_video_path) if file_exists else 0
-                    
-                    
-                    if not (file_exists and file_size > 0):
-                        # 视频文件不存在或无效，但保持 has_demo_video = True
-                        demo_video_path = None
-            except Exception as e:
-                # 保存失败，但保持 has_demo_video = True（视频播放器将为空）
-                demo_video_path = None
-                pass
-        else:
-            # 如果没有 demonstration_frames，demo_video_path 保持为 None，但 has_demo_video = True
-            pass
-
-
-    # 从TASK_INDEX_MAP直接读取Progress
-    task_info = get_task_index(uid)
-    task_idx = task_info["task_index"]
-    total = task_info["total_tasks"]
-    
-    # 根据视图模式重新获取图片
-    img = session.get_pil_image(use_segmented=USE_SEGMENTED_VIEW)
-    
-    # 生成 HTML 内容，包含 MJPEG 流
-    combined_html = _mjpeg_stream_html(uid)
-
-    # 根据是否有示范视频决定UI阶段
-    if has_demo_video:
-        # 有示范视频：同时显示演示视频和执行界面
-        set_ui_phase(uid, "executing_task")  # 设置为执行阶段
-        
-        # 初始化Reference Views队列（有demo video时，也需要立即显示Reference Views）
-        if session.base_frames:
-            from state_manager import FRAME_QUEUES
-            
-            # 初始化队列：传入当前frames数量作为监控起始点
-            # 监控线程会从这些帧之后开始检测新帧，不会重复添加已存在的帧
-            current_base_count = len(session.base_frames) if session.base_frames else 0
-            
-            if uid not in FRAME_QUEUES:
-                FrameQueueManager.init_queue(uid, current_base_count)
-            
-            # 手动添加最后一帧到队列（重复多次），确保初始显示
-            # 这是可选的优化，因为 generate_mjpeg_stream 有 fallback 机制
-            last_base_frame = session.base_frames[-1] if session.base_frames else None
-            
-            if last_base_frame is not None:
-                env_id_for_concat = getattr(session, 'env_id', None)
-                last_frames = concatenate_frames_horizontally(
-                    [last_base_frame],
-                    env_id=env_id_for_concat
-                )
-                
-                queue_info = FRAME_QUEUES.get(uid)
-                if queue_info and last_frames:
-                    last_frame = last_frames[0]
-                    # 重复加入最后一帧10次，确保初始显示
-                    for _ in range(10):
-                        try:
-                            frame_copy = np.copy(last_frame) if isinstance(last_frame, np.ndarray) else last_frame
-                            queue_info["frame_queue"].put(frame_copy, block=False)
-                        except queue.Full:
-                            break
-        
-        
-        return (
-            uid,
-            gr.update(visible=False), # login_group
-            gr.update(visible=True),  # main_interface
-            f"Logged in as {username}",
-            gr.update(value=img, interactive=False),
-            initial_log_msg,
-            gr.update(choices=radio_choices, value=None),
-            goal_text,
-            "No need for coordinates",
-            gr.update(value=combined_html),  # combined_display
-            gr.update(value=demo_video_path, visible=True),  # video_display (auto-play)
-            f"{actual_env_id} (Episode {ep_num})",
-            f"Progress: {task_idx + 1}/{total}",
-            gr.update(interactive=True),   # login_btn
-            gr.update(interactive=False),  # next_task_btn
-            gr.update(interactive=True),   # exec_btn
-            gr.update(visible=True),   # video_phase_group (show video first)
-            gr.update(visible=False),  # livestream_phase_group
-            gr.update(visible=False),  # action_phase_group (hidden until video ends)
-            gr.update(visible=False),  # control_panel_group
-            gr.update(value=get_task_hint(actual_env_id)),  # task_hint_display
-            gr.update(visible=False)  # loading_overlay
-        )
-    else:
-        # 环境不在 DEMO_VIDEO_ENV_IDS 中：直接进入执行阶段
-        set_ui_phase(uid, "executing_task")
-
-        
-        # 初始化Reference Views队列（如果环境不在列表中，需要立即显示Reference Views）
-        # 注意：即使手动添加了初始帧，generate_mjpeg_stream 也有 fallback 机制直接从 session 获取帧
-        # 这确保了即使队列初始化时序有问题，用户也能看到当前状态
-        if session.base_frames:
-            from state_manager import FRAME_QUEUES
-            
-            # 初始化队列：传入当前frames数量作为监控起始点
-            # 监控线程会从这些帧之后开始检测新帧，不会重复添加已存在的帧
-            current_base_count = len(session.base_frames) if session.base_frames else 0
-            
-            if uid not in FRAME_QUEUES:
-                FrameQueueManager.init_queue(uid, current_base_count)
-            
-            # 手动添加最后一帧到队列（重复多次），确保初始显示
-            # 这是可选的优化，因为 generate_mjpeg_stream 有 fallback 机制
-            last_base_frame = session.base_frames[-1] if session.base_frames else None
-            
-            if last_base_frame is not None:
-                env_id = getattr(session, 'env_id', None)
-                last_frames = concatenate_frames_horizontally(
-                    [last_base_frame],
-                    env_id=env_id
-                )
-                
-                queue_info = FRAME_QUEUES.get(uid)
-                if queue_info and last_frames:
-                    last_frame = last_frames[0]
-                    # 重复加入最后一帧10次，确保初始显示
-                    for _ in range(10):
-                        try:
-                            frame_copy = np.copy(last_frame) if isinstance(last_frame, np.ndarray) else last_frame
-                            queue_info["frame_queue"].put(frame_copy, block=False)
-                        except queue.Full:
-                            break
-        
-        # 环境不在 DEMO_VIDEO_ENV_IDS 中，隐藏视频并显示 "No video" 提示
-        
-        # No demo video - skip directly to action phase
-
-        return (
-            uid,
-            gr.update(visible=False),  # login_group
-            gr.update(visible=True),   # main_interface
-            f"Logged in as {username}",
-            gr.update(value=img, interactive=False),  # img_display
-            initial_log_msg,  # log_output
-            gr.update(choices=radio_choices, value=None),  # options_radio
-            goal_text,  # goal_box
-            "No need for coordinates",  # coords_box
-            gr.update(value=combined_html),  # combined_display
-            gr.update(value=None, visible=False),  # video_display (no video)
-            f"{actual_env_id} (Episode {ep_num})",  # task_info_box
-            f"Progress: {task_idx + 1}/{total}",  # progress_info_box
-            gr.update(interactive=True),   # login_btn
-            gr.update(interactive=False),  # next_task_btn
-            gr.update(interactive=True),   # exec_btn
-            gr.update(visible=False),  # video_phase_group (no video)
-            gr.update(visible=False),  # livestream_phase_group
-            gr.update(visible=True),   # action_phase_group (show directly)
-            gr.update(visible=True),   # control_panel_group
-            gr.update(value=get_task_hint(actual_env_id)),  # task_hint_display
-            gr.update(visible=False)  # loading_overlay
-        )
+        return _login_failed_response(uid, msg)
+    return _load_status_task(username, uid, status, login_message=f"Logged in as {username}")
 
 
 def load_next_task_wrapper(username, uid):
     """
-    Wrapper to just reload the user's current status (which should be next task if updated).
-    如果当前任务已有 actions，则创建新的 attempt。
-    对于 user_test，next task 时跳转回 env_id 选择界面。
-    For user_test, jump back to env_id selection interface when next task.
+    Move to next random episode within the same env and reload task.
     """
-    
+
+    if not uid:
+        uid = create_session()
+
     if username:
-        # Check lease before proceeding
         try:
             user_manager.assert_lease(username, uid)
         except LeaseLost as e:
-            # Raise error to be caught by Gradio and displayed
             raise gr.Error(f"You have been logged in elsewhere. This page is no longer valid. Please refresh the page to log in again.\\n{str(e)}")
-        
-        # 更新session活动时间（加载下一个任务操作）
+
         if uid:
             update_session_activity(uid)
-        
-        success, msg, status = user_manager.login(username, uid)
-        if success and not status["is_done_all"]:
+
+        status = user_manager.next_episode_same_env(username)
+        if status:
             current_task = status["current_task"]
             env_id = current_task["env_id"]
             ep_num = current_task["episode_idx"]
 
             if has_existing_actions(username, env_id, ep_num):
                 create_new_attempt(username, env_id, ep_num)
-    
-    return login_and_load_task(username, uid)
+
+        if not status:
+            return _login_failed_response(uid, f"Failed to load next task for {username}")
+        return _load_status_task(username, uid, status, login_message=f"Logged in as {username}")
+
+    return _login_failed_response(uid, "Username cannot be empty")
+
+
+def switch_env_wrapper(username, uid, selected_env):
+    """Switch env from Current Task dropdown and randomly assign an episode."""
+    if not uid:
+        uid = create_session()
+
+    if not username:
+        return _login_failed_response(uid, "Username cannot be empty")
+
+    try:
+        user_manager.assert_lease(username, uid)
+    except LeaseLost as e:
+        raise gr.Error(f"You have been logged in elsewhere. This page is no longer valid. Please refresh the page to log in again.\\n{str(e)}")
+
+    if uid:
+        update_session_activity(uid)
+
+    if selected_env:
+        status = user_manager.switch_env_and_random_episode(username, selected_env)
+    else:
+        status = user_manager.get_user_status(username)
+
+    if status and status.get("current_task"):
+        current_task = status["current_task"]
+        env_id = current_task["env_id"]
+        ep_num = current_task["episode_idx"]
+        if has_existing_actions(username, env_id, ep_num):
+            create_new_attempt(username, env_id, ep_num)
+
+    if not status:
+        return _login_failed_response(uid, f"Failed to switch environment to '{selected_env}'")
+
+    return _load_status_task(username, uid, status, login_message=f"Logged in as {username}")
 
 
 def on_map_click(uid, username, option_value, evt: gr.SelectData):
@@ -950,7 +869,7 @@ def init_app(request: gr.Request):
     if username:
         # 检查用户是否存在
         # Check if user exists
-        if username in user_manager.user_tasks:
+        if username in user_manager.available_users:
             # 直接登录并加载任务，进入主界面
             # Directly login and load task, show main interface
             print(f"URL Auto-Login: Detected '{username}', automatically logging in and loading task.")
@@ -1397,7 +1316,7 @@ def execute_step(uid, username, option_idx, coords_str):
     # combined_display 现在使用 HTML + MJPEG 流，不需要手动更新
     # 不再返回 combined_display 的更新，避免显示加载动画
     
-    progress_update = gr.update()  # 不更新 progress，保持原值
+    progress_update = gr.update()  # 默认不更新 progress
     task_update = gr.update()
     
     if done:
@@ -1413,7 +1332,7 @@ def execute_step(uid, username, option_idx, coords_str):
         else:
             status = "********************************\n****   episode failed       ****\n********************************\n  ---please press next task----   "
 
-        # Update user progress (但不更新 progress_info_box，等用户按 next task/refresh 时再更新)
+        # 更新累计完成计数，不再推进固定任务索引
         if username:
             seed = getattr(session, 'seed', None)
             user_status = user_manager.complete_current_task(
@@ -1426,14 +1345,9 @@ def execute_step(uid, username, option_idx, coords_str):
                 seed=seed
             )
             if user_status:
-                if user_status["is_done_all"]:
-                    task_update = "All tasks completed!"
-                    # progress_update 保持为 gr.update()，不改变
-                else:
-                    next_env = user_status["current_task"]["env_id"]
-                    next_ep = user_status["current_task"]["episode_idx"]
-                    task_update = f"Task Completed! Next: {next_env} (Ep {next_ep})"
-                    # progress_update 保持为 gr.update()，不改变
+                completed_count = user_status.get("completed_count", 0)
+                task_update = f"{session.env_id} (Episode {session.episode_idx})"
+                progress_update = f"Completed: {completed_count}"
     
     # 根据视图模式重新获取图片
     img = session.get_pil_image(use_segmented=USE_SEGMENTED_VIEW)

@@ -37,6 +37,7 @@ def test_native_ui_config_contains_phase_machine_and_precheck_chain(reload_modul
         }
 
         required_ids = {
+            "header_task",
             "main_layout_row",
             "media_card",
             "log_card",

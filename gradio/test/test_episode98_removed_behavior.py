@@ -34,12 +34,8 @@ def test_load_next_task_wrapper_treats_episode98_as_normal(monkeypatch, reload_m
     monkeypatch.setattr(callbacks, "update_session_activity", lambda uid: None)
     monkeypatch.setattr(
         callbacks.user_manager,
-        "login",
-        lambda username, uid: (
-            True,
-            "ok",
-            {"is_done_all": False, "current_task": {"env_id": "BinFill", "episode_idx": 98}},
-        ),
+        "next_episode_same_env",
+        lambda username: {"is_done_all": False, "current_task": {"env_id": "BinFill", "episode_idx": 98}},
     )
     monkeypatch.setattr(callbacks, "has_existing_actions", lambda username, env_id, ep_num: True)
     monkeypatch.setattr(
@@ -47,7 +43,7 @@ def test_load_next_task_wrapper_treats_episode98_as_normal(monkeypatch, reload_m
         "create_new_attempt",
         lambda username, env_id, ep_num: create_calls.append((username, env_id, ep_num)),
     )
-    monkeypatch.setattr(callbacks, "login_and_load_task", lambda username, uid: expected)
+    monkeypatch.setattr(callbacks, "_load_status_task", lambda username, uid, status, login_message=None: expected)
 
     result = callbacks.load_next_task_wrapper("user1", "uid1")
 
@@ -109,4 +105,4 @@ def test_execute_step_failed_episode98_still_advances(monkeypatch, reload_module
     assert len(complete_calls) == 1
     assert complete_calls[0]["episode_idx"] == 98
     assert complete_calls[0]["status"] == "failed"
-    assert result[2] == "Task Completed! Next: MoveCube (Ep 7)"
+    assert result[2] == "BinFill (Episode 98)"

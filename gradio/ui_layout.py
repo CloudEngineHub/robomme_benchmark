@@ -27,6 +27,7 @@ from gradio_callbacks import (
     show_loading_info,
     switch_to_action_phase,
     switch_to_livestream_phase,
+    switch_env_wrapper,
 )
 from user_manager import user_manager
 
@@ -42,7 +43,8 @@ SYNC_JS = ""
 
 
 CSS = f"""
-
+.native-card {{
+}}
 """
 
 
@@ -82,12 +84,17 @@ def _with_phase_from_init(init_result):
 def create_ui_blocks():
     """构建 Gradio Blocks，并完成页面阶段状态（phase）的联动绑定。"""
 
-    # 统一格式化顶部任务文案（仅保留文本内容，label 由 Textbox 提供）
+    # 从任务展示文本中提取 env_id
     def render_header_task(task_text):
         clean_task = str(task_text or "").strip()
+        if not clean_task:
+            return None
         if clean_task.lower().startswith("current task:"):
             clean_task = clean_task.split(":", 1)[1].strip()
-        return " ".join(clean_task.splitlines()).strip() or "—"
+        marker = " (Episode "
+        if marker in clean_task:
+            clean_task = clean_task.split(marker, 1)[0].strip()
+        return " ".join(clean_task.splitlines()).strip() or None
 
     # 从目标文本中提取并渲染首个目标（仅文本内容）
     def render_header_goal(goal_text):
@@ -104,12 +111,12 @@ def create_ui_blocks():
         header_title_md = gr.Markdown("## RoboMME Human Evaluation", elem_id="header_title")
         with gr.Row():
             with gr.Column(scale=1):
-                header_task_box = gr.Textbox(
+                header_task_box = gr.Dropdown(
+                    choices=list(user_manager.env_choices),
                     value=render_header_task(""),
                     label="Current Task",
                     show_label=True,
-                    interactive=False,
-                    lines=1,
+                    interactive=True,
                     elem_id="header_task",
                 )
             with gr.Column(scale=2):
@@ -146,7 +153,7 @@ def create_ui_blocks():
             gr.Markdown("### User Login")
             with gr.Row():
                 # 可登录用户列表来自任务管理器
-                available_users = list(user_manager.user_tasks.keys())
+                available_users = list(user_manager.available_users)
                 username_input = gr.Dropdown(choices=available_users, label="Username", value=None)
                 login_btn = gr.Button("Login", variant="primary")
             login_msg = gr.Markdown("")
@@ -266,10 +273,14 @@ def create_ui_blocks():
 
         # 头部任务/目标信息同步逻辑
         def sync_header_from_task(task_text, goal_text):
-            return render_header_task(task_text), render_header_goal(goal_text)
+            selected_env = render_header_task(task_text)
+            choices = list(user_manager.env_choices)
+            return gr.update(choices=choices, value=selected_env), render_header_goal(goal_text)
 
         def sync_header_from_goal(goal_text, task_text):
-            return render_header_task(task_text), render_header_goal(goal_text)
+            selected_env = render_header_task(task_text)
+            choices = list(user_manager.env_choices)
+            return gr.update(choices=choices, value=selected_env), render_header_goal(goal_text)
 
         # 为初始化和切换任务追加 ui phase，保证前端阶段状态一致
         def login_and_load_task_with_phase(username, uid):
@@ -277,6 +288,9 @@ def create_ui_blocks():
 
         def load_next_task_with_phase(username, uid):
             return _with_phase_from_login(load_next_task_wrapper(username, uid))
+
+        def switch_env_with_phase(username, uid, selected_env):
+            return _with_phase_from_login(switch_env_wrapper(username, uid, selected_env))
 
         def init_app_with_phase(request: gr.Request):
             return _with_phase_from_init(init_app(request))
@@ -290,6 +304,36 @@ def create_ui_blocks():
             fn=sync_header_from_goal,
             inputs=[goal_box, task_info_box],
             outputs=[header_task_box, header_goal_box],
+        )
+
+        header_task_box.input(fn=show_loading_info, outputs=[loading_overlay]).then(
+            fn=switch_env_with_phase,
+            inputs=[username_state, uid_state, header_task_box],
+            outputs=[
+                uid_state,
+                login_group,
+                main_interface,
+                login_msg,
+                img_display,
+                log_output,
+                options_radio,
+                goal_box,
+                coords_box,
+                combined_display,
+                video_display,
+                task_info_box,
+                progress_info_box,
+                login_btn,
+                next_task_btn,
+                exec_btn,
+                video_phase_group,
+                livestream_phase_group,
+                action_phase_group,
+                control_panel_group,
+                task_hint_display,
+                loading_overlay,
+                ui_phase_state,
+            ],
         )
 
         # 登录并加载任务

@@ -121,8 +121,8 @@ def test_load_episode_uses_benchmark_builder(monkeypatch, reload_module):
     assert session.demonstration_frames == ["f1", "f2"]
 
     init_kwargs = _BuilderSuccess.last_init_kwargs
-    assert init_kwargs["dataset"] == "test"
-    assert init_kwargs["action_space"] == "multi_choice"
+    assert init_kwargs["dataset"] == "train"
+    assert init_kwargs["action_space"] == "joint_angle"
     assert init_kwargs["gui_render"] is False
     assert init_kwargs["max_steps"] == 3000
     assert init_kwargs["override_metadata_path"] == Path("/tmp/meta-root")
