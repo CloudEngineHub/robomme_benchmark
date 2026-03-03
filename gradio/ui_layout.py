@@ -106,6 +106,7 @@ def create_ui_blocks():
         header_task_md = gr.Markdown(render_header_task(""), elem_id="header_task")
         header_goal_md = gr.Markdown(render_header_goal(""), elem_id="header_goal")
 
+    
         # 全屏加载遮罩：执行耗时操作时显示
         with gr.Column(visible=False, elem_id="loading_overlay_group") as loading_overlay:
             gr.Markdown("# ⏳\n\n### Loading environment, please wait...")
@@ -177,7 +178,14 @@ def create_ui_blocks():
                     # 系统日志卡片：显示执行过程反馈
                     with gr.Column(elem_classes=["native-card"], elem_id="log_card"):
                         gr.Markdown("### System Log")
-                        log_output = gr.Markdown(value="", elem_classes="compact-log", elem_id="log_output")
+                        log_output = gr.Textbox(
+                            value="",
+                            lines=8,
+                            max_lines=16,
+                            show_label=False,
+                            interactive=False,
+                            elem_id="log_output",
+                        )
 
                 with gr.Column(scale=CONTROL_PANEL_SCALE):
                     # 右侧控制面板：动作选择与执行按钮
@@ -229,7 +237,14 @@ def create_ui_blocks():
         # 任务提示卡片：展示当前任务补充提示
         with gr.Column(visible=True, elem_classes=["native-card"], elem_id="task_hint_card"):
             gr.Markdown("### Task Hint")
-            task_hint_display = gr.Markdown(value="", elem_id="task_hint_display")
+            task_hint_display = gr.Textbox(
+                value="",
+                lines=8,
+                max_lines=16,
+                show_label=False,
+                interactive=True,
+                elem_id="task_hint_display",
+            )
 
         # 头部任务/目标信息同步逻辑
         def sync_header_from_task(task_text, goal_text):

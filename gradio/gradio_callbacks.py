@@ -110,52 +110,17 @@ MJPEG_PAUSED_HTML = "<div id='combined_view_html'><p>Stream paused.</p></div>"
 
 def format_log_markdown(log_message):
     """
-    将纯文本日志消息格式化为 Markdown 格式（支持彩色文本）
+    将日志消息标准化为纯文本，供 Textbox 展示。
 
     Args:
         log_message: 纯文本日志消息（可以是多行）
 
     Returns:
-        str: 格式化的 Markdown 字符串，成功消息显示绿色，错误消息显示红色
-             使用内联 HTML <span> 实现颜色（gr.Markdown 支持）
+        str: 清洗后的纯文本日志字符串
     """
-    if not log_message or not log_message.strip():
+    if log_message is None:
         return ""
-
-    message_upper = log_message.upper()
-    global_color = None
-    if any(keyword in message_upper for keyword in ["SUCCESS", "成功", "EPISODE SUCCESS"]):
-        global_color = "#28a745"
-    elif any(keyword in message_upper for keyword in ["FAILED", "失败", "ERROR", "EPISODE FAILED"]):
-        global_color = "#dc3545"
-
-    lines = log_message.split('\n')
-    formatted_lines = []
-
-    for line in lines:
-        if not line.strip():
-            formatted_lines.append("")
-            continue
-
-        escaped_line = line.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-
-        if global_color:
-            color = global_color
-        else:
-            line_upper = line.strip().upper()
-            if any(keyword in line_upper for keyword in ["SUCCESS", "成功", "EPISODE SUCCESS"]):
-                color = "#28a745"
-            elif any(keyword in line_upper for keyword in ["FAILED", "失败", "ERROR", "EPISODE FAILED"]):
-                color = "#dc3545"
-            else:
-                color = None
-
-        if color:
-            formatted_lines.append(f'<span style="color:{color}">{escaped_line}</span>')
-        else:
-            formatted_lines.append(escaped_line)
-
-    return "<br>".join(formatted_lines)
+    return str(log_message).replace("\r\n", "\n").replace("\r", "\n")
 
 
 def show_task_hint(uid, current_hint=""):
