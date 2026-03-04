@@ -51,6 +51,53 @@ def test_load_next_task_wrapper_treats_episode98_as_normal(monkeypatch, reload_m
     assert result == expected
 
 
+def test_restart_episode_wrapper_reloads_same_episode_and_creates_new_attempt(monkeypatch, reload_module):
+    callbacks = reload_module("gradio_callbacks")
+
+    create_calls = []
+    load_calls = []
+    expected = ("RESTARTED",)
+
+    monkeypatch.setattr(callbacks.user_manager, "assert_lease", lambda username, uid: None)
+    monkeypatch.setattr(callbacks, "update_session_activity", lambda uid: None)
+    monkeypatch.setattr(
+        callbacks.user_manager,
+        "get_user_status",
+        lambda username: {"is_done_all": False, "current_task": {"env_id": "BinFill", "episode_idx": 98}},
+    )
+    monkeypatch.setattr(
+        callbacks,
+        "create_new_attempt",
+        lambda username, env_id, ep_num: create_calls.append((username, env_id, ep_num)) or 3,
+    )
+
+    def _fake_load_status_task(username, uid, status, login_message=None):
+        load_calls.append((username, uid, status, login_message))
+        return expected
+
+    monkeypatch.setattr(callbacks, "_load_status_task", _fake_load_status_task)
+
+    result = callbacks.restart_episode_wrapper("user1", "uid1")
+
+    assert create_calls == [("user1", "BinFill", 98)]
+    assert len(load_calls) == 1
+    assert load_calls[0][2]["current_task"] == {"env_id": "BinFill", "episode_idx": 98}
+    assert result == expected
+
+
+def test_restart_episode_wrapper_missing_status_returns_login_failed(monkeypatch, reload_module):
+    callbacks = reload_module("gradio_callbacks")
+
+    monkeypatch.setattr(callbacks.user_manager, "assert_lease", lambda username, uid: None)
+    monkeypatch.setattr(callbacks, "update_session_activity", lambda uid: None)
+    monkeypatch.setattr(callbacks.user_manager, "get_user_status", lambda username: None)
+    monkeypatch.setattr(callbacks, "create_new_attempt", lambda username, env_id, ep_num: (_ for _ in ()).throw(RuntimeError("should not call")))
+
+    result = callbacks.restart_episode_wrapper("user1", "uid1")
+
+    assert result[3] == "Failed to restart episode for user1"
+
+
 def test_execute_step_failed_episode98_still_advances(monkeypatch, reload_module):
     callbacks = reload_module("gradio_callbacks")
 

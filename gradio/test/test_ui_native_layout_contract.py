@@ -53,6 +53,7 @@ def test_native_ui_config_contains_phase_machine_and_precheck_chain(reload_modul
             "coords_box",
             "exec_btn",
             "reference_action_btn",
+            "restart_episode_btn",
             "next_task_btn",
         }
         missing = required_ids - elem_ids

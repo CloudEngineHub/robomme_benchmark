@@ -26,6 +26,7 @@ from gradio_callbacks import (
     precheck_execute_inputs,
     refresh_live_obs,
     show_loading_info,
+    restart_episode_wrapper,
     switch_to_action_phase,
     switch_to_execute_phase,
     switch_env_wrapper,
@@ -73,12 +74,12 @@ def _phase_from_updates(main_interface_update, video_phase_update):
 
 
 def _with_phase_from_login(load_result):
-    phase = _phase_from_updates(load_result[2], load_result[15])
+    phase = _phase_from_updates(load_result[2], load_result[16])
     return (*load_result, phase)
 
 
 def _with_phase_from_init(init_result):
-    phase = _phase_from_updates(init_result[3], init_result[17])
+    phase = _phase_from_updates(init_result[3], init_result[18])
     return (*init_result, phase)
 
 
@@ -220,7 +221,7 @@ def create_ui_blocks():
                                 with gr.Column(elem_classes=["native-card"], elem_id="log_card"):
                                     log_output = gr.Textbox(
                                         value="",
-                                        lines=1,
+                                        lines=4,
                                         max_lines=None,
                                         show_label=True,
                                         interactive=False,
@@ -228,7 +229,7 @@ def create_ui_blocks():
                                         label="System Log",
                                     )
 
-                        # 操作按钮区：执行、参考动作、下一任务
+                        # 操作按钮区：执行、参考动作、重开/切换 episode
                         with gr.Row(elem_id="action_buttons_row"):
                             with gr.Column(elem_classes=["native-card", "native-button-card"], elem_id="exec_btn_card"):
                                 exec_btn = gr.Button("EXECUTE", variant="stop", size="lg", elem_id="exec_btn")
@@ -245,10 +246,21 @@ def create_ui_blocks():
 
                             with gr.Column(
                                 elem_classes=["native-card", "native-button-card"],
+                                elem_id="restart_episode_btn_card",
+                            ):
+                                restart_episode_btn = gr.Button(
+                                    "restart episode",
+                                    variant="secondary",
+                                    interactive=False,
+                                    elem_id="restart_episode_btn",
+                                )
+
+                            with gr.Column(
+                                elem_classes=["native-card", "native-button-card"],
                                 elem_id="next_task_btn_card",
                             ):
                                 next_task_btn = gr.Button(
-                                    "Next Task",
+                                    "change episode",
                                     variant="primary",
                                     interactive=False,
                                     elem_id="next_task_btn",
@@ -285,6 +297,9 @@ def create_ui_blocks():
         def load_next_task_with_phase(username, uid):
             return _with_phase_from_login(load_next_task_wrapper(username, uid))
 
+        def restart_episode_with_phase(username, uid):
+            return _with_phase_from_login(restart_episode_wrapper(username, uid))
+
         def switch_env_with_phase(username, uid, selected_env):
             return _with_phase_from_login(switch_env_wrapper(username, uid, selected_env))
 
@@ -319,6 +334,7 @@ def create_ui_blocks():
                 task_info_box,
                 progress_info_box,
                 login_btn,
+                restart_episode_btn,
                 next_task_btn,
                 exec_btn,
                 video_phase_group,
@@ -348,6 +364,7 @@ def create_ui_blocks():
                 task_info_box,
                 progress_info_box,
                 login_btn,
+                restart_episode_btn,
                 next_task_btn,
                 exec_btn,
                 video_phase_group,
@@ -377,6 +394,36 @@ def create_ui_blocks():
                 task_info_box,
                 progress_info_box,
                 login_btn,
+                restart_episode_btn,
+                next_task_btn,
+                exec_btn,
+                video_phase_group,
+                action_phase_group,
+                control_panel_group,
+                task_hint_display,
+                loading_overlay,
+                ui_phase_state,
+            ],
+        )
+
+        restart_episode_btn.click(fn=show_loading_info, outputs=[loading_overlay]).then(
+            fn=restart_episode_with_phase,
+            inputs=[username_state, uid_state],
+            outputs=[
+                uid_state,
+                login_group,
+                main_interface,
+                login_msg,
+                img_display,
+                log_output,
+                options_radio,
+                goal_box,
+                coords_box,
+                video_display,
+                task_info_box,
+                progress_info_box,
+                login_btn,
+                restart_episode_btn,
                 next_task_btn,
                 exec_btn,
                 video_phase_group,
@@ -426,6 +473,7 @@ def create_ui_blocks():
             outputs=[
                 options_radio,
                 exec_btn,
+                restart_episode_btn,
                 next_task_btn,
                 img_display,
             ],
@@ -437,7 +485,7 @@ def create_ui_blocks():
         ).then(
             fn=execute_step,
             inputs=[uid_state, username_state, options_radio, coords_box],
-            outputs=[img_display, log_output, task_info_box, progress_info_box, next_task_btn, exec_btn],
+            outputs=[img_display, log_output, task_info_box, progress_info_box, restart_episode_btn, next_task_btn, exec_btn],
             show_progress="hidden",
         ).then(
             fn=switch_to_action_phase,
@@ -445,6 +493,7 @@ def create_ui_blocks():
             outputs=[
                 options_radio,
                 exec_btn,
+                restart_episode_btn,
                 next_task_btn,
                 img_display,
             ],
@@ -482,6 +531,7 @@ def create_ui_blocks():
                 task_info_box,
                 progress_info_box,
                 login_btn,
+                restart_episode_btn,
                 next_task_btn,
                 exec_btn,
                 username_state,

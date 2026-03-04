@@ -197,6 +197,7 @@ def switch_to_execute_phase(uid):
     return (
         gr.update(interactive=False),  # options_radio
         gr.update(interactive=False),  # exec_btn
+        gr.update(interactive=False),  # restart_episode_btn
         gr.update(interactive=False),  # next_task_btn
         gr.update(interactive=False),  # img_display
     )
@@ -210,6 +211,7 @@ def switch_to_action_phase(uid=None):
     return (
         gr.update(interactive=True),  # options_radio
         gr.update(),  # exec_btn (keep execute_step result)
+        gr.update(),  # restart_episode_btn (keep execute_step result)
         gr.update(),  # next_task_btn (keep execute_step result)
         gr.update(interactive=True),  # img_display
     )
@@ -370,6 +372,7 @@ def _login_failed_response(uid, message):
         gr.update(value=None, visible=False),  # video_display
         "", "",  # task_info, progress_info
         gr.update(interactive=True),  # login_btn
+        gr.update(interactive=False),  # restart_episode_btn
         gr.update(interactive=False),  # next_task_btn
         gr.update(interactive=False),  # exec_btn
         gr.update(visible=False),  # video_phase_group
@@ -435,7 +438,8 @@ def _load_status_task(username, uid, status, login_message=None):
             gr.update(value=None, visible=False),  # video_display
             f"{actual_env_id} (Episode {ep_num})", progress_text,
             gr.update(interactive=True),  # login_btn
-            gr.update(interactive=False),  # next_task_btn
+            gr.update(interactive=True),  # restart_episode_btn
+            gr.update(interactive=True),  # next_task_btn
             gr.update(interactive=False),  # exec_btn
             gr.update(visible=False),  # video_phase_group
             gr.update(visible=True),  # action_phase_group
@@ -502,7 +506,8 @@ def _load_status_task(username, uid, status, login_message=None):
             f"{actual_env_id} (Episode {ep_num})",
             progress_text,
             gr.update(interactive=True),  # login_btn
-            gr.update(interactive=False),  # next_task_btn
+            gr.update(interactive=True),  # restart_episode_btn
+            gr.update(interactive=True),  # next_task_btn
             gr.update(interactive=True),  # exec_btn
             gr.update(visible=True),  # video_phase_group
             gr.update(visible=False),  # action_phase_group
@@ -527,7 +532,8 @@ def _load_status_task(username, uid, status, login_message=None):
         f"{actual_env_id} (Episode {ep_num})",  # task_info_box
         progress_text,  # progress_info_box
         gr.update(interactive=True),  # login_btn
-        gr.update(interactive=False),  # next_task_btn
+        gr.update(interactive=True),  # restart_episode_btn
+        gr.update(interactive=True),  # next_task_btn
         gr.update(interactive=True),  # exec_btn
         gr.update(visible=False),  # video_phase_group
         gr.update(visible=True),  # action_phase_group
@@ -559,7 +565,7 @@ def login_and_load_task(username, uid):
 
 def load_next_task_wrapper(username, uid):
     """
-    Move to next random episode within the same env and reload task.
+    Move to a random episode within the same env and reload task.
     """
 
     if not uid:
@@ -588,6 +594,44 @@ def load_next_task_wrapper(username, uid):
         return _load_status_task(username, uid, status, login_message=f"Logged in as {username}")
 
     return _login_failed_response(uid, "Username cannot be empty")
+
+
+def restart_episode_wrapper(username, uid):
+    """
+    Reload the current env + episode and always create a new attempt.
+    """
+    if not uid:
+        uid = create_session()
+
+    if not username:
+        return _login_failed_response(uid, "Username cannot be empty")
+
+    try:
+        user_manager.assert_lease(username, uid)
+    except LeaseLost as e:
+        raise gr.Error(
+            "You have been logged in elsewhere. This page is no longer valid. "
+            f"Please refresh the page to log in again.\\n{str(e)}"
+        )
+
+    if uid:
+        update_session_activity(uid)
+
+    status = user_manager.get_user_status(username)
+    current_task = status.get("current_task") if isinstance(status, dict) else None
+    if not current_task:
+        return _login_failed_response(uid, f"Failed to restart episode for {username}")
+
+    env_id = current_task.get("env_id")
+    ep_num = current_task.get("episode_idx")
+    if env_id is None or ep_num is None:
+        return _login_failed_response(uid, f"Failed to restart episode for {username}")
+
+    attempt_idx = create_new_attempt(username, env_id, ep_num)
+    if attempt_idx < 0:
+        print(f"Warning: failed to create new attempt for {username}:{env_id}:{ep_num}, continuing reload")
+
+    return _load_status_task(username, uid, status, login_message=f"Logged in as {username}")
 
 
 def switch_env_wrapper(username, uid, selected_env):
@@ -887,6 +931,7 @@ def init_app(request: gr.Request):
         "",  # task_info_box
         "",  # progress_info_box
         gr.update(interactive=True),   # login_btn
+        gr.update(interactive=False),  # restart_episode_btn
         gr.update(interactive=False),  # next_task_btn
         gr.update(interactive=False),  # exec_btn
         "",  # username_state
@@ -910,14 +955,14 @@ def init_app(request: gr.Request):
             # 调用 login_and_load_task 进行登录和任务加载
             login_results = login_and_load_task(username, uid)
             
-            # login_and_load_task returns 20 values:
+            # login_and_load_task returns 21 values:
             # (uid, login_group, main_interface, login_msg, img_display, log_output,
             #  options_radio, goal_box, coords_box, video_display, task_info_box,
-            #  progress_info_box, login_btn, next_task_btn, exec_btn,
+            #  progress_info_box, login_btn, restart_episode_btn, next_task_btn, exec_btn,
             #  video_phase_group, action_phase_group, control_panel_group,
             #  task_hint_display, loading_overlay)
 
-            # init_app needs 21 values: same but with loading_group + username_state, without loading_overlay
+            # init_app needs 22 values: same but with loading_group + username_state, without loading_overlay
             return (
                 login_results[0],                    # uid
                 gr.update(visible=False),            # loading_group
@@ -933,13 +978,14 @@ def init_app(request: gr.Request):
                 login_results[10],                   # task_info_box
                 login_results[11],                   # progress_info_box
                 login_results[12],                   # login_btn
-                login_results[13],                   # next_task_btn
-                login_results[14],                   # exec_btn
+                login_results[13],                   # restart_episode_btn
+                login_results[14],                   # next_task_btn
+                login_results[15],                   # exec_btn
                 username,                            # username_state
-                login_results[15],                   # video_phase_group
-                login_results[16],                   # action_phase_group
-                login_results[17],                   # control_panel_group
-                login_results[18],                   # task_hint_display
+                login_results[16],                   # video_phase_group
+                login_results[17],                   # action_phase_group
+                login_results[18],                   # control_panel_group
+                login_results[19],                   # task_hint_display
             )
         else:
             # 用户名不存在，显示错误消息但仍显示登录界面
@@ -961,6 +1007,7 @@ def init_app(request: gr.Request):
                 "",  # task_info_box
                 "",  # progress_info_box
                 gr.update(interactive=True),   # login_btn
+                gr.update(interactive=False),  # restart_episode_btn
                 gr.update(interactive=False),  # next_task_btn
                 gr.update(interactive=False),  # exec_btn
                 "",  # username_state
@@ -1260,9 +1307,9 @@ def execute_step(uid, username, option_idx, coords_str):
         # Episode完成时，格式化System Log的状态消息
         # 使用固定模板，所有行长度一致（32个字符），无空行
         if final_log_status == "success":
-            status = "********************************\n****   episode success      ****\n********************************\n  ---please press next task----   "
+            status = "********************************\n****   episode success      ****\n********************************\n  ---please press change episode----   "
         else:
-            status = "********************************\n****   episode failed       ****\n********************************\n  ---please press next task----   "
+            status = "********************************\n****   episode failed       ****\n********************************\n  ---please press change episode----   "
 
         # 更新累计完成计数，不再推进固定任务索引
         if username:
@@ -1284,10 +1331,19 @@ def execute_step(uid, username, option_idx, coords_str):
     # 根据视图模式重新获取图片
     img = session.get_pil_image(use_segmented=USE_SEGMENTED_VIEW)
         
-    next_task_update = gr.update(interactive=True) if done else gr.update(interactive=False)
+    restart_episode_update = gr.update(interactive=True)
+    next_task_update = gr.update(interactive=True)
     exec_btn_update = gr.update(interactive=False) if done else gr.update(interactive=True)
     
     # 格式化日志消息为 HTML 格式（支持颜色显示）
     formatted_status = format_log_markdown(status)
     
-    return img, formatted_status, task_update, progress_update, next_task_update, exec_btn_update
+    return (
+        img,
+        formatted_status,
+        task_update,
+        progress_update,
+        restart_episode_update,
+        next_task_update,
+        exec_btn_update,
+    )
