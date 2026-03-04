@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+import importlib
 import socket
 import threading
 import time
@@ -9,6 +10,7 @@ from urllib.request import urlopen
 
 import numpy as np
 import pytest
+from PIL import Image
 
 
 gr = pytest.importorskip("gradio")
@@ -340,6 +342,139 @@ def test_phase_machine_runtime_flow_and_execute_precheck(phase_machine_ui_url):
         browser.close()
 
     assert state["precheck_calls"] >= 2
+
+
+def test_unified_loading_overlay_init_and_login_flow(monkeypatch):
+    ui_layout = importlib.reload(importlib.import_module("ui_layout"))
+
+    canonical_copy = "Logging in and setting up environment... Please wait."
+    legacy_copy = "Loading environment, please wait..."
+    fake_obs = np.zeros((24, 24, 3), dtype=np.uint8)
+    fake_obs_img = Image.fromarray(fake_obs)
+    calls = {"init": 0, "login": 0}
+
+    def fake_show_loading_info():
+        return gr.update(visible=True)
+
+    def fake_init_app(_request=None):
+        calls["init"] += 1
+        time.sleep(0.8)
+        return (
+            "uid-init",
+            gr.update(visible=False),  # loading_overlay
+            gr.update(visible=True),   # login_group
+            gr.update(visible=False),  # main_interface
+            "",  # login_msg
+            gr.update(value=None, interactive=False),  # img_display
+            "",  # log_output
+            gr.update(choices=[], value=None),  # options_radio
+            "",  # goal_box
+            "No need for coordinates",  # coords_box
+            gr.update(value=None, visible=False),  # video_display
+            "",  # task_info_box
+            "",  # progress_info_box
+            gr.update(interactive=True),   # login_btn
+            gr.update(interactive=False),  # restart_episode_btn
+            gr.update(interactive=False),  # next_task_btn
+            gr.update(interactive=False),  # exec_btn
+            "",  # username_state
+            gr.update(visible=False),  # video_phase_group
+            gr.update(visible=False),  # action_phase_group
+            gr.update(visible=False),  # control_panel_group
+            gr.update(value=""),  # task_hint_display
+            gr.update(interactive=False),  # reference_action_btn
+        )
+
+    def fake_login_and_load_task(username, uid):
+        calls["login"] += 1
+        time.sleep(0.8)
+        user = username or "user1"
+        session_uid = uid or "uid-login"
+        return (
+            session_uid,
+            gr.update(visible=False),  # login_group
+            gr.update(visible=True),  # main_interface
+            f"Logged in as {user}",  # login_msg
+            gr.update(value=fake_obs_img, interactive=False),  # img_display
+            "ready",  # log_output
+            gr.update(choices=[("pick", 0)], value=None),  # options_radio
+            "goal",  # goal_box
+            "No need for coordinates",  # coords_box
+            gr.update(value=None, visible=False),  # video_display
+            "PickXtimes (Episode 1)",  # task_info_box
+            "Completed: 0",  # progress_info_box
+            gr.update(interactive=True),  # login_btn
+            gr.update(interactive=True),  # restart_episode_btn
+            gr.update(interactive=True),  # next_task_btn
+            gr.update(interactive=True),  # exec_btn
+            gr.update(visible=False),  # video_phase_group
+            gr.update(visible=True),   # action_phase_group
+            gr.update(visible=True),   # control_panel_group
+            gr.update(value="hint"),  # task_hint_display
+            gr.update(visible=False),  # loading_overlay
+            gr.update(interactive=True),  # reference_action_btn
+        )
+
+    monkeypatch.setattr(ui_layout, "show_loading_info", fake_show_loading_info)
+    monkeypatch.setattr(ui_layout, "init_app", fake_init_app)
+    monkeypatch.setattr(ui_layout, "login_and_load_task", fake_login_and_load_task)
+
+    demo = ui_layout.create_ui_blocks()
+
+    port = _free_port()
+    host = "127.0.0.1"
+    root_url = f"http://{host}:{port}/"
+
+    app = FastAPI(title="native-unified-loading-overlay-test")
+    app = gr.mount_gradio_app(app, demo, path="/")
+
+    config = uvicorn.Config(app, host=host, port=port, log_level="error")
+    server = uvicorn.Server(config)
+    thread = threading.Thread(target=server.run, daemon=True)
+    thread.start()
+    _wait_http_ready(root_url)
+
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page(viewport={"width": 1280, "height": 900})
+            page.goto(root_url, wait_until="domcontentloaded")
+
+            page.wait_for_selector("#loading_overlay_group", state="visible", timeout=2500)
+
+            overlay_text = page.evaluate(
+                """() => {
+                    const el = document.getElementById('loading_overlay_group');
+                    return el ? (el.textContent || '') : '';
+                }"""
+            )
+            assert canonical_copy in overlay_text
+            assert legacy_copy not in page.content()
+
+            page.wait_for_selector("#loading_overlay_group", state="hidden", timeout=15000)
+            login_btn = page.get_by_role("button", name="Login")
+            login_btn.wait_for(state="visible", timeout=15000)
+            username_dropdown = page.get_by_label("Username")
+            username_dropdown.click()
+            page.get_by_role("option", name="user1").first.click()
+
+            login_btn.click()
+
+            page.wait_for_selector("#loading_overlay_group", state="visible", timeout=2500)
+            page.wait_for_selector("#loading_overlay_group", state="hidden", timeout=15000)
+            deadline = time.time() + 6.0
+            while calls["login"] < 1 and time.time() < deadline:
+                time.sleep(0.1)
+            assert calls["login"] >= 1
+
+            browser.close()
+    finally:
+        server.should_exit = True
+        thread.join(timeout=10)
+        demo.close()
+
+    assert calls["init"] >= 1
+    assert calls["login"] >= 1
 
 
 def test_phase_machine_runtime_local_video_path_end_transition():

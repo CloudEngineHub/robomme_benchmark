@@ -38,6 +38,7 @@ def test_native_ui_config_contains_phase_machine_and_precheck_chain(reload_modul
 
         required_ids = {
             "header_task",
+            "loading_overlay_group",
             "main_layout_row",
             "media_card",
             "log_card",
@@ -65,6 +66,11 @@ def test_native_ui_config_contains_phase_machine_and_precheck_chain(reload_modul
             if "value" in comp.get("props", {})
         ]
         assert all("_anchor" not in str(v) for v in values)
+        assert any(
+            "Logging in and setting up environment... Please wait." in str(v)
+            for v in values
+        )
+        assert all("Loading environment, please wait..." not in str(v) for v in values)
 
         log_output_comp = next(
             comp

@@ -918,13 +918,13 @@ def init_app(request: gr.Request):
     # Default outputs if no user param
     # outputs: 
     # 0. uid
-    # 1. loading_group
+    # 1. loading_overlay
     # 2. login_group
     # ...
     
     default_outputs = (
         None,
-        gr.update(visible=False),  # loading_group
+        gr.update(visible=False),  # loading_overlay
         gr.update(visible=True),   # login_group
         gr.update(visible=False),  # main_interface
         "",  # login_msg
@@ -969,10 +969,11 @@ def init_app(request: gr.Request):
             #  video_phase_group, action_phase_group, control_panel_group,
             #  task_hint_display, loading_overlay, reference_action_btn)
 
-            # init_app needs 23 values: same but with loading_group + username_state, without loading_overlay
+            # init_app needs 23 values: inject loading_overlay at slot 1 + username_state,
+            # and omit login_results' loading_overlay slot.
             return (
                 login_results[0],                    # uid
-                gr.update(visible=False),            # loading_group
+                gr.update(visible=False),            # loading_overlay
                 login_results[1],                    # login_group
                 login_results[2],                    # main_interface
                 login_results[3],                    # login_msg
@@ -1002,7 +1003,7 @@ def init_app(request: gr.Request):
             error_msg = f"⚠️ 用户名 '{username}' 不存在。请从下拉列表中选择有效的用户名。"
             return (
                 None,
-                gr.update(visible=False),  # loading_group
+                gr.update(visible=False),  # loading_overlay
                 gr.update(visible=True),   # login_group
                 gr.update(visible=False),  # main_interface
                 error_msg,  # login_msg

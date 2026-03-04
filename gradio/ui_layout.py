@@ -48,6 +48,25 @@ CSS = f"""
 .native-card {{
 }}
 
+#loading_overlay_group {{
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 9999 !important;
+    background: rgba(255, 255, 255, 0.92) !important;
+    text-align: center !important;
+}}
+
+#loading_overlay_group > div {{
+    min-height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}}
+
+#loading_overlay_group h3 {{
+    margin: 0 !important;
+}}
+
 button#reference_action_btn:not(:disabled),
 #reference_action_btn:not(:disabled),
 #reference_action_btn button:not(:disabled) {{
@@ -147,9 +166,9 @@ def create_ui_blocks():
                 )
 
     
-        # 全屏加载遮罩：执行耗时操作时显示
-        with gr.Column(visible=False, elem_id="loading_overlay_group") as loading_overlay:
-            gr.Markdown("# ⏳\n\n### Loading environment, please wait...")
+        # 全屏加载遮罩：初始化和耗时操作时显示
+        with gr.Column(visible=True, elem_id="loading_overlay_group") as loading_overlay:
+            gr.Markdown("### Logging in and setting up environment... Please wait.")
 
         # 会话级状态：用户 uid、用户名、当前 UI 阶段
         uid_state = gr.State(value=None)
@@ -161,10 +180,6 @@ def create_ui_blocks():
         task_info_box = gr.Textbox(visible=False, elem_id="task_info_box")
         progress_info_box = gr.Textbox(visible=False)
         goal_box = gr.Textbox(visible=False)
-
-        # 应用初始化阶段的提示区（默认可见）
-        with gr.Column(visible=True) as loading_group:
-            gr.Markdown("### Logging in and setting up environment... Please wait.")
 
         # 登录区域（初始化后显示）
         with gr.Column(visible=False) as login_group:
@@ -539,7 +554,7 @@ def create_ui_blocks():
             inputs=[],
             outputs=[
                 uid_state,
-                loading_group,
+                loading_overlay,
                 login_group,
                 main_interface,
                 login_msg,
