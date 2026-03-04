@@ -340,3 +340,197 @@ def test_phase_machine_runtime_flow_and_execute_precheck(phase_machine_ui_url):
         browser.close()
 
     assert state["precheck_calls"] >= 2
+
+
+def test_phase_machine_runtime_local_video_path_end_transition():
+    import gradio_callbacks as cb
+
+    demo_video_path = gr.get_video("world.mp4")
+    fake_obs = np.zeros((24, 24, 3), dtype=np.uint8)
+
+    class FakeSession:
+        def __init__(self):
+            self.env_id = "VideoPlaceOrder"
+            self.language_goal = "place cube on target"
+            self.available_options = [("pick", 0)]
+            self.raw_solve_options = [{"available": False}]
+            self.demonstration_frames = [fake_obs.copy() for _ in range(4)]
+
+        def load_episode(self, env_id, episode_idx):
+            self.env_id = env_id
+            return fake_obs.copy(), f"loaded {env_id}:{episode_idx}"
+
+        def get_pil_image(self, use_segmented=False):
+            _ = use_segmented
+            return fake_obs.copy()
+
+    originals = {
+        "get_session": cb.get_session,
+        "clear_coordinate_clicks": cb.clear_coordinate_clicks,
+        "clear_option_selects": cb.clear_option_selects,
+        "reset_play_button_clicked": cb.reset_play_button_clicked,
+        "reset_execute_count": cb.reset_execute_count,
+        "set_task_start_time": cb.set_task_start_time,
+        "set_ui_phase": cb.set_ui_phase,
+        "save_video": cb.save_video,
+    }
+
+    fake_session = FakeSession()
+
+    cb.get_session = lambda uid: fake_session
+    cb.clear_coordinate_clicks = lambda uid: None
+    cb.clear_option_selects = lambda uid: None
+    cb.reset_play_button_clicked = lambda uid: None
+    cb.reset_execute_count = lambda username, env_id, ep_num: None
+    cb.set_task_start_time = lambda username, env_id, ep_num, start_time: None
+    cb.set_ui_phase = lambda uid, phase: None
+    cb.save_video = lambda frames, suffix="": demo_video_path
+
+    try:
+        with gr.Blocks(title="Native phase machine local video test") as demo:
+            uid_state = gr.State(value=None)
+
+            with gr.Column(visible=True, elem_id="login_group") as login_group:
+                login_btn = gr.Button("Login", elem_id="login_btn")
+            with gr.Column(visible=False, elem_id="main_interface") as main_interface:
+                with gr.Column(visible=False, elem_id="video_phase_group") as video_phase_group:
+                    video_display = gr.Video(value=None, elem_id="demo_video", autoplay=False)
+
+                with gr.Column(visible="hidden", elem_id="action_phase_group") as action_phase_group:
+                    img_display = gr.Image(value=fake_obs.copy(), elem_id="live_obs")
+
+                with gr.Column(visible="hidden", elem_id="control_panel_group") as control_panel_group:
+                    options_radio = gr.Radio(choices=[("pick", 0)], value=None, elem_id="action_radio")
+
+            login_msg = gr.Markdown("")
+            log_output = gr.Markdown("", elem_id="log_output")
+            goal_box = gr.Textbox("")
+            coords_box = gr.Textbox("No need for coordinates")
+            task_info_box = gr.Textbox("")
+            progress_info_box = gr.Textbox("")
+            task_hint_display = gr.Textbox("")
+            with gr.Column(visible=False) as loading_overlay:
+                gr.Markdown("Loading...")
+
+            restart_episode_btn = gr.Button("restart", interactive=False)
+            next_task_btn = gr.Button("next", interactive=False)
+            exec_btn = gr.Button("execute", interactive=False)
+            reference_action_btn = gr.Button("reference", interactive=False)
+
+            def login_fn():
+                status = {
+                    "current_task": {"env_id": "VideoPlaceOrder", "episode_idx": 1},
+                    "completed_count": 0,
+                }
+                return cb._load_status_task("tester", "uid-local-video", status, login_message="Logged in as tester")
+
+            login_btn.click(
+                fn=login_fn,
+                outputs=[
+                    uid_state,
+                    login_group,
+                    main_interface,
+                    login_msg,
+                    img_display,
+                    log_output,
+                    options_radio,
+                    goal_box,
+                    coords_box,
+                    video_display,
+                    task_info_box,
+                    progress_info_box,
+                    login_btn,
+                    restart_episode_btn,
+                    next_task_btn,
+                    exec_btn,
+                    video_phase_group,
+                    action_phase_group,
+                    control_panel_group,
+                    task_hint_display,
+                    loading_overlay,
+                    reference_action_btn,
+                ],
+                queue=False,
+            )
+
+            video_display.end(
+                fn=cb.on_video_end_transition,
+                inputs=[uid_state],
+                outputs=[video_phase_group, action_phase_group, control_panel_group, log_output],
+                queue=False,
+            )
+
+        port = _free_port()
+        host = "127.0.0.1"
+        root_url = f"http://{host}:{port}/"
+
+        app = FastAPI(title="native-phase-machine-local-video-test")
+        app = gr.mount_gradio_app(app, demo, path="/")
+
+        config = uvicorn.Config(app, host=host, port=port, log_level="error")
+        server = uvicorn.Server(config)
+        thread = threading.Thread(target=server.run, daemon=True)
+        thread.start()
+        _wait_http_ready(root_url)
+
+        try:
+            with sync_playwright() as p:
+                browser = p.chromium.launch(headless=True)
+                page = browser.new_page(viewport={"width": 1280, "height": 900})
+                page.goto(root_url, wait_until="domcontentloaded")
+
+                page.wait_for_selector("#login_btn", timeout=20000)
+                page.click("#login_btn")
+
+                page.wait_for_selector("#demo_video video", timeout=5000)
+                phase_after_login = page.evaluate(
+                    """() => {
+                        const visible = (id) => {
+                            const el = document.getElementById(id);
+                            if (!el) return false;
+                            const st = getComputedStyle(el);
+                            return st.display !== 'none' && st.visibility !== 'hidden' && el.getClientRects().length > 0;
+                        };
+                        return {
+                            video: visible('demo_video'),
+                            action: visible('live_obs'),
+                            control: visible('action_radio'),
+                        };
+                    }"""
+                )
+                assert phase_after_login == {
+                    "video": True,
+                    "action": False,
+                    "control": False,
+                }
+
+                did_dispatch_end = page.evaluate(
+                    """() => {
+                        const videoEl = document.querySelector('#demo_video video');
+                        if (!videoEl) return false;
+                        videoEl.dispatchEvent(new Event('ended', { bubbles: true }));
+                        return true;
+                    }"""
+                )
+                assert did_dispatch_end
+
+                page.wait_for_function(
+                    """() => {
+                        const visible = (id) => {
+                            const el = document.getElementById(id);
+                            if (!el) return false;
+                            const st = getComputedStyle(el);
+                            return st.display !== 'none' && st.visibility !== 'hidden' && el.getClientRects().length > 0;
+                        };
+                        return visible('live_obs') && visible('action_radio') && !visible('demo_video');
+                    }"""
+                )
+
+                browser.close()
+        finally:
+            server.should_exit = True
+            thread.join(timeout=10)
+            demo.close()
+    finally:
+        for name, value in originals.items():
+            setattr(cb, name, value)
