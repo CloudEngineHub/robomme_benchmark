@@ -50,8 +50,6 @@ gradio_callbacks.py (控制层 - 主进程)
   │   └── 功能：全局状态管理
   │       - GLOBAL_SESSIONS: 存储所有 ProcessSessionProxy 实例（每个用户一个代理）
   │       - TASK_INDEX_MAP: 存储任务索引和进度信息
-  │       - COORDINATE_CLICKS: 跟踪坐标点击事件
-  │       - OPTION_SELECTS: 跟踪选项选择事件
   │       - UI 交互中间状态与会话生命周期
   │       提供线程安全的访问方法
   │
@@ -79,12 +77,6 @@ gradio_callbacks.py (控制层 - 主进程)
   │       - 验证用户登录状态
   │       - 检查租约有效性（防止多设备登录）
   │       - 管理用户任务进度
-  │
-  └── logger.py
-      └── 功能：日志记录
-          - log_user_action: 记录用户操作
-          - create_new_attempt: 创建新的尝试记录
-          - has_existing_actions: 检查是否存在已有操作
 
 image_utils.py (工具层)
   └── 功能：纯工具函数库，无业务逻辑依赖

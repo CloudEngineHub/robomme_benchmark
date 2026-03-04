@@ -4,7 +4,7 @@
 
 本模块负责：
 1. 创建和管理 ProcessSessionProxy 实例（每个用户一个）
-2. 存储任务索引、坐标点击、选项选择等UI状态
+2. 存储任务索引等UI状态
 3. 提供线程安全的访问接口
 4. 清理会话资源（当用户重复登录时，自动清理旧会话的进程和状态）
 
@@ -26,14 +26,6 @@ GLOBAL_SESSIONS = {}
 # --- 任务索引存储（用于进度显示） ---
 # 存储每个session的任务索引和总任务数，用于直接读取Progress
 TASK_INDEX_MAP = {}  # {uid: {"task_index": int, "total_tasks": int}}
-
-# --- 坐标点击跟踪（两次动作之间） ---
-# 跟踪每个session从上次action_execute到现在的所有coordinate_click
-COORDINATE_CLICKS = {}  # {uid: [{"coordinates": {"x": x, "y": y}, "coords_str": "...", "image_array": ..., "timestamp": "..."}, ...]}
-
-# --- 选项选择跟踪（两次动作之间） ---
-# 跟踪每个session从上次action_execute到现在的所有option_select
-OPTION_SELECTS = {}  # {uid: [{"option_idx": idx, "option_label": label, "timestamp": "..."}, ...]}
 
 # --- UI阶段存储 ---
 # 存储每个session的UI阶段："watching_demo" 或 "executing_task"
@@ -112,48 +104,6 @@ def set_task_index(uid, task_index, total_tasks):
             "task_index": task_index,
             "total_tasks": total_tasks
         }
-
-
-def get_coordinate_clicks(uid):
-    """获取坐标点击列表"""
-    with _state_lock:
-        return COORDINATE_CLICKS.get(uid, [])
-
-
-def clear_coordinate_clicks(uid):
-    """清空坐标点击列表"""
-    with _state_lock:
-        if uid in COORDINATE_CLICKS:
-            COORDINATE_CLICKS[uid] = []
-
-
-def add_coordinate_click(uid, click_data):
-    """添加坐标点击"""
-    with _state_lock:
-        if uid not in COORDINATE_CLICKS:
-            COORDINATE_CLICKS[uid] = []
-        COORDINATE_CLICKS[uid].append(click_data)
-
-
-def get_option_selects(uid):
-    """获取选项选择列表"""
-    with _state_lock:
-        return OPTION_SELECTS.get(uid, [])
-
-
-def clear_option_selects(uid):
-    """清空选项选择列表"""
-    with _state_lock:
-        if uid in OPTION_SELECTS:
-            OPTION_SELECTS[uid] = []
-
-
-def add_option_select(uid, select_data):
-    """添加选项选择"""
-    with _state_lock:
-        if uid not in OPTION_SELECTS:
-            OPTION_SELECTS[uid] = []
-        OPTION_SELECTS[uid].append(select_data)
 
 
 def get_ui_phase(uid):
@@ -326,7 +276,7 @@ def cleanup_session(uid):
     此函数会清理与指定 uid 相关的所有资源：
     1. 关闭 ProcessSessionProxy（会终止工作进程，释放 RAM/VRAM）
     2. 从 GLOBAL_SESSIONS 中移除
-    3. 清理所有相关的状态数据（任务索引、坐标点击、选项选择、UI阶段）
+    3. 清理所有相关的状态数据（任务索引、UI阶段）
     
     Args:
         uid: 要清理的会话ID
@@ -355,18 +305,8 @@ def cleanup_session(uid):
         if uid in TASK_INDEX_MAP:
             del TASK_INDEX_MAP[uid]
             print(f"Session {uid}: task index cleaned up")
-        
-        # 4. 清理坐标点击
-        if uid in COORDINATE_CLICKS:
-            del COORDINATE_CLICKS[uid]
-            print(f"Session {uid}: coordinate clicks cleaned up")
-        
-        # 5. 清理选项选择
-        if uid in OPTION_SELECTS:
-            del OPTION_SELECTS[uid]
-            print(f"Session {uid}: option selects cleaned up")
-        
-        # 6. 清理UI阶段
+
+        # 4. 清理UI阶段
         if uid in UI_PHASE_MAP:
             del UI_PHASE_MAP[uid]
         
@@ -375,12 +315,12 @@ def cleanup_session(uid):
             del PLAY_BUTTON_CLICKED[uid]
             print(f"Session {uid}: UI phase cleaned up")
         
-        # 7. 清理活动时间跟踪
+        # 5. 清理活动时间跟踪
         if uid in SESSION_LAST_ACTIVITY:
             del SESSION_LAST_ACTIVITY[uid]
             print(f"Session {uid}: last activity time cleaned up")
         
-        # 8. 清理超时警告标志
+        # 6. 清理超时警告标志
         if uid in SESSION_TIMEOUT_WARNED:
             del SESSION_TIMEOUT_WARNED[uid]
             print(f"Session {uid}: timeout warning flag cleaned up")

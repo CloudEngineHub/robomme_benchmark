@@ -5,7 +5,6 @@ Gradio回调函数模块
 import gradio as gr
 import numpy as np
 import time
-import traceback
 import threading
 import queue
 import os
@@ -15,12 +14,6 @@ from PIL import Image
 from state_manager import (
     get_session,
     create_session,
-    get_coordinate_clicks,
-    clear_coordinate_clicks,
-    add_coordinate_click,
-    get_option_selects,
-    clear_option_selects,
-    add_option_select,
     set_ui_phase,
     reset_ui_phase,
     get_execute_count,
@@ -37,7 +30,6 @@ from state_manager import (
 )
 from image_utils import draw_marker, save_video, concatenate_frames_horizontally
 from user_manager import user_manager, LeaseLost
-from logger import log_user_action, create_new_attempt, has_existing_actions
 from config import USE_SEGMENTED_VIEW, should_show_demo_video, SESSION_TIMEOUT, EXECUTE_LIMIT_OFFSET
 from process_session import ScrewPlanFailureError, ProcessSessionProxy
 from note_content import get_task_hint
@@ -416,8 +408,6 @@ def _load_status_task(username, uid, status, login_message=None):
 
     with _LIVE_OBS_REFRESH_LOCK:
         _LIVE_OBS_REFRESH.pop(uid, None)
-    clear_coordinate_clicks(uid)
-    clear_option_selects(uid)
     reset_play_button_clicked(uid)
     reset_execute_count(username, env_id, int(ep_num))
 
@@ -587,13 +577,6 @@ def load_next_task_wrapper(username, uid):
             update_session_activity(uid)
 
         status = user_manager.next_episode_same_env(username)
-        if status:
-            current_task = status["current_task"]
-            env_id = current_task["env_id"]
-            ep_num = current_task["episode_idx"]
-
-            if has_existing_actions(username, env_id, ep_num):
-                create_new_attempt(username, env_id, ep_num)
 
         if not status:
             return _login_failed_response(uid, f"Failed to load next task for {username}")
@@ -604,7 +587,7 @@ def load_next_task_wrapper(username, uid):
 
 def restart_episode_wrapper(username, uid):
     """
-    Reload the current env + episode and always create a new attempt.
+    Reload the current env + episode.
     """
     if not uid:
         uid = create_session()
@@ -633,10 +616,6 @@ def restart_episode_wrapper(username, uid):
     if env_id is None or ep_num is None:
         return _login_failed_response(uid, f"Failed to restart episode for {username}")
 
-    attempt_idx = create_new_attempt(username, env_id, ep_num)
-    if attempt_idx < 0:
-        print(f"Warning: failed to create new attempt for {username}:{env_id}:{ep_num}, continuing reload")
-
     return _load_status_task(username, uid, status, login_message=f"Logged in as {username}")
 
 
@@ -660,13 +639,6 @@ def switch_env_wrapper(username, uid, selected_env):
         status = user_manager.switch_env_and_random_episode(username, selected_env)
     else:
         status = user_manager.get_user_status(username)
-
-    if status and status.get("current_task"):
-        current_task = status["current_task"]
-        env_id = current_task["env_id"]
-        ep_num = current_task["episode_idx"]
-        if has_existing_actions(username, env_id, ep_num):
-            create_new_attempt(username, env_id, ep_num)
 
     if not status:
         return _login_failed_response(uid, f"Failed to switch environment to '{selected_env}'")
@@ -724,27 +696,6 @@ def on_map_click(uid, username, option_value, evt: gr.SelectData):
     
     coords_str = f"{x}, {y}"
     
-    # 将 PIL Image 转换为 numpy array (RGB 格式)
-    image_array = None
-    if base_img is not None:
-        try:
-            # 确保是 RGB 格式
-            if base_img.mode != "RGB":
-                base_img = base_img.convert("RGB")
-            # 转换为 numpy array
-            image_array = np.array(base_img, dtype=np.uint8)
-        except Exception as e:
-            print(f"Error converting image to array in on_map_click: {e}")
-            traceback.print_exc()
-    
-    # 将坐标点击存储到临时列表，等待在action_execute时一起记录
-    add_coordinate_click(uid, {
-        "coordinates": {"x": x, "y": y},
-        "coords_str": coords_str,
-        "image_array": image_array,  # 新增：图片数组
-        "timestamp": datetime.now().isoformat()
-    })
-    
     return marked_img, coords_str
 
 
@@ -767,7 +718,7 @@ def _is_valid_coords_text(coords_text: str) -> bool:
 
 def on_option_select(uid, username, option_value, coords_str=None):
     """
-    处理选项选择事件，记录用户选择了哪个选项
+    处理选项选择事件
     """
     default_msg = "No need for coordinates"
     
@@ -791,23 +742,9 @@ def on_option_select(uid, username, option_value, coords_str=None):
     
     # option_value 是 (label, idx) 元组或直接是 idx
     if isinstance(option_value, tuple):
-        option_label, option_idx = option_value
+        _, option_idx = option_value
     else:
         option_idx = option_value
-        # 从 available_options 中查找标签
-        option_label = None
-        if session.available_options:
-            for label, idx in session.available_options:
-                if idx == option_idx:
-                    option_label = _ui_option_label(session, label, idx)
-                    break
-    
-    # 将选项选择存储到临时列表，等待在action_execute时一起记录
-    add_option_select(uid, {
-        "option_idx": option_idx,
-        "option_label": option_label,
-        "timestamp": datetime.now().isoformat()
-    })
 
     # Determine coords message
     if 0 <= option_idx < len(session.raw_solve_options):
@@ -1072,9 +1009,6 @@ def precheck_execute_inputs(uid, username, option_idx, coords_str):
 
 
 def execute_step(uid, username, option_idx, coords_str):
-    # 记录用户按下 execute 按钮的瞬间时间戳
-    execute_timestamp = datetime.now().isoformat()
-    
     # 检查session是否超时（在更新活动时间之前检查）
     last_activity = get_session_activity(uid)
     if last_activity is not None:
@@ -1153,20 +1087,6 @@ def execute_step(uid, username, option_idx, coords_str):
         except:
             pass
     
-    # 在执行前获取当前图片（用于记录最后执行的坐标对应的图片）
-    pre_execute_image = None
-    if click_coords:
-        try:
-            pre_execute_pil = session.get_pil_image(use_segmented=USE_SEGMENTED_VIEW)
-            # 转换为 numpy array (RGB格式)
-            pre_execute_image = np.array(pre_execute_pil)
-            if len(pre_execute_image.shape) == 2:
-                pre_execute_image = np.stack([pre_execute_image] * 3, axis=-1)
-            elif len(pre_execute_image.shape) == 3 and pre_execute_image.shape[2] == 4:
-                pre_execute_image = pre_execute_image[:, :, :3]
-        except Exception as e:
-            print(f"Error getting pre-execute image: {e}")
-            
     # Execute
     # 如果达到 execute 次数限制，模拟失败状态（使用和任务失败一样的机制）
     if execute_limit_reached:
@@ -1226,82 +1146,6 @@ def execute_step(uid, username, option_idx, coords_str):
     # Enqueue them now, then wait briefly for the 0.1s timer to drain FIFO playback.
     _enqueue_live_obs_frames(uid, getattr(session, "base_frames", None))
     _wait_for_live_obs_queue_drain(uid)
-    
-    # 记录执行操作（包含从上次action到这次action之间的所有coordinate_click）
-    if username and session.env_id is not None and session.episode_idx is not None:
-        try:
-            # 获取选项标签
-            option_label = None
-            if session.available_options:
-                for label, idx in session.available_options:
-                    if idx == option_idx:
-                        option_label = _ui_option_label(session, label, idx)
-                        break
-            
-            # 获取从上次action_execute到现在的所有option_select
-            option_selects_before_execute = get_option_selects(uid).copy()
-            clear_option_selects(uid)
-            
-            # 获取从上次action_execute到现在的所有coordinate_click
-            # 这些点击已经包含了 image_array（在 on_map_click 中添加）
-            coordinate_clicks_before_execute = get_coordinate_clicks(uid).copy()
-            clear_coordinate_clicks(uid)
-            
-            # 获取最后执行的坐标和图片
-            final_coordinates = None
-            final_coords_str = None
-            final_image_array = None
-            if click_coords:
-                final_coordinates = {"x": click_coords[0], "y": click_coords[1]}
-                final_coords_str = f"{click_coords[0]},{click_coords[1]}"
-                final_image_array = pre_execute_image  # 使用执行前的图片
-            
-            # 获取 option_list（从 session.raw_solve_options 获取）
-            option_list = None
-            if hasattr(session, 'raw_solve_options') and session.raw_solve_options:
-                option_list = session.raw_solve_options
-            
-            # 获取任务元数据（从 session 对象获取）
-            task_status = status  # 使用当前执行状态
-            task_difficulty = None
-            if hasattr(session, 'difficulty') and session.difficulty is not None:
-                task_difficulty = session.difficulty
-            task_language_goal = None
-            if hasattr(session, 'language_goal') and session.language_goal is not None:
-                # 如果是 VideoPlaceButton 任务，使用特殊的任务目标格式
-                if session.env_id == "VideoPlaceButton":
-                    task_language_goal = get_videoplacebutton_goal(session.language_goal)
-                else:
-                    task_language_goal = session.language_goal
-            task_seed = None
-            if hasattr(session, 'seed') and session.seed is not None:
-                task_seed = session.seed
-            
-            log_user_action(
-                username=username,
-                env_id=session.env_id,
-                episode_idx=session.episode_idx,
-                action_data={
-                    "execute_timestamp": execute_timestamp,  # 用户按下 execute 按钮的瞬间时间戳
-                    "option_idx": option_idx,  # execute时使用的option（最后一次选择的）
-                    "option_label": option_label,
-                    "final_coordinates": final_coordinates,  # 最后执行的坐标
-                    "final_coords_str": final_coords_str,  # 最后执行的坐标字符串
-                    "final_image_array": final_image_array,  # 最后执行时的图片
-                    "option_selects_before_execute": option_selects_before_execute,  # execute之前所有的option选择
-                    "coordinate_clicks_before_execute": coordinate_clicks_before_execute,  # execute之前所有的坐标点击（已包含 image_array）
-                    "status": status,
-                    "done": done
-                },
-                option_list=option_list,
-                status=task_status,
-                difficulty=task_difficulty,
-                language_goal=task_language_goal,
-                seed=task_seed
-            )
-        except Exception as e:
-            print(f"Error logging action execute: {e}")
-            traceback.print_exc()
     
     # 注意：执行阶段画面由 live_obs 的 0.1s 轮询刷新。
     

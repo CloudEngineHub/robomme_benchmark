@@ -682,8 +682,6 @@ def test_phase_machine_runtime_local_video_path_end_transition():
 
     originals = {
         "get_session": cb.get_session,
-        "clear_coordinate_clicks": cb.clear_coordinate_clicks,
-        "clear_option_selects": cb.clear_option_selects,
         "reset_play_button_clicked": cb.reset_play_button_clicked,
         "reset_execute_count": cb.reset_execute_count,
         "set_task_start_time": cb.set_task_start_time,
@@ -694,8 +692,6 @@ def test_phase_machine_runtime_local_video_path_end_transition():
     fake_session = FakeSession()
 
     cb.get_session = lambda uid: fake_session
-    cb.clear_coordinate_clicks = lambda uid: None
-    cb.clear_option_selects = lambda uid: None
     cb.reset_play_button_clicked = lambda uid: None
     cb.reset_execute_count = lambda username, env_id, ep_num: None
     cb.set_task_start_time = lambda username, env_id, ep_num, start_time: None

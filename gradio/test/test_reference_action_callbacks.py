@@ -88,7 +88,6 @@ def test_on_option_select_keeps_valid_coords_when_option_needs_coords(monkeypatc
     monkeypatch.setattr(callbacks.user_manager, "assert_lease", lambda username, uid: None)
     monkeypatch.setattr(callbacks, "update_session_activity", lambda uid: None)
     monkeypatch.setattr(callbacks, "get_session", lambda uid: session)
-    monkeypatch.setattr(callbacks, "add_option_select", lambda uid, payload: None)
 
     coords_text, img_update = callbacks.on_option_select(
         "uid-1", "user1", 0, "12, 34"

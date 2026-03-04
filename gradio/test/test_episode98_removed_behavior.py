@@ -3,31 +3,9 @@ from __future__ import annotations
 import time
 
 
-def test_logger_records_failed_episode98(monkeypatch, reload_module):
-    logger = reload_module("logger")
-
-    calls = []
-
-    def _fake_log_user_action_hdf5(*args, **kwargs):
-        calls.append((args, kwargs))
-
-    monkeypatch.setattr(logger, "log_user_action_hdf5", _fake_log_user_action_hdf5)
-
-    logger.log_user_action(
-        username="user1",
-        env_id="BinFill",
-        episode_idx=98,
-        action_data={"done": True, "status": "FAILED"},
-        status="FAILED",
-    )
-
-    assert len(calls) == 1
-
-
 def test_load_next_task_wrapper_treats_episode98_as_normal(monkeypatch, reload_module):
     callbacks = reload_module("gradio_callbacks")
 
-    create_calls = []
     expected = ("SENTINEL",)
 
     monkeypatch.setattr(callbacks.user_manager, "assert_lease", lambda username, uid: None)
@@ -37,24 +15,16 @@ def test_load_next_task_wrapper_treats_episode98_as_normal(monkeypatch, reload_m
         "next_episode_same_env",
         lambda username: {"is_done_all": False, "current_task": {"env_id": "BinFill", "episode_idx": 98}},
     )
-    monkeypatch.setattr(callbacks, "has_existing_actions", lambda username, env_id, ep_num: True)
-    monkeypatch.setattr(
-        callbacks,
-        "create_new_attempt",
-        lambda username, env_id, ep_num: create_calls.append((username, env_id, ep_num)),
-    )
     monkeypatch.setattr(callbacks, "_load_status_task", lambda username, uid, status, login_message=None: expected)
 
     result = callbacks.load_next_task_wrapper("user1", "uid1")
 
-    assert create_calls == [("user1", "BinFill", 98)]
     assert result == expected
 
 
-def test_restart_episode_wrapper_reloads_same_episode_and_creates_new_attempt(monkeypatch, reload_module):
+def test_restart_episode_wrapper_reloads_same_episode(monkeypatch, reload_module):
     callbacks = reload_module("gradio_callbacks")
 
-    create_calls = []
     load_calls = []
     expected = ("RESTARTED",)
 
@@ -65,11 +35,6 @@ def test_restart_episode_wrapper_reloads_same_episode_and_creates_new_attempt(mo
         "get_user_status",
         lambda username: {"is_done_all": False, "current_task": {"env_id": "BinFill", "episode_idx": 98}},
     )
-    monkeypatch.setattr(
-        callbacks,
-        "create_new_attempt",
-        lambda username, env_id, ep_num: create_calls.append((username, env_id, ep_num)) or 3,
-    )
 
     def _fake_load_status_task(username, uid, status, login_message=None):
         load_calls.append((username, uid, status, login_message))
@@ -79,7 +44,6 @@ def test_restart_episode_wrapper_reloads_same_episode_and_creates_new_attempt(mo
 
     result = callbacks.restart_episode_wrapper("user1", "uid1")
 
-    assert create_calls == [("user1", "BinFill", 98)]
     assert len(load_calls) == 1
     assert load_calls[0][2]["current_task"] == {"env_id": "BinFill", "episode_idx": 98}
     assert result == expected
@@ -91,7 +55,6 @@ def test_restart_episode_wrapper_missing_status_returns_login_failed(monkeypatch
     monkeypatch.setattr(callbacks.user_manager, "assert_lease", lambda username, uid: None)
     monkeypatch.setattr(callbacks, "update_session_activity", lambda uid: None)
     monkeypatch.setattr(callbacks.user_manager, "get_user_status", lambda username: None)
-    monkeypatch.setattr(callbacks, "create_new_attempt", lambda username, env_id, ep_num: (_ for _ in ()).throw(RuntimeError("should not call")))
 
     result = callbacks.restart_episode_wrapper("user1", "uid1")
 
@@ -129,12 +92,7 @@ def test_execute_step_failed_episode98_still_advances(monkeypatch, reload_module
     monkeypatch.setattr(callbacks, "update_session_activity", lambda uid: None)
     monkeypatch.setattr(callbacks.user_manager, "assert_lease", lambda username, uid: None)
     monkeypatch.setattr(callbacks, "get_session", lambda uid: fake_session)
-    monkeypatch.setattr(callbacks, "get_option_selects", lambda uid: [])
-    monkeypatch.setattr(callbacks, "clear_option_selects", lambda uid: None)
-    monkeypatch.setattr(callbacks, "get_coordinate_clicks", lambda uid: [])
-    monkeypatch.setattr(callbacks, "clear_coordinate_clicks", lambda uid: None)
     monkeypatch.setattr(callbacks, "increment_execute_count", lambda username, env_id, episode_idx: 1)
-    monkeypatch.setattr(callbacks, "log_user_action", lambda *args, **kwargs: None)
 
     def _fake_complete_current_task(*args, **kwargs):
         payload = dict(kwargs)
