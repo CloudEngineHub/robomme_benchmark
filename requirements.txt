@@ -2,6 +2,9 @@ gradio
 numpy
 Pillow
 opencv-python>=4.11.0.86
+gymnasium
+h5py
+imageio
 setuptools==80.9.0
 torch==2.9.1
 torchvision==0.24.1
