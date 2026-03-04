@@ -310,15 +310,36 @@ def create_ui_blocks():
                             )
 
         # 头部任务/目标信息同步逻辑
-        def sync_header_from_task(task_text, goal_text):
-            selected_env = render_header_task(task_text)
-            choices = list(user_manager.env_choices)
-            return gr.update(choices=choices, value=selected_env), render_header_goal(goal_text)
+        def _normalize_env_choice(env_value, choices):
+            if env_value is None:
+                return None
+            env_text = str(env_value).strip()
+            if not env_text:
+                return None
+            lower_map = {}
+            for choice in choices:
+                choice_text = str(choice).strip()
+                if choice_text:
+                    lower_map.setdefault(choice_text.lower(), choice_text)
+            return lower_map.get(env_text.lower(), env_text)
 
-        def sync_header_from_goal(goal_text, task_text):
-            selected_env = render_header_task(task_text)
-            choices = list(user_manager.env_choices)
-            return gr.update(choices=choices, value=selected_env), render_header_goal(goal_text)
+        def _build_header_task_update(task_text, fallback_env=None):
+            base_choices = list(user_manager.env_choices)
+            parsed_env = render_header_task(task_text)
+            selected_env = _normalize_env_choice(parsed_env, base_choices)
+            if selected_env is None:
+                selected_env = _normalize_env_choice(fallback_env, base_choices)
+
+            choices = list(base_choices)
+            if selected_env and selected_env not in choices:
+                choices.append(selected_env)
+            return gr.update(choices=choices, value=selected_env)
+
+        def sync_header_from_task(task_text, goal_text):
+            return _build_header_task_update(task_text), render_header_goal(goal_text)
+
+        def sync_header_from_goal(goal_text, task_text, current_header_task):
+            return _build_header_task_update(task_text, fallback_env=current_header_task), render_header_goal(goal_text)
 
         # 为初始化和切换任务追加 ui phase，保证前端阶段状态一致
         def login_and_load_task_with_phase(username, uid):
@@ -343,7 +364,7 @@ def create_ui_blocks():
         )
         goal_box.change(
             fn=sync_header_from_goal,
-            inputs=[goal_box, task_info_box],
+            inputs=[goal_box, task_info_box, header_task_box],
             outputs=[header_task_box, header_goal_box],
         )
 
@@ -375,6 +396,10 @@ def create_ui_blocks():
                 reference_action_btn,
                 ui_phase_state,
             ],
+        ).then(
+            fn=sync_header_from_task,
+            inputs=[task_info_box, goal_box],
+            outputs=[header_task_box, header_goal_box],
         )
 
         # 登录并加载任务
@@ -406,7 +431,11 @@ def create_ui_blocks():
                 reference_action_btn,
                 ui_phase_state,
             ],
-        ).then(fn=lambda u: u, inputs=[username_input], outputs=[username_state])
+        ).then(fn=lambda u: u, inputs=[username_input], outputs=[username_state]).then(
+            fn=sync_header_from_task,
+            inputs=[task_info_box, goal_box],
+            outputs=[header_task_box, header_goal_box],
+        )
 
         # 切换到下一任务
         next_task_btn.click(fn=show_loading_info, outputs=[loading_overlay]).then(
@@ -437,6 +466,10 @@ def create_ui_blocks():
                 reference_action_btn,
                 ui_phase_state,
             ],
+        ).then(
+            fn=sync_header_from_task,
+            inputs=[task_info_box, goal_box],
+            outputs=[header_task_box, header_goal_box],
         )
 
         restart_episode_btn.click(fn=show_loading_info, outputs=[loading_overlay]).then(
@@ -467,6 +500,10 @@ def create_ui_blocks():
                 reference_action_btn,
                 ui_phase_state,
             ],
+        ).then(
+            fn=sync_header_from_task,
+            inputs=[task_info_box, goal_box],
+            outputs=[header_task_box, header_goal_box],
         )
 
         # 演示视频播放结束后，从视频阶段切到关键点选择阶段。
@@ -598,6 +635,10 @@ def create_ui_blocks():
                 reference_action_btn,
                 ui_phase_state,
             ],
+        ).then(
+            fn=sync_header_from_task,
+            inputs=[task_info_box, goal_box],
+            outputs=[header_task_box, header_goal_box],
         )
 
     return demo

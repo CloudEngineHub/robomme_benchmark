@@ -43,6 +43,24 @@ def _wait_http_ready(url: str, timeout_s: float = 20.0) -> None:
     raise RuntimeError(f"Server did not become ready: {url}")
 
 
+def _read_header_task_value(page) -> str | None:
+    return page.evaluate(
+        """() => {
+            const root = document.getElementById('header_task');
+            if (!root) return null;
+            const input = root.querySelector('input');
+            if (input && typeof input.value === 'string') {
+                const value = input.value.trim();
+                return value || null;
+            }
+            const selected = root.querySelector('.single-select');
+            if (!selected) return null;
+            const text = (selected.textContent || '').trim();
+            return text || null;
+        }"""
+    )
+
+
 @pytest.fixture
 def phase_machine_ui_url():
     state = {"precheck_calls": 0}
@@ -466,6 +484,15 @@ def test_unified_loading_overlay_init_and_login_flow(monkeypatch):
             while calls["login"] < 1 and time.time() < deadline:
                 time.sleep(0.1)
             assert calls["login"] >= 1
+            page.wait_for_function(
+                """() => {
+                    const root = document.getElementById('header_task');
+                    const input = root ? root.querySelector('input') : null;
+                    return !!input && input.value.trim() === 'PickXtimes';
+                }""",
+                timeout=5000,
+            )
+            assert _read_header_task_value(page) == "PickXtimes"
 
             browser.close()
     finally:
@@ -475,6 +502,160 @@ def test_unified_loading_overlay_init_and_login_flow(monkeypatch):
 
     assert calls["init"] >= 1
     assert calls["login"] >= 1
+
+
+def test_header_task_shows_env_on_url_auto_login(monkeypatch):
+    ui_layout = importlib.reload(importlib.import_module("ui_layout"))
+
+    fake_obs = np.zeros((24, 24, 3), dtype=np.uint8)
+    fake_obs_img = Image.fromarray(fake_obs)
+
+    def fake_init_app(request=None):
+        params = request.query_params if request else {}
+        assert params.get("user") == "user1"
+        return (
+            "uid-auto",
+            gr.update(visible=False),  # loading_overlay
+            gr.update(visible=False),  # login_group
+            gr.update(visible=True),  # main_interface
+            "Logged in as user1",  # login_msg
+            gr.update(value=fake_obs_img, interactive=False),  # img_display
+            "ready",  # log_output
+            gr.update(choices=[("pick", 0)], value=None),  # options_radio
+            "goal",  # goal_box
+            "No need for coordinates",  # coords_box
+            gr.update(value=None, visible=False),  # video_display
+            "PickXtimes (Episode 1)",  # task_info_box
+            "Completed: 0",  # progress_info_box
+            gr.update(interactive=True),  # login_btn
+            gr.update(interactive=True),  # restart_episode_btn
+            gr.update(interactive=True),  # next_task_btn
+            gr.update(interactive=True),  # exec_btn
+            "user1",  # username_state
+            gr.update(visible=False),  # video_phase_group
+            gr.update(visible=True),  # action_phase_group
+            gr.update(visible=True),  # control_panel_group
+            gr.update(value="hint"),  # task_hint_display
+            gr.update(interactive=True),  # reference_action_btn
+        )
+
+    monkeypatch.setattr(ui_layout, "init_app", fake_init_app)
+
+    demo = ui_layout.create_ui_blocks()
+
+    port = _free_port()
+    host = "127.0.0.1"
+    root_url = f"http://{host}:{port}/"
+
+    app = FastAPI(title="header-task-url-auto-login-test")
+    app = gr.mount_gradio_app(app, demo, path="/")
+
+    config = uvicorn.Config(app, host=host, port=port, log_level="error")
+    server = uvicorn.Server(config)
+    thread = threading.Thread(target=server.run, daemon=True)
+    thread.start()
+    _wait_http_ready(root_url)
+
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page(viewport={"width": 1280, "height": 900})
+            page.goto(f"{root_url}?user=user1", wait_until="domcontentloaded")
+            page.wait_for_selector("#main_interface_root", state="visible", timeout=15000)
+            page.wait_for_function(
+                """() => {
+                    const root = document.getElementById('header_task');
+                    const input = root ? root.querySelector('input') : null;
+                    return !!input && input.value.trim() === 'PickXtimes';
+                }""",
+                timeout=5000,
+            )
+            assert _read_header_task_value(page) == "PickXtimes"
+            browser.close()
+    finally:
+        server.should_exit = True
+        thread.join(timeout=10)
+        demo.close()
+
+
+@pytest.mark.parametrize(
+    "task_info_text,expected_header_value",
+    [
+        ("pickxtimes (Episode 1)", "PickXtimes"),
+        ("EnvFromSessionOnly (Episode 1)", "EnvFromSessionOnly"),
+    ],
+)
+def test_header_task_env_normalization_and_fallback(monkeypatch, task_info_text, expected_header_value):
+    ui_layout = importlib.reload(importlib.import_module("ui_layout"))
+
+    fake_obs = np.zeros((24, 24, 3), dtype=np.uint8)
+    fake_obs_img = Image.fromarray(fake_obs)
+
+    def fake_init_app(_request=None):
+        return (
+            "uid-auto",
+            gr.update(visible=False),  # loading_overlay
+            gr.update(visible=False),  # login_group
+            gr.update(visible=True),  # main_interface
+            "Logged in as user1",  # login_msg
+            gr.update(value=fake_obs_img, interactive=False),  # img_display
+            "ready",  # log_output
+            gr.update(choices=[("pick", 0)], value=None),  # options_radio
+            "goal",  # goal_box
+            "No need for coordinates",  # coords_box
+            gr.update(value=None, visible=False),  # video_display
+            task_info_text,  # task_info_box
+            "Completed: 0",  # progress_info_box
+            gr.update(interactive=True),  # login_btn
+            gr.update(interactive=True),  # restart_episode_btn
+            gr.update(interactive=True),  # next_task_btn
+            gr.update(interactive=True),  # exec_btn
+            "user1",  # username_state
+            gr.update(visible=False),  # video_phase_group
+            gr.update(visible=True),  # action_phase_group
+            gr.update(visible=True),  # control_panel_group
+            gr.update(value="hint"),  # task_hint_display
+            gr.update(interactive=True),  # reference_action_btn
+        )
+
+    monkeypatch.setattr(ui_layout, "init_app", fake_init_app)
+
+    demo = ui_layout.create_ui_blocks()
+
+    port = _free_port()
+    host = "127.0.0.1"
+    root_url = f"http://{host}:{port}/"
+
+    app = FastAPI(title="header-task-normalization-fallback-test")
+    app = gr.mount_gradio_app(app, demo, path="/")
+
+    config = uvicorn.Config(app, host=host, port=port, log_level="error")
+    server = uvicorn.Server(config)
+    thread = threading.Thread(target=server.run, daemon=True)
+    thread.start()
+    _wait_http_ready(root_url)
+
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page(viewport={"width": 1280, "height": 900})
+            page.goto(root_url, wait_until="domcontentloaded")
+            page.wait_for_selector("#main_interface_root", state="visible", timeout=15000)
+            page.wait_for_function(
+                """(expectedValue) => {
+                    const root = document.getElementById('header_task');
+                    const input = root ? root.querySelector('input') : null;
+                    return !!input && input.value.trim() === expectedValue;
+                }""",
+                arg=expected_header_value,
+                timeout=5000,
+            )
+            assert _read_header_task_value(page) == expected_header_value
+            browser.close()
+    finally:
+        server.should_exit = True
+        thread.join(timeout=10)
+        demo.close()
 
 
 def test_phase_machine_runtime_local_video_path_end_transition():
