@@ -66,20 +66,16 @@ def bootstrap_runtime() -> None:
     _APP_BOOTSTRAPPED = True
 
 
+bootstrap_runtime()
+
 demo = create_ui_blocks()
-
-
-def main() -> None:
-    bootstrap_runtime()
-    allowed_paths = build_allowed_paths()
-    demo.launch(
-        server_name="0.0.0.0",
-        server_port=int(os.getenv("PORT", "7860")),
-        allowed_paths=allowed_paths,
-        show_error=True,
-        ssr_mode=False,
-    )
+demo.ssr_mode = False
+demo.allowed_paths = build_allowed_paths()
+demo.show_error = True
 
 
 if __name__ == "__main__":
-    main()
+    demo.launch(
+        server_name="0.0.0.0",
+        server_port=int(os.getenv("PORT", "7860")),
+    )
