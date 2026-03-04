@@ -281,19 +281,18 @@ def create_ui_blocks():
                                     interactive=False,
                                     elem_id="next_task_btn",
                                 )
-
-        # 任务提示卡片：展示当前任务补充提示
-        with gr.Column(visible=True, elem_classes=["native-card"], elem_id="task_hint_card"):
-            #gr.Markdown("### Task Hint")
-            task_hint_display = gr.Textbox(
-                value="",
-                lines=8,
-                max_lines=16,
-                show_label=True,
-                label="Task Hint",
-                interactive=True,
-                elem_id="task_hint_display",
-            )
+                        # 任务提示卡片：与控制面板同显隐
+                        with gr.Column(visible=True, elem_classes=["native-card"], elem_id="task_hint_card"):
+                            #gr.Markdown("### Task Hint")
+                            task_hint_display = gr.Textbox(
+                                value="",
+                                lines=8,
+                                max_lines=16,
+                                show_label=True,
+                                label="Task Hint",
+                                interactive=True,
+                                elem_id="task_hint_display",
+                            )
 
         # 头部任务/目标信息同步逻辑
         def sync_header_from_task(task_text, goal_text):
