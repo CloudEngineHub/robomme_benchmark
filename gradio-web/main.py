@@ -8,9 +8,15 @@ from pathlib import Path
 
 APP_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = APP_DIR.parent
+SRC_DIR = PROJECT_ROOT / "src"
 VIDEOS_DIR = APP_DIR / "videos"
 TEMP_DEMOS_DIR = PROJECT_ROOT / "temp_demos"
 CWD_TEMP_DEMOS_DIR = Path.cwd() / "temp_demos"
+
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+if str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
 
 
 def setup_logging() -> logging.Logger:
@@ -103,6 +109,7 @@ def main():
         server_port,
         os.environ.get("ROBOMME_TEMP_DEMOS_DIR"),
     )
+    LOGGER.debug("Python path head entries: %s", sys.path[:5])
 
     demo = create_ui_blocks()
     demo.launch(

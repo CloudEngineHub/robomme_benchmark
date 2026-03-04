@@ -21,8 +21,11 @@ import os
 # 添加父目录到路径（逻辑复制自 oracle_logic.py）
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(current_dir)
+src_dir = os.path.join(parent_dir, "src")
 if parent_dir not in sys.path:
     sys.path.insert(0, parent_dir)
+if src_dir not in sys.path:
+    sys.path.insert(0, src_dir)
 
 from oracle_logic import OracleSession, DEFAULT_DATASET_ROOT
 
