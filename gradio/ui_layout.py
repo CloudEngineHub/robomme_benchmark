@@ -1,7 +1,7 @@
 """
 Native Gradio UI layout.
 Sequential media phases: Demo Video -> Action+Keypoint.
-Two-column layout: Media/Log | Control Panel.
+Two-column layout: Keypoint Selection | Right Panel.
 """
 
 import ast
@@ -11,6 +11,8 @@ import gradio as gr
 from config import (
     CONTROL_PANEL_SCALE,
     KEYPOINT_SELECTION_SCALE,
+    RIGHT_TOP_ACTION_SCALE,
+    RIGHT_TOP_LOG_SCALE,
 )
 from gradio_callbacks import (
     execute_step,
@@ -124,7 +126,7 @@ def create_ui_blocks():
                     label="Goal",
                     show_label=True,
                     interactive=False,
-                    lines=2,
+                    lines=1,
                     elem_id="header_goal",
                 )
 
@@ -160,7 +162,7 @@ def create_ui_blocks():
 
         # 主交互界面（登录成功后显示）
         with gr.Column(visible=False, elem_id="main_interface_root") as main_interface:
-            # 主体左右布局：左侧媒体与日志，右侧动作控制
+            # 主体左右布局：左侧关键点区域，右侧控制面板
             with gr.Row(elem_id="main_layout_row"):
                 with gr.Column(scale=KEYPOINT_SELECTION_SCALE):
                     # 左侧媒体卡片：按阶段切换展示内容
@@ -190,38 +192,41 @@ def create_ui_blocks():
                                 sources=[],
                             )
 
-                    # 系统日志卡片：显示执行过程反馈
-                    with gr.Column(elem_classes=["native-card"], elem_id="log_card"):
-                        log_output = gr.Textbox(
-                            value="",
-                            lines=8,
-                            max_lines=16,
-                            show_label=True,
-                            interactive=False,
-                            elem_id="log_output",
-                            label="System Log",
-                        )
-
                 with gr.Column(scale=CONTROL_PANEL_SCALE):
-                    # 右侧控制面板：动作选择与执行按钮
+                    # 右侧控制面板：顶部并排(Action + Log) + 底部操作按钮
                     with gr.Column(visible=False, elem_id="control_panel_group") as control_panel_group:
-                        with gr.Column(elem_classes=["native-card"], elem_id="action_selection_card"):
-                            #gr.Markdown("### Action Selection")
-                            options_radio = gr.Radio(
-                                choices=[],
-                                label=" Action Selection",
-                                type="value",
-                                show_label=True,
-                                elem_id="action_radio",
-                            )
-                            coords_box = gr.Textbox(
-                                label="Coords",
-                                value="",
-                                interactive=False,
-                                show_label=False,
-                                visible=False,
-                                elem_id="coords_box",
-                            )
+                        with gr.Row(elem_id="right_top_row", equal_height=False):
+                            with gr.Column(scale=RIGHT_TOP_ACTION_SCALE, elem_id="right_action_col"):
+                                with gr.Column(elem_classes=["native-card"], elem_id="action_selection_card"):
+                                    #gr.Markdown("### Action Selection")
+                                    options_radio = gr.Radio(
+                                        choices=[],
+                                        label=" Action Selection",
+                                        type="value",
+                                        show_label=True,
+                                        elem_id="action_radio",
+                                    )
+                                    coords_box = gr.Textbox(
+                                        label="Coords",
+                                        value="",
+                                        interactive=False,
+                                        show_label=False,
+                                        visible=False,
+                                        elem_id="coords_box",
+                                    )
+
+                            # 系统日志卡片：显示执行过程反馈
+                            with gr.Column(scale=RIGHT_TOP_LOG_SCALE, elem_id="right_log_col"):
+                                with gr.Column(elem_classes=["native-card"], elem_id="log_card"):
+                                    log_output = gr.Textbox(
+                                        value="",
+                                        lines=1,
+                                        max_lines=None,
+                                        show_label=True,
+                                        interactive=False,
+                                        elem_id="log_output",
+                                        label="System Log",
+                                    )
 
                         # 操作按钮区：执行、参考动作、下一任务
                         with gr.Row(elem_id="action_buttons_row"):

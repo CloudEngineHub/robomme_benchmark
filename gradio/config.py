@@ -5,9 +5,13 @@
 VIDEO_PLAYBACK_FPS = 30.0  # Frame rate for demonstration video playback
 USE_SEGMENTED_VIEW = False  # Set to True to use segmented view, False to use original image
 
-# 主界面两列宽度比例 (Keypoint Selection + System Log : Control Panel)
+# 主界面两列宽度比例 (Keypoint Selection : Right Panel)
 KEYPOINT_SELECTION_SCALE = 1
 CONTROL_PANEL_SCALE = 2
+
+# 右侧顶部并排比例 (Action Selection : System Log)
+RIGHT_TOP_ACTION_SCALE = 2
+RIGHT_TOP_LOG_SCALE = 1
 
 # Session超时配置
 SESSION_TIMEOUT = 300  # Session超时时间（秒），如果30秒内没有execute_step操作，将自动回收session

@@ -41,6 +41,9 @@ def test_native_ui_config_contains_phase_machine_and_precheck_chain(reload_modul
             "main_layout_row",
             "media_card",
             "log_card",
+            "right_top_row",
+            "right_action_col",
+            "right_log_col",
             "control_panel_group",
             "video_phase_group",
             "action_phase_group",
@@ -61,6 +64,13 @@ def test_native_ui_config_contains_phase_machine_and_precheck_chain(reload_modul
             if "value" in comp.get("props", {})
         ]
         assert all("_anchor" not in str(v) for v in values)
+
+        log_output_comp = next(
+            comp
+            for comp in cfg.get("components", [])
+            if comp.get("props", {}).get("elem_id") == "log_output"
+        )
+        assert log_output_comp.get("props", {}).get("max_lines") is None
 
         api_names = [dep.get("api_name") for dep in cfg.get("dependencies", [])]
         assert "precheck_execute_inputs" in api_names
