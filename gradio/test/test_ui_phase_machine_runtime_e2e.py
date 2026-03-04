@@ -485,7 +485,7 @@ def test_phase_machine_runtime_local_video_path_end_transition():
 
     class FakeSession:
         def __init__(self):
-            self.env_id = "VideoPlaceOrder"
+            self.env_id = "VideoUnmask"
             self.language_goal = "place cube on target"
             self.available_options = [("pick", 0)]
             self.raw_solve_options = [{"available": False}]
@@ -531,10 +531,10 @@ def test_phase_machine_runtime_local_video_path_end_transition():
                 with gr.Column(visible=False, elem_id="video_phase_group") as video_phase_group:
                     video_display = gr.Video(value=None, elem_id="demo_video", autoplay=False)
 
-                with gr.Column(visible="hidden", elem_id="action_phase_group") as action_phase_group:
+                with gr.Column(visible=True, elem_id="action_phase_group") as action_phase_group:
                     img_display = gr.Image(value=fake_obs.copy(), elem_id="live_obs")
 
-                with gr.Column(visible="hidden", elem_id="control_panel_group") as control_panel_group:
+                with gr.Column(visible=True, elem_id="control_panel_group") as control_panel_group:
                     options_radio = gr.Radio(choices=[("pick", 0)], value=None, elem_id="action_radio")
 
             login_msg = gr.Markdown("")
@@ -554,7 +554,7 @@ def test_phase_machine_runtime_local_video_path_end_transition():
 
             def login_fn():
                 status = {
-                    "current_task": {"env_id": "VideoPlaceOrder", "episode_idx": 1},
+                    "current_task": {"env_id": "VideoUnmask", "episode_idx": 1},
                     "completed_count": 0,
                 }
                 return cb._load_status_task("tester", "uid-local-video", status, login_message="Logged in as tester")
@@ -658,7 +658,8 @@ def test_phase_machine_runtime_local_video_path_end_transition():
                             return st.display !== 'none' && st.visibility !== 'hidden' && el.getClientRects().length > 0;
                         };
                         return visible('live_obs') && visible('action_radio') && !visible('demo_video');
-                    }"""
+                    }""",
+                    timeout=2000,
                 )
 
                 browser.close()

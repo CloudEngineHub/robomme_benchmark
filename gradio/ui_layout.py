@@ -469,12 +469,32 @@ def create_ui_blocks():
             ],
         )
 
-        # 演示视频播放结束后，从视频阶段切到关键点选择阶段
+        # 演示视频播放结束后，从视频阶段切到关键点选择阶段。
+        # 为提升稳定性，同时监听 end/stop 两类事件，并使用 queue=False 立即切换。
         video_display.end(
             fn=on_video_end_transition,
             inputs=[uid_state],
             outputs=[video_phase_group, action_phase_group, control_panel_group, log_output],
-        ).then(fn=lambda: PHASE_ACTION_KEYPOINT, outputs=[ui_phase_state])
+            queue=False,
+            show_progress="hidden",
+        ).then(
+            fn=lambda: PHASE_ACTION_KEYPOINT,
+            outputs=[ui_phase_state],
+            queue=False,
+            show_progress="hidden",
+        )
+        video_display.stop(
+            fn=on_video_end_transition,
+            inputs=[uid_state],
+            outputs=[video_phase_group, action_phase_group, control_panel_group, log_output],
+            queue=False,
+            show_progress="hidden",
+        ).then(
+            fn=lambda: PHASE_ACTION_KEYPOINT,
+            outputs=[ui_phase_state],
+            queue=False,
+            show_progress="hidden",
+        )
 
         # 关键点点击与动作选择联动
         img_display.select(
