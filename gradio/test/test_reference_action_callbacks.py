@@ -1,6 +1,4 @@
 from __future__ import annotations
-
-import pytest
 from PIL import Image
 
 
@@ -36,13 +34,10 @@ def test_on_reference_action_success_updates_option_and_coords(monkeypatch, relo
         }
     )
 
-    monkeypatch.setattr(callbacks.user_manager, "assert_lease", lambda username, uid: None)
     monkeypatch.setattr(callbacks, "update_session_activity", lambda uid: None)
     monkeypatch.setattr(callbacks, "get_session", lambda uid: session)
 
-    img, option_update, coords_text, log_html = callbacks.on_reference_action(
-        "uid-1", "user1"
-    )
+    img, option_update, coords_text, log_html = callbacks.on_reference_action("uid-1")
 
     assert isinstance(img, Image.Image)
     assert img.getpixel((5, 6)) != (0, 0, 0)
@@ -57,9 +52,7 @@ def test_on_reference_action_session_missing(monkeypatch, reload_module):
     monkeypatch.setattr(callbacks, "update_session_activity", lambda uid: None)
     monkeypatch.setattr(callbacks, "get_session", lambda uid: None)
 
-    img, option_update, coords_text, log_html = callbacks.on_reference_action(
-        "uid-missing", None
-    )
+    img, option_update, coords_text, log_html = callbacks.on_reference_action("uid-missing")
 
     assert img is None
     assert option_update.get("__type__") == "update"
@@ -67,31 +60,25 @@ def test_on_reference_action_session_missing(monkeypatch, reload_module):
     assert "Session Error" in log_html
 
 
-def test_on_reference_action_lease_lost_raises(monkeypatch, reload_module):
+def test_on_reference_action_error_message_from_reference(monkeypatch, reload_module):
     callbacks = reload_module("gradio_callbacks")
 
-    def _raise_lease_lost(username, uid):
-        raise callbacks.LeaseLost("lost")
+    session = _FakeSession({"ok": False, "message": "bad ref"})
+    monkeypatch.setattr(callbacks, "update_session_activity", lambda uid: None)
+    monkeypatch.setattr(callbacks, "get_session", lambda uid: session)
 
-    monkeypatch.setattr(callbacks.user_manager, "assert_lease", _raise_lease_lost)
-
-    with pytest.raises(Exception) as excinfo:
-        callbacks.on_reference_action("uid-lease", "user1")
-
-    assert "logged in elsewhere" in str(excinfo.value)
+    _img, _opt, _coords, log_html = callbacks.on_reference_action("uid-1")
+    assert "bad ref" in log_html
 
 
 def test_on_option_select_keeps_valid_coords_when_option_needs_coords(monkeypatch, reload_module):
     callbacks = reload_module("gradio_callbacks")
 
     session = _FakeOptionSession()
-    monkeypatch.setattr(callbacks.user_manager, "assert_lease", lambda username, uid: None)
     monkeypatch.setattr(callbacks, "update_session_activity", lambda uid: None)
     monkeypatch.setattr(callbacks, "get_session", lambda uid: session)
 
-    coords_text, img_update = callbacks.on_option_select(
-        "uid-1", "user1", 0, "12, 34"
-    )
+    coords_text, img_update = callbacks.on_option_select("uid-1", 0, "12, 34")
 
     assert coords_text == "12, 34"
     assert img_update.get("interactive") is True

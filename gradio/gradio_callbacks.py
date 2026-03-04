@@ -29,7 +29,7 @@ from state_manager import (
     _state_lock,
 )
 from image_utils import draw_marker, save_video, concatenate_frames_horizontally
-from user_manager import user_manager, LeaseLost
+from user_manager import user_manager
 from config import USE_SEGMENTED_VIEW, should_show_demo_video, SESSION_TIMEOUT, EXECUTE_LIMIT_OFFSET
 from process_session import ScrewPlanFailureError, ProcessSessionProxy
 from note_content import get_task_hint
@@ -354,18 +354,18 @@ def on_video_end_transition(uid):
     )
 
 
-def _login_failed_response(uid, message):
+def _task_load_failed_response(uid, message):
     return (
         uid,
-        gr.update(visible=True),  # login_group
-        gr.update(visible=False),  # main_interface
-        message,  # login_message
-        gr.update(value=None, interactive=False), format_log_markdown(""),  # img, log_output
-        gr.update(choices=[], value=None),  # options
-        "", "No need for coordinates",  # goal, coords
+        gr.update(visible=True),  # main_interface
+        gr.update(value=None, interactive=False),  # img_display
+        format_log_markdown(message),  # log_output
+        gr.update(choices=[], value=None),  # options_radio
+        "",  # goal_box
+        "No need for coordinates",  # coords_box
         gr.update(value=None, visible=False),  # video_display
-        "", "",  # task_info, progress_info
-        gr.update(interactive=True),  # login_btn
+        "",  # task_info_box
+        "",  # progress_info_box
         gr.update(interactive=False),  # restart_episode_btn
         gr.update(interactive=False),  # next_task_btn
         gr.update(interactive=False),  # exec_btn
@@ -378,16 +378,16 @@ def _login_failed_response(uid, message):
     )
 
 
-def _load_status_task(username, uid, status, login_message=None):
+def _load_status_task(uid, status):
     """Load status.current_task to session and build the standard UI update tuple."""
     current_task = status.get("current_task") if isinstance(status, dict) else None
     if not current_task:
-        return _login_failed_response(uid, f"Error loading task for {username}: missing current_task")
+        return _task_load_failed_response(uid, "Error loading task: missing current_task")
 
     env_id = current_task.get("env_id")
     ep_num = current_task.get("episode_idx")
     if env_id is None or ep_num is None:
-        return _login_failed_response(uid, f"Error loading task for {username}: invalid task payload")
+        return _task_load_failed_response(uid, "Error loading task: invalid task payload")
 
     try:
         completed_count = int(status.get("completed_count", 0))
@@ -397,40 +397,40 @@ def _load_status_task(username, uid, status, login_message=None):
 
     session = get_session(uid)
     if session is None:
-        print(f"Session {uid} not found, creating new session for {username}")
+        print(f"Session {uid} not found, creating new session")
         session = ProcessSessionProxy()
         with _state_lock:
             GLOBAL_SESSIONS[uid] = session
             SESSION_LAST_ACTIVITY[uid] = time.time()
-        print(f"New session created for {uid} (User: {username})")
+        print(f"New session created for {uid}")
 
-    print(f"Loading {env_id} Ep {ep_num} for {uid} (User: {username})")
+    print(f"Loading {env_id} Ep {ep_num} for {uid}")
 
     with _LIVE_OBS_REFRESH_LOCK:
         _LIVE_OBS_REFRESH.pop(uid, None)
     reset_play_button_clicked(uid)
-    reset_execute_count(username, env_id, int(ep_num))
+    reset_execute_count(uid, env_id, int(ep_num))
 
     img, load_msg = session.load_episode(env_id, int(ep_num))
-    actual_env_id = getattr(session, 'env_id', None) or env_id
+    actual_env_id = getattr(session, "env_id", None) or env_id
 
     if img is not None:
         start_time = datetime.now().isoformat()
-        set_task_start_time(username, env_id, int(ep_num), start_time)
+        set_task_start_time(uid, env_id, int(ep_num), start_time)
 
     if img is None:
         set_ui_phase(uid, "executing_task")
         return (
             uid,
-            gr.update(visible=False),  # login_group
             gr.update(visible=True),  # main_interface
-            f"Error loading task for {username}",
-            gr.update(value=None, interactive=False), format_log_markdown(f"Error: {load_msg}"),
-            gr.update(choices=[], value=None),
-            "", "No need for coordinates",
+            gr.update(value=None, interactive=False),  # img_display
+            format_log_markdown(f"Error: {load_msg}"),  # log_output
+            gr.update(choices=[], value=None),  # options_radio
+            "",  # goal_box
+            "No need for coordinates",  # coords_box
             gr.update(value=None, visible=False),  # video_display
-            f"{actual_env_id} (Episode {ep_num})", progress_text,
-            gr.update(interactive=True),  # login_btn
+            f"{actual_env_id} (Episode {ep_num})",  # task_info_box
+            progress_text,  # progress_info_box
             gr.update(interactive=True),  # restart_episode_btn
             gr.update(interactive=True),  # next_task_btn
             gr.update(interactive=False),  # exec_btn
@@ -481,25 +481,21 @@ def _load_status_task(username, uid, status, login_message=None):
                 demo_video_path = None
 
     img = session.get_pil_image(use_segmented=USE_SEGMENTED_VIEW)
-    ui_login_msg = login_message if login_message else f"Logged in as {username}"
 
     if has_demo_video:
         set_ui_phase(uid, "executing_task")
 
         return (
             uid,
-            gr.update(visible=False),  # login_group
             gr.update(visible=True),  # main_interface
-            ui_login_msg,
-            gr.update(value=img, interactive=False),
-            initial_log_msg,
-            gr.update(choices=radio_choices, value=None),
-            goal_text,
-            "No need for coordinates",
+            gr.update(value=img, interactive=False),  # img_display
+            initial_log_msg,  # log_output
+            gr.update(choices=radio_choices, value=None),  # options_radio
+            goal_text,  # goal_box
+            "No need for coordinates",  # coords_box
             gr.update(value=demo_video_path, visible=True),  # video_display
-            f"{actual_env_id} (Episode {ep_num})",
-            progress_text,
-            gr.update(interactive=True),  # login_btn
+            f"{actual_env_id} (Episode {ep_num})",  # task_info_box
+            progress_text,  # progress_info_box
             gr.update(interactive=True),  # restart_episode_btn
             gr.update(interactive=True),  # next_task_btn
             gr.update(interactive=True),  # exec_btn
@@ -515,9 +511,7 @@ def _load_status_task(username, uid, status, login_message=None):
 
     return (
         uid,
-        gr.update(visible=False),  # login_group
         gr.update(visible=True),  # main_interface
-        ui_login_msg,
         gr.update(value=img, interactive=False),  # img_display
         initial_log_msg,  # log_output
         gr.update(choices=radio_choices, value=None),  # options_radio
@@ -526,7 +520,6 @@ def _load_status_task(username, uid, status, login_message=None):
         gr.update(value=None, visible=False),  # video_display (no video)
         f"{actual_env_id} (Episode {ep_num})",  # task_info_box
         progress_text,  # progress_info_box
-        gr.update(interactive=True),  # login_btn
         gr.update(interactive=True),  # restart_episode_btn
         gr.update(interactive=True),  # next_task_btn
         gr.update(interactive=True),  # exec_btn
@@ -539,124 +532,80 @@ def _load_status_task(username, uid, status, login_message=None):
     )
 
 
-def login_and_load_task(username, uid):
-    """
-    Handle user login and load their current task.
-    处理用户登录并加载当前任务。
-    """
+def init_session_and_load_task(uid):
+    """Initialize the Gradio session and load the current task."""
     if not uid:
         uid = create_session()
-    
-    # Pass uid to login for force takeover mechanism
-    success, msg, status = user_manager.login(username, uid)
-    
-    # 更新session活动时间（登录操作）
+
+    success, msg, status = user_manager.init_session(uid)
+
     if uid:
         update_session_activity(uid)
 
     if not success:
-        return _login_failed_response(uid, msg)
-    return _load_status_task(username, uid, status, login_message=f"Logged in as {username}")
+        return _task_load_failed_response(uid, msg)
+    return _load_status_task(uid, status)
 
 
-def load_next_task_wrapper(username, uid):
-    """
-    Move to a random episode within the same env and reload task.
-    """
+def load_next_task_wrapper(uid):
+    """Move to a random episode within the same env and reload task."""
 
     if not uid:
         uid = create_session()
-
-    if username:
-        try:
-            user_manager.assert_lease(username, uid)
-        except LeaseLost as e:
-            raise gr.Error(f"You have been logged in elsewhere. This page is no longer valid. Please refresh the page to log in again.\\n{str(e)}")
-
-        if uid:
-            update_session_activity(uid)
-
-        status = user_manager.next_episode_same_env(username)
-
-        if not status:
-            return _login_failed_response(uid, f"Failed to load next task for {username}")
-        return _load_status_task(username, uid, status, login_message=f"Logged in as {username}")
-
-    return _login_failed_response(uid, "Username cannot be empty")
-
-
-def restart_episode_wrapper(username, uid):
-    """
-    Reload the current env + episode.
-    """
-    if not uid:
-        uid = create_session()
-
-    if not username:
-        return _login_failed_response(uid, "Username cannot be empty")
-
-    try:
-        user_manager.assert_lease(username, uid)
-    except LeaseLost as e:
-        raise gr.Error(
-            "You have been logged in elsewhere. This page is no longer valid. "
-            f"Please refresh the page to log in again.\\n{str(e)}"
-        )
 
     if uid:
         update_session_activity(uid)
 
-    status = user_manager.get_user_status(username)
+    status = user_manager.next_episode_same_env(uid)
+    if not status:
+        return _task_load_failed_response(uid, "Failed to load next task")
+    return _load_status_task(uid, status)
+
+
+def restart_episode_wrapper(uid):
+    """Reload the current env + episode."""
+    if not uid:
+        uid = create_session()
+
+    if uid:
+        update_session_activity(uid)
+
+    status = user_manager.get_session_status(uid)
     current_task = status.get("current_task") if isinstance(status, dict) else None
     if not current_task:
-        return _login_failed_response(uid, f"Failed to restart episode for {username}")
+        return _task_load_failed_response(uid, "Failed to restart episode: missing current task")
 
     env_id = current_task.get("env_id")
     ep_num = current_task.get("episode_idx")
     if env_id is None or ep_num is None:
-        return _login_failed_response(uid, f"Failed to restart episode for {username}")
+        return _task_load_failed_response(uid, "Failed to restart episode: invalid task payload")
 
-    return _load_status_task(username, uid, status, login_message=f"Logged in as {username}")
+    return _load_status_task(uid, status)
 
 
-def switch_env_wrapper(username, uid, selected_env):
+def switch_env_wrapper(uid, selected_env):
     """Switch env from Current Task dropdown and randomly assign an episode."""
     if not uid:
         uid = create_session()
-
-    if not username:
-        return _login_failed_response(uid, "Username cannot be empty")
-
-    try:
-        user_manager.assert_lease(username, uid)
-    except LeaseLost as e:
-        raise gr.Error(f"You have been logged in elsewhere. This page is no longer valid. Please refresh the page to log in again.\\n{str(e)}")
 
     if uid:
         update_session_activity(uid)
 
     if selected_env:
-        status = user_manager.switch_env_and_random_episode(username, selected_env)
+        status = user_manager.switch_env_and_random_episode(uid, selected_env)
     else:
-        status = user_manager.get_user_status(username)
+        status = user_manager.get_session_status(uid)
 
     if not status:
-        return _login_failed_response(uid, f"Failed to switch environment to '{selected_env}'")
+        return _task_load_failed_response(uid, f"Failed to switch environment to '{selected_env}'")
 
-    return _load_status_task(username, uid, status, login_message=f"Logged in as {username}")
+    return _load_status_task(uid, status)
 
 
-def on_map_click(uid, username, option_value, evt: gr.SelectData):
+def on_map_click(uid, option_value, evt: gr.SelectData):
     """
     处理图片点击事件
     """
-    # Check lease
-    if username:
-        try:
-            user_manager.assert_lease(username, uid)
-        except LeaseLost as e:
-            raise gr.Error(f"You have been logged in elsewhere. This page is no longer valid. Please refresh the page to log in again.\\n{str(e)}")
-    
     # 更新session活动时间（点击图片操作）
     if uid:
         update_session_activity(uid)
@@ -716,7 +665,7 @@ def _is_valid_coords_text(coords_text: str) -> bool:
     return True
 
 
-def on_option_select(uid, username, option_value, coords_str=None):
+def on_option_select(uid, option_value, coords_str=None):
     """
     处理选项选择事件
     """
@@ -724,13 +673,6 @@ def on_option_select(uid, username, option_value, coords_str=None):
     
     if option_value is None:
         return default_msg, gr.update(interactive=False)
-    
-    # Check lease
-    if username:
-        try:
-            user_manager.assert_lease(username, uid)
-        except LeaseLost as e:
-            raise gr.Error(f"You have been logged in elsewhere. This page is no longer valid. Please refresh the page to log in again.\\n{str(e)}")
     
     # 更新session活动时间（选择选项操作）
     if uid:
@@ -757,20 +699,10 @@ def on_option_select(uid, username, option_value, coords_str=None):
     return default_msg, gr.update(interactive=False)
 
 
-def on_reference_action(uid, username):
+def on_reference_action(uid):
     """
     自动获取并回填当前步参考 action + 像素坐标（不执行）。
     """
-    # Check lease
-    if username:
-        try:
-            user_manager.assert_lease(username, uid)
-        except LeaseLost as e:
-            raise gr.Error(
-                "You have been logged in elsewhere. This page is no longer valid. "
-                f"Please refresh the page to log in again.\\n{str(e)}"
-            )
-
     if uid:
         update_session_activity(uid)
 
@@ -833,155 +765,24 @@ def on_reference_action(uid, username):
 
 def init_app(request: gr.Request):
     """
-    处理初始页面加载。
-    如果URL中包含 'user' 或 'username' 查询参数，直接登录并进入主界面。
-    Handle initial page load.
-    If URL contains 'user' or 'username' query parameters, automatically login and show main interface.
-    
-    支持的URL格式 / Supported URL formats：
-    - http://host:port/?user=username
-    - http://host:port/?username=username
+    处理初始页面加载，直接初始化会话并加载首个任务。
     
     Args:
         request: Gradio Request 对象，包含查询参数 / Gradio Request object containing query parameters
     
     Returns:
-        根据是否自动登录返回不同的UI状态 / Different UI states based on auto-login status
+        初始化后的UI状态
     """
-    params = request.query_params if request else {}
-    # 支持 'user' 和 'username' 两种参数名称
-    username = params.get('user') or params.get('username')
-    
-    # Default outputs if no user param
-    # outputs: 
-    # 0. uid
-    # 1. loading_overlay
-    # 2. login_group
-    # ...
-    
-    default_outputs = (
-        None,
-        gr.update(visible=False),  # loading_overlay
-        gr.update(visible=True),   # login_group
-        gr.update(visible=False),  # main_interface
-        "",  # login_msg
-        gr.update(value=None, interactive=False),  # img_display
-        format_log_markdown(""),  # log_output
-        gr.update(choices=[], value=None),  # options_radio
-        "",  # goal_box
-        "No need for coordinates",  # coords_box
-        gr.update(value=None, visible=False),  # video_display
-        "",  # task_info_box
-        "",  # progress_info_box
-        gr.update(interactive=True),   # login_btn
-        gr.update(interactive=False),  # restart_episode_btn
-        gr.update(interactive=False),  # next_task_btn
-        gr.update(interactive=False),  # exec_btn
-        "",  # username_state
-        gr.update(visible=False),  # video_phase_group
-        gr.update(visible=False),  # action_phase_group
-        gr.update(visible=False),  # control_panel_group
-        gr.update(value=""),  # task_hint_display
-        gr.update(interactive=False),  # reference_action_btn
-    )
-    
-    if username:
-        # 检查用户是否存在
-        # Check if user exists
-        if username in user_manager.available_users:
-            # 直接登录并加载任务，进入主界面
-            # Directly login and load task, show main interface
-            print(f"URL Auto-Login: Detected '{username}', automatically logging in and loading task.")
-            
-            # 创建新的会话ID
-            uid = create_session()
-            
-            # 调用 login_and_load_task 进行登录和任务加载
-            login_results = login_and_load_task(username, uid)
-            
-            # login_and_load_task returns 22 values:
-            # (uid, login_group, main_interface, login_msg, img_display, log_output,
-            #  options_radio, goal_box, coords_box, video_display, task_info_box,
-            #  progress_info_box, login_btn, restart_episode_btn, next_task_btn, exec_btn,
-            #  video_phase_group, action_phase_group, control_panel_group,
-            #  task_hint_display, loading_overlay, reference_action_btn)
-
-            # init_app needs 23 values: inject loading_overlay at slot 1 + username_state,
-            # and omit login_results' loading_overlay slot.
-            return (
-                login_results[0],                    # uid
-                gr.update(visible=False),            # loading_overlay
-                login_results[1],                    # login_group
-                login_results[2],                    # main_interface
-                login_results[3],                    # login_msg
-                login_results[4],                    # img_display
-                login_results[5],                    # log_output
-                login_results[6],                    # options_radio
-                login_results[7],                    # goal_box
-                login_results[8],                    # coords_box
-                login_results[9],                    # video_display
-                login_results[10],                   # task_info_box
-                login_results[11],                   # progress_info_box
-                login_results[12],                   # login_btn
-                login_results[13],                   # restart_episode_btn
-                login_results[14],                   # next_task_btn
-                login_results[15],                   # exec_btn
-                username,                            # username_state
-                login_results[16],                   # video_phase_group
-                login_results[17],                   # action_phase_group
-                login_results[18],                   # control_panel_group
-                login_results[19],                   # task_hint_display
-                login_results[21],                   # reference_action_btn
-            )
-        else:
-            # 用户名不存在，显示错误消息但仍显示登录界面
-            # Username does not exist, show error message but still show login interface
-            print(f"自动登录失败: 用户名 '{username}' 不存在于用户列表中")
-            error_msg = f"⚠️ 用户名 '{username}' 不存在。请从下拉列表中选择有效的用户名。"
-            return (
-                None,
-                gr.update(visible=False),  # loading_overlay
-                gr.update(visible=True),   # login_group
-                gr.update(visible=False),  # main_interface
-                error_msg,  # login_msg
-                gr.update(value=None, interactive=False),  # img_display
-                format_log_markdown(""),  # log_output
-                gr.update(choices=[], value=None),  # options_radio
-                "",  # goal_box
-                "No need for coordinates",  # coords_box
-                gr.update(value=None, visible=False),  # video_display
-                "",  # task_info_box
-                "",  # progress_info_box
-                gr.update(interactive=True),   # login_btn
-                gr.update(interactive=False),  # restart_episode_btn
-                gr.update(interactive=False),  # next_task_btn
-                gr.update(interactive=False),  # exec_btn
-                "",  # username_state
-                gr.update(visible=False),  # video_phase_group
-                gr.update(visible=False),  # action_phase_group
-                gr.update(visible=False),  # control_panel_group
-                gr.update(value=""),  # task_hint_display
-                gr.update(interactive=False),  # reference_action_btn
-            )
-    
-    return default_outputs
+    _ = request  # Query params are intentionally ignored in session-based mode.
+    uid = create_session()
+    return init_session_and_load_task(uid)
 
 
-def precheck_execute_inputs(uid, username, option_idx, coords_str):
+def precheck_execute_inputs(uid, option_idx, coords_str):
     """
     Native precheck for execute action.
     Replaces frontend JS interception by validating inputs server-side before phase switch.
     """
-    # Lease check first for a consistent error surface.
-    if username:
-        try:
-            user_manager.assert_lease(username, uid)
-        except LeaseLost as e:
-            raise gr.Error(
-                "You have been logged in elsewhere. This page is no longer valid. "
-                f"Please refresh the page to log in again.\n{str(e)}"
-            )
-
     if uid:
         update_session_activity(uid)
 
@@ -1008,7 +809,7 @@ def precheck_execute_inputs(uid, username, option_idx, coords_str):
         raise gr.Error("please click the keypoint selection image before execute!")
 
 
-def execute_step(uid, username, option_idx, coords_str):
+def execute_step(uid, option_idx, coords_str):
     # 检查session是否超时（在更新活动时间之前检查）
     last_activity = get_session_activity(uid)
     if last_activity is not None:
@@ -1019,27 +820,20 @@ def execute_step(uid, username, option_idx, coords_str):
     # 更新session的最后活动时间
     update_session_activity(uid)
     
-    # Check lease first
-    if username:
-        try:
-            user_manager.assert_lease(username, uid)
-        except LeaseLost as e:
-            raise gr.Error(f"LeaseLost: {str(e)}")
-    
     session = get_session(uid)
     if not session:
         return None, format_log_markdown("Session Error"), gr.update(), gr.update(), gr.update(interactive=False), gr.update(interactive=False)
     
     # 检查 execute 次数限制（在执行前检查，如果达到限制则模拟失败状态）
     execute_limit_reached = False
-    if username and session.env_id is not None and session.episode_idx is not None:
+    if uid and session.env_id is not None and session.episode_idx is not None:
         # 从 session 读取 non_demonstration_task_length，如果存在则加上配置的偏移量作为限制，否则不设置限制
         max_execute = None
         if hasattr(session, 'non_demonstration_task_length') and session.non_demonstration_task_length is not None:
             max_execute = session.non_demonstration_task_length + EXECUTE_LIMIT_OFFSET
         
         if max_execute is not None:
-            current_count = get_execute_count(username, session.env_id, session.episode_idx)
+            current_count = get_execute_count(uid, session.env_id, session.episode_idx)
             if current_count >= max_execute:
                 execute_limit_reached = True
     
@@ -1107,9 +901,9 @@ def execute_step(uid, username, option_idx, coords_str):
         img = session.get_pil_image(use_segmented=USE_SEGMENTED_VIEW)
         
         # 增加 execute 计数（因为这也算一次尝试）
-        if username and session.env_id is not None and session.episode_idx is not None:
-            new_count = increment_execute_count(username, session.env_id, session.episode_idx)
-            print(f"Execute limit reached for {username}:{session.env_id}:{session.episode_idx} (count: {new_count})")
+        if uid and session.env_id is not None and session.episode_idx is not None:
+            new_count = increment_execute_count(uid, session.env_id, session.episode_idx)
+            print(f"Execute limit reached for {uid}:{session.env_id}:{session.episode_idx} (count: {new_count})")
     else:
         # 正常执行
         # 异常处理：所有异常（ScrewPlanFailure 和其他执行错误）都会显示弹窗通知
@@ -1138,9 +932,9 @@ def execute_step(uid, username, option_idx, coords_str):
             img = current_img
         
         # 增加 execute 计数（无论成功或失败都计数，因为用户已经执行了一次操作）
-        if username and session.env_id is not None and session.episode_idx is not None:
-            new_count = increment_execute_count(username, session.env_id, session.episode_idx)
-            print(f"Execute count for {username}:{session.env_id}:{session.episode_idx} = {new_count}")
+        if uid and session.env_id is not None and session.episode_idx is not None:
+            new_count = increment_execute_count(uid, session.env_id, session.episode_idx)
+            print(f"Execute count for {uid}:{session.env_id}:{session.episode_idx} = {new_count}")
 
     # Execute frames are produced in batch when execute_action returns from worker process.
     # Enqueue them now, then wait briefly for the 0.1s timer to drain FIFO playback.
@@ -1166,10 +960,10 @@ def execute_step(uid, username, option_idx, coords_str):
             status = "********************************\n****   episode failed       ****\n********************************\n  ---please press change episode----   "
 
         # 更新累计完成计数，不再推进固定任务索引
-        if username:
+        if uid:
             seed = getattr(session, 'seed', None)
             user_status = user_manager.complete_current_task(
-                username,
+                uid,
                 env_id=session.env_id,
                 episode_idx=session.episode_idx,
                 status=final_log_status,

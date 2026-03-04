@@ -32,13 +32,13 @@ TASK_INDEX_MAP = {}  # {uid: {"task_index": int, "total_tasks": int}}
 UI_PHASE_MAP = {}  # {uid: "watching_demo" | "executing_task"}
 
 # --- Execute 次数跟踪 ---
-# 跟踪每个用户每个任务的 execute 次数
-# 键格式: "{username}:{env_id}:{episode_idx}"
+# 跟踪每个会话每个任务的 execute 次数
+# 键格式: "{uid}:{env_id}:{episode_idx}"
 EXECUTE_COUNTS = {}  # {task_key: count}
 
 # --- 任务开始时间跟踪 ---
 # 跟踪每个任务的开始时间
-# 键格式: "{username}:{env_id}:{episode_idx}"
+# 键格式: "{uid}:{env_id}:{episode_idx}"
 # 值: ISO 格式的时间字符串
 TASK_START_TIMES = {}  # {task_key: "2025-12-28T14:01:25.372278"}
 
@@ -167,17 +167,17 @@ def reset_play_button_clicked(uid):
             del PLAY_BUTTON_CLICKED[uid]
 
 
-def _get_task_key(username, env_id, episode_idx):
+def _get_task_key(uid, env_id, episode_idx):
     """生成任务键（用于跟踪 execute 次数）"""
-    return f"{username}:{env_id}:{episode_idx}"
+    return f"{uid}:{env_id}:{episode_idx}"
 
 
-def get_execute_count(username, env_id, episode_idx):
+def get_execute_count(uid, env_id, episode_idx):
     """
     获取指定任务的 execute 次数
     
     Args:
-        username: 用户名
+        uid: 会话ID
         env_id: 环境ID
         episode_idx: Episode索引
         
@@ -185,16 +185,16 @@ def get_execute_count(username, env_id, episode_idx):
         int: execute 次数，如果任务不存在则返回 0
     """
     with _state_lock:
-        task_key = _get_task_key(username, env_id, episode_idx)
+        task_key = _get_task_key(uid, env_id, episode_idx)
         return EXECUTE_COUNTS.get(task_key, 0)
 
 
-def increment_execute_count(username, env_id, episode_idx):
+def increment_execute_count(uid, env_id, episode_idx):
     """
     增加指定任务的 execute 次数
     
     Args:
-        username: 用户名
+        uid: 会话ID
         env_id: 环境ID
         episode_idx: Episode索引
         
@@ -202,32 +202,32 @@ def increment_execute_count(username, env_id, episode_idx):
         int: 增加后的 execute 次数
     """
     with _state_lock:
-        task_key = _get_task_key(username, env_id, episode_idx)
+        task_key = _get_task_key(uid, env_id, episode_idx)
         current_count = EXECUTE_COUNTS.get(task_key, 0)
         EXECUTE_COUNTS[task_key] = current_count + 1
         return EXECUTE_COUNTS[task_key]
 
 
-def reset_execute_count(username, env_id, episode_idx):
+def reset_execute_count(uid, env_id, episode_idx):
     """
     重置指定任务的 execute 次数为 0
     
     Args:
-        username: 用户名
+        uid: 会话ID
         env_id: 环境ID
         episode_idx: Episode索引
     """
     with _state_lock:
-        task_key = _get_task_key(username, env_id, episode_idx)
+        task_key = _get_task_key(uid, env_id, episode_idx)
         EXECUTE_COUNTS[task_key] = 0
 
 
-def get_task_start_time(username, env_id, episode_idx):
+def get_task_start_time(uid, env_id, episode_idx):
     """
     获取指定任务的开始时间
     
     Args:
-        username: 用户名
+        uid: 会话ID
         env_id: 环境ID
         episode_idx: Episode索引
         
@@ -235,36 +235,36 @@ def get_task_start_time(username, env_id, episode_idx):
         str: ISO 格式的时间字符串，如果任务不存在则返回 None
     """
     with _state_lock:
-        task_key = _get_task_key(username, env_id, episode_idx)
+        task_key = _get_task_key(uid, env_id, episode_idx)
         return TASK_START_TIMES.get(task_key)
 
 
-def set_task_start_time(username, env_id, episode_idx, start_time):
+def set_task_start_time(uid, env_id, episode_idx, start_time):
     """
     设置指定任务的开始时间
     
     Args:
-        username: 用户名
+        uid: 会话ID
         env_id: 环境ID
         episode_idx: Episode索引
         start_time: ISO 格式的时间字符串
     """
     with _state_lock:
-        task_key = _get_task_key(username, env_id, episode_idx)
+        task_key = _get_task_key(uid, env_id, episode_idx)
         TASK_START_TIMES[task_key] = start_time
 
 
-def clear_task_start_time(username, env_id, episode_idx):
+def clear_task_start_time(uid, env_id, episode_idx):
     """
     清除指定任务的开始时间记录
     
     Args:
-        username: 用户名
+        uid: 会话ID
         env_id: 环境ID
         episode_idx: Episode索引
     """
     with _state_lock:
-        task_key = _get_task_key(username, env_id, episode_idx)
+        task_key = _get_task_key(uid, env_id, episode_idx)
         if task_key in TASK_START_TIMES:
             del TASK_START_TIMES[task_key]
 

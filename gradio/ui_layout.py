@@ -18,18 +18,17 @@ from gradio_callbacks import (
     execute_step,
     init_app,
     load_next_task_wrapper,
-    login_and_load_task,
     on_map_click,
     on_option_select,
     on_reference_action,
     on_video_end_transition,
     precheck_execute_inputs,
     refresh_live_obs,
-    show_loading_info,
     restart_episode_wrapper,
+    show_loading_info,
+    switch_env_wrapper,
     switch_to_action_phase,
     switch_to_execute_phase,
-    switch_env_wrapper,
 )
 from user_manager import user_manager
 
@@ -107,20 +106,14 @@ def _phase_from_updates(main_interface_update, video_phase_update):
     return PHASE_ACTION_KEYPOINT
 
 
-def _with_phase_from_login(load_result):
-    phase = _phase_from_updates(load_result[2], load_result[16])
+def _with_phase_from_load(load_result):
+    phase = _phase_from_updates(load_result[1], load_result[13])
     return (*load_result, phase)
-
-
-def _with_phase_from_init(init_result):
-    phase = _phase_from_updates(init_result[3], init_result[18])
-    return (*init_result, phase)
 
 
 def create_ui_blocks():
     """构建 Gradio Blocks，并完成页面阶段状态（phase）的联动绑定。"""
 
-    # 从任务展示文本中提取 env_id
     def render_header_task(task_text):
         clean_task = str(task_text or "").strip()
         if not clean_task:
@@ -132,19 +125,15 @@ def create_ui_blocks():
             clean_task = clean_task.split(marker, 1)[0].strip()
         return " ".join(clean_task.splitlines()).strip() or None
 
-    # 从目标文本中提取并渲染首个目标（仅文本内容）
     def render_header_goal(goal_text):
         first_goal = extract_first_goal(goal_text or "")
         return first_goal if first_goal else "—"
 
-    # 页面主体结构：头部、登录区、主交互区、任务提示区
     with gr.Blocks(title="Oracle Planner Interface") as demo:
-        # 设置全局主题和样式
         demo.theme = gr.themes.Soft()
         demo.css = CSS
 
-        # 顶部信息栏：标题、当前任务、当前目标
-        header_title_md = gr.Markdown("## RoboMME Human Evaluation", elem_id="header_title")
+        gr.Markdown("## RoboMME Human Evaluation", elem_id="header_title")
         with gr.Row():
             with gr.Column(scale=1):
                 header_task_box = gr.Dropdown(
@@ -165,54 +154,32 @@ def create_ui_blocks():
                     elem_id="header_goal",
                 )
 
-    
-        # 全屏加载遮罩：初始化和耗时操作时显示
         with gr.Column(visible=True, elem_id="loading_overlay_group") as loading_overlay:
             gr.Markdown("### Logging in and setting up environment... Please wait.")
 
-        # 会话级状态：用户 uid、用户名、当前 UI 阶段
         uid_state = gr.State(value=None)
-        username_state = gr.State(value="")
         ui_phase_state = gr.State(value=PHASE_INIT)
         live_obs_timer = gr.Timer(value=0.1, active=True)
 
-        # 隐藏数据组件：用于在回调间传递任务/进度/目标信息
         task_info_box = gr.Textbox(visible=False, elem_id="task_info_box")
         progress_info_box = gr.Textbox(visible=False)
         goal_box = gr.Textbox(visible=False)
 
-        # 登录区域（初始化后显示）
-        with gr.Column(visible=False) as login_group:
-            gr.Markdown("### User Login")
-            with gr.Row():
-                # 可登录用户列表来自任务管理器
-                available_users = list(user_manager.available_users)
-                username_input = gr.Dropdown(choices=available_users, label="Username", value=None)
-                login_btn = gr.Button("Login", variant="primary")
-            login_msg = gr.Markdown("")
-
-        # 主交互界面（登录成功后显示）
         with gr.Column(visible=False, elem_id="main_interface_root") as main_interface:
-            # 主体左右布局：左侧关键点区域，右侧控制面板
             with gr.Row(elem_id="main_layout_row"):
                 with gr.Column(scale=KEYPOINT_SELECTION_SCALE):
-                    # 左侧媒体卡片：按阶段切换展示内容
                     with gr.Column(elem_classes=["native-card"], elem_id="media_card"):
-                        # 阶段 1：演示视频
                         with gr.Column(visible=False, elem_id="video_phase_group") as video_phase_group:
-                            #gr.Markdown("### Watch the demonstration video")
                             video_display = gr.Video(
                                 label="Demonstration Video",
                                 interactive=False,
                                 elem_id="demo_video",
                                 autoplay=True,
                                 show_label=True,
-                                    visible=True,
+                                visible=True,
                             )
 
-                        # 阶段 3：关键点选择（图像交互）
                         with gr.Column(visible=False, elem_id="action_phase_group") as action_phase_group:
-                            #gr.Markdown("### Keypoint Selection")
                             img_display = gr.Image(
                                 label="Keypoint Selection",
                                 interactive=False,
@@ -224,12 +191,10 @@ def create_ui_blocks():
                             )
 
                 with gr.Column(scale=CONTROL_PANEL_SCALE):
-                    # 右侧控制面板：顶部并排(Action + Log) + 底部操作按钮
                     with gr.Column(visible=False, elem_id="control_panel_group") as control_panel_group:
                         with gr.Row(elem_id="right_top_row", equal_height=False):
                             with gr.Column(scale=RIGHT_TOP_ACTION_SCALE, elem_id="right_action_col"):
                                 with gr.Column(elem_classes=["native-card"], elem_id="action_selection_card"):
-                                    #gr.Markdown("### Action Selection")
                                     options_radio = gr.Radio(
                                         choices=[],
                                         label=" Action Selection",
@@ -246,7 +211,6 @@ def create_ui_blocks():
                                         elem_id="coords_box",
                                     )
 
-                            # 系统日志卡片：显示执行过程反馈
                             with gr.Column(scale=RIGHT_TOP_LOG_SCALE, elem_id="right_log_col"):
                                 with gr.Column(elem_classes=["native-card"], elem_id="log_card"):
                                     log_output = gr.Textbox(
@@ -259,7 +223,6 @@ def create_ui_blocks():
                                         label="System Log",
                                     )
 
-                        # 操作按钮区：执行、参考动作、重开/切换 episode
                         with gr.Row(elem_id="action_buttons_row"):
                             with gr.Column(elem_classes=["native-card", "native-button-card"], elem_id="exec_btn_card"):
                                 exec_btn = gr.Button("EXECUTE", variant="stop", size="lg", elem_id="exec_btn")
@@ -296,9 +259,8 @@ def create_ui_blocks():
                                     interactive=False,
                                     elem_id="next_task_btn",
                                 )
-                        # 任务提示卡片：与控制面板同显隐
+
                         with gr.Column(visible=True, elem_classes=["native-card"], elem_id="task_hint_card"):
-                            #gr.Markdown("### Task Hint")
                             task_hint_display = gr.Textbox(
                                 value="",
                                 lines=8,
@@ -309,7 +271,6 @@ def create_ui_blocks():
                                 elem_id="task_hint_display",
                             )
 
-        # 头部任务/目标信息同步逻辑
         def _normalize_env_choice(env_value, choices):
             if env_value is None:
                 return None
@@ -341,21 +302,17 @@ def create_ui_blocks():
         def sync_header_from_goal(goal_text, task_text, current_header_task):
             return _build_header_task_update(task_text, fallback_env=current_header_task), render_header_goal(goal_text)
 
-        # 为初始化和切换任务追加 ui phase，保证前端阶段状态一致
-        def login_and_load_task_with_phase(username, uid):
-            return _with_phase_from_login(login_and_load_task(username, uid))
-
-        def load_next_task_with_phase(username, uid):
-            return _with_phase_from_login(load_next_task_wrapper(username, uid))
-
-        def restart_episode_with_phase(username, uid):
-            return _with_phase_from_login(restart_episode_wrapper(username, uid))
-
-        def switch_env_with_phase(username, uid, selected_env):
-            return _with_phase_from_login(switch_env_wrapper(username, uid, selected_env))
-
         def init_app_with_phase(request: gr.Request):
-            return _with_phase_from_init(init_app(request))
+            return _with_phase_from_load(init_app(request))
+
+        def load_next_task_with_phase(uid):
+            return _with_phase_from_load(load_next_task_wrapper(uid))
+
+        def restart_episode_with_phase(uid):
+            return _with_phase_from_load(restart_episode_wrapper(uid))
+
+        def switch_env_with_phase(uid, selected_env):
+            return _with_phase_from_load(switch_env_wrapper(uid, selected_env))
 
         task_info_box.change(
             fn=sync_header_from_task,
@@ -370,12 +327,10 @@ def create_ui_blocks():
 
         header_task_box.input(fn=show_loading_info, outputs=[loading_overlay]).then(
             fn=switch_env_with_phase,
-            inputs=[username_state, uid_state, header_task_box],
+            inputs=[uid_state, header_task_box],
             outputs=[
                 uid_state,
-                login_group,
                 main_interface,
-                login_msg,
                 img_display,
                 log_output,
                 options_radio,
@@ -384,7 +339,6 @@ def create_ui_blocks():
                 video_display,
                 task_info_box,
                 progress_info_box,
-                login_btn,
                 restart_episode_btn,
                 next_task_btn,
                 exec_btn,
@@ -402,50 +356,12 @@ def create_ui_blocks():
             outputs=[header_task_box, header_goal_box],
         )
 
-        # 登录并加载任务
-        login_btn.click(fn=show_loading_info, outputs=[loading_overlay]).then(
-            fn=login_and_load_task_with_phase,
-            inputs=[username_input, uid_state],
-            outputs=[
-                uid_state,
-                login_group,
-                main_interface,
-                login_msg,
-                img_display,
-                log_output,
-                options_radio,
-                goal_box,
-                coords_box,
-                video_display,
-                task_info_box,
-                progress_info_box,
-                login_btn,
-                restart_episode_btn,
-                next_task_btn,
-                exec_btn,
-                video_phase_group,
-                action_phase_group,
-                control_panel_group,
-                task_hint_display,
-                loading_overlay,
-                reference_action_btn,
-                ui_phase_state,
-            ],
-        ).then(fn=lambda u: u, inputs=[username_input], outputs=[username_state]).then(
-            fn=sync_header_from_task,
-            inputs=[task_info_box, goal_box],
-            outputs=[header_task_box, header_goal_box],
-        )
-
-        # 切换到下一任务
         next_task_btn.click(fn=show_loading_info, outputs=[loading_overlay]).then(
             fn=load_next_task_with_phase,
-            inputs=[username_state, uid_state],
+            inputs=[uid_state],
             outputs=[
                 uid_state,
-                login_group,
                 main_interface,
-                login_msg,
                 img_display,
                 log_output,
                 options_radio,
@@ -454,7 +370,6 @@ def create_ui_blocks():
                 video_display,
                 task_info_box,
                 progress_info_box,
-                login_btn,
                 restart_episode_btn,
                 next_task_btn,
                 exec_btn,
@@ -474,12 +389,10 @@ def create_ui_blocks():
 
         restart_episode_btn.click(fn=show_loading_info, outputs=[loading_overlay]).then(
             fn=restart_episode_with_phase,
-            inputs=[username_state, uid_state],
+            inputs=[uid_state],
             outputs=[
                 uid_state,
-                login_group,
                 main_interface,
-                login_msg,
                 img_display,
                 log_output,
                 options_radio,
@@ -488,7 +401,6 @@ def create_ui_blocks():
                 video_display,
                 task_info_box,
                 progress_info_box,
-                login_btn,
                 restart_episode_btn,
                 next_task_btn,
                 exec_btn,
@@ -506,8 +418,6 @@ def create_ui_blocks():
             outputs=[header_task_box, header_goal_box],
         )
 
-        # 演示视频播放结束后，从视频阶段切到关键点选择阶段。
-        # 为提升稳定性，同时监听 end/stop 两类事件，并使用 queue=False 立即切换。
         video_display.end(
             fn=on_video_end_transition,
             inputs=[uid_state],
@@ -533,29 +443,27 @@ def create_ui_blocks():
             show_progress="hidden",
         )
 
-        # 关键点点击与动作选择联动
         img_display.select(
             fn=on_map_click,
-            inputs=[uid_state, username_state, options_radio],
+            inputs=[uid_state, options_radio],
             outputs=[img_display, coords_box],
         )
 
         options_radio.change(
             fn=on_option_select,
-            inputs=[uid_state, username_state, options_radio, coords_box],
+            inputs=[uid_state, options_radio, coords_box],
             outputs=[coords_box, img_display],
         )
 
         reference_action_btn.click(
             fn=on_reference_action,
-            inputs=[uid_state, username_state],
+            inputs=[uid_state],
             outputs=[img_display, options_radio, coords_box, log_output],
         )
 
-        # 执行动作链路：校验输入 -> 切到执行播放阶段 -> 执行 -> 回到动作选择阶段
         exec_btn.click(
             fn=precheck_execute_inputs,
-            inputs=[uid_state, username_state, options_radio, coords_box],
+            inputs=[uid_state, options_radio, coords_box],
             outputs=[],
             show_progress="hidden",
         ).then(
@@ -576,7 +484,7 @@ def create_ui_blocks():
             show_progress="hidden",
         ).then(
             fn=execute_step,
-            inputs=[uid_state, username_state, options_radio, coords_box],
+            inputs=[uid_state, options_radio, coords_box],
             outputs=[img_display, log_output, task_info_box, progress_info_box, restart_episode_btn, next_task_btn, exec_btn],
             show_progress="hidden",
         ).then(
@@ -605,16 +513,12 @@ def create_ui_blocks():
             show_progress="hidden",
         )
 
-        # 页面首次加载初始化
         demo.load(
             fn=init_app_with_phase,
             inputs=[],
             outputs=[
                 uid_state,
-                loading_overlay,
-                login_group,
                 main_interface,
-                login_msg,
                 img_display,
                 log_output,
                 options_radio,
@@ -623,15 +527,14 @@ def create_ui_blocks():
                 video_display,
                 task_info_box,
                 progress_info_box,
-                login_btn,
                 restart_episode_btn,
                 next_task_btn,
                 exec_btn,
-                username_state,
                 video_phase_group,
                 action_phase_group,
                 control_panel_group,
                 task_hint_display,
+                loading_overlay,
                 reference_action_btn,
                 ui_phase_state,
             ],

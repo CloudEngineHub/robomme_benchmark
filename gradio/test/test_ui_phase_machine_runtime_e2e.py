@@ -362,14 +362,14 @@ def test_phase_machine_runtime_flow_and_execute_precheck(phase_machine_ui_url):
     assert state["precheck_calls"] >= 2
 
 
-def test_unified_loading_overlay_init_and_login_flow(monkeypatch):
+def test_unified_loading_overlay_init_flow(monkeypatch):
     ui_layout = importlib.reload(importlib.import_module("ui_layout"))
 
     canonical_copy = "Logging in and setting up environment... Please wait."
     legacy_copy = "Loading environment, please wait..."
     fake_obs = np.zeros((24, 24, 3), dtype=np.uint8)
     fake_obs_img = Image.fromarray(fake_obs)
-    calls = {"init": 0, "login": 0}
+    calls = {"init": 0}
 
     def fake_show_loading_info():
         return gr.update(visible=True)
@@ -379,40 +379,7 @@ def test_unified_loading_overlay_init_and_login_flow(monkeypatch):
         time.sleep(0.8)
         return (
             "uid-init",
-            gr.update(visible=False),  # loading_overlay
-            gr.update(visible=True),   # login_group
-            gr.update(visible=False),  # main_interface
-            "",  # login_msg
-            gr.update(value=None, interactive=False),  # img_display
-            "",  # log_output
-            gr.update(choices=[], value=None),  # options_radio
-            "",  # goal_box
-            "No need for coordinates",  # coords_box
-            gr.update(value=None, visible=False),  # video_display
-            "",  # task_info_box
-            "",  # progress_info_box
-            gr.update(interactive=True),   # login_btn
-            gr.update(interactive=False),  # restart_episode_btn
-            gr.update(interactive=False),  # next_task_btn
-            gr.update(interactive=False),  # exec_btn
-            "",  # username_state
-            gr.update(visible=False),  # video_phase_group
-            gr.update(visible=False),  # action_phase_group
-            gr.update(visible=False),  # control_panel_group
-            gr.update(value=""),  # task_hint_display
-            gr.update(interactive=False),  # reference_action_btn
-        )
-
-    def fake_login_and_load_task(username, uid):
-        calls["login"] += 1
-        time.sleep(0.8)
-        user = username or "user1"
-        session_uid = uid or "uid-login"
-        return (
-            session_uid,
-            gr.update(visible=False),  # login_group
             gr.update(visible=True),  # main_interface
-            f"Logged in as {user}",  # login_msg
             gr.update(value=fake_obs_img, interactive=False),  # img_display
             "ready",  # log_output
             gr.update(choices=[("pick", 0)], value=None),  # options_radio
@@ -421,7 +388,6 @@ def test_unified_loading_overlay_init_and_login_flow(monkeypatch):
             gr.update(value=None, visible=False),  # video_display
             "PickXtimes (Episode 1)",  # task_info_box
             "Completed: 0",  # progress_info_box
-            gr.update(interactive=True),  # login_btn
             gr.update(interactive=True),  # restart_episode_btn
             gr.update(interactive=True),  # next_task_btn
             gr.update(interactive=True),  # exec_btn
@@ -435,7 +401,6 @@ def test_unified_loading_overlay_init_and_login_flow(monkeypatch):
 
     monkeypatch.setattr(ui_layout, "show_loading_info", fake_show_loading_info)
     monkeypatch.setattr(ui_layout, "init_app", fake_init_app)
-    monkeypatch.setattr(ui_layout, "login_and_load_task", fake_login_and_load_task)
 
     demo = ui_layout.create_ui_blocks()
 
@@ -470,20 +435,7 @@ def test_unified_loading_overlay_init_and_login_flow(monkeypatch):
             assert legacy_copy not in page.content()
 
             page.wait_for_selector("#loading_overlay_group", state="hidden", timeout=15000)
-            login_btn = page.get_by_role("button", name="Login")
-            login_btn.wait_for(state="visible", timeout=15000)
-            username_dropdown = page.get_by_label("Username")
-            username_dropdown.click()
-            page.get_by_role("option", name="user1").first.click()
-
-            login_btn.click()
-
-            page.wait_for_selector("#loading_overlay_group", state="visible", timeout=2500)
-            page.wait_for_selector("#loading_overlay_group", state="hidden", timeout=15000)
-            deadline = time.time() + 6.0
-            while calls["login"] < 1 and time.time() < deadline:
-                time.sleep(0.1)
-            assert calls["login"] >= 1
+            page.wait_for_selector("#main_interface_root", state="visible", timeout=15000)
             page.wait_for_function(
                 """() => {
                     const root = document.getElementById('header_task');
@@ -501,24 +453,19 @@ def test_unified_loading_overlay_init_and_login_flow(monkeypatch):
         demo.close()
 
     assert calls["init"] >= 1
-    assert calls["login"] >= 1
 
 
-def test_header_task_shows_env_on_url_auto_login(monkeypatch):
+def test_header_task_shows_env_after_init(monkeypatch):
     ui_layout = importlib.reload(importlib.import_module("ui_layout"))
 
     fake_obs = np.zeros((24, 24, 3), dtype=np.uint8)
     fake_obs_img = Image.fromarray(fake_obs)
 
     def fake_init_app(request=None):
-        params = request.query_params if request else {}
-        assert params.get("user") == "user1"
+        _ = request
         return (
             "uid-auto",
-            gr.update(visible=False),  # loading_overlay
-            gr.update(visible=False),  # login_group
             gr.update(visible=True),  # main_interface
-            "Logged in as user1",  # login_msg
             gr.update(value=fake_obs_img, interactive=False),  # img_display
             "ready",  # log_output
             gr.update(choices=[("pick", 0)], value=None),  # options_radio
@@ -527,15 +474,14 @@ def test_header_task_shows_env_on_url_auto_login(monkeypatch):
             gr.update(value=None, visible=False),  # video_display
             "PickXtimes (Episode 1)",  # task_info_box
             "Completed: 0",  # progress_info_box
-            gr.update(interactive=True),  # login_btn
             gr.update(interactive=True),  # restart_episode_btn
             gr.update(interactive=True),  # next_task_btn
             gr.update(interactive=True),  # exec_btn
-            "user1",  # username_state
             gr.update(visible=False),  # video_phase_group
             gr.update(visible=True),  # action_phase_group
             gr.update(visible=True),  # control_panel_group
             gr.update(value="hint"),  # task_hint_display
+            gr.update(visible=False),  # loading_overlay
             gr.update(interactive=True),  # reference_action_btn
         )
 
@@ -594,10 +540,7 @@ def test_header_task_env_normalization_and_fallback(monkeypatch, task_info_text,
     def fake_init_app(_request=None):
         return (
             "uid-auto",
-            gr.update(visible=False),  # loading_overlay
-            gr.update(visible=False),  # login_group
             gr.update(visible=True),  # main_interface
-            "Logged in as user1",  # login_msg
             gr.update(value=fake_obs_img, interactive=False),  # img_display
             "ready",  # log_output
             gr.update(choices=[("pick", 0)], value=None),  # options_radio
@@ -606,15 +549,14 @@ def test_header_task_env_normalization_and_fallback(monkeypatch, task_info_text,
             gr.update(value=None, visible=False),  # video_display
             task_info_text,  # task_info_box
             "Completed: 0",  # progress_info_box
-            gr.update(interactive=True),  # login_btn
             gr.update(interactive=True),  # restart_episode_btn
             gr.update(interactive=True),  # next_task_btn
             gr.update(interactive=True),  # exec_btn
-            "user1",  # username_state
             gr.update(visible=False),  # video_phase_group
             gr.update(visible=True),  # action_phase_group
             gr.update(visible=True),  # control_panel_group
             gr.update(value="hint"),  # task_hint_display
+            gr.update(visible=False),  # loading_overlay
             gr.update(interactive=True),  # reference_action_btn
         )
 
@@ -693,17 +635,14 @@ def test_phase_machine_runtime_local_video_path_end_transition():
 
     cb.get_session = lambda uid: fake_session
     cb.reset_play_button_clicked = lambda uid: None
-    cb.reset_execute_count = lambda username, env_id, ep_num: None
-    cb.set_task_start_time = lambda username, env_id, ep_num, start_time: None
+    cb.reset_execute_count = lambda uid, env_id, ep_num: None
+    cb.set_task_start_time = lambda uid, env_id, ep_num, start_time: None
     cb.set_ui_phase = lambda uid, phase: None
     cb.save_video = lambda frames, suffix="": demo_video_path
 
     try:
         with gr.Blocks(title="Native phase machine local video test") as demo:
-            uid_state = gr.State(value=None)
-
-            with gr.Column(visible=True, elem_id="login_group") as login_group:
-                login_btn = gr.Button("Login", elem_id="login_btn")
+            uid_state = gr.State(value="uid-local-video")
             with gr.Column(visible=False, elem_id="main_interface") as main_interface:
                 with gr.Column(visible=False, elem_id="video_phase_group") as video_phase_group:
                     video_display = gr.Video(value=None, elem_id="demo_video", autoplay=False)
@@ -714,7 +653,6 @@ def test_phase_machine_runtime_local_video_path_end_transition():
                 with gr.Column(visible=True, elem_id="control_panel_group") as control_panel_group:
                     options_radio = gr.Radio(choices=[("pick", 0)], value=None, elem_id="action_radio")
 
-            login_msg = gr.Markdown("")
             log_output = gr.Markdown("", elem_id="log_output")
             goal_box = gr.Textbox("")
             coords_box = gr.Textbox("No need for coordinates")
@@ -729,20 +667,18 @@ def test_phase_machine_runtime_local_video_path_end_transition():
             exec_btn = gr.Button("execute", interactive=False)
             reference_action_btn = gr.Button("reference", interactive=False)
 
-            def login_fn():
+            def load_fn():
                 status = {
                     "current_task": {"env_id": "VideoUnmask", "episode_idx": 1},
                     "completed_count": 0,
                 }
-                return cb._load_status_task("tester", "uid-local-video", status, login_message="Logged in as tester")
+                return cb._load_status_task("uid-local-video", status)
 
-            login_btn.click(
-                fn=login_fn,
+            demo.load(
+                fn=load_fn,
                 outputs=[
                     uid_state,
-                    login_group,
                     main_interface,
-                    login_msg,
                     img_display,
                     log_output,
                     options_radio,
@@ -751,7 +687,6 @@ def test_phase_machine_runtime_local_video_path_end_transition():
                     video_display,
                     task_info_box,
                     progress_info_box,
-                    login_btn,
                     restart_episode_btn,
                     next_task_btn,
                     exec_btn,
@@ -790,9 +725,7 @@ def test_phase_machine_runtime_local_video_path_end_transition():
                 browser = p.chromium.launch(headless=True)
                 page = browser.new_page(viewport={"width": 1280, "height": 900})
                 page.goto(root_url, wait_until="domcontentloaded")
-
-                page.wait_for_selector("#login_btn", timeout=20000)
-                page.click("#login_btn")
+                page.wait_for_selector("#main_interface", state="visible", timeout=20000)
 
                 page.wait_for_selector("#demo_video video", timeout=5000)
                 phase_after_login = page.evaluate(
