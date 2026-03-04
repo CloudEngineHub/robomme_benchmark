@@ -4,7 +4,7 @@
 
 ## 📢 Announcements
 
-[03/2026] We are thrilled to release RoboMME, the first large-scale robotic benchmark dedicated to memory-augmented manipulation! Spanning 4 cognitively motivated task suites with 16 carefully designed tasks, RoboMME pushes robots to remember, reason, and act.
+[03/2026] 🎉 We are thrilled to release RoboMME, the first large-scale robotic benchmark dedicated to memory-augmented manipulation! Spanning 4 cognitively motivated task suites with 16 carefully designed tasks, RoboMME pushes robots to remember 🧠, reason 💭, and act ⚡.
 
 ## 📦 Installation
 
@@ -85,7 +85,7 @@ uv run scripts/dev/xxxx
 ```
 
 
-## 🧠 Model Training
+## 🎓 Model Training
 
 ### 🌟 MME-VLA-Suite
 

@@ -127,19 +127,12 @@ def main(
 
         for ep in episodes:
             print(f"\nRunning task: {tid}, episode: {ep}, action_space: {action_space_type}, dataset: {dataset}")
-            env = env_builder.make_env_for_episode(
-                ep,
-                include_maniskill_obs=True,
-                include_front_depth=True,
-                include_wrist_depth=True,
-                include_front_camera_extrinsic=True,
-                include_wrist_camera_extrinsic=True,
-                include_available_multi_choices=True,
-                include_front_camera_intrinsic=True,
-                include_wrist_camera_intrinsic=True,
-            )
+            env = env_builder.make_env_for_episode(ep)
             obs, info = env.reset()
-
+            
+            if action_space_type == "multi_choice":
+                print(f"Available multi choices: {info['available_multi_choices']}")
+                
             task_goal = info["task_goal"]
             if isinstance(task_goal, list):
                 task_goal = task_goal[0]
@@ -151,6 +144,7 @@ def main(
 
             action_gen = generate_sample_actions(action_space_type, env=env)
             for action in action_gen:
+                print(f"Action: {action}")
                 obs, _, terminated, truncated, info = env.step(action)
                 status = info.get("status", "unknown")
                 if status == "error":
