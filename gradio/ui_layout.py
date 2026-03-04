@@ -47,6 +47,12 @@ SYNC_JS = ""
 CSS = f"""
 .native-card {{
 }}
+
+#reference_action_btn:not(:disabled) {{
+    background: #1f8b4c !important;
+    border-color: #1f8b4c !important;
+    color: #ffffff !important;
+}}
 """
 
 
@@ -241,6 +247,7 @@ def create_ui_blocks():
                                 reference_action_btn = gr.Button(
                                     "Ground Truth Action",
                                     variant="secondary",
+                                    interactive=False,
                                     elem_id="reference_action_btn",
                                 )
 
@@ -342,6 +349,7 @@ def create_ui_blocks():
                 control_panel_group,
                 task_hint_display,
                 loading_overlay,
+                reference_action_btn,
                 ui_phase_state,
             ],
         )
@@ -372,6 +380,7 @@ def create_ui_blocks():
                 control_panel_group,
                 task_hint_display,
                 loading_overlay,
+                reference_action_btn,
                 ui_phase_state,
             ],
         ).then(fn=lambda u: u, inputs=[username_input], outputs=[username_state])
@@ -402,6 +411,7 @@ def create_ui_blocks():
                 control_panel_group,
                 task_hint_display,
                 loading_overlay,
+                reference_action_btn,
                 ui_phase_state,
             ],
         )
@@ -431,6 +441,7 @@ def create_ui_blocks():
                 control_panel_group,
                 task_hint_display,
                 loading_overlay,
+                reference_action_btn,
                 ui_phase_state,
             ],
         )
@@ -476,6 +487,7 @@ def create_ui_blocks():
                 restart_episode_btn,
                 next_task_btn,
                 img_display,
+                reference_action_btn,
             ],
             show_progress="hidden",
         ).then(
@@ -496,6 +508,7 @@ def create_ui_blocks():
                 restart_episode_btn,
                 next_task_btn,
                 img_display,
+                reference_action_btn,
             ],
             show_progress="hidden",
         ).then(
@@ -539,6 +552,7 @@ def create_ui_blocks():
                 action_phase_group,
                 control_panel_group,
                 task_hint_display,
+                reference_action_btn,
                 ui_phase_state,
             ],
         )

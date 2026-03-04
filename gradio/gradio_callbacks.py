@@ -200,6 +200,7 @@ def switch_to_execute_phase(uid):
         gr.update(interactive=False),  # restart_episode_btn
         gr.update(interactive=False),  # next_task_btn
         gr.update(interactive=False),  # img_display
+        gr.update(interactive=False),  # reference_action_btn
     )
 
 
@@ -214,6 +215,7 @@ def switch_to_action_phase(uid=None):
         gr.update(),  # restart_episode_btn (keep execute_step result)
         gr.update(),  # next_task_btn (keep execute_step result)
         gr.update(interactive=True),  # img_display
+        gr.update(interactive=True),  # reference_action_btn
     )
 
 
@@ -380,6 +382,7 @@ def _login_failed_response(uid, message):
         gr.update(visible=False),  # control_panel_group
         gr.update(value=""),  # task_hint_display
         gr.update(visible=False),  # loading_overlay
+        gr.update(interactive=False),  # reference_action_btn
     )
 
 
@@ -446,6 +449,7 @@ def _load_status_task(username, uid, status, login_message=None):
             gr.update(visible=True),  # control_panel_group
             gr.update(value=get_task_hint(env_id) if env_id else ""),  # task_hint_display
             gr.update(visible=False),  # loading_overlay
+            gr.update(interactive=False),  # reference_action_btn
         )
 
     if session.env_id == "VideoPlaceButton" and session.language_goal:
@@ -514,6 +518,7 @@ def _load_status_task(username, uid, status, login_message=None):
             gr.update(visible=False),  # control_panel_group
             gr.update(value=get_task_hint(actual_env_id)),  # task_hint_display
             gr.update(visible=False),  # loading_overlay
+            gr.update(interactive=True),  # reference_action_btn
         )
 
     set_ui_phase(uid, "executing_task")
@@ -540,6 +545,7 @@ def _load_status_task(username, uid, status, login_message=None):
         gr.update(visible=True),  # control_panel_group
         gr.update(value=get_task_hint(actual_env_id)),  # task_hint_display
         gr.update(visible=False),  # loading_overlay
+        gr.update(interactive=True),  # reference_action_btn
     )
 
 
@@ -939,6 +945,7 @@ def init_app(request: gr.Request):
         gr.update(visible=False),  # action_phase_group
         gr.update(visible=False),  # control_panel_group
         gr.update(value=""),  # task_hint_display
+        gr.update(interactive=False),  # reference_action_btn
     )
     
     if username:
@@ -955,14 +962,14 @@ def init_app(request: gr.Request):
             # 调用 login_and_load_task 进行登录和任务加载
             login_results = login_and_load_task(username, uid)
             
-            # login_and_load_task returns 21 values:
+            # login_and_load_task returns 22 values:
             # (uid, login_group, main_interface, login_msg, img_display, log_output,
             #  options_radio, goal_box, coords_box, video_display, task_info_box,
             #  progress_info_box, login_btn, restart_episode_btn, next_task_btn, exec_btn,
             #  video_phase_group, action_phase_group, control_panel_group,
-            #  task_hint_display, loading_overlay)
+            #  task_hint_display, loading_overlay, reference_action_btn)
 
-            # init_app needs 22 values: same but with loading_group + username_state, without loading_overlay
+            # init_app needs 23 values: same but with loading_group + username_state, without loading_overlay
             return (
                 login_results[0],                    # uid
                 gr.update(visible=False),            # loading_group
@@ -986,6 +993,7 @@ def init_app(request: gr.Request):
                 login_results[17],                   # action_phase_group
                 login_results[18],                   # control_panel_group
                 login_results[19],                   # task_hint_display
+                login_results[21],                   # reference_action_btn
             )
         else:
             # 用户名不存在，显示错误消息但仍显示登录界面
@@ -1015,6 +1023,7 @@ def init_app(request: gr.Request):
                 gr.update(visible=False),  # action_phase_group
                 gr.update(visible=False),  # control_panel_group
                 gr.update(value=""),  # task_hint_display
+                gr.update(interactive=False),  # reference_action_btn
             )
     
     return default_outputs

@@ -58,11 +58,13 @@ def test_switch_phase_keeps_live_obs_visible_and_toggles_interactive(reload_modu
     callbacks = reload_module("gradio_callbacks")
 
     to_exec = callbacks.switch_to_execute_phase("uid-3")
-    assert len(to_exec) == 5
+    assert len(to_exec) == 6
     assert to_exec[0].get("interactive") is False
     assert to_exec[4].get("interactive") is False
+    assert to_exec[5].get("interactive") is False
 
     to_action = callbacks.switch_to_action_phase()
-    assert len(to_action) == 5
+    assert len(to_action) == 6
     assert to_action[0].get("interactive") is True
     assert to_action[4].get("interactive") is True
+    assert to_action[5].get("interactive") is True
