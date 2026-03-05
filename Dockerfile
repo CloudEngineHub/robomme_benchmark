@@ -31,6 +31,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics \
+    HOME=/home/user \
+    PATH=/home/user/.local/bin:$PATH \
+    OMP_NUM_THREADS=1 \
     PORT=7860
 
 RUN useradd -m -u 1000 user
@@ -42,9 +45,10 @@ RUN python3 -m pip install --upgrade pip setuptools wheel \
 
 COPY --chown=user:user . .
 RUN python3 -m pip install -e .
-RUN chown -R user:user /home/user/app
+RUN chmod +x /home/user/app/docker-entrypoint.sh
 
 USER user
 EXPOSE 7860
+ENTRYPOINT ["./docker-entrypoint.sh"]
 
 CMD ["python3", "gradio-web/main.py"]

@@ -59,6 +59,21 @@ def setup_logging() -> logging.Logger:
 LOGGER = setup_logging()
 
 
+def log_runtime_graphics_env():
+    """Log graphics-related runtime env so Spaces diagnostics are visible in stdout."""
+    keys = [
+        "CUDA_VISIBLE_DEVICES",
+        "NVIDIA_VISIBLE_DEVICES",
+        "NVIDIA_DRIVER_CAPABILITIES",
+        "VK_ICD_FILENAMES",
+        "OMP_NUM_THREADS",
+        "SAPIEN_RENDER_DEVICE",
+        "MUJOCO_GL",
+    ]
+    snapshot = {key: os.getenv(key) for key in keys}
+    LOGGER.info("Runtime graphics env: %s", snapshot)
+
+
 def ensure_media_dirs():
     """Ensure media temp directories exist before first write."""
     TEMP_DEMOS_DIR.mkdir(parents=True, exist_ok=True)
@@ -97,6 +112,7 @@ def main():
     from ui_layout import create_ui_blocks
 
     LOGGER.info("Starting Gradio real environment entrypoint: %s", __file__)
+    log_runtime_graphics_env()
     ensure_media_dirs()
     start_timeout_monitor()
 
