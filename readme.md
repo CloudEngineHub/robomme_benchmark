@@ -75,21 +75,21 @@ The train split has 100 episodes. The val/test splits each have 50 episodes. All
 The environment input/output format is described in [doc/env_format.md](doc/env_format.md).
 
 > Currently, environment spawning is set up only for imitation learning. We are working on extending it to support more general parallel environments for reinforcement learning in the future.
-
+<!-- 
 ### 🔧 Data Generation
 
 You can also re-generate your own HDF5 data via parallel processing using
 @hongze
 ```bash
 uv run scripts/dev/xxxx
-```
+``` -->
 
 
 ## 🎓 Model Training
 
 ### 🌟 MME-VLA-Suite
 
-The [MME Policy Learning](https://github.com/RoboMME/robomme_policy_learning) repo provides MME-VLA model training and evaluation used in our paper. It contains a family of memory-augmented VLA models built on [pi05](https://github.com/Physical-Intelligence/openpi) backbone and our implementation of [MemER](https://jen-pan.github.io/memer/). 
+The [MME Policy Learning](https://github.com/RoboMME/robomme_policy_learning) repo provides MME-VLA model training and evaluation used in our paper. It contains a family of 14 memory-augmented VLA models built on [pi05](https://github.com/Physical-Intelligence/openpi) backbone.
 
 ### 📚 Prior Methods
 
@@ -125,7 +125,7 @@ os.environ['MUJOCO_GL'] = 'osmesa'
 
 ## 🙏 Acknowledgements
 
-This work was supported in part by NSF SES-2128623, NSF CAREER #2337870, NSF NRI #2220876, NSF NAIRR250085. We would also like to thank the wonderful [OpenPi](https://github.com/Physical-Intelligence/openpi/tree/main) codebase from Physical-Intelligence.
+This work was supported in part by NSF SES-2128623, NSF CAREER #2337870, NSF NRI #2220876, NSF NAIRR250085, NSF IIS-1949634. We would also like to thank the wonderful [OpenPi](https://github.com/Physical-Intelligence/openpi/tree/main) codebase from Physical-Intelligence.
 
 
 ## 📄 Citation
