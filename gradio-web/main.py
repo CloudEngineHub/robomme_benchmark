@@ -116,6 +116,7 @@ def main():
         server_name="0.0.0.0",
         server_port=server_port,
         allowed_paths=allowed_paths,
+        ssr_mode=False,
         debug=True,
         show_error=True,
         quiet=False,
