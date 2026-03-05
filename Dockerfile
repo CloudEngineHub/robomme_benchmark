@@ -38,6 +38,8 @@ ENV PYTHONUNBUFFERED=1 \
 
 RUN useradd -m -u 1000 user
 WORKDIR /home/user/app
+RUN mkdir -p /home/user/app/temp_demos \
+    && chown user:user /home/user/app /home/user/app/temp_demos
 
 COPY --chown=user:user requirements.txt pyproject.toml README.md ./
 RUN python3 -m pip install --upgrade pip setuptools wheel \
