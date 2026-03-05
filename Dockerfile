@@ -11,7 +11,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     ffmpeg \
     libgl1 \
+    libglvnd-dev \
     libglib2.0-0 \
+    libvulkan1 \
+    vulkan-tools \
     && add-apt-repository ppa:deadsnakes/ppa \
     && apt-get update && apt-get install -y --no-install-recommends \
     python3.11 \
@@ -27,6 +30,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
+    NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics \
     PORT=7860
 
 RUN useradd -m -u 1000 user
@@ -38,6 +42,7 @@ RUN python3 -m pip install --upgrade pip setuptools wheel \
 
 COPY --chown=user:user . .
 RUN python3 -m pip install -e .
+RUN chown -R user:user /home/user/app
 
 USER user
 EXPOSE 7860

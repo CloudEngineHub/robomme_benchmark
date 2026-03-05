@@ -29,11 +29,13 @@ Build image:
 docker build -t robomme-gradio:gpu .
 ```
 
-Run container (GPU):
+Run container (GPU + Vulkan for ManiSkill/SAPIEN):
 
 ```bash
 docker run --rm --gpus all -p 7860:7860 robomme-gradio:gpu
 ```
+
+The image sets `NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics` so the NVIDIA container runtime exposes Vulkan/graphics driver files inside the container. Without graphics capability, ManiSkill/SAPIEN may fail with `vk::createInstanceUnique: ErrorIncompatibleDriver`.
 
 Optional metadata override:
 
@@ -148,7 +150,7 @@ A1: Use a physical display or set up a virtual display for GUI rendering (e.g. i
 
 **Q2: Failure related to Vulkan installation.**
 
-A2: We recommend reinstalling the NVIDIA driver and Vulkan packages. We use NVIDIA driver 570.211.01 and Vulkan 1.3.275. If it still does not work, switch to CPU rendering:
+A2: ManiSkill/SAPIEN requires both Vulkan userspace packages inside the container and NVIDIA graphics capability exposed by the container runtime. This image installs `libvulkan1`, `vulkan-tools`, and `libglvnd-dev`, and sets `NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics`. If it still does not work, first verify the host machine itself supports Vulkan (`vulkaninfo` on the host), then switch to CPU rendering:
 
 ```python
 os.environ['SAPIEN_RENDER_DEVICE'] = 'cpu'
