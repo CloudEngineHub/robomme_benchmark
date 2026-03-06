@@ -6,12 +6,26 @@ import sys
 import tempfile
 from pathlib import Path
 
+
+
+
 APP_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = APP_DIR.parent
 SRC_DIR = PROJECT_ROOT / "src"
 VIDEOS_DIR = APP_DIR / "videos"
 TEMP_DEMOS_DIR = PROJECT_ROOT / "temp_demos"
 CWD_TEMP_DEMOS_DIR = Path.cwd() / "temp_demos"
+
+
+def configure_runtime_devices():
+    """Restrict the app to physical GPU 1 and map rendering to the visible device."""
+    os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+    os.environ.setdefault("NVIDIA_VISIBLE_DEVICES", "1")
+    # After masking to physical GPU 1, libraries should use logical cuda:0.
+    os.environ["SAPIEN_RENDER_DEVICE"] = "cuda:0"
+
+
+configure_runtime_devices()
 
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))

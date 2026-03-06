@@ -38,6 +38,7 @@ from config import (
     SESSION_TIMEOUT,
     UI_TEXT,
     USE_SEGMENTED_VIEW,
+    get_ui_action_text,
     should_show_demo_video,
 )
 from process_session import ScrewPlanFailureError, ProcessSessionProxy
@@ -105,17 +106,34 @@ def get_videoplacebutton_goal(original_goal: str) -> str:
 def _ui_option_label(session, opt_label: str, opt_idx: int) -> str:
     """
     仅在 Gradio UI 层对选项显示文案做覆盖（不改底层 env/options 生成逻辑）。
-    目前只对 RouteStick 任务把 4 个长句 label 显示为短 label。
+    优先使用 raw_solve_options 中的原始 label/action 重新组装显示文本，
+    并按 env_id 做 display-only action 文案映射。
     """
-    env_id = getattr(session, "env_id", None)
-    if env_id == "RouteStick":
-        routestick_map = {
-            0: "move left clockwise",
-            1: "move right clockwise",
-            2: "move left counterclockwise",
-            3: "move right counterclockwise",
-        }
-        return routestick_map.get(int(opt_idx), opt_label)
+    try:
+        option_index = int(opt_idx)
+    except (TypeError, ValueError):
+        return opt_label
+
+    raw_solve_options = getattr(session, "raw_solve_options", None)
+    if not isinstance(raw_solve_options, list):
+        return opt_label
+    if not (0 <= option_index < len(raw_solve_options)):
+        return opt_label
+
+    raw_option = raw_solve_options[option_index]
+    if not isinstance(raw_option, dict):
+        return opt_label
+
+    raw_label = str(raw_option.get("label", "")).strip()
+    raw_action = str(raw_option.get("action", "")).strip()
+    mapped_action = get_ui_action_text(getattr(session, "env_id", None), raw_action)
+
+    if raw_label and mapped_action:
+        return f"{raw_label}. {mapped_action}"
+    if mapped_action:
+        return mapped_action
+    if raw_label:
+        return raw_label
     return opt_label
 
 
@@ -508,7 +526,7 @@ def _load_status_task(uid, status):
         if 0 <= opt_idx < len(session.raw_solve_options):
             opt = session.raw_solve_options[opt_idx]
             if opt.get("available"):
-                opt_label_with_hint = f"{opt_label} (click mouse 🖱️ to select 🎯)"
+                opt_label_with_hint = f"{opt_label}{_ui_text('actions', 'keypoint_required_suffix')}"
             else:
                 opt_label_with_hint = opt_label
         else:
@@ -860,6 +878,7 @@ def on_reference_action(uid):
     option_idx = reference.get("option_idx")
     option_label = str(reference.get("option_label", "")).strip()
     option_action = str(reference.get("option_action", "")).strip()
+    option_action = get_ui_action_text(getattr(session, "env_id", None), option_action)
     need_coords = bool(reference.get("need_coords", False))
     coords_xy = reference.get("coords_xy")
 

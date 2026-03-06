@@ -10,7 +10,7 @@ import math
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 import cv2
-from config import VIDEO_PLAYBACK_FPS
+from config import VIDEO_PLAYBACK_FPS, ROUTESTICK_OVERLAY_ACTION_TEXTS, get_ui_action_text
 
 # DEPRECATED: 历史任务特化图像叠加配置，保留仅为兼容旧代码路径。
 # 当前已统一关闭任务特化渲染。
@@ -354,6 +354,11 @@ def draw_coordinate_axes(img, position="right", rotate_180=False, env_id=None):
     
     # 如果是 RouteStick 任务，绘制旋转方向示意图（左侧或右侧）
     if env_id == "RouteStick" and (position == "right" or position == "left"):
+        lcw_text, lccw_text, rcw_text, rccw_text = [
+            get_ui_action_text("RouteStick", action_text)
+            for action_text in ROUTESTICK_OVERLAY_ACTION_TEXTS
+        ]
+
         # 绘制四个半圆箭头示意图（垂直排列）
         # 示意图位置：在图像的左侧或右侧，从上到下垂直排列
         illustration_width = 220  # 示意图区域宽度（已弃用，保留以保持兼容性）
@@ -401,7 +406,6 @@ def draw_coordinate_axes(img, position="right", rotate_180=False, env_id=None):
         draw_semicircle(draw, (lcw_center_x , lcw_center_y+15), semicircle_radius, line_color, line_width, half="upper", start_pos="left", end_pos="right", arrow_position="end", arrow_size=arrow_size)
         
         # 添加标签 "L CW"
-        lcw_text = "Left Clockwise"
         lcw_bbox = draw.textbbox((0, 0), lcw_text, font=small_font)
         lcw_text_width = lcw_bbox[2] - lcw_bbox[0]
         lcw_text_height = lcw_bbox[3] - lcw_bbox[1]
@@ -418,7 +422,6 @@ def draw_coordinate_axes(img, position="right", rotate_180=False, env_id=None):
         draw_semicircle(draw, (lccw_center_x, lccw_center_y), semicircle_radius, line_color, line_width, half="lower", start_pos="left", end_pos="right", arrow_position="end", arrow_size=arrow_size)
 
         # 添加标签 "L CCW"
-        lccw_text = "Left Counterclockwise"
         lccw_bbox = draw.textbbox((0, 0), lccw_text, font=small_font)
         lccw_text_width = lccw_bbox[2] - lccw_bbox[0]
         lccw_text_height = lccw_bbox[3] - lccw_bbox[1]
@@ -435,7 +438,6 @@ def draw_coordinate_axes(img, position="right", rotate_180=False, env_id=None):
         draw_semicircle(draw, (rcw_center_x , rcw_center_y), semicircle_radius, line_color, line_width, half="lower", start_pos="right", end_pos="left", arrow_position="end", arrow_size=arrow_size)
 
         # 添加标签 "R CW"
-        rcw_text = "Right Clockwise"
         rcw_bbox = draw.textbbox((0, 0), rcw_text, font=small_font)
         rcw_text_width = rcw_bbox[2] - rcw_bbox[0]
         rcw_text_height = rcw_bbox[3] - rcw_bbox[1]
@@ -452,7 +454,6 @@ def draw_coordinate_axes(img, position="right", rotate_180=False, env_id=None):
         draw_semicircle(draw, (rccw_center_x , rccw_center_y+15), semicircle_radius, line_color, line_width, half="upper",start_pos="right", end_pos="left", arrow_position="end", arrow_size=arrow_size)
 
         # 添加标签 "R CCW"
-        rccw_text = "Right Counterclockwise"
         rccw_bbox = draw.textbbox((0, 0), rccw_text, font=small_font)
         rccw_text_width = rccw_bbox[2] - rccw_bbox[0]
         rccw_text_height = rccw_bbox[3] - rccw_bbox[1]

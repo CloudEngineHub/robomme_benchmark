@@ -37,7 +37,7 @@ DEMO_VIDEO_ENV_IDS = [
 
 UI_TEXT = {
     "log": {
-        "action_selection_prompt": "please select the action below 👇🏻,\nsome actions also need to select keypoint",
+        "action_selection_prompt": "please select the action in the right 👈,\nsome actions also need to select keypoint",
         "demo_video_prompt": 'press "Watch Video Input🎬" to watch a video\nNote: you can only watch the video once',
         "session_error": "Session Error",
         "reference_action_error": "Ground Truth Action Error: {error}",
@@ -53,6 +53,9 @@ UI_TEXT = {
         "select_keypoint": "please click the keypoint selection image",
         "select_keypoint_before_execute": "please click the keypoint selection image before execute!",
     },
+    "actions": {
+        "keypoint_required_suffix": " (click mouse 🖱️ to select 🎯)",
+    },
     "errors": {
         "load_missing_task": "Error loading task: missing current_task",
         "load_invalid_task": "Error loading task: invalid task payload",
@@ -65,6 +68,45 @@ UI_TEXT = {
         "reference_action_resolve_failed": "Failed to resolve ground truth action.",
     },
 }
+
+UI_ACTION_TEXT_OVERRIDES = {
+    "PatternLock": {
+        "move forward": "move forward↓",
+        "move backward": "move backward↑",
+        "move left": "move left→",
+        "move right": "move right←",
+        "move forward-left": "move forward-left↘︎",
+        "move forward-right": "move forward-right↙︎",
+        "move backward-left": "move backward-left↗︎",
+        "move backward-right": "move backward-right↖︎",
+    },
+    "RouteStick": {
+        "move to the nearest left target by circling around the stick clockwise": "move left clockwise↘︎→↗︎ ◟→◞",
+        "move to the nearest right target by circling around the stick clockwise": "move right clockwise↖︎←↙︎ ◟←◞",
+        "move to the nearest left target by circling around the stick counterclockwise": "move left counterclockwise↗︎→↘︎ ◜→◝",
+        "move to the nearest right target by circling around the stick counterclockwise": "move right counterclockwise↙︎←↖︎ ◜←◝",
+    },
+}
+
+ROUTESTICK_OVERLAY_ACTION_TEXTS = [
+    "move to the nearest left target by circling around the stick clockwise",
+    "move to the nearest left target by circling around the stick counterclockwise",
+    "move to the nearest right target by circling around the stick clockwise",
+    "move to the nearest right target by circling around the stick counterclockwise",
+]
+
+
+def get_ui_action_text(env_id, action_text):
+    """
+    Return display-only action text overrides for a specific env/action pair.
+    Falls back to the original action text when no override is configured.
+    """
+    if not isinstance(action_text, str):
+        return action_text
+    if not isinstance(env_id, str) or not env_id:
+        return action_text
+    env_overrides = UI_ACTION_TEXT_OVERRIDES.get(env_id, {})
+    return env_overrides.get(action_text, action_text)
 
 def should_show_demo_video(env_id):
     """

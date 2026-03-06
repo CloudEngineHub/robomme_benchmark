@@ -4,8 +4,9 @@ from PIL import Image
 
 
 class _FakeSession:
-    def __init__(self, reference_payload):
+    def __init__(self, reference_payload, env_id="BinFill"):
         self._reference_payload = reference_payload
+        self.env_id = env_id
 
     def get_reference_action(self):
         return self._reference_payload
@@ -92,3 +93,32 @@ def test_on_option_select_keeps_valid_coords_when_option_needs_coords(monkeypatc
 
     assert coords_text == "12, 34"
     assert img_update.get("interactive") is True
+
+
+def test_on_reference_action_uses_configured_action_text_override(monkeypatch, reload_module):
+    config = reload_module("config")
+    callbacks = reload_module("gradio_callbacks")
+
+    session = _FakeSession(
+        {
+            "ok": True,
+            "option_idx": 0,
+            "option_label": "a",
+            "option_action": "move forward",
+            "need_coords": False,
+            "coords_xy": None,
+            "message": "ok",
+        },
+        env_id="PatternLock",
+    )
+
+    monkeypatch.setattr(callbacks, "update_session_activity", lambda uid: None)
+    monkeypatch.setattr(callbacks, "get_session", lambda uid: session)
+
+    _img, _option_update, coords_text, log_html = callbacks.on_reference_action("uid-1")
+
+    assert coords_text == config.UI_TEXT["coords"]["not_needed"]
+    assert log_html == config.UI_TEXT["log"]["reference_action_message"].format(
+        option_label="a",
+        option_action="move forward↑",
+    )
