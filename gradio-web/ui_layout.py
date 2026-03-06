@@ -10,6 +10,7 @@ import gradio as gr
 
 from config import (
     CONTROL_PANEL_SCALE,
+    LIVE_OBS_REFRESH_HZ,
     KEYPOINT_SELECTION_SCALE,
     RIGHT_TOP_ACTION_SCALE,
     RIGHT_TOP_LOG_SCALE,
@@ -159,7 +160,7 @@ def create_ui_blocks():
 
         uid_state = gr.State(value=None)
         ui_phase_state = gr.State(value=PHASE_INIT)
-        live_obs_timer = gr.Timer(value=0.1, active=True)
+        live_obs_timer = gr.Timer(value=1.0 / LIVE_OBS_REFRESH_HZ, active=True)
 
         task_info_box = gr.Textbox(visible=False, elem_id="task_info_box")
         progress_info_box = gr.Textbox(visible=False)

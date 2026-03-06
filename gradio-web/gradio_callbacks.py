@@ -31,7 +31,14 @@ from state_manager import (
 )
 from image_utils import draw_marker, save_video, concatenate_frames_horizontally
 from user_manager import user_manager
-from config import USE_SEGMENTED_VIEW, should_show_demo_video, SESSION_TIMEOUT, EXECUTE_LIMIT_OFFSET
+from config import (
+    EXECUTE_LIMIT_OFFSET,
+    KEYFRAME_DOWNSAMPLE_FACTOR,
+    LIVE_OBS_REFRESH_HZ,
+    SESSION_TIMEOUT,
+    USE_SEGMENTED_VIEW,
+    should_show_demo_video,
+)
 from process_session import ScrewPlanFailureError, ProcessSessionProxy
 from note_content import get_task_hint
 
@@ -41,6 +48,15 @@ from note_content import get_task_hint
 _LIVE_OBS_REFRESH = {}
 _LIVE_OBS_REFRESH_LOCK = threading.Lock()
 LOGGER = logging.getLogger("robomme.callbacks")
+
+
+def _should_enqueue_sample(sample_index: int) -> bool:
+    factor = max(1, int(KEYFRAME_DOWNSAMPLE_FACTOR))
+    return sample_index % factor == 0
+
+
+def _live_obs_refresh_interval_sec() -> float:
+    return 1.0 / max(float(LIVE_OBS_REFRESH_HZ), 1.0)
 
 
 def _uid_for_log(uid):
@@ -199,7 +215,7 @@ def switch_to_execute_phase(uid):
             _LIVE_OBS_REFRESH[uid] = {
                 "frame_queue": queue.Queue(),
                 "last_base_count": base_count,
-                "take_next": True,  # downsample x2 by enqueueing every other frame
+                "sample_index": 0,
             }
     return (
         gr.update(interactive=False),  # options_radio
@@ -233,14 +249,14 @@ def _get_live_obs_refresh_state(uid, base_count=0):
             _LIVE_OBS_REFRESH[uid] = {
                 "frame_queue": queue.Queue(),
                 "last_base_count": int(base_count),
-                "take_next": True,  # downsample x2 by enqueueing every other frame
+                "sample_index": 0,
             }
         return _LIVE_OBS_REFRESH[uid]
 
 
 def _enqueue_live_obs_frames(uid, base_frames):
     """
-    Push newly appended base_frames into per-uid FIFO queue with x2 downsampling.
+    Push newly appended base_frames into per-uid FIFO queue with configurable downsampling.
     """
     if not uid:
         return 0
@@ -255,22 +271,22 @@ def _enqueue_live_obs_frames(uid, base_frames):
         with _LIVE_OBS_REFRESH_LOCK:
             state["frame_queue"] = queue.Queue()
             state["last_base_count"] = current_count
-            state["take_next"] = True
+            state["sample_index"] = 0
         return 0
 
     if current_count <= last_count:
         return frame_queue.qsize()
 
     new_frames = frames[last_count:current_count]
-    take_next = bool(state.get("take_next", True))
+    sample_index = int(state.get("sample_index", 0))
     for frame in new_frames:
-        if take_next and frame is not None:
+        if _should_enqueue_sample(sample_index) and frame is not None:
             frame_queue.put(frame)
-        take_next = not take_next
+        sample_index += 1
 
     with _LIVE_OBS_REFRESH_LOCK:
         state["last_base_count"] = current_count
-        state["take_next"] = take_next
+        state["sample_index"] = sample_index
     return frame_queue.qsize()
 
 
@@ -285,8 +301,8 @@ def _wait_for_live_obs_queue_drain(uid, max_wait_sec=None, empty_grace_sec=0.2, 
         queue0 = state0.get("frame_queue") if state0 else None
         initial_qsize = int(queue0.qsize()) if queue0 is not None else 0
     if max_wait_sec is None:
-        # 0.1s tick playback + small buffer, capped to keep UI responsive.
-        max_wait_sec = min(30.0, max(2.0, initial_qsize * 0.12 + 1.0))
+        # Timer-driven playback + small buffer, capped to keep UI responsive.
+        max_wait_sec = min(30.0, max(2.0, initial_qsize * (_live_obs_refresh_interval_sec() + 0.02) + 1.0))
 
     start = time.time()
     empty_since = None
@@ -329,7 +345,7 @@ def _prepare_refresh_frame(frame):
 def refresh_live_obs(uid, ui_phase):
     """
     Poll latest cached frame during execute phase.
-    Updates live_obs every 0.1s via gr.Timer.
+    Updates live_obs using the configured gr.Timer interval.
     """
     if ui_phase != "execution_playback":
         return gr.update()
@@ -1108,12 +1124,12 @@ def execute_step(uid, option_idx, coords_str):
             )
 
     # Execute frames are produced in batch when execute_action returns from worker process.
-    # Enqueue them now, then wait briefly for the 0.1s timer to drain FIFO playback.
+    # Enqueue them now, then wait briefly for the configured timer to drain FIFO playback.
     _enqueue_live_obs_frames(uid, getattr(session, "base_frames", None))
     _wait_for_live_obs_queue_drain(uid)
     LOGGER.debug("execute_step playback drain complete uid=%s", _uid_for_log(uid))
     
-    # 注意：执行阶段画面由 live_obs 的 0.1s 轮询刷新。
+    # 注意：执行阶段画面由 live_obs 的配置化轮询间隔刷新。
     
     progress_update = gr.update()  # 默认不更新 progress
     task_update = gr.update()
