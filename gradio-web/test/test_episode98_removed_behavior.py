@@ -4,6 +4,7 @@ import time
 
 
 def test_load_next_task_wrapper_treats_episode98_as_normal(monkeypatch, reload_module):
+    reload_module("config")
     callbacks = reload_module("gradio_callbacks")
 
     expected = ("SENTINEL",)
@@ -22,6 +23,7 @@ def test_load_next_task_wrapper_treats_episode98_as_normal(monkeypatch, reload_m
 
 
 def test_restart_episode_wrapper_reloads_same_episode(monkeypatch, reload_module):
+    reload_module("config")
     callbacks = reload_module("gradio_callbacks")
 
     load_calls = []
@@ -48,6 +50,7 @@ def test_restart_episode_wrapper_reloads_same_episode(monkeypatch, reload_module
 
 
 def test_restart_episode_wrapper_missing_status_returns_login_failed(monkeypatch, reload_module):
+    config = reload_module("config")
     callbacks = reload_module("gradio_callbacks")
 
     monkeypatch.setattr(callbacks, "update_session_activity", lambda uid: None)
@@ -55,10 +58,11 @@ def test_restart_episode_wrapper_missing_status_returns_login_failed(monkeypatch
 
     result = callbacks.restart_episode_wrapper("uid1")
 
-    assert "Failed to restart episode" in result[3]
+    assert config.UI_TEXT["errors"]["restart_missing_task"] in result[3]
 
 
 def test_execute_step_failed_episode98_still_advances(monkeypatch, reload_module):
+    config = reload_module("config")
     callbacks = reload_module("gradio_callbacks")
 
     class _FakeSession:
@@ -99,7 +103,7 @@ def test_execute_step_failed_episode98_still_advances(monkeypatch, reload_module
 
     monkeypatch.setattr(callbacks.user_manager, "complete_current_task", _fake_complete_current_task)
 
-    result = callbacks.execute_step("uid1", 0, "No need for coordinates")
+    result = callbacks.execute_step("uid1", 0, config.UI_TEXT["coords"]["not_needed"])
 
     assert len(complete_calls) == 1
     assert complete_calls[0]["episode_idx"] == 98

@@ -35,6 +35,37 @@ DEMO_VIDEO_ENV_IDS = [
     "RouteStick"
 ]
 
+UI_TEXT = {
+    "log": {
+        "action_selection_prompt": "please select the action below 👇🏻,\nsome actions also need to select keypoint",
+        "demo_video_prompt": 'press "Watch Video Input🎬" to watch a video\nNote: you can only watch the video once',
+        "session_error": "Session Error",
+        "reference_action_error": "Ground Truth Action Error: {error}",
+        "reference_action_message": "Ground Truth Action: {option_label}. {option_action}",
+        "reference_action_message_with_coords": "Ground Truth Action: {option_label}. {option_action} | coords: {coords_text}",
+        "reference_action_status": "Ground Truth Action: {message}",
+        "execute_missing_action": "Error: No action selected",
+        "episode_success_banner": "********************************\n****   episode success      ****\n********************************\n  ---please press change episode----   ",
+        "episode_failed_banner": "********************************\n****   episode failed       ****\n********************************\n  ---please press change episode----   ",
+    },
+    "coords": {
+        "not_needed": "No need for coordinates",
+        "select_keypoint": "please click the keypoint selection image",
+        "select_keypoint_before_execute": "please click the keypoint selection image before execute!",
+    },
+    "errors": {
+        "load_missing_task": "Error loading task: missing current_task",
+        "load_invalid_task": "Error loading task: invalid task payload",
+        "load_episode_error": "Error: {load_msg}",
+        "next_task_failed": "Failed to load next task",
+        "restart_missing_task": "Failed to restart episode: missing current task",
+        "restart_invalid_task": "Failed to restart episode: invalid task payload",
+        "switch_env_failed": "Failed to switch environment to '{selected_env}'",
+        "init_failed": "Initialization error: {error}",
+        "reference_action_resolve_failed": "Failed to resolve ground truth action.",
+    },
+}
+
 def should_show_demo_video(env_id):
     """
     判断指定的环境ID是否应该显示demonstration video

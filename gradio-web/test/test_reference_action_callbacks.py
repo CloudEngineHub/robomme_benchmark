@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 from PIL import Image
 
 
@@ -20,6 +21,7 @@ class _FakeOptionSession:
 
 
 def test_on_reference_action_success_updates_option_and_coords(monkeypatch, reload_module):
+    config = reload_module("config")
     callbacks = reload_module("gradio_callbacks")
 
     session = _FakeSession(
@@ -43,10 +45,16 @@ def test_on_reference_action_success_updates_option_and_coords(monkeypatch, relo
     assert img.getpixel((5, 6)) != (0, 0, 0)
     assert option_update.get("value") == 2
     assert coords_text == "5, 6"
-    assert "Ground Truth Action" in log_html
+    expected_log = config.UI_TEXT["log"]["reference_action_message_with_coords"].format(
+        option_label="c",
+        option_action="press the button",
+        coords_text="5, 6",
+    )
+    assert log_html == expected_log
 
 
 def test_on_reference_action_session_missing(monkeypatch, reload_module):
+    config = reload_module("config")
     callbacks = reload_module("gradio_callbacks")
 
     monkeypatch.setattr(callbacks, "update_session_activity", lambda uid: None)
@@ -56,11 +64,12 @@ def test_on_reference_action_session_missing(monkeypatch, reload_module):
 
     assert img is None
     assert option_update.get("__type__") == "update"
-    assert coords_text == "No need for coordinates"
-    assert "Session Error" in log_html
+    assert coords_text == config.UI_TEXT["coords"]["not_needed"]
+    assert log_html == config.UI_TEXT["log"]["session_error"]
 
 
 def test_on_reference_action_error_message_from_reference(monkeypatch, reload_module):
+    config = reload_module("config")
     callbacks = reload_module("gradio_callbacks")
 
     session = _FakeSession({"ok": False, "message": "bad ref"})
@@ -68,10 +77,11 @@ def test_on_reference_action_error_message_from_reference(monkeypatch, reload_mo
     monkeypatch.setattr(callbacks, "get_session", lambda uid: session)
 
     _img, _opt, _coords, log_html = callbacks.on_reference_action("uid-1")
-    assert "bad ref" in log_html
+    assert log_html == config.UI_TEXT["log"]["reference_action_status"].format(message="bad ref")
 
 
 def test_on_option_select_keeps_valid_coords_when_option_needs_coords(monkeypatch, reload_module):
+    reload_module("config")
     callbacks = reload_module("gradio_callbacks")
 
     session = _FakeOptionSession()

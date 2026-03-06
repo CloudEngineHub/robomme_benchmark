@@ -9,30 +9,33 @@ class _FakeSession:
 
 
 def test_precheck_execute_inputs_requires_action(monkeypatch, reload_module):
+    config = reload_module("config")
     callbacks = reload_module("gradio_callbacks")
     monkeypatch.setattr(callbacks, "get_session", lambda uid: _FakeSession(available=False))
     monkeypatch.setattr(callbacks, "update_session_activity", lambda uid: None)
 
     with pytest.raises(Exception) as excinfo:
-        callbacks.precheck_execute_inputs("uid-1", None, "No need for coordinates")
+        callbacks.precheck_execute_inputs("uid-1", None, config.UI_TEXT["coords"]["not_needed"])
 
-    assert "No action selected" in str(excinfo.value)
+    assert config.UI_TEXT["log"]["execute_missing_action"] in str(excinfo.value)
 
 
 def test_precheck_execute_inputs_requires_coords_when_option_needs_it(monkeypatch, reload_module):
+    config = reload_module("config")
     callbacks = reload_module("gradio_callbacks")
     monkeypatch.setattr(callbacks, "get_session", lambda uid: _FakeSession(available=True))
     monkeypatch.setattr(callbacks, "update_session_activity", lambda uid: None)
 
     with pytest.raises(Exception) as excinfo:
         callbacks.precheck_execute_inputs(
-            "uid-1", 0, "please click the keypoint selection image"
+            "uid-1", 0, config.UI_TEXT["coords"]["select_keypoint"]
         )
 
-    assert "before execute" in str(excinfo.value)
+    assert config.UI_TEXT["coords"]["select_keypoint_before_execute"] in str(excinfo.value)
 
 
 def test_precheck_execute_inputs_accepts_valid_coords(monkeypatch, reload_module):
+    reload_module("config")
     callbacks = reload_module("gradio_callbacks")
     monkeypatch.setattr(callbacks, "get_session", lambda uid: _FakeSession(available=True))
     monkeypatch.setattr(callbacks, "update_session_activity", lambda uid: None)
@@ -43,6 +46,7 @@ def test_precheck_execute_inputs_accepts_valid_coords(monkeypatch, reload_module
 
 
 def test_precheck_execute_inputs_session_error(monkeypatch, reload_module):
+    config = reload_module("config")
     callbacks = reload_module("gradio_callbacks")
     monkeypatch.setattr(callbacks, "get_session", lambda uid: None)
     monkeypatch.setattr(callbacks, "update_session_activity", lambda uid: None)
@@ -50,4 +54,4 @@ def test_precheck_execute_inputs_session_error(monkeypatch, reload_module):
     with pytest.raises(Exception) as excinfo:
         callbacks.precheck_execute_inputs("uid-missing", 0, "1, 2")
 
-    assert "Session Error" in str(excinfo.value)
+    assert config.UI_TEXT["log"]["session_error"] in str(excinfo.value)

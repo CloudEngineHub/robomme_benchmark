@@ -36,6 +36,7 @@ from config import (
     KEYFRAME_DOWNSAMPLE_FACTOR,
     LIVE_OBS_REFRESH_HZ,
     SESSION_TIMEOUT,
+    UI_TEXT,
     USE_SEGMENTED_VIEW,
     should_show_demo_video,
 )
@@ -48,6 +49,11 @@ from note_content import get_task_hint
 _LIVE_OBS_REFRESH = {}
 _LIVE_OBS_REFRESH_LOCK = threading.Lock()
 LOGGER = logging.getLogger("robomme.callbacks")
+
+
+def _ui_text(section, key, **kwargs):
+    template = UI_TEXT[section][key]
+    return template.format(**kwargs) if kwargs else template
 
 
 def _should_enqueue_sample(sample_index: int) -> bool:
@@ -198,7 +204,7 @@ def on_video_end(uid):
     Called when the demonstration video finishes playing.
     Updates the system log to prompt for action selection.
     """
-    return format_log_markdown("please select the action below 👇🏻,\nsome actions also need to select keypoint")
+    return format_log_markdown(_ui_text("log", "action_selection_prompt"))
 
 
 def switch_to_execute_phase(uid):
@@ -382,7 +388,7 @@ def on_video_end_transition(uid):
         gr.update(visible=False),  # video_phase_group
         gr.update(visible=True),   # action_phase_group
         gr.update(visible=True),   # control_panel_group
-        format_log_markdown("please select the action below 👇🏻,\nsome actions also need to select keypoint")
+        format_log_markdown(_ui_text("log", "action_selection_prompt"))
     )
 
 
@@ -395,7 +401,7 @@ def _task_load_failed_response(uid, message):
         format_log_markdown(message),  # log_output
         gr.update(choices=[], value=None),  # options_radio
         "",  # goal_box
-        "No need for coordinates",  # coords_box
+        _ui_text("coords", "not_needed"),  # coords_box
         gr.update(value=None, visible=False),  # video_display
         "",  # task_info_box
         "",  # progress_info_box
@@ -415,12 +421,12 @@ def _load_status_task(uid, status):
     """Load status.current_task to session and build the standard UI update tuple."""
     current_task = status.get("current_task") if isinstance(status, dict) else None
     if not current_task:
-        return _task_load_failed_response(uid, "Error loading task: missing current_task")
+        return _task_load_failed_response(uid, _ui_text("errors", "load_missing_task"))
 
     env_id = current_task.get("env_id")
     ep_num = current_task.get("episode_idx")
     if env_id is None or ep_num is None:
-        return _task_load_failed_response(uid, "Error loading task: invalid task payload")
+        return _task_load_failed_response(uid, _ui_text("errors", "load_invalid_task"))
 
     try:
         completed_count = int(status.get("completed_count", 0))
@@ -472,10 +478,10 @@ def _load_status_task(uid, status):
             uid,
             gr.update(visible=True),  # main_interface
             gr.update(value=None, interactive=False),  # img_display
-            format_log_markdown(f"Error: {load_msg}"),  # log_output
+            format_log_markdown(_ui_text("errors", "load_episode_error", load_msg=load_msg)),  # log_output
             gr.update(choices=[], value=None),  # options_radio
             "",  # goal_box
-            "No need for coordinates",  # coords_box
+            _ui_text("coords", "not_needed"),  # coords_box
             gr.update(value=None, visible=False),  # video_display
             f"{actual_env_id} (Episode {ep_num})",  # task_info_box
             progress_text,  # progress_info_box
@@ -518,11 +524,11 @@ def _load_status_task(uid, status):
     demo_video_path = None
     has_demo_video = False
     should_show = should_show_demo_video(actual_env_id) if actual_env_id else False
-    initial_log_msg = format_log_markdown("please select the action below 👇🏻,\nsome actions also need to select keypoint")
+    initial_log_msg = format_log_markdown(_ui_text("log", "action_selection_prompt"))
 
     if should_show:
         has_demo_video = True
-        initial_log_msg = format_log_markdown('press "Watch Video Input🎬" to watch a video\nNote: you can only watch the video once')
+        initial_log_msg = format_log_markdown(_ui_text("log", "demo_video_prompt"))
         if session.demonstration_frames:
             try:
                 demo_video_path = save_video(session.demonstration_frames, "demo")
@@ -553,7 +559,7 @@ def _load_status_task(uid, status):
             initial_log_msg,  # log_output
             gr.update(choices=radio_choices, value=None),  # options_radio
             goal_text,  # goal_box
-            "No need for coordinates",  # coords_box
+            _ui_text("coords", "not_needed"),  # coords_box
             gr.update(value=demo_video_path, visible=True),  # video_display
             f"{actual_env_id} (Episode {ep_num})",  # task_info_box
             progress_text,  # progress_info_box
@@ -577,7 +583,7 @@ def _load_status_task(uid, status):
         initial_log_msg,  # log_output
         gr.update(choices=radio_choices, value=None),  # options_radio
         goal_text,  # goal_box
-        "No need for coordinates",  # coords_box
+        _ui_text("coords", "not_needed"),  # coords_box
         gr.update(value=None, visible=False),  # video_display (no video)
         f"{actual_env_id} (Episode {ep_num})",  # task_info_box
         progress_text,  # progress_info_box
@@ -630,7 +636,7 @@ def load_next_task_wrapper(uid):
     LOGGER.info("load_next_task_wrapper uid=%s", _uid_for_log(uid))
     status = user_manager.next_episode_same_env(uid)
     if not status:
-        return _task_load_failed_response(uid, "Failed to load next task")
+        return _task_load_failed_response(uid, _ui_text("errors", "next_task_failed"))
     return _load_status_task(uid, status)
 
 
@@ -647,12 +653,12 @@ def restart_episode_wrapper(uid):
     status = user_manager.get_session_status(uid)
     current_task = status.get("current_task") if isinstance(status, dict) else None
     if not current_task:
-        return _task_load_failed_response(uid, "Failed to restart episode: missing current task")
+        return _task_load_failed_response(uid, _ui_text("errors", "restart_missing_task"))
 
     env_id = current_task.get("env_id")
     ep_num = current_task.get("episode_idx")
     if env_id is None or ep_num is None:
-        return _task_load_failed_response(uid, "Failed to restart episode: invalid task payload")
+        return _task_load_failed_response(uid, _ui_text("errors", "restart_invalid_task"))
 
     return _load_status_task(uid, status)
 
@@ -677,7 +683,10 @@ def switch_env_wrapper(uid, selected_env):
         status = user_manager.get_session_status(uid)
 
     if not status:
-        return _task_load_failed_response(uid, f"Failed to switch environment to '{selected_env}'")
+        return _task_load_failed_response(
+            uid,
+            _ui_text("errors", "switch_env_failed", selected_env=selected_env),
+        )
 
     return _load_status_task(uid, status)
 
@@ -693,7 +702,7 @@ def on_map_click(uid, option_value, evt: gr.SelectData):
     session = get_session(uid)
     if not session:
         LOGGER.warning("on_map_click: missing session uid=%s", _uid_for_log(uid))
-        return None, "Session Error"
+        return None, _ui_text("log", "session_error")
         
     # Check if current option actually needs coordinates
     needs_coords = False
@@ -720,7 +729,7 @@ def on_map_click(uid, option_value, evt: gr.SelectData):
         # Return current state without changes (or reset to default message if needed, but it should already be there)
         # We return the clean image and the "No need" message to enforce state
         base_img = session.get_pil_image(use_segmented=USE_SEGMENTED_VIEW)
-        return base_img, "No need for coordinates"
+        return base_img, _ui_text("coords", "not_needed")
 
     x, y = evt.index[0], evt.index[1]
     LOGGER.debug(
@@ -746,7 +755,11 @@ def _is_valid_coords_text(coords_text: str) -> bool:
     if not isinstance(coords_text, str):
         return False
     text = coords_text.strip()
-    if text in {"", "please click the keypoint selection image", "No need for coordinates"}:
+    if text in {
+        "",
+        _ui_text("coords", "select_keypoint"),
+        _ui_text("coords", "not_needed"),
+    }:
         return False
     if "," not in text:
         return False
@@ -763,7 +776,7 @@ def on_option_select(uid, option_value, coords_str=None):
     """
     处理选项选择事件
     """
-    default_msg = "No need for coordinates"
+    default_msg = _ui_text("coords", "not_needed")
     
     if option_value is None:
         LOGGER.debug("on_option_select uid=%s option=None", _uid_for_log(uid))
@@ -796,7 +809,7 @@ def on_option_select(uid, option_value, coords_str=None):
              )
              if _is_valid_coords_text(coords_str):
                  return coords_str, gr.update(interactive=True)
-             return "please click the keypoint selection image", gr.update(interactive=True)
+             return _ui_text("coords", "select_keypoint"), gr.update(interactive=True)
     
     LOGGER.debug("on_option_select uid=%s option=%s requires_coords=False", _uid_for_log(uid), option_idx)
     return default_msg, gr.update(interactive=False)
@@ -815,8 +828,8 @@ def on_reference_action(uid):
         return (
             None,
             gr.update(),
-            "No need for coordinates",
-            format_log_markdown("Session Error"),
+            _ui_text("coords", "not_needed"),
+            format_log_markdown(_ui_text("log", "session_error")),
         )
 
     LOGGER.info("on_reference_action uid=%s env=%s", _uid_for_log(uid), getattr(session, "env_id", None))
@@ -830,18 +843,18 @@ def on_reference_action(uid):
             current_img,
             gr.update(),
             gr.update(),
-            format_log_markdown(f"Ground Truth Action Error: {exc}"),
+            format_log_markdown(_ui_text("log", "reference_action_error", error=exc)),
         )
 
     if not isinstance(reference, dict) or not reference.get("ok", False):
-        message = "Failed to resolve ground truth action."
+        message = _ui_text("errors", "reference_action_resolve_failed")
         if isinstance(reference, dict) and reference.get("message"):
             message = str(reference.get("message"))
         return (
             current_img,
             gr.update(),
             gr.update(),
-            format_log_markdown(f"Ground Truth Action: {message}"),
+            format_log_markdown(_ui_text("log", "reference_action_status", message=message)),
         )
 
     option_idx = reference.get("option_idx")
@@ -851,15 +864,26 @@ def on_reference_action(uid):
     coords_xy = reference.get("coords_xy")
 
     updated_img = current_img
-    coords_text = "No need for coordinates"
-    log_text = f"Ground Truth Action: {option_label}. {option_action}".strip()
+    coords_text = _ui_text("coords", "not_needed")
+    log_text = _ui_text(
+        "log",
+        "reference_action_message",
+        option_label=option_label,
+        option_action=option_action,
+    ).strip()
 
     if need_coords and isinstance(coords_xy, (list, tuple)) and len(coords_xy) >= 2:
         x = int(coords_xy[0])
         y = int(coords_xy[1])
         updated_img = draw_marker(current_img, x, y)
         coords_text = f"{x}, {y}"
-        log_text = f"Ground Truth Action: {option_label}. {option_action} | coords: {coords_text}"
+        log_text = _ui_text(
+            "log",
+            "reference_action_message_with_coords",
+            option_label=option_label,
+            option_action=option_action,
+            coords_text=coords_text,
+        )
     LOGGER.debug(
         "on_reference_action resolved uid=%s option_idx=%s need_coords=%s coords=%s",
         _uid_for_log(uid),
@@ -897,7 +921,7 @@ def init_app(request: gr.Request):
     except Exception as e:
         LOGGER.exception("init_app exception")
         # Return a safe fallback that hides the loading overlay and shows error
-        return _task_load_failed_response("", f"Initialization error: {e}")
+        return _task_load_failed_response("", _ui_text("errors", "init_failed", error=e))
 
 
 def precheck_execute_inputs(uid, option_idx, coords_str):
@@ -911,7 +935,7 @@ def precheck_execute_inputs(uid, option_idx, coords_str):
     session = get_session(uid)
     if not session:
         LOGGER.error("precheck_execute_inputs: missing session uid=%s", _uid_for_log(uid))
-        raise gr.Error("Session Error")
+        raise gr.Error(_ui_text("log", "session_error"))
 
     parsed_option_idx = option_idx
     if isinstance(option_idx, tuple):
@@ -919,7 +943,7 @@ def precheck_execute_inputs(uid, option_idx, coords_str):
 
     if parsed_option_idx is None:
         LOGGER.debug("precheck_execute_inputs uid=%s missing option", _uid_for_log(uid))
-        raise gr.Error("Error: No action selected")
+        raise gr.Error(_ui_text("log", "execute_missing_action"))
 
     needs_coords = False
     if (
@@ -936,7 +960,7 @@ def precheck_execute_inputs(uid, option_idx, coords_str):
             parsed_option_idx,
             coords_str,
         )
-        raise gr.Error("please click the keypoint selection image before execute!")
+        raise gr.Error(_ui_text("coords", "select_keypoint_before_execute"))
     LOGGER.debug(
         "precheck_execute_inputs passed uid=%s option=%s needs_coords=%s",
         _uid_for_log(uid),
@@ -971,7 +995,14 @@ def execute_step(uid, option_idx, coords_str):
     session = get_session(uid)
     if not session:
         LOGGER.error("execute_step missing session uid=%s", _uid_for_log(uid))
-        return None, format_log_markdown("Session Error"), gr.update(), gr.update(), gr.update(interactive=False), gr.update(interactive=False)
+        return (
+            None,
+            format_log_markdown(_ui_text("log", "session_error")),
+            gr.update(),
+            gr.update(),
+            gr.update(interactive=False),
+            gr.update(interactive=False),
+        )
     
     # 检查 execute 次数限制（在执行前检查，如果达到限制则模拟失败状态）
     execute_limit_reached = False
@@ -1002,7 +1033,14 @@ def execute_step(uid, option_idx, coords_str):
     
     if option_idx is None:
         LOGGER.debug("execute_step uid=%s aborted: option_idx is None", _uid_for_log(uid))
-        return session.get_pil_image(use_segmented=USE_SEGMENTED_VIEW), format_log_markdown("Error: No action selected"), gr.update(), gr.update(), gr.update(interactive=False), gr.update(interactive=True)
+        return (
+            session.get_pil_image(use_segmented=USE_SEGMENTED_VIEW),
+            format_log_markdown(_ui_text("log", "execute_missing_action")),
+            gr.update(),
+            gr.update(),
+            gr.update(interactive=False),
+            gr.update(interactive=True),
+        )
 
     # 检查当前选项是否需要坐标
     needs_coords = False
@@ -1013,21 +1051,7 @@ def execute_step(uid, option_idx, coords_str):
     
     # 如果选项需要坐标，检查是否已经点击了图片
     if needs_coords:
-        # 检查 coords_str 是否是有效的坐标（不是提示信息）
-        is_valid_coords = False
-        if coords_str and "," in coords_str:
-            try:
-                parts = coords_str.split(",")
-                x = int(parts[0].strip())
-                y = int(parts[1].strip())
-                # 如果成功解析为数字，且不是提示信息，则认为是有效坐标
-                if coords_str.strip() not in ["please click the keypoint selection image", "No need for coordinates"]:
-                    is_valid_coords = True
-            except:
-                pass
-        
-        # 如果需要坐标但没有有效坐标，返回错误提示
-        if not is_valid_coords:
+        if not _is_valid_coords_text(coords_str):
             LOGGER.debug(
                 "execute_step uid=%s option=%s missing valid coords, coords_str=%s",
                 _uid_for_log(uid),
@@ -1035,7 +1059,7 @@ def execute_step(uid, option_idx, coords_str):
                 coords_str,
             )
             current_img = session.get_pil_image(use_segmented=USE_SEGMENTED_VIEW)
-            error_msg = "please click the keypoint selection image before execute!"
+            error_msg = _ui_text("coords", "select_keypoint_before_execute")
             return current_img, format_log_markdown(error_msg), gr.update(), gr.update(), gr.update(interactive=False), gr.update(interactive=True)
 
     # Parse coords
@@ -1143,9 +1167,9 @@ def execute_step(uid, option_idx, coords_str):
         # Episode完成时，格式化System Log的状态消息
         # 使用固定模板，所有行长度一致（32个字符），无空行
         if final_log_status == "success":
-            status = "********************************\n****   episode success      ****\n********************************\n  ---please press change episode----   "
+            status = _ui_text("log", "episode_success_banner")
         else:
-            status = "********************************\n****   episode failed       ****\n********************************\n  ---please press change episode----   "
+            status = _ui_text("log", "episode_failed_banner")
 
         # 更新累计完成计数，不再推进固定任务索引
         if uid:
