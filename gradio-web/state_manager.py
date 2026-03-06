@@ -13,6 +13,7 @@
 当同一用户第二次登录时，系统会自动清理旧会话的所有资源（进程、RAM、VRAM、状态数据等）。
 """
 import logging
+import os
 import uuid
 import threading
 import time
@@ -111,7 +112,7 @@ def set_task_index(uid, task_index, total_tasks):
 def get_ui_phase(uid):
     """获取UI阶段"""
     with _state_lock:
-        return UI_PHASE_MAP.get(uid, "watching_demo")  # 默认为观看示范阶段
+        return UI_PHASE_MAP.get(uid, "demo_video")
 
 
 def set_ui_phase(uid, phase):
@@ -119,16 +120,16 @@ def set_ui_phase(uid, phase):
     
     Args:
         uid: session ID
-        phase: "watching_demo" 或 "executing_task"
+        phase: "demo_video" / "action_keypoint" / "execution_wait" / "execution_video"
     """
     with _state_lock:
         UI_PHASE_MAP[uid] = phase
 
 
 def reset_ui_phase(uid):
-    """重置UI阶段为初始阶段（watching_demo）"""
+    """重置UI阶段为初始阶段（demo_video）"""
     with _state_lock:
-        UI_PHASE_MAP[uid] = "watching_demo"
+        UI_PHASE_MAP[uid] = "demo_video"
 
 
 def set_play_button_clicked(uid, clicked=True):
@@ -290,6 +291,15 @@ def cleanup_session(uid):
         # 1. 关闭 ProcessSessionProxy（终止工作进程）
         session = GLOBAL_SESSIONS.get(uid)
         if session:
+            execute_video_path = getattr(session, "execute_video_path", None)
+            try:
+                if execute_video_path and os.path.exists(execute_video_path):
+                    os.remove(execute_video_path)
+                    LOGGER.debug("cleanup_session uid=%s removed execute video %s", uid, execute_video_path)
+            except Exception as e:
+                LOGGER.exception("cleanup_session uid=%s execute video cleanup failed: %s", uid, e)
+            if hasattr(session, "execute_video_path"):
+                session.execute_video_path = None
             try:
                 LOGGER.info("cleanup_session uid=%s closing ProcessSessionProxy", uid)
                 session.close()

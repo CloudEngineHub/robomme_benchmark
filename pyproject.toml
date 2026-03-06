@@ -5,8 +5,12 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+    "gradio",
+    "imageio",
     "mani-skill",
+    "numpy",
     "opencv-python>=4.11.0.86",
+    "pillow",
     "setuptools==80.9.0",
     "torch==2.9.1",
     "torchvision==0.24.1",

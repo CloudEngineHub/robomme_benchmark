@@ -19,15 +19,13 @@ from gradio_callbacks import (
     init_app,
     load_next_task_wrapper,
     on_map_click,
+    on_video_media_end,
     on_option_select,
     on_reference_action,
-    on_video_end_transition,
     precheck_execute_inputs,
-    refresh_live_obs,
     restart_episode_wrapper,
     show_loading_info,
     switch_env_wrapper,
-    switch_to_action_phase,
     switch_to_execute_phase,
 )
 from user_manager import user_manager
@@ -36,7 +34,8 @@ from user_manager import user_manager
 PHASE_INIT = "init"
 PHASE_DEMO_VIDEO = "demo_video"
 PHASE_ACTION_KEYPOINT = "action_keypoint"
-PHASE_EXECUTION_PLAYBACK = "execution_playback"
+PHASE_EXECUTION_WAIT = "execution_wait"
+PHASE_EXECUTION_VIDEO = "execution_video"
 
 
 # Deprecated: no runtime JS logic in native Gradio mode.
@@ -159,7 +158,6 @@ def create_ui_blocks():
 
         uid_state = gr.State(value=None)
         ui_phase_state = gr.State(value=PHASE_INIT)
-        live_obs_timer = gr.Timer(value=0.1, active=True)
 
         task_info_box = gr.Textbox(visible=False, elem_id="task_info_box")
         progress_info_box = gr.Textbox(visible=False)
@@ -419,26 +417,42 @@ def create_ui_blocks():
         )
 
         video_display.end(
-            fn=on_video_end_transition,
-            inputs=[uid_state],
-            outputs=[video_phase_group, action_phase_group, control_panel_group, log_output],
-            queue=False,
-            show_progress="hidden",
-        ).then(
-            fn=lambda: PHASE_ACTION_KEYPOINT,
-            outputs=[ui_phase_state],
+            fn=on_video_media_end,
+            inputs=[uid_state, ui_phase_state],
+            outputs=[
+                video_display,
+                video_phase_group,
+                action_phase_group,
+                control_panel_group,
+                log_output,
+                options_radio,
+                exec_btn,
+                restart_episode_btn,
+                next_task_btn,
+                img_display,
+                reference_action_btn,
+                ui_phase_state,
+            ],
             queue=False,
             show_progress="hidden",
         )
         video_display.stop(
-            fn=on_video_end_transition,
-            inputs=[uid_state],
-            outputs=[video_phase_group, action_phase_group, control_panel_group, log_output],
-            queue=False,
-            show_progress="hidden",
-        ).then(
-            fn=lambda: PHASE_ACTION_KEYPOINT,
-            outputs=[ui_phase_state],
+            fn=on_video_media_end,
+            inputs=[uid_state, ui_phase_state],
+            outputs=[
+                video_display,
+                video_phase_group,
+                action_phase_group,
+                control_panel_group,
+                log_output,
+                options_radio,
+                exec_btn,
+                restart_episode_btn,
+                next_task_btn,
+                img_display,
+                reference_action_btn,
+                ui_phase_state,
+            ],
             queue=False,
             show_progress="hidden",
         )
@@ -479,37 +493,28 @@ def create_ui_blocks():
             ],
             show_progress="hidden",
         ).then(
-            fn=lambda: PHASE_EXECUTION_PLAYBACK,
+            fn=lambda: PHASE_EXECUTION_WAIT,
             outputs=[ui_phase_state],
             show_progress="hidden",
         ).then(
             fn=execute_step,
             inputs=[uid_state, options_radio, coords_box],
-            outputs=[img_display, log_output, task_info_box, progress_info_box, restart_episode_btn, next_task_btn, exec_btn],
-            show_progress="hidden",
-        ).then(
-            fn=switch_to_action_phase,
-            inputs=[uid_state],
             outputs=[
+                video_display,
+                video_phase_group,
+                action_phase_group,
+                control_panel_group,
                 options_radio,
-                exec_btn,
+                img_display,
+                log_output,
+                task_info_box,
+                progress_info_box,
                 restart_episode_btn,
                 next_task_btn,
-                img_display,
+                exec_btn,
                 reference_action_btn,
+                ui_phase_state,
             ],
-            show_progress="hidden",
-        ).then(
-            fn=lambda: PHASE_ACTION_KEYPOINT,
-            outputs=[ui_phase_state],
-            show_progress="hidden",
-        )
-
-        live_obs_timer.tick(
-            fn=refresh_live_obs,
-            inputs=[uid_state, ui_phase_state],
-            outputs=[img_display],
-            queue=False,
             show_progress="hidden",
         )
 

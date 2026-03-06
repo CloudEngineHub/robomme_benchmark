@@ -83,6 +83,11 @@ def test_native_ui_config_contains_phase_machine_and_precheck_chain(reload_modul
         assert "precheck_execute_inputs" in api_names
         assert "switch_to_execute_phase" in api_names
         assert "execute_step" in api_names
-        assert "switch_to_action_phase" in api_names
+        assert "on_video_media_end" in api_names
+        assert "switch_to_action_phase" not in api_names
+        assert "refresh_live_obs" not in api_names
+
+        component_types = [str(comp.get("type", "")).lower() for comp in cfg.get("components", [])]
+        assert "timer" not in component_types
     finally:
         demo.close()
