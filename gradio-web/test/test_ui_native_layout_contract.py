@@ -36,6 +36,8 @@ def test_native_ui_css_uses_configured_global_font_size_variables(reload_module)
     assert f"--button-large-text-size: {config.UI_GLOBAL_FONT_SIZE} !important;" in css
     assert f"--section-header-text-size: {config.UI_GLOBAL_FONT_SIZE} !important;" in css
     assert f"--text-md: {config.UI_GLOBAL_FONT_SIZE} !important;" in css
+    assert "#loading_overlay_group h3" in css
+    assert f"font-size: {config.UI_GLOBAL_FONT_SIZE} !important;" in css
 
 
 def test_native_ui_css_excludes_header_title_from_global_font_size(reload_module):
@@ -163,7 +165,11 @@ def test_native_ui_config_contains_phase_machine_and_precheck_chain(reload_modul
         ]
         assert all("_anchor" not in str(v) for v in values)
         assert any(
-            "Logging in and setting up environment... Please wait." in str(v)
+            "The episode is loading..." in str(v)
+            for v in values
+        )
+        assert all(
+            "Logging in and setting up environment... Please wait." not in str(v)
             for v in values
         )
         assert all("Loading environment, please wait..." not in str(v) for v in values)

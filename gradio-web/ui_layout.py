@@ -369,6 +369,7 @@ CSS = f"""
 
 #loading_overlay_group h3 {{
     margin: 0 !important;
+    font-size: {UI_GLOBAL_FONT_SIZE} !important;
 }}
 
 #reference_action_btn button:not(:disabled),
@@ -581,7 +582,7 @@ def create_ui_blocks():
                 )
 
         with gr.Column(visible=True, elem_id="loading_overlay_group") as loading_overlay:
-            gr.Markdown("### Logging in and setting up environment... Please wait.")
+            gr.Markdown("### The episode is loading...")
 
         uid_state = gr.State(value=None)
         ui_phase_state = gr.State(value=PHASE_INIT)

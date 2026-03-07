@@ -1032,10 +1032,13 @@ def test_demo_video_stop_event_transitions_and_hides_button(phase_machine_ui_url
 
 
 def test_unified_loading_overlay_init_flow(monkeypatch):
+    config_module = importlib.reload(importlib.import_module("config"))
+    monkeypatch.setattr(config_module, "UI_GLOBAL_FONT_SIZE", "32px")
     ui_layout = importlib.reload(importlib.import_module("ui_layout"))
 
-    canonical_copy = "Logging in and setting up environment... Please wait."
+    canonical_copy = "The episode is loading..."
     legacy_copy = "Loading environment, please wait..."
+    superseded_copy = "Logging in and setting up environment... Please wait."
     fake_obs = np.zeros((24, 24, 3), dtype=np.uint8)
     fake_obs_img = Image.fromarray(fake_obs)
     calls = {"init": 0}
@@ -1076,15 +1079,17 @@ def test_unified_loading_overlay_init_flow(monkeypatch):
 
     port = _free_port()
     host = "127.0.0.1"
-    root_url = f"http://{host}:{port}/"
-
-    app = FastAPI(title="native-unified-loading-overlay-test")
-    app = gr.mount_gradio_app(app, demo, path="/")
-
-    config = uvicorn.Config(app, host=host, port=port, log_level="error")
-    server = uvicorn.Server(config)
-    thread = threading.Thread(target=server.run, daemon=True)
-    thread.start()
+    _app, root_url, _share_url = demo.launch(
+        server_name=host,
+        server_port=port,
+        prevent_thread_lock=True,
+        quiet=True,
+        show_error=True,
+        ssr_mode=False,
+        theme=ui_layout.APP_THEME,
+        css=ui_layout.CSS,
+        head=ui_layout.THEME_LOCK_HEAD,
+    )
     _wait_http_ready(root_url)
 
     try:
@@ -1101,7 +1106,15 @@ def test_unified_loading_overlay_init_flow(monkeypatch):
                     return el ? (el.textContent || '') : '';
                 }"""
             )
+            page.wait_for_function(
+                """() => {
+                    const heading = document.querySelector('#loading_overlay_group h3');
+                    return !!heading && getComputedStyle(heading).fontSize === '32px';
+                }""",
+                timeout=5000,
+            )
             assert canonical_copy in overlay_text
+            assert superseded_copy not in overlay_text
             assert legacy_copy not in page.content()
 
             page.wait_for_selector("#loading_overlay_group", state="hidden", timeout=15000)
@@ -1109,17 +1122,20 @@ def test_unified_loading_overlay_init_flow(monkeypatch):
             page.wait_for_function(
                 """() => {
                     const root = document.getElementById('header_task');
-                    const input = root ? root.querySelector('input') : null;
-                    return !!input && input.value.trim() === 'PickXtimes';
+                    if (!root) return false;
+                    const input = root.querySelector('input');
+                    if (input && typeof input.value === 'string' && input.value.trim() === 'PickXtimes') {
+                        return true;
+                    }
+                    const selected = root.querySelector('.single-select');
+                    return !!selected && (selected.textContent || '').trim() === 'PickXtimes';
                 }""",
-                timeout=5000,
+                timeout=15000,
             )
             assert _read_header_task_value(page) == "PickXtimes"
 
             browser.close()
     finally:
-        server.should_exit = True
-        thread.join(timeout=10)
         demo.close()
 
     assert calls["init"] >= 1
