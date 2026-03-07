@@ -100,6 +100,29 @@ def _read_coords_box_value(page) -> str | None:
     )
 
 
+def _read_phase_visibility(page) -> dict[str, bool | str | None]:
+    return page.evaluate(
+        """() => {
+            const visible = (id) => {
+                const el = document.getElementById(id);
+                if (!el) return false;
+                const st = getComputedStyle(el);
+                return st.display !== 'none' && st.visibility !== 'hidden' && el.getClientRects().length > 0;
+            };
+            const videoEl = document.querySelector('#demo_video video');
+            return {
+                videoPhase: visible('video_phase_group'),
+                video: visible('demo_video'),
+                actionPhase: visible('action_phase_group'),
+                action: visible('live_obs'),
+                controlPhase: visible('control_panel_group'),
+                control: visible('action_radio'),
+                currentSrc: videoEl ? videoEl.currentSrc : null,
+            };
+        }"""
+    )
+
+
 def _read_live_obs_geometry(page) -> dict[str, dict[str, float] | None]:
     return page.evaluate(
         """() => {
@@ -1044,6 +1067,172 @@ def test_header_task_env_normalization_and_fallback(monkeypatch, task_info_text,
                 timeout=5000,
             )
             assert _read_header_task_value(page) == expected_header_value
+            browser.close()
+    finally:
+        server.should_exit = True
+        thread.join(timeout=10)
+        demo.close()
+
+
+def test_header_task_switch_to_video_task_shows_demo_phase(monkeypatch):
+    ui_layout = importlib.reload(importlib.import_module("ui_layout"))
+
+    fake_obs = np.zeros((24, 24, 3), dtype=np.uint8)
+    fake_obs_img = Image.fromarray(fake_obs)
+    demo_video_path = gr.get_video("world.mp4")
+    switch_calls = []
+
+    def fake_init_app(request=None):
+        _ = request
+        return (
+            "uid-header-video",
+            gr.update(visible=True),  # main_interface
+            gr.update(value=fake_obs_img, interactive=False),  # img_display
+            "ready",  # log_output
+            gr.update(choices=[("pick", 0)], value=None),  # options_radio
+            "goal",  # goal_box
+            "No need for coordinates",  # coords_box
+            gr.update(value=None, visible=False),  # video_display
+            "PickXtimes (Episode 1)",  # task_info_box
+            "Completed: 0",  # progress_info_box
+            gr.update(interactive=True),  # restart_episode_btn
+            gr.update(interactive=True),  # next_task_btn
+            gr.update(interactive=True),  # exec_btn
+            gr.update(visible=False),  # video_phase_group
+            gr.update(visible=True),  # action_phase_group
+            gr.update(visible=True),  # control_panel_group
+            gr.update(value="hint"),  # task_hint_display
+            gr.update(visible=False),  # loading_overlay
+            gr.update(interactive=True),  # reference_action_btn
+        )
+
+    def fake_switch_env_wrapper(uid, selected_env):
+        switch_calls.append((uid, selected_env))
+        return (
+            uid,
+            gr.update(visible=True),  # main_interface
+            gr.update(value=fake_obs_img, interactive=False),  # img_display
+            "demo prompt",  # log_output
+            gr.update(choices=[("pick", 0)], value=None),  # options_radio
+            "video goal",  # goal_box
+            "No need for coordinates",  # coords_box
+            gr.update(value=demo_video_path, visible=True),  # video_display
+            "VideoPlaceButton (Episode 1)",  # task_info_box
+            "Completed: 0",  # progress_info_box
+            gr.update(interactive=True),  # restart_episode_btn
+            gr.update(interactive=True),  # next_task_btn
+            gr.update(interactive=True),  # exec_btn
+            gr.update(visible=True),  # video_phase_group
+            gr.update(visible=False),  # action_phase_group
+            gr.update(visible=False),  # control_panel_group
+            gr.update(value="video hint"),  # task_hint_display
+            gr.update(visible=False),  # loading_overlay
+            gr.update(interactive=True),  # reference_action_btn
+        )
+
+    monkeypatch.setattr(ui_layout, "init_app", fake_init_app)
+    monkeypatch.setattr(ui_layout, "switch_env_wrapper", fake_switch_env_wrapper)
+    monkeypatch.setattr(ui_layout.user_manager, "env_choices", ["PickXtimes", "VideoPlaceButton"])
+
+    demo = ui_layout.create_ui_blocks()
+
+    port = _free_port()
+    host = "127.0.0.1"
+    root_url = f"http://{host}:{port}/"
+
+    app = FastAPI(title="header-task-switch-video-phase-test")
+    app = gr.mount_gradio_app(app, demo, path="/")
+
+    config = uvicorn.Config(app, host=host, port=port, log_level="error")
+    server = uvicorn.Server(config)
+    thread = threading.Thread(target=server.run, daemon=True)
+    thread.start()
+    _wait_http_ready(root_url)
+
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page(viewport={"width": 1280, "height": 900})
+            page.goto(root_url, wait_until="domcontentloaded")
+            page.wait_for_selector("#main_interface_root", state="visible", timeout=15000)
+            page.wait_for_function(
+                """() => {
+                    const root = document.getElementById('header_task');
+                    const input = root ? root.querySelector('input') : null;
+                    return !!input && input.value.trim() === 'PickXtimes';
+                }""",
+                timeout=5000,
+            )
+
+            page.click("#header_task input")
+            page.get_by_role("option", name="VideoPlaceButton").click()
+
+            page.wait_for_function(
+                """() => {
+                    const visible = (id) => {
+                        const el = document.getElementById(id);
+                        if (!el) return false;
+                        const st = getComputedStyle(el);
+                        return st.display !== 'none' && st.visibility !== 'hidden' && el.getClientRects().length > 0;
+                    };
+                    const videoEl = document.querySelector('#demo_video video');
+                    return (
+                        visible('video_phase_group') &&
+                        visible('demo_video') &&
+                        !visible('action_phase_group') &&
+                        !visible('control_panel_group') &&
+                        !!(videoEl && videoEl.currentSrc)
+                    );
+                }""",
+                timeout=10000,
+            )
+
+            phase_after_switch = _read_phase_visibility(page)
+            assert phase_after_switch["videoPhase"] is True
+            assert phase_after_switch["video"] is True
+            assert phase_after_switch["actionPhase"] is False
+            assert phase_after_switch["controlPhase"] is False
+            assert phase_after_switch["currentSrc"]
+            assert switch_calls == [("uid-header-video", "VideoPlaceButton")]
+
+            did_dispatch_end = page.evaluate(
+                """() => {
+                    const videoEl = document.querySelector('#demo_video video');
+                    if (!videoEl) return false;
+                    videoEl.dispatchEvent(new Event('ended', { bubbles: true }));
+                    return true;
+                }"""
+            )
+            assert did_dispatch_end
+
+            page.wait_for_function(
+                """() => {
+                    const visible = (id) => {
+                        const el = document.getElementById(id);
+                        if (!el) return false;
+                        const st = getComputedStyle(el);
+                        return st.display !== 'none' && st.visibility !== 'hidden' && el.getClientRects().length > 0;
+                    };
+                    return (
+                        !visible('video_phase_group') &&
+                        !visible('demo_video') &&
+                        visible('action_phase_group') &&
+                        visible('control_panel_group') &&
+                        visible('live_obs') &&
+                        visible('action_radio')
+                    );
+                }""",
+                timeout=5000,
+            )
+
+            phase_after_end = _read_phase_visibility(page)
+            assert phase_after_end["videoPhase"] is False
+            assert phase_after_end["video"] is False
+            assert phase_after_end["actionPhase"] is True
+            assert phase_after_end["action"] is True
+            assert phase_after_end["controlPhase"] is True
+            assert phase_after_end["control"] is True
+
             browser.close()
     finally:
         server.should_exit = True

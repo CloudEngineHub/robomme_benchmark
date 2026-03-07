@@ -290,6 +290,30 @@ def _with_phase_from_load(load_result):
     return (*load_result, phase)
 
 
+def _skip_load_flow():
+    return tuple(gr.skip() for _ in range(20))
+
+
+def _phase_visibility_updates(phase):
+    if phase == PHASE_DEMO_VIDEO:
+        return (
+            gr.update(visible=True),
+            gr.update(visible=False),
+            gr.update(visible=False),
+        )
+    if phase in {PHASE_ACTION_KEYPOINT, PHASE_EXECUTION_PLAYBACK}:
+        return (
+            gr.update(visible=False),
+            gr.update(visible=True),
+            gr.update(visible=True),
+        )
+    return (
+        gr.update(visible=False),
+        gr.update(visible=False),
+        gr.update(visible=False),
+    )
+
+
 def create_ui_blocks():
     """构建 Gradio Blocks，并完成页面阶段状态（phase）的联动绑定。"""
 
@@ -337,6 +361,8 @@ def create_ui_blocks():
 
         uid_state = gr.State(value=None)
         ui_phase_state = gr.State(value=PHASE_INIT)
+        pending_header_task_state = gr.State(value=None)
+        programmatic_header_task_state = gr.State(value=None)
         live_obs_timer = gr.Timer(value=1.0 / LIVE_OBS_REFRESH_HZ, active=True)
 
         task_info_box = gr.Textbox(visible=False, elem_id="task_info_box")
@@ -450,6 +476,34 @@ def create_ui_blocks():
                                 elem_id="task_hint_display",
                             )
 
+        load_flow_outputs = [
+            uid_state,
+            main_interface,
+            img_display,
+            log_output,
+            options_radio,
+            goal_box,
+            coords_box,
+            video_display,
+            task_info_box,
+            progress_info_box,
+            restart_episode_btn,
+            next_task_btn,
+            exec_btn,
+            video_phase_group,
+            action_phase_group,
+            control_panel_group,
+            task_hint_display,
+            loading_overlay,
+            reference_action_btn,
+            ui_phase_state,
+        ]
+        phase_visibility_outputs = [
+            video_phase_group,
+            action_phase_group,
+            control_panel_group,
+        ]
+
         def _normalize_env_choice(env_value, choices):
             if env_value is None:
                 return None
@@ -463,7 +517,7 @@ def create_ui_blocks():
                     lower_map.setdefault(choice_text.lower(), choice_text)
             return lower_map.get(env_text.lower(), env_text)
 
-        def _build_header_task_update(task_text, fallback_env=None):
+        def _resolve_header_task_state(task_text, fallback_env=None):
             base_choices = list(user_manager.env_choices)
             parsed_env = render_header_task(task_text)
             selected_env = _normalize_env_choice(parsed_env, base_choices)
@@ -473,13 +527,23 @@ def create_ui_blocks():
             choices = list(base_choices)
             if selected_env and selected_env not in choices:
                 choices.append(selected_env)
+            return choices, selected_env
+
+        def _build_header_task_update(task_text, fallback_env=None):
+            choices, selected_env = _resolve_header_task_state(task_text, fallback_env=fallback_env)
             return gr.update(choices=choices, value=selected_env)
 
         def sync_header_from_task(task_text, goal_text):
-            return _build_header_task_update(task_text), render_header_goal(goal_text)
+            _, selected_env = _resolve_header_task_state(task_text)
+            return _build_header_task_update(task_text), render_header_goal(goal_text), selected_env
 
         def sync_header_from_goal(goal_text, task_text, current_header_task):
-            return _build_header_task_update(task_text, fallback_env=current_header_task), render_header_goal(goal_text)
+            _, selected_env = _resolve_header_task_state(task_text, fallback_env=current_header_task)
+            return (
+                _build_header_task_update(task_text, fallback_env=current_header_task),
+                render_header_goal(goal_text),
+                selected_env,
+            )
 
         def init_app_with_phase(request: gr.Request):
             return _with_phase_from_load(init_app(request))
@@ -493,108 +557,87 @@ def create_ui_blocks():
         def switch_env_with_phase(uid, selected_env):
             return _with_phase_from_load(switch_env_wrapper(uid, selected_env))
 
+        def maybe_switch_env_with_phase(uid, selected_env):
+            if not selected_env:
+                return _skip_load_flow()
+            return switch_env_with_phase(uid, selected_env)
+
+        def prepare_header_task_switch(selected_env, programmatic_selected_env):
+            base_choices = list(user_manager.env_choices)
+            normalized_selected_env = _normalize_env_choice(selected_env, base_choices)
+            normalized_programmatic_env = _normalize_env_choice(programmatic_selected_env, base_choices)
+
+            if not normalized_selected_env:
+                return None, None, gr.update(visible=False)
+            if normalized_selected_env == normalized_programmatic_env:
+                return None, None, gr.update(visible=False)
+            return normalized_selected_env, None, show_loading_info()
+
         task_info_box.change(
             fn=sync_header_from_task,
             inputs=[task_info_box, goal_box],
-            outputs=[header_task_box, header_goal_box],
+            outputs=[header_task_box, header_goal_box, programmatic_header_task_state],
         )
         goal_box.change(
             fn=sync_header_from_goal,
             inputs=[goal_box, task_info_box, header_task_box],
-            outputs=[header_task_box, header_goal_box],
+            outputs=[header_task_box, header_goal_box, programmatic_header_task_state],
         )
 
-        header_task_box.input(fn=show_loading_info, outputs=[loading_overlay]).then(
-            fn=switch_env_with_phase,
-            inputs=[uid_state, header_task_box],
-            outputs=[
-                uid_state,
-                main_interface,
-                img_display,
-                log_output,
-                options_radio,
-                goal_box,
-                coords_box,
-                video_display,
-                task_info_box,
-                progress_info_box,
-                restart_episode_btn,
-                next_task_btn,
-                exec_btn,
-                video_phase_group,
-                action_phase_group,
-                control_panel_group,
-                task_hint_display,
-                loading_overlay,
-                reference_action_btn,
-                ui_phase_state,
-            ],
+        header_task_box.change(
+            fn=prepare_header_task_switch,
+            inputs=[header_task_box, programmatic_header_task_state],
+            outputs=[pending_header_task_state, programmatic_header_task_state, loading_overlay],
+            queue=False,
+            show_progress="hidden",
         ).then(
-            fn=sync_header_from_task,
-            inputs=[task_info_box, goal_box],
-            outputs=[header_task_box, header_goal_box],
+            fn=maybe_switch_env_with_phase,
+            inputs=[uid_state, pending_header_task_state],
+            outputs=load_flow_outputs,
+        ).then(
+            fn=_phase_visibility_updates,
+            inputs=[ui_phase_state],
+            outputs=phase_visibility_outputs,
+            queue=False,
+            show_progress="hidden",
+        ).then(
+            fn=lambda _selected_env: None,
+            inputs=[pending_header_task_state],
+            outputs=[pending_header_task_state],
+            queue=False,
+            show_progress="hidden",
         )
 
         next_task_btn.click(fn=show_loading_info, outputs=[loading_overlay]).then(
             fn=load_next_task_with_phase,
             inputs=[uid_state],
-            outputs=[
-                uid_state,
-                main_interface,
-                img_display,
-                log_output,
-                options_radio,
-                goal_box,
-                coords_box,
-                video_display,
-                task_info_box,
-                progress_info_box,
-                restart_episode_btn,
-                next_task_btn,
-                exec_btn,
-                video_phase_group,
-                action_phase_group,
-                control_panel_group,
-                task_hint_display,
-                loading_overlay,
-                reference_action_btn,
-                ui_phase_state,
-            ],
+            outputs=load_flow_outputs,
+        ).then(
+            fn=_phase_visibility_updates,
+            inputs=[ui_phase_state],
+            outputs=phase_visibility_outputs,
+            queue=False,
+            show_progress="hidden",
         ).then(
             fn=sync_header_from_task,
             inputs=[task_info_box, goal_box],
-            outputs=[header_task_box, header_goal_box],
+            outputs=[header_task_box, header_goal_box, programmatic_header_task_state],
         )
 
         restart_episode_btn.click(fn=show_loading_info, outputs=[loading_overlay]).then(
             fn=restart_episode_with_phase,
             inputs=[uid_state],
-            outputs=[
-                uid_state,
-                main_interface,
-                img_display,
-                log_output,
-                options_radio,
-                goal_box,
-                coords_box,
-                video_display,
-                task_info_box,
-                progress_info_box,
-                restart_episode_btn,
-                next_task_btn,
-                exec_btn,
-                video_phase_group,
-                action_phase_group,
-                control_panel_group,
-                task_hint_display,
-                loading_overlay,
-                reference_action_btn,
-                ui_phase_state,
-            ],
+            outputs=load_flow_outputs,
+        ).then(
+            fn=_phase_visibility_updates,
+            inputs=[ui_phase_state],
+            outputs=phase_visibility_outputs,
+            queue=False,
+            show_progress="hidden",
         ).then(
             fn=sync_header_from_task,
             inputs=[task_info_box, goal_box],
-            outputs=[header_task_box, header_goal_box],
+            outputs=[header_task_box, header_goal_box, programmatic_header_task_state],
         )
 
         video_display.end(
@@ -701,32 +744,17 @@ def create_ui_blocks():
         demo.load(
             fn=init_app_with_phase,
             inputs=[],
-            outputs=[
-                uid_state,
-                main_interface,
-                img_display,
-                log_output,
-                options_radio,
-                goal_box,
-                coords_box,
-                video_display,
-                task_info_box,
-                progress_info_box,
-                restart_episode_btn,
-                next_task_btn,
-                exec_btn,
-                video_phase_group,
-                action_phase_group,
-                control_panel_group,
-                task_hint_display,
-                loading_overlay,
-                reference_action_btn,
-                ui_phase_state,
-            ],
+            outputs=load_flow_outputs,
+        ).then(
+            fn=_phase_visibility_updates,
+            inputs=[ui_phase_state],
+            outputs=phase_visibility_outputs,
+            queue=False,
+            show_progress="hidden",
         ).then(
             fn=sync_header_from_task,
             inputs=[task_info_box, goal_box],
-            outputs=[header_task_box, header_goal_box],
+            outputs=[header_task_box, header_goal_box, programmatic_header_task_state],
         )
 
     return demo

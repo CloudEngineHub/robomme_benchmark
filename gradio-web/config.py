@@ -40,7 +40,7 @@ DEMO_VIDEO_ENV_IDS = [
 
 UI_TEXT = {
     "log": {
-        "action_selection_prompt": "please select the action in the right 👈,\nsome actions also need to select keypoint",
+        "action_selection_prompt": "please select the action in the left 👈,\nsome actions also need to select keypoint",
         "demo_video_prompt": 'press "Watch Video Input🎬" to watch a video\nNote: you can only watch the video once',
         "session_error": "Session Error",
         "reference_action_error": "Ground Truth Action Error: {error}",
