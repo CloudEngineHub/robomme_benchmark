@@ -104,7 +104,7 @@ The [MME Policy Learning](https://github.com/RoboMME/robomme_policy_learning) re
 
 
 ## 🏆 Submit Your Models
-Want to add your model? Download the [dataset](https://huggingface.co/datasets/Yinpei/robomme_data) from Hugging Face, run evaluation using our [eval scripts](scripts/evaluation.py), then submit a PR with your results by adding `<your_model>.md` to the `doc/submission/` [directory](https://github.com/RoboMME/robomme_benchmark/tree/main/doc/submission). We will review it and update our leaderboard.
+Want to add your model? Download the [dataset](https://huggingface.co/Yinpei/robomme_data_h5) from Hugging Face, run evaluation using our [eval scripts](scripts/evaluation.py), then submit a PR with your results by adding `<your_model>.md` to the `doc/submission/` [directory](https://github.com/RoboMME/robomme_benchmark/tree/main/doc/submission). We will review it and update our leaderboard.
 
 
 ## 🔧 Troubleshooting
