@@ -51,7 +51,12 @@ def test_native_ui_css_highlights_media_card_not_live_obs_transform(reload_modul
     css = ui_layout.CSS
 
     assert "#media_card::after" in css
+    assert "--media-card-radius: 8px;" in css
+    assert "#media_card #live_obs button" in css
+    assert "#media_card #live_obs img" in css
     assert "#media_card:has(#live_obs.live-obs-keypoint-waiting)::after" in css
+    assert "inset: 0;" in css
+    assert "border-radius: inherit;" in css
     assert "animation: media-card-keypoint-ring 1.2s ease-in-out infinite;" in css
     assert "@keyframes media-card-keypoint-ring" in css
     assert "#live_obs.live-obs-keypoint-waiting .image-frame" not in css

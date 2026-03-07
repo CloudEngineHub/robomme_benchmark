@@ -304,17 +304,31 @@ button#watch_demo_video_btn {{
 }}
 
 #media_card {{
+    --media-card-radius: 8px;
     position: relative;
-    border-radius: 24px;
+    border-radius: var(--media-card-radius);
     overflow: visible;
+}}
+
+#media_card > div,
+#media_card #action_phase_group,
+#media_card #video_phase_group,
+#media_card #live_obs,
+#media_card #live_obs button,
+#media_card #live_obs .image-frame,
+#media_card #live_obs img,
+#media_card #demo_video,
+#media_card #demo_video video {{
+    border-radius: var(--media-card-radius);
 }}
 
 #media_card::after {{
     content: "";
     position: absolute;
-    inset: -8px;
-    border-radius: 30px;
+    inset: 0;
+    border-radius: inherit;
     border: 3px solid rgba(225, 29, 72, 0.00);
+    box-sizing: border-box;
     box-shadow: 0 0 0 0 rgba(225, 29, 72, 0.00);
     opacity: 0;
     pointer-events: none;
