@@ -16,7 +16,7 @@ RIGHT_TOP_ACTION_SCALE = 2
 RIGHT_TOP_LOG_SCALE = 1
 
 # 全局界面字号（不作用于页面主标题）
-UI_GLOBAL_FONT_SIZE = "25px"
+UI_GLOBAL_FONT_SIZE = "24px"
 
 # Session超时配置
 SESSION_TIMEOUT = 300  # Session超时时间（秒），如果30秒内没有execute_step操作，将自动回收session
@@ -29,14 +29,17 @@ TASK_NAME_LIST = [
     "StopCube",
     "PickXtimes",
     "SwingXtimes",
+    
     "ButtonUnmask",
     "VideoUnmask",
     "VideoUnmaskSwap",
     "ButtonUnmaskSwap",
+    
     "PickHighlight",
     "VideoRepick",
     "VideoPlaceButton",
     "VideoPlaceOrder",
+    
     "MoveCube",
     "InsertPeg",
     "PatternLock",
@@ -59,7 +62,7 @@ DEMO_VIDEO_ENV_IDS = [
 
 UI_TEXT = {
     "log": {
-        "action_selection_prompt": "Please select the action in the left 👈,\nActions with 🎯 need to select a point on the image as input",
+        "action_selection_prompt": "Please select the action.\nActions with 🎯 need to select a point on the image as input",
         "point_selection_prompt": "Current action needs location input, please click on the image to select key pixel",
         "demo_video_prompt": 'Press "Watch Video Input 🎬" to watch a video\nNote: you can only watch the video once',
         "session_error": "Session Error",
