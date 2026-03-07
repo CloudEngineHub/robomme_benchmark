@@ -119,7 +119,7 @@ def test_on_reference_action_same_selected_option_does_not_set_suppression(monke
     assert suppress_flag is False
 
 
-def test_on_option_select_resets_to_keypoint_wait_state_for_point_action(monkeypatch, reload_module):
+def test_on_option_select_resets_to_point_wait_state_for_point_action(monkeypatch, reload_module):
     config = reload_module("config")
     callbacks = reload_module("gradio_callbacks")
 
@@ -129,10 +129,10 @@ def test_on_option_select_resets_to_keypoint_wait_state_for_point_action(monkeyp
 
     coords_text, img_update, log_text, suppress_flag = callbacks.on_option_select("uid-1", 0, "12, 34", False)
 
-    assert coords_text == config.UI_TEXT["coords"]["select_keypoint"]
+    assert coords_text == config.UI_TEXT["coords"]["select_point"]
     assert img_update.get("interactive") is True
-    assert img_update.get("elem_classes") == config.get_live_obs_elem_classes(waiting_for_keypoint=True)
-    assert log_text == config.UI_TEXT["log"]["keypoint_selection_prompt"]
+    assert img_update.get("elem_classes") == config.get_live_obs_elem_classes(waiting_for_point=True)
+    assert log_text == config.UI_TEXT["log"]["point_selection_prompt"]
     assert suppress_flag is False
 
 

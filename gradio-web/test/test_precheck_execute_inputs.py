@@ -28,10 +28,10 @@ def test_precheck_execute_inputs_requires_coords_when_option_needs_it(monkeypatc
 
     with pytest.raises(Exception) as excinfo:
         callbacks.precheck_execute_inputs(
-            "uid-1", 0, config.UI_TEXT["coords"]["select_keypoint"]
+            "uid-1", 0, config.UI_TEXT["coords"]["select_point"]
         )
 
-    assert config.UI_TEXT["coords"]["select_keypoint_before_execute"] in str(excinfo.value)
+    assert config.UI_TEXT["coords"]["select_point_before_execute"] in str(excinfo.value)
 
 
 def test_precheck_execute_inputs_accepts_valid_coords(monkeypatch, reload_module):

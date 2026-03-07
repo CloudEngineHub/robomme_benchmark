@@ -7,8 +7,8 @@ USE_SEGMENTED_VIEW = False  # Set to True to use segmented view, False to use or
 LIVE_OBS_REFRESH_HZ = 30.0  # Live observation refresh frequency in Hz
 KEYFRAME_DOWNSAMPLE_FACTOR = 1  # Keep 1 frame out of every N streamed frames
 
-# 主界面两列宽度比例 (Keypoint Selection : Right Panel)
-KEYPOINT_SELECTION_SCALE = 1
+# 主界面两列宽度比例 (Point Selection : Right Panel)
+POINT_SELECTION_SCALE = 1
 CONTROL_PANEL_SCALE = 2
 
 # 右侧顶部并排比例 (Action Selection : System Log)
@@ -59,8 +59,8 @@ DEMO_VIDEO_ENV_IDS = [
 
 UI_TEXT = {
     "log": {
-        "action_selection_prompt": "Please select the action in the left 👈,\nSome actions also need to select keypoint",
-        "keypoint_selection_prompt": "Current action needs location input, please click on the image to select key pixel",
+        "action_selection_prompt": "Please select the action in the left 👈,\nSome actions also need to select a point",
+        "point_selection_prompt": "Current action needs location input, please click on the image to select a point",
         "demo_video_prompt": 'Press "Watch Video Input🎬" to watch a video\nNote: you can only watch the video once',
         "session_error": "Session Error",
         "reference_action_error": "Ground Truth Action Error: {error}",
@@ -73,11 +73,11 @@ UI_TEXT = {
     },
     "coords": {
         "not_needed": "No need for coordinates",
-        "select_keypoint": "Please click the keypoint selection image",
-        "select_keypoint_before_execute": "Please click the keypoint selection image before execute!",
+        "select_point": "Please click the point selection image",
+        "select_point_before_execute": "Please click the point selection image before execute!",
     },
     "actions": {
-        "keypoint_required_suffix": " 🎯",
+        "point_required_suffix": " 🎯",
     },
     "errors": {
         "load_missing_task": "Error loading task: missing current_task",
@@ -119,13 +119,13 @@ ROUTESTICK_OVERLAY_ACTION_TEXTS = [
 ]
 
 LIVE_OBS_BASE_CLASS = "live-obs-resizable"
-LIVE_OBS_KEYPOINT_WAIT_CLASS = "live-obs-keypoint-waiting"
+LIVE_OBS_POINT_WAIT_CLASS = "live-obs-point-waiting"
 
 
-def get_live_obs_elem_classes(waiting_for_keypoint=False):
+def get_live_obs_elem_classes(waiting_for_point=False):
     classes = [LIVE_OBS_BASE_CLASS]
-    if waiting_for_keypoint:
-        classes.append(LIVE_OBS_KEYPOINT_WAIT_CLASS)
+    if waiting_for_point:
+        classes.append(LIVE_OBS_POINT_WAIT_CLASS)
     return classes
 
 

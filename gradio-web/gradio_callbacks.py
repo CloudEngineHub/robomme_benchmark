@@ -67,8 +67,8 @@ def _action_selection_log():
     return format_log_markdown(_ui_text("log", "action_selection_prompt"))
 
 
-def _keypoint_selection_log():
-    return format_log_markdown(_ui_text("log", "keypoint_selection_prompt"))
+def _point_selection_log():
+    return format_log_markdown(_ui_text("log", "point_selection_prompt"))
 
 
 def _live_obs_update(
@@ -76,10 +76,10 @@ def _live_obs_update(
     value=_LIVE_OBS_UPDATE_SKIP,
     interactive=None,
     visible=None,
-    waiting_for_keypoint=False,
+    waiting_for_point=False,
 ):
     kwargs = {
-        "elem_classes": get_live_obs_elem_classes(waiting_for_keypoint=waiting_for_keypoint),
+        "elem_classes": get_live_obs_elem_classes(waiting_for_point=waiting_for_point),
     }
     if value is not _LIVE_OBS_UPDATE_SKIP:
         kwargs["value"] = value
@@ -293,7 +293,7 @@ def on_demo_video_play(uid):
 
 
 def switch_to_execute_phase(uid):
-    """Disable controls and keypoint clicking during execute playback."""
+    """Disable controls and point clicking during execute playback."""
     if uid:
         session = get_session(uid)
         base_count = len(getattr(session, "base_frames", []) or []) if session else 0
@@ -596,7 +596,7 @@ def _load_status_task(uid, status):
         if 0 <= opt_idx < len(session.raw_solve_options):
             opt = session.raw_solve_options[opt_idx]
             if opt.get("available"):
-                opt_label_with_hint = f"{opt_label}{_ui_text('actions', 'keypoint_required_suffix')}"
+                opt_label_with_hint = f"{opt_label}{_ui_text('actions', 'point_required_suffix')}"
             else:
                 opt_label_with_hint = opt_label
         else:
@@ -840,7 +840,7 @@ def _is_valid_coords_text(coords_text: str) -> bool:
     text = coords_text.strip()
     if text in {
         "",
-        _ui_text("coords", "select_keypoint"),
+        _ui_text("coords", "select_point"),
         _ui_text("coords", "not_needed"),
     }:
         return False
@@ -896,9 +896,9 @@ def on_option_select(uid, option_value, coords_str=None, suppress_next_option_ch
             _is_valid_coords_text(coords_str),
         )
         return (
-            _ui_text("coords", "select_keypoint"),
-            _live_obs_update(value=base_img, interactive=True, waiting_for_keypoint=True),
-            _keypoint_selection_log(),
+            _ui_text("coords", "select_point"),
+            _live_obs_update(value=base_img, interactive=True, waiting_for_point=True),
+            _point_selection_log(),
             False,
         )
     
@@ -1050,7 +1050,7 @@ def precheck_execute_inputs(uid, option_idx, coords_str):
             parsed_option_idx,
             coords_str,
         )
-        raise gr.Error(_ui_text("coords", "select_keypoint_before_execute"))
+        raise gr.Error(_ui_text("coords", "select_point_before_execute"))
     LOGGER.debug(
         "precheck_execute_inputs passed uid=%s option=%s needs_coords=%s",
         _uid_for_log(uid),
@@ -1145,7 +1145,7 @@ def execute_step(uid, option_idx, coords_str):
                 coords_str,
             )
             current_img = session.get_pil_image(use_segmented=USE_SEGMENTED_VIEW)
-            error_msg = _ui_text("coords", "select_keypoint_before_execute")
+            error_msg = _ui_text("coords", "select_point_before_execute")
             return _live_obs_update(value=current_img, interactive=False), format_log_markdown(error_msg), gr.update(), gr.update(), gr.update(interactive=False), gr.update(interactive=True)
 
     # Parse coords

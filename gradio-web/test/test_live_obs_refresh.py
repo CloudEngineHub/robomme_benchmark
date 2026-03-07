@@ -14,7 +14,7 @@ def test_refresh_live_obs_skips_when_not_execution_phase(monkeypatch, reload_mod
     callbacks = reload_module("gradio_callbacks")
     monkeypatch.setattr(callbacks, "get_session", lambda uid: _FakeSession([]))
 
-    update = callbacks.refresh_live_obs("uid-1", "action_keypoint")
+    update = callbacks.refresh_live_obs("uid-1", "action_point")
 
     assert update.get("__type__") == "update"
     assert "value" not in update

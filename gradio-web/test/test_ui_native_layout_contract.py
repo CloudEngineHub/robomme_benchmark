@@ -75,13 +75,13 @@ def test_native_ui_css_highlights_media_card_not_live_obs_transform(reload_modul
     assert "--media-card-radius: 8px;" in css
     assert "#media_card #live_obs button" in css
     assert "#media_card #live_obs img" in css
-    assert "#media_card:has(#live_obs.live-obs-keypoint-waiting)::after" in css
+    assert "#media_card:has(#live_obs.live-obs-point-waiting)::after" in css
     assert "inset: 0;" in css
     assert "border-radius: inherit;" in css
-    assert "animation: media-card-keypoint-ring 1.2s ease-in-out infinite;" in css
-    assert "@keyframes media-card-keypoint-ring" in css
-    assert "#live_obs.live-obs-keypoint-waiting .image-frame" not in css
-    assert "#live_obs.live-obs-keypoint-waiting .upload-container" not in css
+    assert "animation: media-card-point-ring 1.2s ease-in-out infinite;" in css
+    assert "@keyframes media-card-point-ring" in css
+    assert "#live_obs.live-obs-point-waiting .image-frame" not in css
+    assert "#live_obs.live-obs-point-waiting .upload-container" not in css
     assert "transform: scale(" not in css
 
 

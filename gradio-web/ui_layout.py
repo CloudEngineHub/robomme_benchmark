@@ -1,7 +1,7 @@
 """
 Native Gradio UI layout.
-Sequential media phases: Demo Video -> Action+Keypoint.
-Two-column layout: Keypoint Selection | Right Panel.
+Sequential media phases: Demo Video -> Action+Point.
+Two-column layout: Point Selection | Right Panel.
 """
 
 import ast
@@ -11,9 +11,9 @@ import gradio as gr
 from config import (
     CONTROL_PANEL_SCALE,
     LIVE_OBS_BASE_CLASS,
-    LIVE_OBS_KEYPOINT_WAIT_CLASS,
+    LIVE_OBS_POINT_WAIT_CLASS,
     LIVE_OBS_REFRESH_HZ,
-    KEYPOINT_SELECTION_SCALE,
+    POINT_SELECTION_SCALE,
     RIGHT_TOP_ACTION_SCALE,
     RIGHT_TOP_LOG_SCALE,
     UI_GLOBAL_FONT_SIZE,
@@ -41,7 +41,7 @@ from user_manager import user_manager
 
 PHASE_INIT = "init"
 PHASE_DEMO_VIDEO = "demo_video"
-PHASE_ACTION_KEYPOINT = "action_keypoint"
+PHASE_ACTION_POINT = "action_point"
 PHASE_EXECUTION_PLAYBACK = "execution_playback"
 
 APP_THEME = gr.themes.Default()
@@ -432,7 +432,7 @@ button#watch_demo_video_btn {{
     z-index: 0;
 }}
 
-@keyframes media-card-keypoint-ring {{
+@keyframes media-card-point-ring {{
     0% {{
         box-shadow: 0 0 0 0 rgba(225, 29, 72, 0.00);
         border-color: rgba(225, 29, 72, 0.72);
@@ -460,11 +460,11 @@ button#watch_demo_video_btn {{
     }}
 }}
 
-#media_card:has(#live_obs.{LIVE_OBS_KEYPOINT_WAIT_CLASS})::after {{
+#media_card:has(#live_obs.{LIVE_OBS_POINT_WAIT_CLASS})::after {{
     border-color: rgba(225, 29, 72, 0.94);
     box-shadow: 0 0 0 0 rgba(225, 29, 72, 0.00);
     opacity: 1;
-    animation: media-card-keypoint-ring 1.2s ease-in-out infinite;
+    animation: media-card-point-ring 1.2s ease-in-out infinite;
 }}
 """
 
@@ -509,7 +509,7 @@ def _phase_from_updates(main_interface_update, video_phase_update):
         return PHASE_INIT
     if isinstance(video_phase_update, dict) and video_phase_update.get("visible") is True:
         return PHASE_DEMO_VIDEO
-    return PHASE_ACTION_KEYPOINT
+    return PHASE_ACTION_POINT
 
 
 def _with_phase_from_load(load_result):
@@ -528,7 +528,7 @@ def _phase_visibility_updates(phase):
             gr.update(visible=False),
             gr.update(visible=False),
         )
-    if phase in {PHASE_ACTION_KEYPOINT, PHASE_EXECUTION_PLAYBACK}:
+    if phase in {PHASE_ACTION_POINT, PHASE_EXECUTION_PLAYBACK}:
         return (
             gr.update(visible=False),
             gr.update(visible=True),
@@ -596,7 +596,7 @@ def create_ui_blocks():
 
         with gr.Column(visible=False, elem_id="main_interface_root") as main_interface:
             with gr.Row(elem_id="main_layout_row"):
-                with gr.Column(scale=KEYPOINT_SELECTION_SCALE):
+                with gr.Column(scale=POINT_SELECTION_SCALE):
                     with gr.Column(elem_classes=["native-card"], elem_id="media_card"):
                         with gr.Column(visible=False, elem_id="video_phase_group") as video_phase_group:
                             video_display = gr.Video(
@@ -618,7 +618,7 @@ def create_ui_blocks():
 
                         with gr.Column(visible=False, elem_id="action_phase_group") as action_phase_group:
                             img_display = gr.Image(
-                                label="Keypoint Selection",
+                                label="Point Selection",
                                 interactive=False,
                                 type="pil",
                                 elem_id="live_obs",
@@ -895,7 +895,7 @@ def create_ui_blocks():
             queue=False,
             show_progress="hidden",
         ).then(
-            fn=lambda: PHASE_ACTION_KEYPOINT,
+            fn=lambda: PHASE_ACTION_POINT,
             outputs=[ui_phase_state],
             queue=False,
             show_progress="hidden",
@@ -913,7 +913,7 @@ def create_ui_blocks():
             queue=False,
             show_progress="hidden",
         ).then(
-            fn=lambda: PHASE_ACTION_KEYPOINT,
+            fn=lambda: PHASE_ACTION_POINT,
             outputs=[ui_phase_state],
             queue=False,
             show_progress="hidden",
@@ -984,7 +984,7 @@ def create_ui_blocks():
             ],
             show_progress="hidden",
         ).then(
-            fn=lambda: PHASE_ACTION_KEYPOINT,
+            fn=lambda: PHASE_ACTION_POINT,
             outputs=[ui_phase_state],
             show_progress="hidden",
         )

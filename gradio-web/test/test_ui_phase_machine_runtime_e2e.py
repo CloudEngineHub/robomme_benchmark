@@ -374,7 +374,7 @@ def phase_machine_ui_url():
 
             with gr.Column(visible=False, elem_id="control_panel_group") as control_panel_group:
                 options_radio = gr.Radio(choices=[("pick", 0)], value=0, elem_id="action_radio")
-                coords_box = gr.Textbox(value="please click the keypoint selection image", elem_id="coords_box")
+                coords_box = gr.Textbox(value="please click the point selection image", elem_id="coords_box")
                 with gr.Column(visible=False, elem_id="action_buttons_row") as action_buttons_row:
                     exec_btn = gr.Button("EXECUTE", elem_id="exec_btn")
                     reference_action_btn = gr.Button(
@@ -404,7 +404,7 @@ def phase_machine_ui_url():
                 gr.update(visible=False),
                 gr.update(visible=False),
                 gr.update(interactive=False),
-                gr.update(value="please click the keypoint selection image"),
+                gr.update(value="please click the point selection image"),
                 "demo_video",
             )
 
@@ -423,13 +423,13 @@ def phase_machine_ui_url():
                 gr.update(visible=True),
                 gr.update(interactive=True),
                 gr.update(visible=False, interactive=False),
-                "action_keypoint",
+                "action_point",
             )
 
         def precheck_fn(_option_idx, _coords):
             state["precheck_calls"] += 1
             if state["precheck_calls"] == 1:
-                raise gr.Error("please click the keypoint selection image before execute!")
+                raise gr.Error("please click the point selection image before execute!")
 
         def to_execute_fn():
             return (
@@ -456,7 +456,7 @@ def phase_machine_ui_url():
                 gr.update(interactive=True),
                 gr.update(interactive=True),
                 gr.update(interactive=True),
-                "action_keypoint",
+                "action_point",
             )
 
         login_btn.click(
@@ -1230,7 +1230,7 @@ def test_no_video_task_hides_manual_demo_button(monkeypatch):
         demo.close()
 
 
-def test_keypoint_wait_state_pulses_live_obs_and_updates_system_log(monkeypatch):
+def test_point_wait_state_pulses_live_obs_and_updates_system_log(monkeypatch):
     config_module = importlib.reload(importlib.import_module("config"))
     callbacks = importlib.reload(importlib.import_module("gradio_callbacks"))
     ui_layout = importlib.reload(importlib.import_module("ui_layout"))
@@ -1248,7 +1248,7 @@ def test_keypoint_wait_state_pulses_live_obs_and_updates_system_log(monkeypatch)
 
     def fake_init_app(_request=None):
         return (
-            "uid-keypoint-wait",
+            "uid-point-wait",
             gr.update(visible=True),  # main_interface
             gr.update(
                 value=fake_obs_img.copy(),
@@ -1265,7 +1265,7 @@ def test_keypoint_wait_state_pulses_live_obs_and_updates_system_log(monkeypatch)
             ),  # coords_box
             gr.update(value=None, visible=False),  # video_display
             gr.update(visible=False, interactive=False),  # watch_demo_video_btn
-            "KeypointEnv (Episode 1)",  # task_info_box
+            "PointEnv (Episode 1)",  # task_info_box
             "Completed: 0",  # progress_info_box
             gr.update(interactive=True),  # restart_episode_btn
             gr.update(interactive=True),  # next_task_btn
@@ -1288,7 +1288,7 @@ def test_keypoint_wait_state_pulses_live_obs_and_updates_system_log(monkeypatch)
     host = "127.0.0.1"
     root_url = f"http://{host}:{port}/"
 
-    app = FastAPI(title="keypoint-wait-state-test")
+    app = FastAPI(title="point-wait-state-test")
     app = gr.mount_gradio_app(app, demo, path="/")
 
     config = uvicorn.Config(app, host=host, port=port, log_level="error")
@@ -1308,7 +1308,7 @@ def test_keypoint_wait_state_pulses_live_obs_and_updates_system_log(monkeypatch)
 
             initial_classes = _read_elem_classes(page, "live_obs")
             assert initial_classes is not None
-            assert config_module.LIVE_OBS_KEYPOINT_WAIT_CLASS not in initial_classes
+            assert config_module.LIVE_OBS_POINT_WAIT_CLASS not in initial_classes
             assert _read_log_output_value(page) == config_module.UI_TEXT["log"]["action_selection_prompt"]
             initial_card_wait = _read_media_card_wait_snapshot(page)
             initial_transforms = _read_live_obs_transform_snapshot(page)
@@ -1345,25 +1345,25 @@ def test_keypoint_wait_state_pulses_live_obs_and_updates_system_log(monkeypatch)
                     );
                 }""",
                 arg={
-                    "cardAnimation": "media-card-keypoint-ring",
-                    "waitClass": config_module.LIVE_OBS_KEYPOINT_WAIT_CLASS,
-                    "coordsPrompt": config_module.UI_TEXT["coords"]["select_keypoint"],
-                    "waitLog": config_module.UI_TEXT["log"]["keypoint_selection_prompt"],
+                    "cardAnimation": "media-card-point-ring",
+                    "waitClass": config_module.LIVE_OBS_POINT_WAIT_CLASS,
+                    "coordsPrompt": config_module.UI_TEXT["coords"]["select_point"],
+                    "waitLog": config_module.UI_TEXT["log"]["point_selection_prompt"],
                 },
                 timeout=5000,
             )
 
             wait_classes = _read_elem_classes(page, "live_obs")
             assert wait_classes is not None
-            assert config_module.LIVE_OBS_KEYPOINT_WAIT_CLASS in wait_classes
-            assert _read_coords_box_value(page) == config_module.UI_TEXT["coords"]["select_keypoint"]
-            assert _read_log_output_value(page) == config_module.UI_TEXT["log"]["keypoint_selection_prompt"]
+            assert config_module.LIVE_OBS_POINT_WAIT_CLASS in wait_classes
+            assert _read_coords_box_value(page) == config_module.UI_TEXT["coords"]["select_point"]
+            assert _read_log_output_value(page) == config_module.UI_TEXT["log"]["point_selection_prompt"]
             wait_card = _read_media_card_wait_snapshot(page)
             wait_transforms = _read_live_obs_transform_snapshot(page)
             wait_img_box = page.locator("#live_obs img").bounding_box()
             wait_frame_box = page.locator("#live_obs .image-frame").bounding_box()
             assert wait_card["opacity"] is not None and wait_card["opacity"] > 0.5
-            assert wait_card["animationName"] == "media-card-keypoint-ring"
+            assert wait_card["animationName"] == "media-card-point-ring"
             assert wait_card["borderColor"] != "rgba(225, 29, 72, 0)"
             assert wait_transforms["imgTransform"] == "none"
             assert wait_transforms["frameTransform"] == "none"
@@ -1401,7 +1401,7 @@ def test_keypoint_wait_state_pulses_live_obs_and_updates_system_log(monkeypatch)
                     );
                 }""",
                 arg={
-                    "waitClass": config_module.LIVE_OBS_KEYPOINT_WAIT_CLASS,
+                    "waitClass": config_module.LIVE_OBS_POINT_WAIT_CLASS,
                     "actionLog": config_module.UI_TEXT["log"]["action_selection_prompt"],
                 },
                 timeout=5000,
@@ -1414,7 +1414,7 @@ def test_keypoint_wait_state_pulses_live_obs_and_updates_system_log(monkeypatch)
             assert abs(coord_y - 8) <= 1
             final_classes = _read_elem_classes(page, "live_obs")
             assert final_classes is not None
-            assert config_module.LIVE_OBS_KEYPOINT_WAIT_CLASS not in final_classes
+            assert config_module.LIVE_OBS_POINT_WAIT_CLASS not in final_classes
             assert config_module.LIVE_OBS_BASE_CLASS in final_classes
             assert _read_log_output_value(page) == config_module.UI_TEXT["log"]["action_selection_prompt"]
             final_card_wait = _read_media_card_wait_snapshot(page)
@@ -1562,14 +1562,14 @@ def test_reference_action_single_click_applies_coords_without_wait_state(monkeyp
                     "checkedValue": "0",
                     "coordsValue": "5, 6",
                     "logValue": expected_reference_log,
-                    "waitClass": config_module.LIVE_OBS_KEYPOINT_WAIT_CLASS,
+                    "waitClass": config_module.LIVE_OBS_POINT_WAIT_CLASS,
                 },
                 timeout=5000,
             )
 
             classes_after_reference = _read_elem_classes(page, "live_obs")
             assert classes_after_reference is not None
-            assert config_module.LIVE_OBS_KEYPOINT_WAIT_CLASS not in classes_after_reference
+            assert config_module.LIVE_OBS_POINT_WAIT_CLASS not in classes_after_reference
             assert _read_coords_box_value(page) == "5, 6"
             assert _read_log_output_value(page) == expected_reference_log
 
@@ -1595,18 +1595,18 @@ def test_reference_action_single_click_applies_coords_without_wait_state(monkeyp
                 }""",
                 arg={
                     "checkedValue": "1",
-                    "coordsValue": config_module.UI_TEXT["coords"]["select_keypoint"],
-                    "logValue": config_module.UI_TEXT["log"]["keypoint_selection_prompt"],
-                    "waitClass": config_module.LIVE_OBS_KEYPOINT_WAIT_CLASS,
+                    "coordsValue": config_module.UI_TEXT["coords"]["select_point"],
+                    "logValue": config_module.UI_TEXT["log"]["point_selection_prompt"],
+                    "waitClass": config_module.LIVE_OBS_POINT_WAIT_CLASS,
                 },
                 timeout=5000,
             )
 
             classes_after_manual_change = _read_elem_classes(page, "live_obs")
             assert classes_after_manual_change is not None
-            assert config_module.LIVE_OBS_KEYPOINT_WAIT_CLASS in classes_after_manual_change
-            assert _read_coords_box_value(page) == config_module.UI_TEXT["coords"]["select_keypoint"]
-            assert _read_log_output_value(page) == config_module.UI_TEXT["log"]["keypoint_selection_prompt"]
+            assert config_module.LIVE_OBS_POINT_WAIT_CLASS in classes_after_manual_change
+            assert _read_coords_box_value(page) == config_module.UI_TEXT["coords"]["select_point"]
+            assert _read_log_output_value(page) == config_module.UI_TEXT["log"]["point_selection_prompt"]
 
             browser.close()
     finally:
@@ -1638,7 +1638,7 @@ def test_live_obs_client_resize_fills_width_and_keeps_click_mapping(monkeypatch)
             gr.update(choices=[("pick", 0)], value=0),  # options_radio
             "goal",  # goal_box
             gr.update(
-                value="please click the keypoint selection image",
+                value="please click the point selection image",
                 visible=True,
                 interactive=False,
             ),  # coords_box

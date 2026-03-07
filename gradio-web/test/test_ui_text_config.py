@@ -30,14 +30,14 @@ class _FakeLoadSession:
         return "IMG"
 
 
-def test_on_option_select_uses_configured_select_keypoint_and_log_messages(monkeypatch, reload_module):
+def test_on_option_select_uses_configured_select_point_and_log_messages(monkeypatch, reload_module):
     reload_module("config")
     callbacks = reload_module("gradio_callbacks")
 
-    monkeypatch.setitem(callbacks.UI_TEXT["coords"], "select_keypoint", "pick a point from config")
+    monkeypatch.setitem(callbacks.UI_TEXT["coords"], "select_point", "pick a point from config")
     monkeypatch.setitem(
         callbacks.UI_TEXT["log"],
-        "keypoint_selection_prompt",
+        "point_selection_prompt",
         "custom log prompt from config",
     )
     monkeypatch.setattr(callbacks, "update_session_activity", lambda uid: None)
@@ -47,7 +47,7 @@ def test_on_option_select_uses_configured_select_keypoint_and_log_messages(monke
 
     assert coords_text == "pick a point from config"
     assert img_update.get("interactive") is True
-    assert callbacks.get_live_obs_elem_classes(waiting_for_keypoint=True) == img_update.get("elem_classes")
+    assert callbacks.get_live_obs_elem_classes(waiting_for_point=True) == img_update.get("elem_classes")
     assert log_text == "custom log prompt from config"
     assert suppress_flag is False
 
@@ -56,10 +56,10 @@ def test_precheck_execute_inputs_uses_configured_before_execute_message(monkeypa
     reload_module("config")
     callbacks = reload_module("gradio_callbacks")
 
-    monkeypatch.setitem(callbacks.UI_TEXT["coords"], "select_keypoint", "pick a point from config")
+    monkeypatch.setitem(callbacks.UI_TEXT["coords"], "select_point", "pick a point from config")
     monkeypatch.setitem(
         callbacks.UI_TEXT["coords"],
-        "select_keypoint_before_execute",
+        "select_point_before_execute",
         "pick a point before execute from config",
     )
     monkeypatch.setattr(callbacks, "update_session_activity", lambda uid: None)
@@ -180,7 +180,7 @@ def test_ui_option_label_uses_routestick_configured_action_text(reload_module):
     assert callbacks._ui_option_label(session, "fallback", 0) == "d. move right counterclockwise↙︎←↖︎ ◜←◝"
 
 
-def test_load_status_task_appends_configured_keypoint_suffix_after_mapped_label(monkeypatch, reload_module):
+def test_load_status_task_appends_configured_point_suffix_after_mapped_label(monkeypatch, reload_module):
     config = reload_module("config")
     callbacks = reload_module("gradio_callbacks")
     session = _FakeLoadSession(
@@ -204,7 +204,7 @@ def test_load_status_task_appends_configured_keypoint_suffix_after_mapped_label(
 
     assert result[4]["choices"] == [
         (
-            f"a. move forward↓{config.UI_TEXT['actions']['keypoint_required_suffix']}",
+            f"a. move forward↓{config.UI_TEXT['actions']['point_required_suffix']}",
             0,
         )
     ]
