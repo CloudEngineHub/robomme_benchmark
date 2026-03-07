@@ -44,6 +44,8 @@ PHASE_DEMO_VIDEO = "demo_video"
 PHASE_ACTION_KEYPOINT = "action_keypoint"
 PHASE_EXECUTION_PLAYBACK = "execution_playback"
 
+APP_THEME = gr.themes.Default()
+
 
 # Deprecated: no legacy runtime JS logic in native Gradio mode.
 SYNC_JS = ""
@@ -234,6 +236,97 @@ LIVE_OBS_CLIENT_RESIZE_JS = r"""
 """
 
 
+THEME_LOCK_HEAD = r"""
+<script>
+(() => {
+    const applyLightTheme = () => {
+        const normalizeThemeState = (store) => {
+            try {
+                store.setItem("theme", "light");
+                store.setItem("color-scheme", "light");
+                store.setItem("gradio-theme", "light");
+                for (const key of Object.keys(store)) {
+                    if (!/theme|color-scheme/i.test(key)) {
+                        continue;
+                    }
+                    const value = store.getItem(key);
+                    if (typeof value === "string" && /dark/i.test(value)) {
+                        store.setItem(key, value.replace(/dark/gi, "light"));
+                    }
+                }
+            } catch (error) {
+                console.debug("Failed to normalize theme state", error);
+            }
+        };
+        const normalizeNode = (node) => {
+            if (!node) {
+                return;
+            }
+            if (node.classList.contains("dark")) {
+                node.classList.remove("dark");
+            }
+            if (node.dataset.theme !== "light") {
+                node.dataset.theme = "light";
+            }
+            if (node.getAttribute("data-color-scheme") !== "light") {
+                node.setAttribute("data-color-scheme", "light");
+            }
+            if (node.style.colorScheme !== "light") {
+                node.style.colorScheme = "light";
+            }
+        };
+
+        normalizeThemeState(window.localStorage);
+        normalizeThemeState(window.sessionStorage);
+        normalizeNode(document.documentElement);
+        normalizeNode(document.body);
+    };
+
+    applyLightTheme();
+    window.__robommeForceLightTheme = applyLightTheme;
+
+    if (window.__robommeThemeLockInstalled) {
+        return;
+    }
+
+    const observer = new MutationObserver(() => applyLightTheme());
+    observer.observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ["class", "data-theme", "style"],
+    });
+
+    const attachBodyObserver = () => {
+        if (!document.body || document.body.dataset.robommeThemeObserved === "1") {
+            return;
+        }
+        document.body.dataset.robommeThemeObserved = "1";
+        observer.observe(document.body, {
+            attributes: true,
+            attributeFilter: ["class", "data-theme", "style"],
+        });
+    };
+
+    attachBodyObserver();
+    document.addEventListener("DOMContentLoaded", attachBodyObserver, { once: true });
+    window.addEventListener("load", applyLightTheme, { once: true });
+    window.setTimeout(applyLightTheme, 0);
+    window.setTimeout(applyLightTheme, 100);
+    window.__robommeThemeLockInstalled = true;
+})();
+</script>
+"""
+
+
+THEME_LOCK_JS = r"""
+() => {
+    if (typeof window.__robommeForceLightTheme === "function") {
+        window.__robommeForceLightTheme();
+        window.setTimeout(window.__robommeForceLightTheme, 0);
+    }
+}
+"""
+
+
 CSS = f"""
 :root {{
     --body-text-size: {UI_GLOBAL_FONT_SIZE} !important;
@@ -248,6 +341,7 @@ CSS = f"""
     --button-small-text-size: {UI_GLOBAL_FONT_SIZE} !important;
     --section-header-text-size: {UI_GLOBAL_FONT_SIZE} !important;
     --text-md: {UI_GLOBAL_FONT_SIZE} !important;
+    color-scheme: light !important;
 }}
 
 .native-card {{
@@ -262,6 +356,7 @@ CSS = f"""
     inset: 0 !important;
     z-index: 9999 !important;
     background: rgba(255, 255, 255, 0.92) !important;
+    color: var(--body-text-color) !important;
     text-align: center !important;
 }}
 
@@ -461,6 +556,8 @@ def create_ui_blocks():
 
     with gr.Blocks(title="Oracle Planner Interface") as demo:
         demo.css = CSS
+        demo.theme = APP_THEME
+        demo.head = THEME_LOCK_HEAD
 
         gr.Markdown("## RoboMME Interactive Demo 🚀🚀🚀", elem_id="header_title")
         with gr.Row():
@@ -896,6 +993,12 @@ def create_ui_blocks():
             outputs=[img_display],
             queue=False,
             show_progress="hidden",
+        )
+
+        demo.load(
+            fn=None,
+            js=THEME_LOCK_JS,
+            queue=False,
         )
 
         demo.load(

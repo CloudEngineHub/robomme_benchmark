@@ -284,6 +284,36 @@ def _read_font_probe_snapshot(page) -> dict[str, str | None]:
     )
 
 
+def _read_theme_snapshot(page) -> dict[str, str | bool | None]:
+    return page.evaluate(
+        """() => {
+            const html = document.documentElement;
+            const body = document.body;
+            const overlay = document.getElementById('loading_overlay_group');
+            const readStore = (store, key) => {
+                try {
+                    return store.getItem(key);
+                } catch (error) {
+                    return null;
+                }
+            };
+            return {
+                htmlHasDark: html ? html.classList.contains('dark') : null,
+                bodyHasDark: body ? body.classList.contains('dark') : null,
+                htmlTheme: html ? html.dataset.theme || null : null,
+                bodyTheme: body ? body.dataset.theme || null : null,
+                htmlInlineColorScheme: html ? html.style.colorScheme || null : null,
+                bodyInlineColorScheme: body ? body.style.colorScheme || null : null,
+                htmlColorScheme: html ? getComputedStyle(html).colorScheme : null,
+                bodyColorScheme: body ? getComputedStyle(body).colorScheme : null,
+                overlayBackground: overlay ? getComputedStyle(overlay).backgroundColor : null,
+                storedTheme: readStore(window.localStorage, 'theme'),
+                storedGradioTheme: readStore(window.localStorage, 'gradio-theme'),
+            };
+        }"""
+    )
+
+
 @pytest.fixture
 def font_size_probe_ui_url(monkeypatch):
     config_module = importlib.reload(importlib.import_module("config"))
@@ -587,6 +617,129 @@ def test_global_font_size_applies_except_header_title(font_size_probe_ui_url):
         assert snapshot["header"] != snapshot["field"]
 
         browser.close()
+
+
+def test_create_ui_blocks_stays_light_under_dark_system_preference(monkeypatch):
+    ui_layout = importlib.reload(importlib.import_module("ui_layout"))
+
+    fake_obs = np.zeros((24, 24, 3), dtype=np.uint8)
+    fake_obs_img = Image.fromarray(fake_obs)
+
+    def fake_init_app(_request):
+        return (
+            "uid-1",
+            gr.update(visible=True),
+            fake_obs_img,
+            "ready",
+            gr.update(choices=[("pick", 0)], value=None),
+            "goal",
+            "No need for coordinates",
+            gr.update(value=None, visible=False),
+            gr.update(visible=False, interactive=False),
+            "PickXtimes (Episode 1)",
+            "Completed: 0",
+            gr.update(interactive=True),
+            gr.update(interactive=True),
+            gr.update(interactive=True),
+            gr.update(visible=False),
+            gr.update(visible=True),
+            gr.update(visible=True),
+            gr.update(value="hint"),
+            gr.update(visible=False),
+            gr.update(interactive=True),
+        )
+
+    monkeypatch.setattr(ui_layout, "init_app", fake_init_app)
+
+    demo = ui_layout.create_ui_blocks()
+    port = _free_port()
+    _app, root_url, _share_url = demo.launch(
+        server_name="127.0.0.1",
+        server_port=port,
+        prevent_thread_lock=True,
+        quiet=True,
+        show_error=True,
+        ssr_mode=False,
+        theme=ui_layout.APP_THEME,
+        css=ui_layout.CSS,
+        head=ui_layout.THEME_LOCK_HEAD,
+    )
+    _wait_http_ready(root_url)
+
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            context = browser.new_context(
+                viewport={"width": 1280, "height": 900},
+                color_scheme="dark",
+            )
+            context.add_init_script(
+                """
+                window.localStorage.setItem('theme', 'dark');
+                window.localStorage.setItem('gradio-theme', 'dark');
+                """
+            )
+            page = context.new_page()
+            page.goto(root_url, wait_until="domcontentloaded")
+
+            page.wait_for_function(
+                """() => {
+                    const html = document.documentElement;
+                    const body = document.body;
+                    if (!html || !body) return false;
+                    return (
+                        typeof window.__robommeForceLightTheme === 'function' &&
+                        !html.classList.contains('dark') &&
+                        !body.classList.contains('dark') &&
+                        html.dataset.theme === 'light' &&
+                        body.dataset.theme === 'light' &&
+                        html.style.colorScheme === 'light' &&
+                        body.style.colorScheme === 'light'
+                    );
+                }""",
+                timeout=15000,
+            )
+
+            snapshot = _read_theme_snapshot(page)
+            assert snapshot["htmlHasDark"] is False
+            assert snapshot["bodyHasDark"] is False
+            assert snapshot["htmlTheme"] == "light"
+            assert snapshot["bodyTheme"] == "light"
+            assert snapshot["htmlInlineColorScheme"] == "light"
+            assert snapshot["bodyInlineColorScheme"] == "light"
+            assert snapshot["storedTheme"] == "light"
+            assert snapshot["storedGradioTheme"] == "light"
+
+            page.reload(wait_until="domcontentloaded")
+            page.wait_for_function(
+                """() => {
+                    const html = document.documentElement;
+                    const body = document.body;
+                    return (
+                        !!html &&
+                        !!body &&
+                        typeof window.__robommeForceLightTheme === 'function' &&
+                        !html.classList.contains('dark') &&
+                        !body.classList.contains('dark') &&
+                        html.dataset.theme === 'light' &&
+                        body.dataset.theme === 'light'
+                    );
+                }""",
+                timeout=15000,
+            )
+
+            reloaded_snapshot = _read_theme_snapshot(page)
+            assert reloaded_snapshot["htmlHasDark"] is False
+            assert reloaded_snapshot["bodyHasDark"] is False
+            assert reloaded_snapshot["htmlInlineColorScheme"] == "light"
+            assert reloaded_snapshot["bodyInlineColorScheme"] == "light"
+            assert reloaded_snapshot["storedTheme"] == "light"
+            assert reloaded_snapshot["storedGradioTheme"] == "light"
+
+            context.close()
+            browser.close()
+    finally:
+        demo.close()
 
 
 def test_phase_machine_runtime_flow_and_execute_precheck(phase_machine_ui_url):

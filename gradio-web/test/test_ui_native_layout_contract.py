@@ -45,6 +45,25 @@ def test_native_ui_css_excludes_header_title_from_global_font_size(reload_module
     assert "font-size: var(--text-xxl) !important;" in ui_layout.CSS
 
 
+def test_native_ui_forces_light_theme_and_uses_light_overlay_baseline(reload_module):
+    ui_layout = reload_module("ui_layout")
+
+    css = ui_layout.CSS
+
+    assert "color-scheme: light !important;" in css
+    assert "background: rgba(255, 255, 255, 0.92) !important;" in css
+    assert "color: var(--body-text-color) !important;" in css
+    assert "body.dark," not in css
+    assert ".dark," not in css
+    assert ":root.dark" not in css
+    assert "rgba(15, 23, 42, 0.92)" not in css
+
+    assert "window.__robommeForceLightTheme = applyLightTheme;" in ui_layout.THEME_LOCK_HEAD
+    assert 'store.setItem("gradio-theme", "light");' in ui_layout.THEME_LOCK_HEAD
+    assert 'node.classList.remove("dark");' in ui_layout.THEME_LOCK_HEAD
+    assert "window.__robommeForceLightTheme();" in ui_layout.THEME_LOCK_JS
+
+
 def test_native_ui_css_highlights_media_card_not_live_obs_transform(reload_module):
     ui_layout = reload_module("ui_layout")
 
@@ -84,6 +103,8 @@ def test_native_ui_config_contains_phase_machine_and_precheck_chain(reload_modul
 
     try:
         cfg = demo.get_config_file()
+        assert cfg.get("theme") == "default"
+        assert cfg.get("head") == ui_layout.THEME_LOCK_HEAD
 
         elem_ids = {
             comp.get("props", {}).get("elem_id")

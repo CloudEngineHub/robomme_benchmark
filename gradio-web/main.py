@@ -145,7 +145,9 @@ def main():
         debug=True,
         show_error=True,
         quiet=False,
+        theme=getattr(demo, "theme", None),
         css=CSS,
+        head=getattr(demo, "head", None),
     )
 
 
