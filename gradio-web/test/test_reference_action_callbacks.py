@@ -48,7 +48,7 @@ def test_on_reference_action_success_updates_option_and_coords(monkeypatch, relo
     monkeypatch.setattr(callbacks, "update_session_activity", lambda uid: None)
     monkeypatch.setattr(callbacks, "get_session", lambda uid: session)
 
-    img_update, option_update, coords_text, log_html = callbacks.on_reference_action("uid-1")
+    img_update, option_update, coords_text, log_html, suppress_flag = callbacks.on_reference_action("uid-1", None)
 
     assert img_update.get("__type__") == "update"
     assert isinstance(img_update.get("value"), Image.Image)
@@ -56,6 +56,7 @@ def test_on_reference_action_success_updates_option_and_coords(monkeypatch, relo
     assert img_update.get("elem_classes") == config.get_live_obs_elem_classes()
     assert option_update.get("value") == 2
     assert coords_text == "5, 6"
+    assert suppress_flag is True
     expected_log = config.UI_TEXT["log"]["reference_action_message_with_coords"].format(
         option_label="c",
         option_action="press the button",
@@ -71,13 +72,14 @@ def test_on_reference_action_session_missing(monkeypatch, reload_module):
     monkeypatch.setattr(callbacks, "update_session_activity", lambda uid: None)
     monkeypatch.setattr(callbacks, "get_session", lambda uid: None)
 
-    img_update, option_update, coords_text, log_html = callbacks.on_reference_action("uid-missing")
+    img_update, option_update, coords_text, log_html, suppress_flag = callbacks.on_reference_action("uid-missing", None)
 
     assert img_update.get("__type__") == "update"
     assert img_update.get("value") is None
     assert option_update.get("__type__") == "update"
     assert coords_text == config.UI_TEXT["coords"]["not_needed"]
     assert log_html == config.UI_TEXT["log"]["session_error"]
+    assert suppress_flag is False
 
 
 def test_on_reference_action_error_message_from_reference(monkeypatch, reload_module):
@@ -88,8 +90,33 @@ def test_on_reference_action_error_message_from_reference(monkeypatch, reload_mo
     monkeypatch.setattr(callbacks, "update_session_activity", lambda uid: None)
     monkeypatch.setattr(callbacks, "get_session", lambda uid: session)
 
-    _img, _opt, _coords, log_html = callbacks.on_reference_action("uid-1")
+    _img, _opt, _coords, log_html, suppress_flag = callbacks.on_reference_action("uid-1", None)
     assert log_html == config.UI_TEXT["log"]["reference_action_status"].format(message="bad ref")
+    assert suppress_flag is False
+
+
+def test_on_reference_action_same_selected_option_does_not_set_suppression(monkeypatch, reload_module):
+    callbacks = reload_module("gradio_callbacks")
+
+    session = _FakeSession(
+        {
+            "ok": True,
+            "option_idx": 0,
+            "option_label": "a",
+            "option_action": "pick up the cube",
+            "need_coords": True,
+            "coords_xy": [3, 4],
+            "message": "ok",
+        }
+    )
+
+    monkeypatch.setattr(callbacks, "update_session_activity", lambda uid: None)
+    monkeypatch.setattr(callbacks, "get_session", lambda uid: session)
+
+    _img, _option_update, coords_text, _log_html, suppress_flag = callbacks.on_reference_action("uid-1", 0)
+
+    assert coords_text == "3, 4"
+    assert suppress_flag is False
 
 
 def test_on_option_select_resets_to_keypoint_wait_state_for_point_action(monkeypatch, reload_module):
@@ -100,12 +127,24 @@ def test_on_option_select_resets_to_keypoint_wait_state_for_point_action(monkeyp
     monkeypatch.setattr(callbacks, "update_session_activity", lambda uid: None)
     monkeypatch.setattr(callbacks, "get_session", lambda uid: session)
 
-    coords_text, img_update, log_text = callbacks.on_option_select("uid-1", 0, "12, 34")
+    coords_text, img_update, log_text, suppress_flag = callbacks.on_option_select("uid-1", 0, "12, 34", False)
 
     assert coords_text == config.UI_TEXT["coords"]["select_keypoint"]
     assert img_update.get("interactive") is True
     assert img_update.get("elem_classes") == config.get_live_obs_elem_classes(waiting_for_keypoint=True)
     assert log_text == config.UI_TEXT["log"]["keypoint_selection_prompt"]
+    assert suppress_flag is False
+
+
+def test_on_option_select_suppresses_programmatic_reference_change(reload_module):
+    callbacks = reload_module("gradio_callbacks")
+
+    coords_update, img_update, log_update, suppress_flag = callbacks.on_option_select("uid-1", 0, "12, 34", True)
+
+    assert coords_update.get("__type__") == "update"
+    assert img_update.get("__type__") == "update"
+    assert log_update.get("__type__") == "update"
+    assert suppress_flag is False
 
 
 def test_on_map_click_clears_wait_state_and_restores_action_prompt(monkeypatch, reload_module):
@@ -147,10 +186,11 @@ def test_on_reference_action_uses_configured_action_text_override(monkeypatch, r
     monkeypatch.setattr(callbacks, "update_session_activity", lambda uid: None)
     monkeypatch.setattr(callbacks, "get_session", lambda uid: session)
 
-    _img, _option_update, coords_text, log_html = callbacks.on_reference_action("uid-1")
+    _img, _option_update, coords_text, log_html, suppress_flag = callbacks.on_reference_action("uid-1", None)
 
     assert coords_text == config.UI_TEXT["coords"]["not_needed"]
     assert log_html == config.UI_TEXT["log"]["reference_action_message"].format(
         option_label="a",
         option_action="move forward↓",
     )
+    assert suppress_flag is True

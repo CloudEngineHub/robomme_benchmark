@@ -855,17 +855,25 @@ def _is_valid_coords_text(coords_text: str) -> bool:
     return True
 
 
-def on_option_select(uid, option_value, coords_str=None):
+def on_option_select(uid, option_value, coords_str=None, suppress_next_option_change=False):
     """
     处理选项选择事件
     """
     default_msg = _ui_text("coords", "not_needed")
+
+    if suppress_next_option_change:
+        LOGGER.debug(
+            "on_option_select suppressed uid=%s option=%s",
+            _uid_for_log(uid),
+            option_value,
+        )
+        return gr.update(), gr.update(), gr.update(), False
     
     if option_value is None:
         LOGGER.debug("on_option_select uid=%s option=None", _uid_for_log(uid))
         session = get_session(uid) if uid else None
         base_img = session.get_pil_image(use_segmented=USE_SEGMENTED_VIEW) if session else _LIVE_OBS_UPDATE_SKIP
-        return default_msg, _live_obs_update(value=base_img, interactive=False), _action_selection_log()
+        return default_msg, _live_obs_update(value=base_img, interactive=False), _action_selection_log(), False
     
     # 更新session活动时间（选择选项操作）
     if uid:
@@ -874,7 +882,7 @@ def on_option_select(uid, option_value, coords_str=None):
     session = get_session(uid)
     if not session:
         LOGGER.warning("on_option_select: missing session uid=%s", _uid_for_log(uid))
-        return default_msg, _live_obs_update(interactive=False), format_log_markdown(_ui_text("log", "session_error"))
+        return default_msg, _live_obs_update(interactive=False), format_log_markdown(_ui_text("log", "session_error")), False
     
     option_idx = _parse_option_idx(option_value)
     base_img = session.get_pil_image(use_segmented=USE_SEGMENTED_VIEW)
@@ -891,13 +899,14 @@ def on_option_select(uid, option_value, coords_str=None):
             _ui_text("coords", "select_keypoint"),
             _live_obs_update(value=base_img, interactive=True, waiting_for_keypoint=True),
             _keypoint_selection_log(),
+            False,
         )
     
     LOGGER.debug("on_option_select uid=%s option=%s requires_coords=False", _uid_for_log(uid), option_idx)
-    return default_msg, _live_obs_update(value=base_img, interactive=False), _action_selection_log()
+    return default_msg, _live_obs_update(value=base_img, interactive=False), _action_selection_log(), False
 
 
-def on_reference_action(uid):
+def on_reference_action(uid, current_option_value=None):
     """
     自动获取并回填当前步参考 action + 像素坐标（不执行）。
     """
@@ -912,6 +921,7 @@ def on_reference_action(uid):
             gr.update(),
             _ui_text("coords", "not_needed"),
             format_log_markdown(_ui_text("log", "session_error")),
+            False,
         )
 
     LOGGER.info("on_reference_action uid=%s env=%s", _uid_for_log(uid), getattr(session, "env_id", None))
@@ -926,6 +936,7 @@ def on_reference_action(uid):
             gr.update(),
             gr.update(),
             format_log_markdown(_ui_text("log", "reference_action_error", error=exc)),
+            False,
         )
 
     if not isinstance(reference, dict) or not reference.get("ok", False):
@@ -937,14 +948,17 @@ def on_reference_action(uid):
             gr.update(),
             gr.update(),
             format_log_markdown(_ui_text("log", "reference_action_status", message=message)),
+            False,
         )
 
     option_idx = reference.get("option_idx")
+    current_option_idx = _parse_option_idx(current_option_value)
     option_label = str(reference.get("option_label", "")).strip()
     option_action = str(reference.get("option_action", "")).strip()
     option_action = get_ui_action_text(getattr(session, "env_id", None), option_action)
     need_coords = bool(reference.get("need_coords", False))
     coords_xy = reference.get("coords_xy")
+    suppress_next_option_change = option_idx != current_option_idx
 
     updated_img = current_img
     coords_text = _ui_text("coords", "not_needed")
@@ -980,6 +994,7 @@ def on_reference_action(uid):
         gr.update(value=option_idx),
         coords_text,
         format_log_markdown(log_text),
+        suppress_next_option_change,
     )
 
 

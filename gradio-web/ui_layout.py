@@ -586,6 +586,7 @@ def create_ui_blocks():
         uid_state = gr.State(value=None)
         ui_phase_state = gr.State(value=PHASE_INIT)
         current_task_env_state = gr.State(value=None)
+        suppress_next_option_change_state = gr.State(value=False)
         live_obs_timer = gr.Timer(value=1.0 / LIVE_OBS_REFRESH_HZ, active=True)
 
         task_info_box = gr.Textbox(visible=False, elem_id="task_info_box")
@@ -925,8 +926,8 @@ def create_ui_blocks():
 
         options_radio.change(
             fn=on_option_select,
-            inputs=[uid_state, options_radio, coords_box],
-            outputs=[coords_box, img_display, log_output],
+            inputs=[uid_state, options_radio, coords_box, suppress_next_option_change_state],
+            outputs=[coords_box, img_display, log_output, suppress_next_option_change_state],
         )
 
         watch_demo_video_btn.click(
@@ -939,8 +940,8 @@ def create_ui_blocks():
 
         reference_action_btn.click(
             fn=on_reference_action,
-            inputs=[uid_state],
-            outputs=[img_display, options_radio, coords_box, log_output],
+            inputs=[uid_state, options_radio],
+            outputs=[img_display, options_radio, coords_box, log_output, suppress_next_option_change_state],
         )
 
         exec_btn.click(

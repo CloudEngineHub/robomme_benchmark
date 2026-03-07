@@ -1415,6 +1415,190 @@ def test_keypoint_wait_state_pulses_live_obs_and_updates_system_log(monkeypatch)
         demo.close()
 
 
+def test_reference_action_single_click_applies_coords_without_wait_state(monkeypatch):
+    config_module = importlib.reload(importlib.import_module("config"))
+    callbacks = importlib.reload(importlib.import_module("gradio_callbacks"))
+    ui_layout = importlib.reload(importlib.import_module("ui_layout"))
+
+    fake_obs = np.zeros((24, 48, 3), dtype=np.uint8)
+    fake_obs[:, :] = [15, 20, 25]
+    fake_obs_img = Image.fromarray(fake_obs)
+
+    class FakeSession:
+        env_id = "BinFill"
+        raw_solve_options = [
+            {"label": "a", "action": "pick the left cube", "available": [object()]},
+            {"label": "b", "action": "pick the right cube", "available": [object()]},
+        ]
+        available_options = [
+            ("a. pick the left cube", 0),
+            ("b. pick the right cube", 1),
+        ]
+
+        def get_pil_image(self, use_segmented=False):
+            _ = use_segmented
+            return fake_obs_img.copy()
+
+        def get_reference_action(self):
+            return {
+                "ok": True,
+                "option_idx": 0,
+                "option_label": "a",
+                "option_action": "pick the left cube",
+                "need_coords": True,
+                "coords_xy": [5, 6],
+                "message": "ok",
+            }
+
+    def fake_init_app(_request=None):
+        return (
+            "uid-reference-action",
+            gr.update(visible=True),  # main_interface
+            gr.update(
+                value=fake_obs_img.copy(),
+                interactive=False,
+                elem_classes=config_module.get_live_obs_elem_classes(),
+            ),  # img_display
+            config_module.UI_TEXT["log"]["action_selection_prompt"],  # log_output
+            gr.update(
+                choices=[
+                    ("a. pick the left cube", 0),
+                    ("b. pick the right cube", 1),
+                ],
+                value=None,
+            ),  # options_radio
+            "goal",  # goal_box
+            gr.update(
+                value=config_module.UI_TEXT["coords"]["not_needed"],
+                visible=True,
+                interactive=False,
+            ),  # coords_box
+            gr.update(value=None, visible=False),  # video_display
+            gr.update(visible=False, interactive=False),  # watch_demo_video_btn
+            "BinFill (Episode 1)",  # task_info_box
+            "Completed: 0",  # progress_info_box
+            gr.update(interactive=True),  # restart_episode_btn
+            gr.update(interactive=True),  # next_task_btn
+            gr.update(interactive=True),  # exec_btn
+            gr.update(visible=False),  # video_phase_group
+            gr.update(visible=True),  # action_phase_group
+            gr.update(visible=True),  # control_panel_group
+            gr.update(value="hint"),  # task_hint_display
+            gr.update(visible=False),  # loading_overlay
+            gr.update(interactive=True),  # reference_action_btn
+        )
+
+    monkeypatch.setattr(ui_layout, "init_app", fake_init_app)
+    monkeypatch.setattr(callbacks, "get_session", lambda uid: FakeSession())
+    monkeypatch.setattr(callbacks, "update_session_activity", lambda uid: None)
+
+    demo = ui_layout.create_ui_blocks()
+
+    port = _free_port()
+    host = "127.0.0.1"
+    root_url = f"http://{host}:{port}/"
+
+    app = FastAPI(title="reference-action-single-click-test")
+    app = gr.mount_gradio_app(app, demo, path="/")
+
+    config = uvicorn.Config(app, host=host, port=port, log_level="error")
+    server = uvicorn.Server(config)
+    thread = threading.Thread(target=server.run, daemon=True)
+    thread.start()
+    _wait_http_ready(root_url)
+
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page(viewport={"width": 1280, "height": 900})
+            page.goto(root_url, wait_until="domcontentloaded")
+            page.wait_for_selector("#main_interface_root", state="visible", timeout=15000)
+            page.wait_for_selector("#live_obs img", timeout=15000)
+            page.wait_for_selector("#reference_action_btn button, button#reference_action_btn", timeout=15000)
+
+            expected_reference_log = config_module.UI_TEXT["log"]["reference_action_message_with_coords"].format(
+                option_label="a",
+                option_action="pick the left cube",
+                coords_text="5, 6",
+            )
+            page.locator("#reference_action_btn button, button#reference_action_btn").first.click()
+
+            page.wait_for_function(
+                """(state) => {
+                    const coordsRoot = document.getElementById('coords_box');
+                    const coordsField = coordsRoot?.querySelector('textarea, input');
+                    const logRoot = document.getElementById('log_output');
+                    const logField = logRoot?.querySelector('textarea, input');
+                    const liveObs = document.getElementById('live_obs');
+                    const checked = document.querySelector('#action_radio input[type="radio"]:checked');
+                    const coordsValue = coordsField ? coordsField.value.trim() : '';
+                    const logValue = logField ? logField.value.trim() : (logRoot?.textContent || '').trim();
+                    return (
+                        !!checked &&
+                        checked.value === state.checkedValue &&
+                        coordsValue === state.coordsValue &&
+                        logValue === state.logValue &&
+                        !!liveObs &&
+                        !liveObs.classList.contains(state.waitClass)
+                    );
+                }""",
+                arg={
+                    "checkedValue": "0",
+                    "coordsValue": "5, 6",
+                    "logValue": expected_reference_log,
+                    "waitClass": config_module.LIVE_OBS_KEYPOINT_WAIT_CLASS,
+                },
+                timeout=5000,
+            )
+
+            classes_after_reference = _read_elem_classes(page, "live_obs")
+            assert classes_after_reference is not None
+            assert config_module.LIVE_OBS_KEYPOINT_WAIT_CLASS not in classes_after_reference
+            assert _read_coords_box_value(page) == "5, 6"
+            assert _read_log_output_value(page) == expected_reference_log
+
+            page.locator("#action_radio input[type='radio']").nth(1).check(force=True)
+            page.wait_for_function(
+                """(state) => {
+                    const coordsRoot = document.getElementById('coords_box');
+                    const coordsField = coordsRoot?.querySelector('textarea, input');
+                    const logRoot = document.getElementById('log_output');
+                    const logField = logRoot?.querySelector('textarea, input');
+                    const liveObs = document.getElementById('live_obs');
+                    const checked = document.querySelector('#action_radio input[type="radio"]:checked');
+                    const coordsValue = coordsField ? coordsField.value.trim() : '';
+                    const logValue = logField ? logField.value.trim() : (logRoot?.textContent || '').trim();
+                    return (
+                        !!checked &&
+                        checked.value === state.checkedValue &&
+                        coordsValue === state.coordsValue &&
+                        logValue === state.logValue &&
+                        !!liveObs &&
+                        liveObs.classList.contains(state.waitClass)
+                    );
+                }""",
+                arg={
+                    "checkedValue": "1",
+                    "coordsValue": config_module.UI_TEXT["coords"]["select_keypoint"],
+                    "logValue": config_module.UI_TEXT["log"]["keypoint_selection_prompt"],
+                    "waitClass": config_module.LIVE_OBS_KEYPOINT_WAIT_CLASS,
+                },
+                timeout=5000,
+            )
+
+            classes_after_manual_change = _read_elem_classes(page, "live_obs")
+            assert classes_after_manual_change is not None
+            assert config_module.LIVE_OBS_KEYPOINT_WAIT_CLASS in classes_after_manual_change
+            assert _read_coords_box_value(page) == config_module.UI_TEXT["coords"]["select_keypoint"]
+            assert _read_log_output_value(page) == config_module.UI_TEXT["log"]["keypoint_selection_prompt"]
+
+            browser.close()
+    finally:
+        server.should_exit = True
+        thread.join(timeout=10)
+        demo.close()
+
+
 def test_live_obs_client_resize_fills_width_and_keeps_click_mapping(monkeypatch):
     callbacks = importlib.reload(importlib.import_module("gradio_callbacks"))
     ui_layout = importlib.reload(importlib.import_module("ui_layout"))

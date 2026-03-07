@@ -43,12 +43,13 @@ def test_on_option_select_uses_configured_select_keypoint_and_log_messages(monke
     monkeypatch.setattr(callbacks, "update_session_activity", lambda uid: None)
     monkeypatch.setattr(callbacks, "get_session", lambda uid: _FakeOptionSession())
 
-    coords_text, img_update, log_text = callbacks.on_option_select("uid-1", 0, None)
+    coords_text, img_update, log_text, suppress_flag = callbacks.on_option_select("uid-1", 0, None, False)
 
     assert coords_text == "pick a point from config"
     assert img_update.get("interactive") is True
     assert callbacks.get_live_obs_elem_classes(waiting_for_keypoint=True) == img_update.get("elem_classes")
     assert log_text == "custom log prompt from config"
+    assert suppress_flag is False
 
 
 def test_precheck_execute_inputs_uses_configured_before_execute_message(monkeypatch, reload_module):
@@ -112,11 +113,12 @@ def test_missing_session_paths_use_configured_session_error(monkeypatch, reload_
     monkeypatch.setattr(callbacks, "update_session_activity", lambda uid: None)
     monkeypatch.setattr(callbacks, "get_session", lambda uid: None)
 
-    _img, _option_update, coords_text, log_text = callbacks.on_reference_action("uid-missing")
+    _img, _option_update, coords_text, log_text, suppress_flag = callbacks.on_reference_action("uid-missing", None)
     map_img, map_coords, map_log = callbacks.on_map_click("uid-missing", None, None)
 
     assert coords_text == callbacks.UI_TEXT["coords"]["not_needed"]
     assert log_text == "Session Error From Config"
+    assert suppress_flag is False
     assert map_img.get("__type__") == "update"
     assert map_img.get("value") is None
     assert map_coords == callbacks.UI_TEXT["coords"]["not_needed"]
