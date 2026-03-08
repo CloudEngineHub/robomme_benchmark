@@ -715,3 +715,90 @@ def test_active_user_execute_is_not_blocked_by_waiting_init_loads(monkeypatch):
         server.should_exit = True
         thread.join(timeout=10)
         demo.close()
+
+
+def test_waiting_page_enters_task_after_idle_session_ttl_release(monkeypatch):
+    config = importlib.reload(importlib.import_module("config"))
+    state_manager = importlib.reload(importlib.import_module("state_manager"))
+    callbacks = importlib.reload(importlib.import_module("gradio_callbacks"))
+    ui_layout = importlib.reload(importlib.import_module("ui_layout"))
+
+    monkeypatch.setattr(ui_layout, "SESSION_TIMEOUT", 2)
+
+    class _FakeProxy:
+        def __init__(self):
+            self.env_id = None
+            self.episode_idx = None
+            self.language_goal = "goal"
+            self.available_options = [("pick", 0)]
+            self.raw_solve_options = [{"label": "a", "action": "pick", "available": False}]
+            self.demonstration_frames = []
+
+        def load_episode(self, env_id, episode_idx):
+            self.env_id = env_id
+            self.episode_idx = episode_idx
+            return Image.new("RGB", (32, 32), color=(10, 20, 30)), "loaded"
+
+        def get_pil_image(self, use_segmented=False):
+            _ = use_segmented
+            return Image.new("RGB", (32, 32), color=(10, 20, 30))
+
+        def close(self):
+            return None
+
+    monkeypatch.setattr(state_manager, "ProcessSessionProxy", _FakeProxy)
+    monkeypatch.setattr(
+        callbacks.user_manager,
+        "init_session",
+        lambda uid: (
+            True,
+            "ok",
+            {"current_task": {"env_id": "BinFill", "episode_idx": 1}, "completed_count": 0},
+        ),
+    )
+    monkeypatch.setattr(callbacks, "get_task_hint", lambda env_id: "")
+    monkeypatch.setattr(callbacks, "should_show_demo_video", lambda env_id: False)
+
+    demo = ui_layout.create_ui_blocks()
+    root_url, demo, server, thread = _mount_demo(demo)
+
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+
+            active_pages = []
+            for _ in range(config.SESSION_CONCURRENCY_LIMIT):
+                page = browser.new_page(viewport={"width": 1280, "height": 900})
+                page.goto(root_url, wait_until="domcontentloaded")
+                active_pages.append(page)
+                time.sleep(0.25)
+
+            for page in active_pages:
+                _wait_until(lambda page=page: _read_progress_text(page) is None, timeout_s=15.0)
+
+            waiting_page = browser.new_page(viewport={"width": 1280, "height": 900})
+            waiting_page.goto(root_url, wait_until="domcontentloaded")
+
+            _wait_until(
+                lambda: _read_session_wait_overlay_snapshot(waiting_page)["visible"] is True,
+                timeout_s=10.0,
+            )
+            _wait_until(
+                lambda: len(state_manager.ACTIVE_SESSION_SLOTS) < config.SESSION_CONCURRENCY_LIMIT,
+                timeout_s=10.0,
+            )
+            _wait_until(
+                lambda: _read_session_wait_overlay_snapshot(waiting_page)["visible"] is False,
+                timeout_s=15.0,
+            )
+            _wait_until(
+                lambda: (_read_log_output_value(waiting_page) or "").strip() == "Please select the action.\nActions with 🎯 need to select a point on the image as input",
+                timeout_s=15.0,
+            )
+            assert _read_progress_text(waiting_page) is None
+
+            browser.close()
+    finally:
+        server.should_exit = True
+        thread.join(timeout=10)
+        demo.close()

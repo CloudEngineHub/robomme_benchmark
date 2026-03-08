@@ -373,6 +373,7 @@ PROGRESS_TEXT_REWRITE_JS = f"""
     const modeIdle = {json.dumps(LOAD_STATUS_MODE_IDLE)};
     const episodeLoadingText = {json.dumps(UI_TEXT["progress"]["episode_loading"])};
     const queueWaitText = {json.dumps(UI_TEXT["progress"]["queue_wait"])};
+    const elapsedOnlyPattern = /^\\d+(?:\\.\\d+)?s$/i;
 
     window.__robommeLoadStatusMode = window.__robommeLoadStatusMode || modeIdle;
     const getMode = () => window.__robommeLoadStatusMode || modeIdle;
@@ -449,8 +450,14 @@ PROGRESS_TEXT_REWRITE_JS = f"""
             node.dataset.robommeProgressCustomized === "1" && displayed === previousCustom
                 ? node.dataset.robommeProgressRaw || displayed
                 : displayed;
-
         if (getMode() !== modeEpisodeLoad) {{
+            if (
+                (elapsedOnlyPattern.test(raw) ||
+                    /^processing/i.test(raw) ||
+                    /^queue:/i.test(raw))
+            ) {{
+                node.textContent = "";
+            }}
             if (
                 node.dataset.robommeProgressCustomized === "1" &&
                 displayed === previousCustom &&
