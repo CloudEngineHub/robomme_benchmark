@@ -268,6 +268,7 @@ def test_entry_rejects_immediately_when_session_limit_is_full(monkeypatch):
             assert overlay_snapshot["width"] and overlay_snapshot["width"] > 0
             assert overlay_snapshot["height"] and overlay_snapshot["height"] >= 400
             assert overlay_snapshot["background"] == "rgba(255, 255, 255, 0.92)"
+            assert pages[-1].evaluate("() => document.getElementById('robomme_episode_loading_copy') === null") is True
             rejection_snapshot = _read_session_wait_overlay_snapshot(pages[-1])
             assert rejection_snapshot["content"] == config.UI_TEXT["progress"]["entry_rejected"]
             assert _read_unified_overlay_text(pages[-1]) == config.UI_TEXT["progress"]["entry_rejected"]
@@ -372,6 +373,10 @@ def test_single_load_uses_native_episode_loading_copy(monkeypatch):
             assert overlay_snapshot["width"] and overlay_snapshot["width"] > 0
             assert overlay_snapshot["height"] and overlay_snapshot["height"] >= 400
             assert overlay_snapshot["background"] == "rgba(255, 255, 255, 0.92)"
+            assert _read_progress_text(page) == config.UI_TEXT["progress"]["episode_loading"]
+            assert page.evaluate("() => document.getElementById('robomme_episode_loading_copy') === null") is True
+            wait_snapshot = _read_session_wait_overlay_snapshot(page)
+            assert wait_snapshot["content"] is None
 
             page.wait_for_selector("#main_interface_root", state="visible", timeout=15000)
 
@@ -448,6 +453,7 @@ def test_execute_does_not_use_episode_loading_copy(monkeypatch):
             body_text = page.evaluate("() => document.body.innerText")
             assert "The episode is loading..." not in body_text
             assert "too many people playing" not in body_text
+            assert page.evaluate("() => document.getElementById('robomme_episode_loading_copy') === null") is True
 
             browser.close()
     finally:

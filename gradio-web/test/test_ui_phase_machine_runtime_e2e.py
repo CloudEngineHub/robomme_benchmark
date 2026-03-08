@@ -129,6 +129,72 @@ def _read_log_output_value(page) -> str | None:
     )
 
 
+def _read_progress_markdown_snapshot(page) -> dict[str, bool | str | None]:
+    return page.evaluate(
+        """() => {
+            const host = document.getElementById('native_progress_host');
+            const pending = host?.querySelector('.pending');
+            const markdown = host?.querySelector('[data-testid="markdown"]');
+            const prose = markdown ? markdown.querySelector('.prose, .md') || markdown : null;
+            if (!host) {
+                return {
+                    pendingPresent: false,
+                    pendingVisible: false,
+                    markdownVisible: false,
+                    text: null,
+                };
+            }
+            const pendingStyle = pending ? getComputedStyle(pending) : null;
+            const markdownStyle = markdown ? getComputedStyle(markdown) : null;
+            const text = prose ? ((prose.textContent || '').trim()) : '';
+            return {
+                pendingPresent: !!pending,
+                pendingVisible: !!pendingStyle && pendingStyle.display !== 'none' && pendingStyle.visibility !== 'hidden',
+                markdownVisible:
+                    !!markdownStyle &&
+                    markdownStyle.display !== 'none' &&
+                    markdownStyle.visibility !== 'hidden',
+                text: text || null,
+            };
+        }"""
+    )
+
+
+def _read_progress_text_snapshot(page) -> dict[str, float | bool | str | None]:
+    return page.evaluate(
+        """() => {
+            const node = document.querySelector('.progress-text');
+            if (!node) {
+                return {
+                    present: false,
+                    visible: false,
+                    text: null,
+                    x: null,
+                    y: null,
+                    width: null,
+                    height: null,
+                };
+            }
+            const style = getComputedStyle(node);
+            const rect = node.getBoundingClientRect();
+            return {
+                present: true,
+                visible:
+                    style.display !== 'none' &&
+                    style.visibility !== 'hidden' &&
+                    Number.parseFloat(style.opacity || '1') > 0 &&
+                    rect.width > 0 &&
+                    rect.height > 0,
+                text: (node.textContent || '').trim() || null,
+                x: rect.x,
+                y: rect.y,
+                width: rect.width,
+                height: rect.height,
+            };
+        }"""
+    )
+
+
 def _read_elem_classes(page, elem_id: str) -> list[str] | None:
     return page.evaluate(
         """(elemId) => {
@@ -1096,19 +1162,33 @@ def test_unified_loading_overlay_init_flow(monkeypatch):
             page.wait_for_function(
                 """() => {
                     const node = document.querySelector('.progress-text');
-                    return !!node && (node.textContent || '').includes('The episode is loading...');
-                }"""
-                ,
+                    if (!node) return false;
+                    const style = getComputedStyle(node);
+                    const rect = node.getBoundingClientRect();
+                    return (
+                        style.display !== 'none' &&
+                        style.visibility !== 'hidden' &&
+                        Number.parseFloat(style.opacity || '1') > 0 &&
+                        rect.width > 0 &&
+                        rect.height > 0 &&
+                        (node.textContent || '').includes('The episode is loading...')
+                    );
+                }""",
                 timeout=5000,
             )
-            progress_text = page.evaluate(
-                """() => {
-                    const node = document.querySelector('.progress-text');
-                    return node ? (node.textContent || '') : '';
-                }"""
-            )
-            assert canonical_copy in progress_text
-            assert superseded_copy not in progress_text
+            progress_snapshot = _read_progress_text_snapshot(page)
+            markdown_snapshot = _read_progress_markdown_snapshot(page)
+
+            assert progress_snapshot["present"] is True
+            assert progress_snapshot["visible"] is True
+            assert progress_snapshot["text"] == canonical_copy
+            assert progress_snapshot["x"] is not None and progress_snapshot["x"] < 500
+            assert progress_snapshot["y"] is not None and progress_snapshot["y"] > 300
+            assert markdown_snapshot["text"] is None
+            assert markdown_snapshot["pendingVisible"] is False
+            assert markdown_snapshot["markdownVisible"] is False
+            assert page.locator("#robomme_episode_loading_copy").count() == 0
+            assert superseded_copy not in str(progress_snapshot["text"] or "")
             assert legacy_copy not in page.content()
             assert page.locator("#loading_overlay_group").count() == 0
 
@@ -1137,6 +1217,141 @@ def test_unified_loading_overlay_init_flow(monkeypatch):
         demo.close()
 
     assert calls["init"] >= 1
+
+
+def test_episode_loading_copy_after_change_episode(monkeypatch):
+    ui_layout = importlib.reload(importlib.import_module("ui_layout"))
+
+    fake_obs = np.zeros((24, 24, 3), dtype=np.uint8)
+    fake_obs_img = Image.fromarray(fake_obs)
+    calls = {"init": 0, "next": 0}
+
+    def _load_result(uid: str, episode_idx: int, log_text: str):
+        return (
+            uid,
+            gr.update(visible=True),  # main_interface
+            gr.update(value=fake_obs_img.copy(), interactive=False),  # img_display
+            log_text,  # log_output
+            gr.update(choices=[("pick", 0)], value=None),  # options_radio
+            "goal",  # goal_box
+            "No need for coordinates",  # coords_box
+            gr.update(value=None, visible=False),  # video_display
+            gr.update(visible=False, interactive=False),  # watch_demo_video_btn
+            f"PickXtimes (Episode {episode_idx})",  # task_info_box
+            f"Completed: {episode_idx - 1}",  # progress_info_box
+            gr.update(interactive=True),  # restart_episode_btn
+            gr.update(interactive=True),  # next_task_btn
+            gr.update(interactive=True),  # exec_btn
+            gr.update(visible=False),  # video_phase_group
+            gr.update(visible=True),   # action_phase_group
+            gr.update(visible=True),   # control_panel_group
+            gr.update(value="hint"),  # task_hint_display
+            gr.update(interactive=True),  # reference_action_btn
+        )
+
+    def fake_init_app(_request=None):
+        calls["init"] += 1
+        return _load_result("uid-next-episode", 1, "ready-1")
+
+    def fake_load_next_task_wrapper(uid):
+        calls["next"] += 1
+        time.sleep(0.8)
+        return _load_result(uid, 2, "ready-2")
+
+    monkeypatch.setattr(ui_layout, "init_app", fake_init_app)
+    monkeypatch.setattr(ui_layout, "load_next_task_wrapper", fake_load_next_task_wrapper)
+
+    demo = ui_layout.create_ui_blocks()
+
+    port = _free_port()
+    host = "127.0.0.1"
+    root_url = f"http://{host}:{port}/"
+
+    app = FastAPI(title="episode-loading-copy-change-episode-test")
+    app = gr.mount_gradio_app(app, demo, path="/")
+
+    config = uvicorn.Config(app, host=host, port=port, log_level="error")
+    server = uvicorn.Server(config)
+    thread = threading.Thread(target=server.run, daemon=True)
+    thread.start()
+    _wait_http_ready(root_url)
+
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page(viewport={"width": 1280, "height": 900})
+            page.goto(root_url, wait_until="domcontentloaded")
+            page.wait_for_selector("#main_interface_root", state="visible", timeout=15000)
+            page.wait_for_function(
+                """() => {
+                    const root = document.getElementById('header_task');
+                    if (!root) return false;
+                    const input = root.querySelector('input');
+                    if (input && typeof input.value === 'string' && input.value.trim() === 'PickXtimes') {
+                        return true;
+                    }
+                    const selected = root.querySelector('.single-select');
+                    return !!selected && (selected.textContent || '').trim() === 'PickXtimes';
+                }""",
+                timeout=5000,
+            )
+            page.wait_for_function(
+                """() => {
+                    const host = document.getElementById('native_progress_host');
+                    const markdown = host?.querySelector('[data-testid="markdown"]');
+                    const prose = markdown ? markdown.querySelector('.prose, .md') || markdown : null;
+                    const text = prose ? ((prose.innerText || prose.textContent || '').trim()) : '';
+                    return text === '';
+                }""",
+                timeout=5000,
+            )
+
+            page.locator("#next_task_btn button, button#next_task_btn").first.click()
+
+            page.wait_for_function(
+                """() => {
+                    const node = document.querySelector('.progress-text');
+                    if (!node) return false;
+                    const style = getComputedStyle(node);
+                    const rect = node.getBoundingClientRect();
+                    return (
+                        style.display !== 'none' &&
+                        style.visibility !== 'hidden' &&
+                        Number.parseFloat(style.opacity || '1') > 0 &&
+                        rect.width > 0 &&
+                        rect.height > 0 &&
+                        (node.textContent || '').trim() === 'The episode is loading...'
+                    );
+                }""",
+                timeout=5000,
+            )
+
+            progress_snapshot = _read_progress_text_snapshot(page)
+            markdown_snapshot = _read_progress_markdown_snapshot(page)
+            assert progress_snapshot["present"] is True
+            assert progress_snapshot["visible"] is True
+            assert progress_snapshot["text"] == "The episode is loading..."
+            assert markdown_snapshot["text"] is None
+            assert markdown_snapshot["pendingVisible"] is False
+            assert markdown_snapshot["markdownVisible"] is False
+            assert page.locator("#robomme_episode_loading_copy").count() == 0
+
+            deadline = time.time() + 15.0
+            while time.time() < deadline:
+                if _read_log_output_value(page) == "ready-2":
+                    break
+                time.sleep(0.1)
+            else:
+                raise AssertionError("next episode load did not complete")
+            assert page.locator("#robomme_episode_loading_copy").count() == 0
+
+            browser.close()
+    finally:
+        server.should_exit = True
+        thread.join(timeout=10)
+        demo.close()
+
+    assert calls == {"init": 1, "next": 1}
 
 
 def test_no_video_task_hides_manual_demo_button(monkeypatch):

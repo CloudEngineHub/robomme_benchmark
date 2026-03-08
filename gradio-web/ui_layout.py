@@ -367,17 +367,54 @@ PROGRESS_TEXT_REWRITE_JS = f"""
 () => {{
     const modeEpisodeLoad = {json.dumps(LOAD_STATUS_MODE_EPISODE_LOAD)};
     const modeIdle = {json.dumps(LOAD_STATUS_MODE_IDLE)};
+    const overlayStateIdle = "idle";
+    const overlayStateEpisodeLoad = "episode-load";
+    const overlayStateQueue = "queue";
     const episodeLoadingText = {json.dumps(UI_TEXT["progress"]["episode_loading"])};
     const queueWaitText = {json.dumps(UI_TEXT["progress"]["queue_wait"])};
     const elapsedOnlyPattern = /^\\d+(?:\\.\\d+)?s$/i;
+    const progressStyleKeys = [
+        "position",
+        "top",
+        "right",
+        "bottom",
+        "left",
+        "transform",
+        "width",
+        "max-width",
+        "display",
+        "margin",
+        "text-align",
+        "color",
+        "font-size",
+        "font-weight",
+        "line-height",
+        "white-space",
+        "z-index",
+        "order",
+    ];
+    const wrapStyleKeys = ["flex-direction", "gap"];
+    const spinnerStyleKeys = ["order"];
 
     window.__robommeLoadStatusMode = window.__robommeLoadStatusMode || modeIdle;
     const getMode = () => window.__robommeLoadStatusMode || modeIdle;
 
+    const isEpisodeLoadRaw = (raw) =>
+        elapsedOnlyPattern.test(raw) || /^processing/i.test(raw);
+
+    const isQueueRaw = (raw) => /^queue:/i.test(raw);
+
+    const clearInlineStyles = (node, keys) => {{
+        if (!(node instanceof HTMLElement)) {{
+            return;
+        }}
+        keys.forEach((key) => node.style.removeProperty(key));
+    }};
+
     const ensureOverlayStyles = () => {{
         const host = document.getElementById("native_progress_host");
         if (!(host instanceof HTMLElement)) {{
-            return;
+            return null;
         }}
         host.style.setProperty("position", "fixed", "important");
         host.style.setProperty("inset", "0", "important");
@@ -407,6 +444,12 @@ PROGRESS_TEXT_REWRITE_JS = f"""
             markdown instanceof HTMLElement
                 ? markdown.querySelector(".prose, .md") || markdown
                 : null;
+        const pending =
+            markdown instanceof HTMLElement ? markdown.closest(".pending") : host.querySelector(".pending");
+        const spinner =
+            host.querySelector("svg") instanceof SVGElement
+                ? host.querySelector("svg").closest("div")
+                : null;
         if (markdown instanceof HTMLElement) {{
             markdown.style.setProperty("position", "fixed", "important");
             markdown.style.setProperty("inset", "0", "important");
@@ -427,72 +470,165 @@ PROGRESS_TEXT_REWRITE_JS = f"""
             prose.style.setProperty("line-height", "1.5", "important");
             prose.style.setProperty("white-space", "pre-line", "important");
         }}
+        return {{
+            wrap,
+            markdown,
+            prose,
+            pending,
+            spinner,
+        }};
     }};
 
-    const splitSegments = (text) =>
-        text
-            .split("|")
-            .map((part) => part.trim())
-            .filter(Boolean);
+    const resolveRawText = (node) => {{
+        const displayed = (node.innerText || node.textContent || "").trim();
+        return node.dataset.robommeProgressRaw || displayed;
+    }};
 
-    const rewriteNode = (node) => {{
+    const setProgressNodeVisible = (node, visible) => {{
+        node.style.setProperty("visibility", visible ? "visible" : "hidden", "important");
+        node.style.setProperty("opacity", visible ? "1" : "0", "important");
+    }};
+
+    const resetProgressNode = (node) => {{
+        const raw = node.dataset.robommeProgressRaw || (node.innerText || node.textContent || "").trim();
+        if (raw) {{
+            node.textContent = raw;
+        }}
+        delete node.dataset.robommeProgressCustomized;
+        delete node.dataset.robommeProgressRaw;
+        delete node.dataset.robommeProgressCustom;
+        clearInlineStyles(node, progressStyleKeys);
+        setProgressNodeVisible(node, true);
+    }};
+
+    const applyEpisodeLoadLayout = (entry, overlayRefs) => {{
+        const node = entry.node;
+        const {{
+            wrap,
+            spinner,
+        }} = overlayRefs || {{}};
+        if (wrap instanceof HTMLElement) {{
+            wrap.style.setProperty("flex-direction", "column", "important");
+            wrap.style.setProperty("gap", "24px", "important");
+        }}
+        if (spinner instanceof HTMLElement) {{
+            spinner.style.setProperty("order", "1", "important");
+        }}
+        node.dataset.robommeProgressCustomized = "1";
+        node.dataset.robommeProgressCustom = episodeLoadingText;
+        node.textContent = episodeLoadingText;
+        setProgressNodeVisible(node, true);
+        node.style.setProperty("position", "static", "important");
+        node.style.setProperty("top", "auto", "important");
+        node.style.setProperty("right", "auto", "important");
+        node.style.setProperty("bottom", "auto", "important");
+        node.style.setProperty("left", "auto", "important");
+        node.style.setProperty("transform", "none", "important");
+        node.style.setProperty("width", "min(720px, calc(100vw - 48px))", "important");
+        node.style.setProperty("max-width", "calc(100vw - 48px)", "important");
+        node.style.setProperty("display", "block", "important");
+        node.style.setProperty("margin", "0", "important");
+        node.style.setProperty("text-align", "center", "important");
+        node.style.setProperty("color", "#0f172a", "important");
+        node.style.setProperty("font-size", "var(--text-lg)", "important");
+        node.style.setProperty("font-weight", "600", "important");
+        node.style.setProperty("line-height", "1.5", "important");
+        node.style.setProperty("white-space", "pre-line", "important");
+        node.style.setProperty("z-index", "20", "important");
+        node.style.setProperty("order", "2", "important");
+    }};
+
+    const rewriteNode = (entry, overlayState) => {{
+        const node = entry.node;
         if (!(node instanceof HTMLElement)) {{
             return;
         }}
 
-        const displayed = (node.innerText || node.textContent || "").trim();
-        const previousCustom = node.dataset.robommeProgressCustom || "";
-        const raw =
-            node.dataset.robommeProgressCustomized === "1" && displayed === previousCustom
-                ? node.dataset.robommeProgressRaw || displayed
-                : displayed;
+        const raw = entry.raw;
         if (getMode() !== modeEpisodeLoad) {{
-            if (
-                (elapsedOnlyPattern.test(raw) ||
-                    /^processing/i.test(raw) ||
-                    /^queue:/i.test(raw))
-            ) {{
+            resetProgressNode(node);
+            if (isEpisodeLoadRaw(raw) || isQueueRaw(raw)) {{
                 node.textContent = "";
             }}
-            if (
-                node.dataset.robommeProgressCustomized === "1" &&
-                displayed === previousCustom &&
-                node.dataset.robommeProgressRaw
-            ) {{
-                node.textContent = node.dataset.robommeProgressRaw;
-            }}
-            delete node.dataset.robommeProgressCustomized;
-            delete node.dataset.robommeProgressRaw;
-            delete node.dataset.robommeProgressCustom;
             return;
         }}
 
-        const normalized = raw.toLowerCase();
-        let custom = null;
-
-        if (normalized.startsWith("processing")) {{
-            const segments = splitSegments(raw);
-            const suffix = segments.length > 1 ? ` | ${{segments.slice(1).join(" | ")}}` : "";
-            custom = `${{episodeLoadingText}}${{suffix}}`;
-        }} else if (normalized.startsWith("queue:")) {{
-            custom = `${{queueWaitText}} | ${{raw}}`;
-        }}
-
-        if (!custom) {{
-            return;
-        }}
-
-        node.dataset.robommeProgressCustomized = "1";
         node.dataset.robommeProgressRaw = raw;
-        node.dataset.robommeProgressCustom = custom;
-        if (displayed !== custom) {{
-            node.textContent = custom;
+        if (overlayState === overlayStateEpisodeLoad && isEpisodeLoadRaw(raw)) {{
+            applyEpisodeLoadLayout(entry, window.__robommeOverlayRefs || null);
+            return;
+        }}
+
+        if (overlayState === overlayStateQueue && isQueueRaw(raw)) {{
+            const custom = `${{queueWaitText}} | ${{raw}}`;
+            node.dataset.robommeProgressCustomized = "1";
+            node.dataset.robommeProgressCustom = custom;
+            if ((node.innerText || node.textContent || "").trim() !== custom) {{
+                node.textContent = custom;
+            }}
+            setProgressNodeVisible(node, true);
+            return;
+        }}
+
+        resetProgressNode(node);
+    }};
+
+    const syncOverlayContent = (overlayRefs, overlayState) => {{
+        if (!overlayRefs) {{
+            return;
+        }}
+        const {{
+            wrap,
+            markdown,
+            prose,
+            pending,
+            spinner,
+        }} = overlayRefs;
+        const markdownText =
+            prose instanceof HTMLElement ? ((prose.innerText || prose.textContent || "").trim()) : "";
+        const showMarkdown = overlayState === overlayStateIdle && markdownText.length > 0;
+
+        if (wrap instanceof HTMLElement && overlayState !== overlayStateEpisodeLoad) {{
+            clearInlineStyles(wrap, wrapStyleKeys);
+        }}
+        if (spinner instanceof HTMLElement && overlayState !== overlayStateEpisodeLoad) {{
+            clearInlineStyles(spinner, spinnerStyleKeys);
+        }}
+        if (pending instanceof HTMLElement) {{
+            pending.style.setProperty("display", showMarkdown ? "block" : "none", "important");
+            pending.style.setProperty("visibility", showMarkdown ? "visible" : "hidden", "important");
+        }}
+        if (markdown instanceof HTMLElement) {{
+            markdown.style.setProperty("display", showMarkdown ? "flex" : "none", "important");
+            markdown.style.setProperty("visibility", showMarkdown ? "visible" : "hidden", "important");
         }}
     }};
 
     const rewriteAll = () => {{
-        ensureOverlayStyles();
-        document.querySelectorAll(".progress-text").forEach(rewriteNode);
+        const overlayRefs = ensureOverlayStyles();
+        window.__robommeOverlayRefs = overlayRefs;
+        const progressEntries = Array.from(document.querySelectorAll(".progress-text"))
+            .filter((node) => node instanceof HTMLElement)
+            .map((node) => {{
+                const raw = resolveRawText(node);
+                return {{
+                    node,
+                    raw,
+                }};
+            }});
+        let overlayState = overlayStateIdle;
+        if (getMode() === modeEpisodeLoad) {{
+            const hasEpisodeLoad = progressEntries.some((entry) => isEpisodeLoadRaw(entry.raw));
+            const hasQueue = progressEntries.some((entry) => isQueueRaw(entry.raw));
+            if (hasEpisodeLoad) {{
+                overlayState = overlayStateEpisodeLoad;
+            }} else if (hasQueue) {{
+                overlayState = overlayStateQueue;
+            }}
+        }}
+
+        progressEntries.forEach((entry) => rewriteNode(entry, overlayState));
+        syncOverlayContent(overlayRefs, overlayState);
     }};
 
     const scheduleRewrite = () => {{
@@ -799,7 +935,7 @@ def create_ui_blocks():
 
         with gr.Column(visible=True, elem_id="main_interface_root") as main_interface:
             native_progress_host = gr.Markdown(
-                value=UI_TEXT["progress"]["episode_loading"],
+                value="",
                 visible=True,
                 container=False,
                 elem_id="native_progress_host",
