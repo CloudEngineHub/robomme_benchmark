@@ -48,9 +48,9 @@ Select "Ground Truth Action" if you need help, then "Execute" it.
 
         "StopCube": """\
 To stop the cube on the target three times, a typical sequence:
-    1. Move above the button to prepare.
+    1. Move to the top of the button to prepare.
     2. Remain static for a fixed duration (count how many times the cube passes the target, may select "remain static" multiple times).
-    3. When the cube is about to reach the target for the last time, press the button to stop.
+    3. When the cube is about to reach the target for the last time, press the button to stop the cube.
 
 Select "Ground Truth Action" if you need help, then "Execute" it.
 """,
@@ -58,7 +58,7 @@ Select "Ground Truth Action" if you need help, then "Execute" it.
         "SwingXtimes": """\
 To swing right-to-left twice, a typical sequence:
     1. Pick up the cube (click to select the correct color).
-    2. Move above the right target, then the left (click to select each).
+    2. Move to the top of the right target, then the left (click to select each).
     3. Repeat: right, then left.
     4. Put the cube on the table and press the button to stop.
 
@@ -78,7 +78,7 @@ Select "Ground Truth Action" if you need help, then "Execute" it.
         "VideoUnmaskSwap": """\
 Watch the video: cubes are hidden by containers. Memorize each cube's color. Track the swap of containers.
 Typical sequence:
-    1. Pick up a container (click to select), then drop it.
+    1. Pick up a container (click to select), then put it down.
     Repeat for a second container if the goal is to find two cubes.
 
 Select "Ground Truth Action" if you need help, then "Execute" it.
@@ -87,7 +87,7 @@ Select "Ground Truth Action" if you need help, then "Execute" it.
         "VideoUnmask": """\
 Watch the video: cubes are hidden by containers. Memorize each cube's color.
 Typical sequence:
-    1. Pick up a container (click to select), then drop it.
+    1. Pick up a container (click to select), then put it down.
     Repeat for a second container if the goal is to find two cubes.
 
 Select "Ground Truth Action" if you need help, then "Execute" it.
@@ -97,7 +97,7 @@ Select "Ground Truth Action" if you need help, then "Execute" it.
 Press the buttons. While doing so, cubes are hidden in containers. Memorize each cube's color. Track the swap of containers.
 Typical sequence:
     1. Press the first button, then the second.
-    2. Pick up a container (click to select), then drop it.
+    2. Pick up a container (click to select), then put it down.
     Repeat for a second container if the goal is to find two cubes.
 
 Select "Ground Truth Action" if you need help, then "Execute" it.
@@ -107,7 +107,7 @@ Select "Ground Truth Action" if you need help, then "Execute" it.
 Press the buttons in order. Cubes are hidden in containers—memorize each cube's color.
 Typical sequence:
     1. Press the button.
-    2. Pick up a container (click to select), then drop it.
+    2. Pick up a container (click to select), then put it down.
     Repeat for a second container if the goal is to find two cubes.
 
 Select "Ground Truth Action" if you need help, then "Execute" it.
@@ -117,9 +117,9 @@ Select "Ground Truth Action" if you need help, then "Execute" it.
 Remember which cube was picked in the video, then pick it again. Cube positions may be swapped.
 Typical sequence:
     1. Pick up the correct cube (click to select by color)
-    2. Put it on the table.
+    2. Put it down.
     3. Repeat step 1 for the required number of times.
-    4. Press the button to stop.
+    4. Press the button to finish.
 
 Select "Ground Truth Action" if you need help, then "Execute" it.
 """,
@@ -128,7 +128,7 @@ Select "Ground Truth Action" if you need help, then "Execute" it.
 The video shows a robot placing a cube on different targets and pressing the button in sequence. Targets may change positions.
 Typical sequence:
     1. Pick up the correct cube (click to select)
-    2. Place it on the target (click to select target).
+    2. Drop it onto the target (click to select target).
 
 Select "Ground Truth Action" if you need help, then "Execute" it.
 """,
@@ -137,7 +137,7 @@ Select "Ground Truth Action" if you need help, then "Execute" it.
 The video shows a robot placing a cube on different targets and pressing the button in sequence. Targets may change positions.
 Typical sequence:
     1. Pick up the correct cube (click to select)
-    2. Place it on the target (click to select target).
+    2. Drop it onto the target (click to select target).
 
 Select "Ground Truth Action" if you need help, then "Execute" it.
 """,
@@ -146,7 +146,7 @@ Select "Ground Truth Action" if you need help, then "Execute" it.
 While the robot presses the button, some cubes are highlighted with white discs—remember them.
 Typical sequence:
     1. Press the button.
-    2. Pick up each highlighted cube (click to select), put it on the table. Repeat for all highlighted cubes.
+    2. Pick up each highlighted cube (click to select), place the cube onto the table. Repeat for all highlighted cubes.
 
 Select "Ground Truth Action" if you need help, then "Execute" it.
 """,
