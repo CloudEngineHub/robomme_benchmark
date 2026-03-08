@@ -180,6 +180,7 @@ def session_worker_loop(cmd_queue, result_queue, stream_queue, dataset_root, gui
                     "difficulty": session.difficulty,
                     "seed": session.seed,
                     "demonstration_frames": session.demonstration_frames,
+                    "last_execution_frames": [],
                     "base_frames": session.base_frames,  # 加载时完整同步
                     "wrist_frames": session.wrist_frames,  # 加载时完整同步
                     "available_options": session.available_options,
@@ -192,6 +193,7 @@ def session_worker_loop(cmd_queue, result_queue, stream_queue, dataset_root, gui
                 
             elif cmd == CMD_EXECUTE_ACTION:
                 # 执行动作（重计算任务）
+                execute_base_start = len(session.base_frames)
                 try:
                     res = session.execute_action(*args, **kwargs)
                     LOGGER.info(
@@ -240,8 +242,11 @@ def session_worker_loop(cmd_queue, result_queue, stream_queue, dataset_root, gui
                 if session.env:
                     is_demonstration = getattr(session.env, 'current_task_demonstration', False)
 
+                execution_frames = session.base_frames[execute_base_start:]
+
                 # 构建状态更新（只更新选项和分割视图，帧通过流队列同步）
                 state_update = {
+                    "last_execution_frames": execution_frames,
                     "available_options": session.available_options,
                     "raw_solve_options": _sanitize_options(session.raw_solve_options),
                     "seg_vis": session.seg_vis,
@@ -353,6 +358,7 @@ class ProcessSessionProxy:
         self.difficulty = None
         self.seed = None
         self.demonstration_frames = []
+        self.last_execution_frames = []
         self.base_frames = []  # 由后台同步线程持续更新
         self.wrist_frames = []  # 由后台同步线程持续更新
         self.available_options = []
@@ -482,6 +488,7 @@ class ProcessSessionProxy:
         Returns:
             tuple: (PIL.Image, str, bool) 图像、状态消息、是否完成
         """
+        self.last_execution_frames = []
         return self._send_cmd(CMD_EXECUTE_ACTION, action_idx, click_coords)
         
     def get_pil_image(self, use_segmented=True):

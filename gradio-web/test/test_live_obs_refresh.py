@@ -1,64 +1,104 @@
 from __future__ import annotations
 
 import numpy as np
-from PIL import Image
 
 
 class _FakeSession:
-    def __init__(self, frames, env_id="BinFill"):
-        self.base_frames = frames
-        self.env_id = env_id
+    def __init__(self):
+        self.env_id = "BinFill"
+        self.episode_idx = 1
+        self.raw_solve_options = [{"available": False}]
+        self.available_options = [("pick", 0)]
+        self.base_frames = []
+        self.last_execution_frames = []
+        self.non_demonstration_task_length = None
+        self.difficulty = "easy"
+        self.language_goal = "goal"
+        self.seed = 123
+
+    def get_pil_image(self, use_segmented=False):
+        _ = use_segmented
+        return "IMG"
+
+    def update_observation(self, use_segmentation=False):
+        _ = use_segmentation
+        return None
 
 
-def test_refresh_live_obs_skips_when_not_execution_phase(monkeypatch, reload_module):
+def test_execute_step_builds_video_from_last_execution_frames(monkeypatch, reload_module):
     callbacks = reload_module("gradio_callbacks")
-    monkeypatch.setattr(callbacks, "get_session", lambda uid: _FakeSession([]))
 
-    update = callbacks.refresh_live_obs("uid-1", "action_point")
-
-    assert update.get("__type__") == "update"
-    assert "value" not in update
-
-
-def test_refresh_live_obs_updates_image_from_latest_frame(monkeypatch, reload_module):
-    config = reload_module("config")
-    callbacks = reload_module("gradio_callbacks")
-    frame0 = np.zeros((8, 8, 3), dtype=np.uint8)
     frame1 = np.full((8, 8, 3), 11, dtype=np.uint8)
     frame2 = np.full((8, 8, 3), 22, dtype=np.uint8)
-    frame3 = np.full((8, 8, 3), 33, dtype=np.uint8)
-    frame4 = np.full((8, 8, 3), 44, dtype=np.uint8)
-    session = _FakeSession([frame0])
+    session = _FakeSession()
+    session.base_frames = [frame2]
+
+    def _execute_action(_option_idx, _coords):
+        session.last_execution_frames = [frame1, frame2]
+        return "IMG", "Executing: pick", False
+
+    session.execute_action = _execute_action
+
+    captured = {}
     monkeypatch.setattr(callbacks, "get_session", lambda uid: session)
-    monkeypatch.setattr(callbacks, "KEYFRAME_DOWNSAMPLE_FACTOR", 2)
+    monkeypatch.setattr(callbacks, "increment_execute_count", lambda uid, env_id, episode_idx: 1)
+    monkeypatch.setattr(callbacks, "concatenate_frames_horizontally", lambda frames, env_id=None: list(frames))
+    def _save_video(frames, suffix=""):
+        captured["payload"] = (list(frames), suffix)
+        return "/tmp/exec.mp4"
 
-    # Reset queue state at execute start (cursor anchored at current base_frames length).
-    callbacks.switch_to_execute_phase("uid-2")
-    session.base_frames.extend([frame1, frame2, frame3, frame4])
+    monkeypatch.setattr(callbacks, "save_video", _save_video)
+    monkeypatch.setattr(callbacks.os.path, "exists", lambda path: True)
+    monkeypatch.setattr(callbacks.os.path, "getsize", lambda path: 10)
 
-    # Downsample x2 + FIFO => first frame1, then frame3.
-    update1 = callbacks.refresh_live_obs("uid-2", "execution_playback")
-    update2 = callbacks.refresh_live_obs("uid-2", "execution_playback")
-    update3 = callbacks.refresh_live_obs("uid-2", "execution_playback")
+    result = callbacks.execute_step("uid-1", 0, callbacks.UI_TEXT["coords"]["not_needed"])
 
-    assert update1.get("__type__") == "update"
-    assert update1.get("interactive") is False
-    assert update1.get("elem_classes") == config.get_live_obs_elem_classes()
-    assert isinstance(update1.get("value"), Image.Image)
-    assert update1["value"].getpixel((0, 0)) == (11, 11, 11)
-
-    assert update2.get("__type__") == "update"
-    assert update2.get("interactive") is False
-    assert update2.get("elem_classes") == config.get_live_obs_elem_classes()
-    assert isinstance(update2.get("value"), Image.Image)
-    assert update2["value"].getpixel((0, 0)) == (33, 33, 33)
-
-    # Queue drained, so no further value update.
-    assert update3.get("__type__") == "update"
-    assert "value" not in update3
+    saved_frames, suffix = captured["payload"]
+    assert [int(frame[0, 0, 0]) for frame in saved_frames] == [11, 22]
+    assert suffix.startswith("execute_")
+    assert result[7]["visible"] is True
+    assert result[7]["autoplay"] is True
+    assert result[9]["visible"] is True
+    assert result[10]["visible"] is False
+    assert result[11]["visible"] is False
+    assert result[12]["value"] is None
+    assert result[15] == "execution_video"
 
 
-def test_switch_phase_keeps_live_obs_visible_and_toggles_interactive(reload_module):
+def test_execute_step_falls_back_to_single_frame_clip_when_no_new_frames(monkeypatch, reload_module):
+    callbacks = reload_module("gradio_callbacks")
+
+    frame = np.full((8, 8, 3), 33, dtype=np.uint8)
+    session = _FakeSession()
+    session.base_frames = [frame]
+
+    def _execute_action(_option_idx, _coords):
+        session.last_execution_frames = []
+        return "IMG", "Executing: pick", False
+
+    session.execute_action = _execute_action
+
+    captured = {}
+    monkeypatch.setattr(callbacks, "get_session", lambda uid: session)
+    monkeypatch.setattr(callbacks, "increment_execute_count", lambda uid, env_id, episode_idx: 1)
+    monkeypatch.setattr(callbacks, "concatenate_frames_horizontally", lambda frames, env_id=None: list(frames))
+    def _save_video(frames, suffix=""):
+        captured["frames"] = list(frames)
+        return "/tmp/exec-single.mp4"
+
+    monkeypatch.setattr(callbacks, "save_video", _save_video)
+    monkeypatch.setattr(callbacks.os.path, "exists", lambda path: True)
+    monkeypatch.setattr(callbacks.os.path, "getsize", lambda path: 10)
+
+    result = callbacks.execute_step("uid-1", 0, callbacks.UI_TEXT["coords"]["not_needed"])
+
+    assert len(captured["frames"]) == 1
+    assert int(captured["frames"][0][0, 0, 0]) == 33
+    assert result[7]["visible"] is True
+    assert result[15] == "execution_video"
+
+
+def test_switch_phase_toggles_live_obs_interactive_without_refresh_queue(reload_module):
     config = reload_module("config")
     callbacks = reload_module("gradio_callbacks")
 

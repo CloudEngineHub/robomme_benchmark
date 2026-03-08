@@ -75,11 +75,12 @@ def test_on_video_end_transition_uses_configured_action_prompt(monkeypatch, relo
 
     monkeypatch.setitem(callbacks.UI_TEXT["log"], "action_selection_prompt", "choose an action from config")
 
-    result = callbacks.on_video_end_transition("uid-1")
+    result = callbacks.on_video_end_transition("uid-1", "demo_video")
 
     assert result[3] == "choose an action from config"
     assert result[4]["visible"] is False
     assert result[4]["interactive"] is False
+    assert result[5] == "action_point"
 
 
 def test_on_demo_video_play_disables_button_and_sets_single_use_state(monkeypatch, reload_module):

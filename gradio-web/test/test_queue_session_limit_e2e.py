@@ -435,23 +435,21 @@ def test_execute_does_not_use_episode_loading_copy(monkeypatch):
             gr.update(interactive=True),
             gr.update(interactive=True),
             gr.update(interactive=True),
-        )
-
-    def fake_switch_to_action_phase(uid=None):
-        return (
+            gr.update(value=None, visible=False, autoplay=False, playback_position=0),
+            gr.update(visible=False, interactive=False),
+            gr.update(visible=False),
+            gr.update(visible=True),
+            gr.update(visible=True),
+            gr.update(choices=[("pick", 0)], value=None, interactive=True),
+            "No need for coordinates",
             gr.update(interactive=True),
-            gr.update(),
-            gr.update(),
-            gr.update(),
-            gr.update(interactive=True),
-            gr.update(interactive=True),
+            "action_point",
         )
 
     monkeypatch.setattr(ui_layout, "init_app", fake_init_app)
     monkeypatch.setattr(ui_layout, "precheck_execute_inputs", fake_precheck_execute_inputs)
     monkeypatch.setattr(ui_layout, "switch_to_execute_phase", fake_switch_to_execute_phase)
     monkeypatch.setattr(ui_layout, "execute_step", fake_execute_step)
-    monkeypatch.setattr(ui_layout, "switch_to_action_phase", fake_switch_to_action_phase)
 
     demo = ui_layout.create_ui_blocks()
     root_url, demo, server, thread = _mount_demo(demo)

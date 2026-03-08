@@ -1,6 +1,6 @@
 """
 Native Gradio UI layout.
-Sequential media phases: Demo Video -> Action+Point.
+Sequential media phases: Demo Video -> Action+Point -> Execute Video.
 Two-column layout: Point Selection | Right Panel.
 """
 
@@ -16,7 +16,6 @@ from config import (
     SESSION_CONCURRENCY_ID,
     SESSION_CONCURRENCY_LIMIT,
     SESSION_TIMEOUT,
-    LIVE_OBS_REFRESH_HZ,
     POINT_SELECTION_SCALE,
     RIGHT_TOP_ACTION_SCALE,
     RIGHT_TOP_LOG_SCALE,
@@ -36,7 +35,6 @@ from gradio_callbacks import (
     on_reference_action,
     on_video_end_transition,
     precheck_execute_inputs,
-    refresh_live_obs,
     restart_episode_wrapper,
     switch_env_wrapper,
     switch_to_action_phase,
@@ -49,7 +47,7 @@ from user_manager import user_manager
 PHASE_INIT = "init"
 PHASE_DEMO_VIDEO = "demo_video"
 PHASE_ACTION_POINT = "action_point"
-PHASE_EXECUTION_PLAYBACK = "execution_playback"
+PHASE_EXECUTION_VIDEO = "execution_video"
 LOAD_STATUS_MODE_IDLE = "idle"
 LOAD_STATUS_MODE_EPISODE_LOAD = "episode_load"
 
@@ -863,13 +861,13 @@ def _with_rejected_init(load_result, message):
 
 
 def _phase_visibility_updates(phase):
-    if phase == PHASE_DEMO_VIDEO:
+    if phase in {PHASE_DEMO_VIDEO, PHASE_EXECUTION_VIDEO}:
         return (
             gr.update(visible=True),
             gr.update(visible=False),
             gr.update(visible=False),
         )
-    if phase in {PHASE_ACTION_POINT, PHASE_EXECUTION_PLAYBACK}:
+    if phase == PHASE_ACTION_POINT:
         return (
             gr.update(visible=False),
             gr.update(visible=True),
@@ -931,7 +929,6 @@ def create_ui_blocks():
         ui_phase_state = gr.State(value=PHASE_INIT)
         current_task_env_state = gr.State(value=None)
         suppress_next_option_change_state = gr.State(value=False)
-        live_obs_timer = gr.Timer(value=1.0 / LIVE_OBS_REFRESH_HZ, active=True)
 
         task_info_box = gr.Textbox(visible=False, elem_id="task_info_box")
         progress_info_box = gr.Textbox(visible=False)
@@ -949,7 +946,7 @@ def create_ui_blocks():
                     with gr.Column(elem_classes=["native-card"], elem_id="media_card"):
                         with gr.Column(visible=False, elem_id="video_phase_group") as video_phase_group:
                             video_display = gr.Video(
-                                label="Demonstration Video 🎬",
+                                label="Video Playback 🎬",
                                 interactive=False,
                                 elem_id="demo_video",
                                 autoplay=False,
@@ -1316,19 +1313,15 @@ def create_ui_blocks():
 
         video_display.end(
             fn=on_video_end_transition,
-            inputs=[uid_state],
+            inputs=[uid_state, ui_phase_state],
             outputs=[
                 video_phase_group,
                 action_phase_group,
                 control_panel_group,
                 log_output,
                 watch_demo_video_btn,
+                ui_phase_state,
             ],
-            queue=False,
-            show_progress="hidden",
-        ).then(
-            fn=lambda: PHASE_ACTION_POINT,
-            outputs=[ui_phase_state],
             queue=False,
             show_progress="hidden",
         ).then(
@@ -1340,19 +1333,15 @@ def create_ui_blocks():
         )
         video_display.stop(
             fn=on_video_end_transition,
-            inputs=[uid_state],
+            inputs=[uid_state, ui_phase_state],
             outputs=[
                 video_phase_group,
                 action_phase_group,
                 control_panel_group,
                 log_output,
                 watch_demo_video_btn,
+                ui_phase_state,
             ],
-            queue=False,
-            show_progress="hidden",
-        ).then(
-            fn=lambda: PHASE_ACTION_POINT,
-            outputs=[ui_phase_state],
             queue=False,
             show_progress="hidden",
         ).then(
@@ -1438,11 +1427,6 @@ def create_ui_blocks():
             queue=False,
             show_progress="hidden",
         ).then(
-            fn=lambda: PHASE_EXECUTION_PLAYBACK,
-            outputs=[ui_phase_state],
-            queue=False,
-            show_progress="hidden",
-        ).then(
             fn=touch_session,
             inputs=[uid_state],
             outputs=[uid_state],
@@ -1451,39 +1435,30 @@ def create_ui_blocks():
         ).then(
             fn=execute_step,
             inputs=[uid_state, options_radio, coords_box],
-            outputs=[img_display, log_output, task_info_box, progress_info_box, restart_episode_btn, next_task_btn, exec_btn],
-            show_progress="hidden",
-            **action_queue_kwargs,
-        ).then(
-            fn=switch_to_action_phase,
-            inputs=[uid_state],
             outputs=[
-                options_radio,
-                exec_btn,
+                img_display,
+                log_output,
+                task_info_box,
+                progress_info_box,
                 restart_episode_btn,
                 next_task_btn,
-                img_display,
+                exec_btn,
+                video_display,
+                watch_demo_video_btn,
+                video_phase_group,
+                action_phase_group,
+                control_panel_group,
+                options_radio,
+                coords_box,
                 reference_action_btn,
+                ui_phase_state,
             ],
-            queue=False,
             show_progress="hidden",
-        ).then(
-            fn=lambda: PHASE_ACTION_POINT,
-            outputs=[ui_phase_state],
-            queue=False,
-            show_progress="hidden",
+            **action_queue_kwargs,
         ).then(
             fn=touch_session,
             inputs=[uid_state],
             outputs=[uid_state],
-            queue=False,
-            show_progress="hidden",
-        )
-
-        live_obs_timer.tick(
-            fn=refresh_live_obs,
-            inputs=[uid_state, ui_phase_state],
-            outputs=[img_display],
             queue=False,
             show_progress="hidden",
         )

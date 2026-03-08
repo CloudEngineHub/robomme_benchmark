@@ -4,15 +4,14 @@ Gradio回调函数模块
 """
 import logging
 import os
-import queue
 import re
 import threading
 import time
 from datetime import datetime
+from pathlib import Path
 
 import gradio as gr
 import numpy as np
-from PIL import Image
 
 from state_manager import (
     cleanup_session,
@@ -31,8 +30,6 @@ from image_utils import draw_marker, save_video, concatenate_frames_horizontally
 from user_manager import user_manager
 from config import (
     EXECUTE_LIMIT_OFFSET,
-    KEYFRAME_DOWNSAMPLE_FACTOR,
-    LIVE_OBS_REFRESH_HZ,
     UI_TEXT,
     USE_SEGMENTED_VIEW,
     get_live_obs_elem_classes,
@@ -43,10 +40,9 @@ from process_session import ScrewPlanFailureError
 from note_content import get_task_hint
 
 
-# --- live_obs refresh queue state ---
-# Each uid keeps its own FIFO queue and sampling cursor.
-_LIVE_OBS_REFRESH = {}
-_LIVE_OBS_REFRESH_LOCK = threading.Lock()
+# --- execute video temp files ---
+_EXECUTION_VIDEO_PATHS = {}
+_EXECUTION_VIDEO_LOCK = threading.Lock()
 LOGGER = logging.getLogger("robomme.callbacks")
 
 
@@ -86,8 +82,7 @@ def cleanup_user_session(uid):
     """Unified cleanup entry for gr.State TTL deletion and unload hooks."""
     if not uid:
         return
-    with _LIVE_OBS_REFRESH_LOCK:
-        _LIVE_OBS_REFRESH.pop(uid, None)
+    _clear_execution_video_path(uid)
     cleanup_session(uid)
 
 
@@ -134,20 +129,114 @@ def _option_requires_coords(session, option_value) -> bool:
     return bool(raw_solve_options[option_idx].get("available"))
 
 
-def _should_enqueue_sample(sample_index: int) -> bool:
-    factor = max(1, int(KEYFRAME_DOWNSAMPLE_FACTOR))
-    return sample_index % factor == 0
-
-
-def _live_obs_refresh_interval_sec() -> float:
-    return 1.0 / max(float(LIVE_OBS_REFRESH_HZ), 1.0)
-
-
 def _uid_for_log(uid):
     if not uid:
         return "<none>"
     text = str(uid)
     return text if len(text) <= 12 else f"{text[:8]}..."
+
+
+def _delete_temp_video(path):
+    if not path:
+        return
+    try:
+        Path(path).unlink(missing_ok=True)
+    except Exception:
+        LOGGER.warning("failed to delete temp video: %s", path, exc_info=True)
+
+
+def _clear_execution_video_path(uid):
+    if not uid:
+        return
+    with _EXECUTION_VIDEO_LOCK:
+        old_path = _EXECUTION_VIDEO_PATHS.pop(uid, None)
+    _delete_temp_video(old_path)
+
+
+def _set_execution_video_path(uid, path):
+    if not uid:
+        return
+    with _EXECUTION_VIDEO_LOCK:
+        old_path = _EXECUTION_VIDEO_PATHS.get(uid)
+        _EXECUTION_VIDEO_PATHS[uid] = path
+    if old_path and old_path != path:
+        _delete_temp_video(old_path)
+
+
+def _build_radio_choices(session):
+    radio_choices = []
+    options = getattr(session, "available_options", None) or []
+    raw_solve_options = getattr(session, "raw_solve_options", None) or []
+    for opt_label, opt_idx in options:
+        ui_label = _ui_option_label(session, opt_label, opt_idx)
+        if 0 <= opt_idx < len(raw_solve_options) and raw_solve_options[opt_idx].get("available"):
+            ui_label = f"{ui_label}{_ui_text('actions', 'point_required_suffix')}"
+        radio_choices.append((ui_label, opt_idx))
+    return radio_choices
+
+
+def _coerce_video_source_frames(frames):
+    if not isinstance(frames, list):
+        return []
+    valid = []
+    for frame in frames:
+        if frame is None:
+            continue
+        frame_arr = np.asarray(frame)
+        if frame_arr.ndim not in {2, 3}:
+            continue
+        if frame_arr.dtype.kind in {"U", "S", "O"}:
+            continue
+        valid.append(frame_arr)
+    return valid
+
+
+def _fallback_execution_frames(session):
+    base_frames = getattr(session, "base_frames", None) or []
+    if base_frames:
+        return [np.asarray(base_frames[-1])]
+    try:
+        pil_image = session.get_pil_image(use_segmented=False)
+    except Exception:
+        return []
+    if pil_image is None:
+        return []
+    frame_arr = np.asarray(pil_image)
+    if frame_arr.ndim not in {2, 3}:
+        return []
+    if frame_arr.dtype.kind in {"U", "S", "O"}:
+        return []
+    return [frame_arr]
+
+
+def _build_execution_video_update(uid, session):
+    raw_frames = _coerce_video_source_frames(getattr(session, "last_execution_frames", None))
+    if not raw_frames:
+        raw_frames = _fallback_execution_frames(session)
+    stitched_frames = concatenate_frames_horizontally(
+        raw_frames,
+        env_id=getattr(session, "env_id", None),
+    )
+    if not stitched_frames:
+        _clear_execution_video_path(uid)
+        return gr.update(value=None, visible=False)
+
+    suffix = f"execute_{int(time.time() * 1000)}"
+    video_path = save_video(stitched_frames, suffix=suffix)
+    if not video_path:
+        _clear_execution_video_path(uid)
+        return gr.update(value=None, visible=False)
+    if not (os.path.exists(video_path) and os.path.getsize(video_path) > 0):
+        _clear_execution_video_path(uid)
+        return gr.update(value=None, visible=False)
+
+    _set_execution_video_path(uid, video_path)
+    return gr.update(
+        value=video_path,
+        visible=True,
+        autoplay=True,
+        playback_position=0,
+    )
 
 
 def capitalize_first_letter(text: str) -> str:
@@ -284,21 +373,9 @@ def on_demo_video_play(uid):
 
 
 def switch_to_execute_phase(uid):
-    """Disable controls and point clicking during execute playback."""
+    """Disable controls and point clicking while execute work is running."""
     if uid:
-        session = get_session(uid)
-        base_count = len(getattr(session, "base_frames", []) or []) if session else 0
-        LOGGER.debug(
-            "switch_to_execute_phase uid=%s base_frames=%s",
-            _uid_for_log(uid),
-            base_count,
-        )
-        with _LIVE_OBS_REFRESH_LOCK:
-            _LIVE_OBS_REFRESH[uid] = {
-                "frame_queue": queue.Queue(),
-                "last_base_count": base_count,
-                "sample_index": 0,
-            }
+        LOGGER.debug("switch_to_execute_phase uid=%s", _uid_for_log(uid))
     return (
         gr.update(interactive=False),  # options_radio
         gr.update(interactive=False),  # exec_btn
@@ -313,8 +390,6 @@ def switch_to_action_phase(uid=None):
     """Switch display to action phase and restore control panel interactions."""
     if uid:
         LOGGER.debug("switch_to_action_phase uid=%s", _uid_for_log(uid))
-        with _LIVE_OBS_REFRESH_LOCK:
-            _LIVE_OBS_REFRESH.pop(uid, None)
     return (
         gr.update(interactive=True),  # options_radio
         gr.update(),  # exec_btn (keep execute_step result)
@@ -325,152 +400,29 @@ def switch_to_action_phase(uid=None):
     )
 
 
-def _get_live_obs_refresh_state(uid, base_count=0):
-    with _LIVE_OBS_REFRESH_LOCK:
-        if uid not in _LIVE_OBS_REFRESH:
-            _LIVE_OBS_REFRESH[uid] = {
-                "frame_queue": queue.Queue(),
-                "last_base_count": int(base_count),
-                "sample_index": 0,
-            }
-        return _LIVE_OBS_REFRESH[uid]
-
-
-def _enqueue_live_obs_frames(uid, base_frames):
-    """
-    Push newly appended base_frames into per-uid FIFO queue with configurable downsampling.
-    """
-    if not uid:
-        return 0
-    frames = base_frames or []
-    state = _get_live_obs_refresh_state(uid, base_count=len(frames))
-    frame_queue = state["frame_queue"]
-    current_count = len(frames)
-    last_count = int(state.get("last_base_count", 0))
-
-    # Session/task reset: history shrank.
-    if current_count < last_count:
-        with _LIVE_OBS_REFRESH_LOCK:
-            state["frame_queue"] = queue.Queue()
-            state["last_base_count"] = current_count
-            state["sample_index"] = 0
-        return 0
-
-    if current_count <= last_count:
-        return frame_queue.qsize()
-
-    new_frames = frames[last_count:current_count]
-    sample_index = int(state.get("sample_index", 0))
-    for frame in new_frames:
-        if _should_enqueue_sample(sample_index) and frame is not None:
-            frame_queue.put(frame)
-        sample_index += 1
-
-    with _LIVE_OBS_REFRESH_LOCK:
-        state["last_base_count"] = current_count
-        state["sample_index"] = sample_index
-    return frame_queue.qsize()
-
-
-def _wait_for_live_obs_queue_drain(uid, max_wait_sec=None, empty_grace_sec=0.2, poll_sec=0.05):
-    """
-    Wait for timer-driven live_obs refresh to consume queued frames before phase switch.
-    """
-    if not uid:
-        return
-    with _LIVE_OBS_REFRESH_LOCK:
-        state0 = _LIVE_OBS_REFRESH.get(uid)
-        queue0 = state0.get("frame_queue") if state0 else None
-        initial_qsize = int(queue0.qsize()) if queue0 is not None else 0
-    if max_wait_sec is None:
-        # Timer-driven playback + small buffer, capped to keep UI responsive.
-        max_wait_sec = min(30.0, max(2.0, initial_qsize * (_live_obs_refresh_interval_sec() + 0.02) + 1.0))
-
-    start = time.time()
-    empty_since = None
-    while True:
-        if (time.time() - start) >= max_wait_sec:
-            break
-        with _LIVE_OBS_REFRESH_LOCK:
-            state = _LIVE_OBS_REFRESH.get(uid)
-            frame_queue = state.get("frame_queue") if state else None
-        if frame_queue is None:
-            break
-        if frame_queue.qsize() > 0:
-            empty_since = None
-        else:
-            if empty_since is None:
-                empty_since = time.time()
-            elif (time.time() - empty_since) >= empty_grace_sec:
-                break
-        time.sleep(poll_sec)
-
-
-def _prepare_refresh_frame(frame):
-    """Normalize cached frame to an RGB uint8 PIL image for gr.Image."""
-    if frame is None:
-        return None
-    frame_arr = np.asarray(frame)
-    if frame_arr.dtype != np.uint8:
-        max_val = float(np.max(frame_arr)) if frame_arr.size else 0.0
-        if max_val <= 1.0:
-            frame_arr = (frame_arr * 255.0).clip(0, 255).astype(np.uint8)
-        else:
-            frame_arr = frame_arr.clip(0, 255).astype(np.uint8)
-    if frame_arr.ndim == 2:
-        frame_arr = np.stack([frame_arr] * 3, axis=-1)
-    elif frame_arr.ndim == 3 and frame_arr.shape[2] == 4:
-        frame_arr = frame_arr[:, :, :3]
-    return Image.fromarray(frame_arr)
-
-
-def refresh_live_obs(uid, ui_phase):
-    """
-    Poll latest cached frame during execute phase.
-    Updates live_obs using the configured gr.Timer interval.
-    """
-    if ui_phase != "execution_playback":
-        return gr.update()
-    session = get_session(uid)
-    if not session:
-        return gr.update()
-
-    base_frames = getattr(session, "base_frames", None) or []
-    if not base_frames:
-        return gr.update()
-
-    _enqueue_live_obs_frames(uid, base_frames)
-    state = _get_live_obs_refresh_state(uid, base_count=len(base_frames))
-    frame_queue = state["frame_queue"]
-
-    if frame_queue.empty():
-        return gr.update()
-
-    latest = frame_queue.get()
-    env_id = getattr(session, "env_id", None)
-    stitched = concatenate_frames_horizontally([latest], env_id=env_id)
-    if stitched:
-        latest = stitched[-1]
-
-    img = _prepare_refresh_frame(latest)
-    if img is None:
-        return gr.update()
-    return _live_obs_update(value=img, interactive=False)
-
-
-def on_video_end_transition(uid):
-    """Called when demo video finishes. Transition from video to action phase."""
+def on_video_end_transition(uid, ui_phase=None):
+    """Transition from video phase back to the action phase."""
+    LOGGER.debug(
+        "on_video_end_transition uid=%s ui_phase=%s",
+        _uid_for_log(uid),
+        ui_phase,
+    )
+    log_update = gr.update()
+    if ui_phase == "demo_video" or ui_phase is None:
+        log_update = _action_selection_log()
     return (
         gr.update(visible=False),  # video_phase_group
         gr.update(visible=True),   # action_phase_group
         gr.update(visible=True),   # control_panel_group
-        _action_selection_log(),
+        log_update,  # log_output
         gr.update(visible=False, interactive=False),  # watch_demo_video_btn
+        "action_point",  # ui_phase_state
     )
 
 
 def _task_load_failed_response(uid, message):
     LOGGER.warning("task_load_failed uid=%s message=%s", _uid_for_log(uid), message)
+    _clear_execution_video_path(uid)
     return (
         uid,
         gr.update(visible=True),  # main_interface
@@ -479,7 +431,7 @@ def _task_load_failed_response(uid, message):
         gr.update(choices=[], value=None),  # options_radio
         "",  # goal_box
         _ui_text("coords", "not_needed"),  # coords_box
-        gr.update(value=None, visible=False),  # video_display
+        gr.update(value=None, visible=False, autoplay=False, playback_position=0),  # video_display
         gr.update(visible=False, interactive=False),  # watch_demo_video_btn
         "",  # task_info_box
         "",  # progress_info_box
@@ -525,8 +477,7 @@ def _load_status_task(uid, status):
 
     LOGGER.debug("loading episode env=%s episode=%s uid=%s", env_id, ep_num, _uid_for_log(uid))
 
-    with _LIVE_OBS_REFRESH_LOCK:
-        _LIVE_OBS_REFRESH.pop(uid, None)
+    _clear_execution_video_path(uid)
     reset_play_button_clicked(uid)
     reset_execute_count(uid, env_id, int(ep_num))
 
@@ -555,7 +506,7 @@ def _load_status_task(uid, status):
             gr.update(choices=[], value=None),  # options_radio
             "",  # goal_box
             _ui_text("coords", "not_needed"),  # coords_box
-            gr.update(value=None, visible=False),  # video_display
+            gr.update(value=None, visible=False, autoplay=False, playback_position=0),  # video_display
             gr.update(visible=False, interactive=False),  # watch_demo_video_btn
             f"{actual_env_id} (Episode {ep_num})",  # task_info_box
             progress_text,  # progress_info_box
@@ -574,19 +525,7 @@ def _load_status_task(uid, status):
     else:
         goal_text = capitalize_first_letter(session.language_goal) if session.language_goal else ""
 
-    options = session.available_options
-    radio_choices = []
-    for opt_label, opt_idx in options:
-        opt_label = _ui_option_label(session, opt_label, opt_idx)
-        if 0 <= opt_idx < len(session.raw_solve_options):
-            opt = session.raw_solve_options[opt_idx]
-            if opt.get("available"):
-                opt_label_with_hint = f"{opt_label}{_ui_text('actions', 'point_required_suffix')}"
-            else:
-                opt_label_with_hint = opt_label
-        else:
-            opt_label_with_hint = opt_label
-        radio_choices.append((opt_label_with_hint, opt_idx))
+    radio_choices = _build_radio_choices(session)
     LOGGER.debug(
         "options prepared uid=%s env=%s count=%s",
         _uid_for_log(uid),
@@ -634,7 +573,7 @@ def _load_status_task(uid, status):
             gr.update(choices=radio_choices, value=None),  # options_radio
             goal_text,  # goal_box
             _ui_text("coords", "not_needed"),  # coords_box
-            gr.update(value=demo_video_path, visible=True),  # video_display
+            gr.update(value=demo_video_path, visible=True, autoplay=False, playback_position=0),  # video_display
             gr.update(visible=True, interactive=True),  # watch_demo_video_btn
             f"{actual_env_id} (Episode {ep_num})",  # task_info_box
             progress_text,  # progress_info_box
@@ -658,7 +597,7 @@ def _load_status_task(uid, status):
         gr.update(choices=radio_choices, value=None),  # options_radio
         goal_text,  # goal_box
         _ui_text("coords", "not_needed"),  # coords_box
-        gr.update(value=None, visible=False),  # video_display (no video)
+        gr.update(value=None, visible=False, autoplay=False, playback_position=0),  # video_display (no video)
         gr.update(visible=False, interactive=False),  # watch_demo_video_btn
         f"{actual_env_id} (Episode {ep_num})",  # task_info_box
         progress_text,  # progress_info_box
@@ -1061,18 +1000,60 @@ def execute_step(uid, option_idx, coords_str):
         option_idx,
         coords_str,
     )
+
+    def _response(
+        *,
+        img_update,
+        log_update,
+        task_update=gr.update(),
+        progress_update=gr.update(),
+        restart_update=gr.update(interactive=True),
+        next_update=gr.update(interactive=True),
+        exec_update=gr.update(interactive=True),
+        video_update=None,
+        options_update=gr.update(interactive=True),
+        coords_update=None,
+        reference_update=gr.update(interactive=True),
+        show_execution_video=False,
+        ui_phase="action_point",
+    ):
+        if video_update is None:
+            video_update = gr.update(value=None, visible=False, autoplay=False, playback_position=0)
+        if coords_update is None:
+            coords_update = _ui_text("coords", "not_needed")
+        return (
+            img_update,
+            log_update,
+            task_update,
+            progress_update,
+            restart_update,
+            next_update,
+            exec_update,
+            video_update,
+            gr.update(visible=False, interactive=False),  # watch_demo_video_btn
+            gr.update(visible=show_execution_video),  # video_phase_group
+            gr.update(visible=not show_execution_video),  # action_phase_group
+            gr.update(visible=not show_execution_video),  # control_panel_group
+            options_update,
+            coords_update,
+            reference_update,
+            ui_phase,
+        )
+
     session = get_session(uid)
     if not session:
         LOGGER.error("execute_step missing session uid=%s", _uid_for_log(uid))
-        return (
-            _live_obs_update(value=None, interactive=False),
-            format_log_markdown(_session_error_text()),
-            gr.update(),
-            gr.update(),
-            gr.update(interactive=False),
-            gr.update(interactive=False),
+        return _response(
+            img_update=_live_obs_update(value=None, interactive=False),
+            log_update=format_log_markdown(_session_error_text()),
+            restart_update=gr.update(interactive=False),
+            next_update=gr.update(interactive=False),
+            exec_update=gr.update(interactive=False),
+            options_update=gr.update(interactive=False),
+            reference_update=gr.update(interactive=False),
+            show_execution_video=False,
         )
-    
+
     # 检查 execute 次数限制（在执行前检查，如果达到限制则模拟失败状态）
     execute_limit_reached = False
     if uid and session.env_id is not None and session.episode_idx is not None:
@@ -1094,22 +1075,24 @@ def execute_step(uid, option_idx, coords_str):
                 max_execute,
                 execute_limit_reached,
             )
-    
-    # Ensure at least one cached frame exists for timer-based refresh.
+
+    # Ensure at least one cached frame exists for fallback clip generation.
     if not session.base_frames:
         LOGGER.debug("execute_step uid=%s base_frames empty; triggering update_observation", _uid_for_log(uid))
         session.update_observation(use_segmentation=USE_SEGMENTED_VIEW)
-    
+    if hasattr(session, "last_execution_frames"):
+        session.last_execution_frames = []
+
     option_idx = _parse_option_idx(option_idx)
     if option_idx is None:
         LOGGER.debug("execute_step uid=%s aborted: option_idx is None", _uid_for_log(uid))
-        return (
-            _live_obs_update(value=session.get_pil_image(use_segmented=USE_SEGMENTED_VIEW), interactive=False),
-            format_log_markdown(_ui_text("log", "execute_missing_action")),
-            gr.update(),
-            gr.update(),
-            gr.update(interactive=False),
-            gr.update(interactive=True),
+        return _response(
+            img_update=_live_obs_update(value=session.get_pil_image(use_segmented=USE_SEGMENTED_VIEW), interactive=False),
+            log_update=format_log_markdown(_ui_text("log", "execute_missing_action")),
+            exec_update=gr.update(interactive=True),
+            options_update=gr.update(choices=_build_radio_choices(session), value=None, interactive=True),
+            reference_update=gr.update(interactive=True),
+            show_execution_video=False,
         )
 
     needs_coords = _option_requires_coords(session, option_idx)
@@ -1125,7 +1108,15 @@ def execute_step(uid, option_idx, coords_str):
             )
             current_img = session.get_pil_image(use_segmented=USE_SEGMENTED_VIEW)
             error_msg = _ui_text("coords", "select_point_before_execute")
-            return _live_obs_update(value=current_img, interactive=False), format_log_markdown(error_msg), gr.update(), gr.update(), gr.update(interactive=False), gr.update(interactive=True)
+            return _response(
+                img_update=_live_obs_update(value=current_img, interactive=False),
+                log_update=format_log_markdown(error_msg),
+                exec_update=gr.update(interactive=True),
+                options_update=gr.update(choices=_build_radio_choices(session), value=None, interactive=True),
+                coords_update=coords_str,
+                reference_update=gr.update(interactive=True),
+                show_execution_video=False,
+            )
 
     # Parse coords
     click_coords = None
@@ -1212,14 +1203,6 @@ def execute_step(uid, option_idx, coords_str):
                 new_count,
             )
 
-    # Execute frames are produced in batch when execute_action returns from worker process.
-    # Enqueue them now, then wait briefly for the configured timer to drain FIFO playback.
-    _enqueue_live_obs_frames(uid, getattr(session, "base_frames", None))
-    _wait_for_live_obs_queue_drain(uid)
-    LOGGER.debug("execute_step playback drain complete uid=%s", _uid_for_log(uid))
-    
-    # 注意：执行阶段画面由 live_obs 的配置化轮询间隔刷新。
-    
     progress_update = gr.update()  # 默认不更新 progress
     task_update = gr.update()
     
@@ -1263,28 +1246,40 @@ def execute_step(uid, option_idx, coords_str):
     
     # 根据视图模式重新获取图片
     img = session.get_pil_image(use_segmented=USE_SEGMENTED_VIEW)
-        
+    video_update = _build_execution_video_update(uid, session)
+    show_execution_video = video_update.get("visible") is True
+    radio_choices = _build_radio_choices(session)
     restart_episode_update = gr.update(interactive=True)
     next_task_update = gr.update(interactive=True)
     exec_btn_update = gr.update(interactive=False) if done else gr.update(interactive=True)
+    options_update = gr.update(choices=radio_choices, value=None, interactive=True)
+    coords_update = _ui_text("coords", "not_needed")
+    reference_update = gr.update(interactive=True)
     
     # 格式化日志消息为 HTML 格式（支持颜色显示）
     formatted_status = format_log_markdown(status)
     LOGGER.debug(
-        "execute_step done uid=%s env=%s ep=%s done=%s exec_btn_interactive=%s",
+        "execute_step done uid=%s env=%s ep=%s done=%s exec_btn_interactive=%s show_execution_video=%s",
         _uid_for_log(uid),
         getattr(session, "env_id", None),
         getattr(session, "episode_idx", None),
         done,
         not done,
+        show_execution_video,
     )
-    
-    return (
-        _live_obs_update(value=img, interactive=False),
-        formatted_status,
-        task_update,
-        progress_update,
-        restart_episode_update,
-        next_task_update,
-        exec_btn_update,
+
+    return _response(
+        img_update=_live_obs_update(value=img, interactive=False),
+        log_update=formatted_status,
+        task_update=task_update,
+        progress_update=progress_update,
+        restart_update=restart_episode_update,
+        next_update=next_task_update,
+        exec_update=exec_btn_update,
+        video_update=video_update,
+        options_update=options_update,
+        coords_update=coords_update,
+        reference_update=reference_update,
+        show_execution_video=show_execution_video,
+        ui_phase="execution_video" if show_execution_video else "action_point",
     )

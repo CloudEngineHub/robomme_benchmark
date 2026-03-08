@@ -416,6 +416,7 @@ def font_size_probe_ui_url(monkeypatch):
 def phase_machine_ui_url():
     state = {"precheck_calls": 0, "play_clicks": 0}
     demo_video_url = "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4"
+    execution_video_path = gr.get_video("world.mp4")
     ui_layout = importlib.reload(importlib.import_module("ui_layout"))
 
     with gr.Blocks(title="Native phase machine test") as demo:
@@ -504,7 +505,6 @@ def phase_machine_ui_url():
                 gr.update(interactive=False),
                 gr.update(interactive=False),
                 gr.update(interactive=False),
-                "execution_playback",
             )
 
         def execute_fn():
@@ -513,16 +513,15 @@ def phase_machine_ui_url():
                 "executed",
                 gr.update(interactive=True),
                 gr.update(interactive=True),
-            )
-
-        def to_action_fn():
-            return (
+                gr.update(value=execution_video_path, visible=True, autoplay=True, playback_position=0),
+                gr.update(visible=False, interactive=False),
+                gr.update(visible=True),
+                gr.update(visible=False),
+                gr.update(visible=False),
                 gr.update(interactive=True),
+                "No need for coordinates",
                 gr.update(interactive=True),
-                gr.update(interactive=True),
-                gr.update(interactive=True),
-                gr.update(interactive=True),
-                "action_point",
+                "execution_video",
             )
 
         login_btn.click(
@@ -616,16 +615,24 @@ def phase_machine_ui_url():
                 next_task_btn,
                 img_display,
                 reference_action_btn,
-                phase_state,
             ],
             queue=False,
         ).then(
             fn=execute_fn,
-            outputs=[log_output, next_task_btn, exec_btn],
-            queue=False,
-        ).then(
-            fn=to_action_fn,
-            outputs=[options_radio, exec_btn, next_task_btn, img_display, reference_action_btn, phase_state],
+            outputs=[
+                log_output,
+                next_task_btn,
+                exec_btn,
+                video_display,
+                watch_demo_video_btn,
+                video_phase_group,
+                action_phase_group,
+                control_panel_group,
+                options_radio,
+                coords_box,
+                reference_action_btn,
+                phase_state,
+            ],
             queue=False,
         )
 
@@ -962,6 +969,21 @@ def test_phase_machine_runtime_flow_and_execute_precheck(phase_machine_ui_url):
         )
         assert interactive_snapshot["execDisabled"] is True
         assert interactive_snapshot["nextDisabled"] is True
+
+        page.wait_for_function(
+            """() => {
+                const videoEl = document.querySelector('#demo_video video');
+                return !!videoEl && videoEl.autoplay === true && (videoEl.paused === false || videoEl.currentTime > 0);
+            }""",
+            timeout=6000,
+        )
+        execute_video_controls = _read_demo_video_controls(page)
+        assert execute_video_controls["videoVisible"] is True
+        assert execute_video_controls["autoplay"] is True
+        assert execute_video_controls["paused"] is False
+
+        did_dispatch_end = _dispatch_video_event(page, "ended")
+        assert did_dispatch_end
 
         page.wait_for_function(
             """() => {
@@ -2451,54 +2473,58 @@ def test_header_task_switch_to_video_task_shows_demo_phase(monkeypatch):
 
 def test_phase_machine_runtime_local_video_path_end_transition():
     import gradio_callbacks as cb
-    ui_layout = importlib.reload(importlib.import_module("ui_layout"))
+    import config as config_module
 
+    ui_layout = importlib.reload(importlib.import_module("ui_layout"))
     demo_video_path = gr.get_video("world.mp4")
     fake_obs = np.zeros((24, 24, 3), dtype=np.uint8)
 
     class FakeSession:
         def __init__(self):
-            self.env_id = "VideoUnmask"
+            self.env_id = "BinFill"
+            self.episode_idx = 1
             self.language_goal = "place cube on target"
-            self.available_options = [("pick", 0)]
-            self.raw_solve_options = [{"available": False}]
-            self.demonstration_frames = [fake_obs.copy() for _ in range(4)]
-
-        def load_episode(self, env_id, episode_idx):
-            self.env_id = env_id
-            return fake_obs.copy(), f"loaded {env_id}:{episode_idx}"
+            self.available_options = [("pick", 0), ("point", 1)]
+            self.raw_solve_options = [{"available": False}, {"available": [object()]}]
+            self.demonstration_frames = []
+            self.last_execution_frames = []
+            self.base_frames = [fake_obs.copy()]
+            self.non_demonstration_task_length = None
+            self.difficulty = "easy"
+            self.seed = 123
 
         def get_pil_image(self, use_segmented=False):
             _ = use_segmented
             return fake_obs.copy()
 
+        def update_observation(self, use_segmentation=False):
+            _ = use_segmentation
+            return None
+
+        def execute_action(self, option_idx, click_coords):
+            _ = option_idx, click_coords
+            self.last_execution_frames = [fake_obs.copy() for _ in range(3)]
+            self.base_frames.extend(self.last_execution_frames)
+            return fake_obs.copy(), "Executing: pick", False
+
     originals = {
         "get_session": cb.get_session,
-        "reset_play_button_clicked": cb.reset_play_button_clicked,
-        "reset_execute_count": cb.reset_execute_count,
-        "set_task_start_time": cb.set_task_start_time,
-        "set_ui_phase": cb.set_ui_phase,
+        "increment_execute_count": cb.increment_execute_count,
         "save_video": cb.save_video,
     }
 
     fake_session = FakeSession()
 
     cb.get_session = lambda uid: fake_session
-    cb.reset_play_button_clicked = lambda uid: None
-    cb.reset_execute_count = lambda uid, env_id, ep_num: None
-    cb.set_task_start_time = lambda uid, env_id, ep_num, start_time: None
-    cb.set_ui_phase = lambda uid, phase: None
+    cb.increment_execute_count = lambda uid, env_id, ep_num: 1
     cb.save_video = lambda frames, suffix="": demo_video_path
 
     try:
         with gr.Blocks(title="Native phase machine local video test") as demo:
             uid_state = gr.State(value="uid-local-video")
-            demo.load(
-                fn=None,
-                js=ui_layout.DEMO_VIDEO_PLAY_BINDING_JS,
-                queue=False,
-            )
-            with gr.Column(visible=False, elem_id="main_interface") as main_interface:
+            phase_state = gr.State(value="action_point")
+            suppress_state = gr.State(value=False)
+            with gr.Column(visible=True, elem_id="main_interface") as main_interface:
                 with gr.Column(visible=False, elem_id="video_phase_group") as video_phase_group:
                     video_display = gr.Video(value=None, elem_id="demo_video", autoplay=False)
                     watch_demo_video_btn = gr.Button(
@@ -2512,72 +2538,87 @@ def test_phase_machine_runtime_local_video_path_end_transition():
                     img_display = gr.Image(value=fake_obs.copy(), elem_id="live_obs")
 
                 with gr.Column(visible=True, elem_id="control_panel_group") as control_panel_group:
-                    options_radio = gr.Radio(choices=[("pick", 0)], value=None, elem_id="action_radio")
+                    options_radio = gr.Radio(choices=[("pick", 0), ("point", 1)], value=None, elem_id="action_radio")
+                    coords_box = gr.Textbox(config_module.UI_TEXT["coords"]["not_needed"], elem_id="coords_box")
+                    exec_btn = gr.Button("execute", interactive=True, elem_id="exec_btn")
+                    reference_action_btn = gr.Button("reference", interactive=True, elem_id="reference_action_btn")
+                    restart_episode_btn = gr.Button("restart", interactive=True, elem_id="restart_episode_btn")
+                    next_task_btn = gr.Button("next", interactive=True, elem_id="next_task_btn")
 
             log_output = gr.Markdown("", elem_id="log_output")
-            goal_box = gr.Textbox("")
-            coords_box = gr.Textbox("No need for coordinates")
             task_info_box = gr.Textbox("")
             progress_info_box = gr.Textbox("")
-            task_hint_display = gr.Textbox("")
-            with gr.Column(visible=False) as loading_overlay:
-                gr.Markdown("Loading...")
 
-            restart_episode_btn = gr.Button("restart", interactive=False)
-            next_task_btn = gr.Button("next", interactive=False)
-            exec_btn = gr.Button("execute", interactive=False)
-            reference_action_btn = gr.Button("reference", interactive=False)
-
-            def load_fn():
-                status = {
-                    "current_task": {"env_id": "VideoUnmask", "episode_idx": 1},
-                    "completed_count": 0,
-                }
-                return cb._load_status_task("uid-local-video", status)
-
-            demo.load(
-                fn=load_fn,
+            exec_btn.click(
+                fn=cb.precheck_execute_inputs,
+                inputs=[uid_state, options_radio, coords_box],
+                outputs=[],
+                queue=False,
+            ).then(
+                fn=cb.switch_to_execute_phase,
+                inputs=[uid_state],
                 outputs=[
-                    uid_state,
-                    main_interface,
+                    options_radio,
+                    exec_btn,
+                    restart_episode_btn,
+                    next_task_btn,
+                    img_display,
+                    reference_action_btn,
+                ],
+                queue=False,
+            ).then(
+                fn=cb.execute_step,
+                inputs=[uid_state, options_radio, coords_box],
+                outputs=[
                     img_display,
                     log_output,
-                    options_radio,
-                    goal_box,
-                    coords_box,
-                    video_display,
-                    watch_demo_video_btn,
                     task_info_box,
                     progress_info_box,
                     restart_episode_btn,
                     next_task_btn,
                     exec_btn,
+                    video_display,
+                    watch_demo_video_btn,
                     video_phase_group,
                     action_phase_group,
                     control_panel_group,
-                    task_hint_display,
-                    loading_overlay,
+                    options_radio,
+                    coords_box,
                     reference_action_btn,
+                    phase_state,
                 ],
                 queue=False,
             )
-
-            watch_demo_video_btn.click(
-                fn=cb.on_demo_video_play,
-                inputs=[uid_state],
-                outputs=[watch_demo_video_btn],
+            options_radio.change(
+                fn=cb.on_option_select,
+                inputs=[uid_state, options_radio, coords_box, suppress_state],
+                outputs=[coords_box, img_display, log_output, suppress_state],
                 queue=False,
             )
 
             video_display.end(
                 fn=cb.on_video_end_transition,
-                inputs=[uid_state],
+                inputs=[uid_state, phase_state],
                 outputs=[
                     video_phase_group,
                     action_phase_group,
                     control_panel_group,
                     log_output,
                     watch_demo_video_btn,
+                    phase_state,
+                ],
+                queue=False,
+            )
+            video_display.stop(
+                fn=cb.on_video_end_transition,
+                inputs=[uid_state, phase_state],
+                outputs=[
+                    video_phase_group,
+                    action_phase_group,
+                    control_panel_group,
+                    log_output,
+                    watch_demo_video_btn,
+                    phase_state,
                 ],
                 queue=False,
             )
@@ -2601,9 +2642,10 @@ def test_phase_machine_runtime_local_video_path_end_transition():
                 page = browser.new_page(viewport={"width": 1280, "height": 900})
                 page.goto(root_url, wait_until="domcontentloaded")
                 page.wait_for_selector("#main_interface", state="visible", timeout=20000)
-
+                page.locator("#action_radio input[type='radio']").first.check(force=True)
+                page.locator("#exec_btn button, button#exec_btn").first.click()
                 page.wait_for_selector("#demo_video video", timeout=5000)
-                phase_after_login = page.evaluate(
+                page.wait_for_function(
                     """() => {
                         const visible = (id) => {
                             const el = document.getElementById(id);
@@ -2611,37 +2653,25 @@ def test_phase_machine_runtime_local_video_path_end_transition():
                             const st = getComputedStyle(el);
                             return st.display !== 'none' && st.visibility !== 'hidden' && el.getClientRects().length > 0;
                         };
-                        return {
-                            video: visible('demo_video'),
-                            watchButton: visible('watch_demo_video_btn'),
-                            action: visible('live_obs'),
-                            control: visible('action_radio'),
-                        };
-                    }"""
-                )
-                assert phase_after_login == {
-                    "video": True,
-                    "watchButton": True,
-                    "action": False,
-                    "control": False,
-                }
-
-                controls_after_login = _read_demo_video_controls(page)
-                assert controls_after_login["buttonVisible"] is True
-                assert controls_after_login["buttonDisabled"] is False
-                assert controls_after_login["autoplay"] is False
-                assert controls_after_login["paused"] is True
-
-                _click_demo_video_button(page)
-                page.wait_for_function(
-                    """() => {
-                        const button =
-                            document.querySelector('#watch_demo_video_btn button') ||
-                            document.querySelector('button#watch_demo_video_btn');
-                        return !!button && button.disabled === true;
+                        const videoEl = document.querySelector('#demo_video video');
+                        return (
+                            visible('video_phase_group') &&
+                            visible('demo_video') &&
+                            !visible('watch_demo_video_btn') &&
+                            !visible('action_phase_group') &&
+                            !visible('control_panel_group') &&
+                            !!videoEl &&
+                            videoEl.autoplay === true &&
+                            (videoEl.paused === false || videoEl.currentTime > 0)
+                        );
                     }""",
-                    timeout=5000,
+                    timeout=10000,
                 )
+                controls_after_execute = _read_demo_video_controls(page)
+                assert controls_after_execute["videoVisible"] is True
+                assert controls_after_execute["buttonVisible"] is False
+                assert controls_after_execute["autoplay"] is True
+                assert controls_after_execute["paused"] is False
 
                 did_dispatch_end = _dispatch_video_event(page, "ended")
                 assert did_dispatch_end
@@ -2662,6 +2692,30 @@ def test_phase_machine_runtime_local_video_path_end_transition():
                         );
                     }""",
                     timeout=2000,
+                )
+                page.locator("#action_radio input[type='radio']").nth(1).check(force=True)
+                page.wait_for_function(
+                    """(state) => {
+                        const liveObs = document.getElementById('live_obs');
+                        const coordsRoot = document.getElementById('coords_box');
+                        const coordsField = coordsRoot?.querySelector('textarea, input');
+                        const logRoot = document.getElementById('log_output');
+                        const logField = logRoot?.querySelector('textarea, input');
+                        const coordsValue = coordsField ? coordsField.value.trim() : '';
+                        const logValue = logField ? logField.value.trim() : (logRoot?.textContent || '').trim();
+                        return (
+                            !!liveObs &&
+                            liveObs.classList.contains(state.waitClass) &&
+                            coordsValue === state.coordsPrompt &&
+                            logValue === state.waitLog
+                        );
+                    }""",
+                    arg={
+                        "waitClass": config_module.LIVE_OBS_POINT_WAIT_CLASS,
+                        "coordsPrompt": config_module.UI_TEXT["coords"]["select_point"],
+                        "waitLog": config_module.UI_TEXT["log"]["point_selection_prompt"],
+                    },
+                    timeout=5000,
                 )
 
                 browser.close()

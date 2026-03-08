@@ -184,12 +184,14 @@ def test_native_ui_config_contains_phase_machine_and_precheck_chain(reload_modul
             if comp.get("props", {}).get("elem_id") == "demo_video"
         )
         assert demo_video_comp.get("props", {}).get("autoplay") is False
+        component_types = [comp.get("type") for comp in cfg.get("components", [])]
+        assert "timer" not in component_types
 
         api_names = [dep.get("api_name") for dep in cfg.get("dependencies", [])]
         assert "on_demo_video_play" in api_names
         assert "precheck_execute_inputs" in api_names
         assert "switch_to_execute_phase" in api_names
         assert "execute_step" in api_names
-        assert "switch_to_action_phase" in api_names
+        assert "refresh_live_obs" not in api_names
     finally:
         demo.close()
