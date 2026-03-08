@@ -19,9 +19,9 @@ RIGHT_TOP_LOG_SCALE = 1
 UI_GLOBAL_FONT_SIZE = "24px"
 
 # Session / queue 配置
-SESSION_TIMEOUT = 20  # 30秒无用户主动操作后，交由 gr.State TTL 自动回收 session
+SESSION_TIMEOUT = 90  # 30秒无用户主动操作后，交由 gr.State TTL 自动回收 session
 SESSION_CONCURRENCY_ID = "session_actions"
-SESSION_CONCURRENCY_LIMIT = 2
+SESSION_CONCURRENCY_LIMIT = 10
 
 # 兜底执行次数配置
 EXECUTE_LIMIT_OFFSET = 4  # 兜底执行次数 = non_demonstration_task_length + EXECUTE_LIMIT_OFFSET
@@ -87,7 +87,7 @@ UI_TEXT = {
     "progress": {
         "episode_loading": "The episode is loading...",
         "queue_wait": "Lots of people are playing! Please wait...",
-        "entry_rejected": "too many people playing",
+        "entry_rejected": "Too many users are trying the demo right now. Please try again later.",
     },
     "errors": {
         "load_missing_task": "Error loading task: missing current_task",

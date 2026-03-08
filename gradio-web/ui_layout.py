@@ -444,8 +444,10 @@ PROGRESS_TEXT_REWRITE_JS = f"""
             markdown instanceof HTMLElement
                 ? markdown.querySelector(".prose, .md") || markdown
                 : null;
-        const pending =
-            markdown instanceof HTMLElement ? markdown.closest(".pending") : host.querySelector(".pending");
+        const markdownWrapper =
+            markdown instanceof HTMLElement && markdown.parentElement instanceof HTMLElement
+                ? markdown.parentElement
+                : null;
         const spinner =
             host.querySelector("svg") instanceof SVGElement
                 ? host.querySelector("svg").closest("div")
@@ -474,7 +476,7 @@ PROGRESS_TEXT_REWRITE_JS = f"""
             wrap,
             markdown,
             prose,
-            pending,
+            markdownWrapper,
             spinner,
         }};
     }};
@@ -581,7 +583,7 @@ PROGRESS_TEXT_REWRITE_JS = f"""
             wrap,
             markdown,
             prose,
-            pending,
+            markdownWrapper,
             spinner,
         }} = overlayRefs;
         const markdownText =
@@ -594,9 +596,9 @@ PROGRESS_TEXT_REWRITE_JS = f"""
         if (spinner instanceof HTMLElement && overlayState !== overlayStateEpisodeLoad) {{
             clearInlineStyles(spinner, spinnerStyleKeys);
         }}
-        if (pending instanceof HTMLElement) {{
-            pending.style.setProperty("display", showMarkdown ? "block" : "none", "important");
-            pending.style.setProperty("visibility", showMarkdown ? "visible" : "hidden", "important");
+        if (markdownWrapper instanceof HTMLElement) {{
+            markdownWrapper.style.setProperty("display", showMarkdown ? "block" : "none", "important");
+            markdownWrapper.style.setProperty("visibility", showMarkdown ? "visible" : "hidden", "important");
         }}
         if (markdown instanceof HTMLElement) {{
             markdown.style.setProperty("display", showMarkdown ? "flex" : "none", "important");

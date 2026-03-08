@@ -130,14 +130,21 @@ def _read_session_wait_overlay_snapshot(page) -> dict[str, float | bool | None]:
                     proseBackground: null,
                     proseBorderRadius: null,
                     proseBoxShadow: null,
+                    markdownDisplay: null,
+                    markdownVisibility: null,
+                    wrapperDisplay: null,
+                    wrapperVisibility: null,
                 };
             }
             const markdown = host.querySelector('[data-testid="markdown"]');
             const prose = markdown ? markdown.querySelector('.prose, .md') || markdown : null;
+            const wrapper = markdown ? markdown.parentElement : null;
             const text = prose ? ((prose.innerText || prose.textContent || '').trim()) : '';
             const rect = host.getBoundingClientRect();
             const style = getComputedStyle(host);
             const proseStyle = prose ? getComputedStyle(prose) : null;
+            const markdownStyle = markdown ? getComputedStyle(markdown) : null;
+            const wrapperStyle = wrapper ? getComputedStyle(wrapper) : null;
             return {
                 present: true,
                 visible: style.display !== 'none' && rect.width > 0 && rect.height > 0 && text.length > 0,
@@ -148,6 +155,10 @@ def _read_session_wait_overlay_snapshot(page) -> dict[str, float | bool | None]:
                 proseBackground: proseStyle ? proseStyle.backgroundColor || null : null,
                 proseBorderRadius: proseStyle ? proseStyle.borderRadius || null : null,
                 proseBoxShadow: proseStyle ? proseStyle.boxShadow || null : null,
+                markdownDisplay: markdownStyle ? markdownStyle.display || null : null,
+                markdownVisibility: markdownStyle ? markdownStyle.visibility || null : null,
+                wrapperDisplay: wrapperStyle ? wrapperStyle.display || null : null,
+                wrapperVisibility: wrapperStyle ? wrapperStyle.visibility || null : null,
             };
         }"""
     )
@@ -271,6 +282,10 @@ def test_entry_rejects_immediately_when_session_limit_is_full(monkeypatch):
             assert pages[-1].evaluate("() => document.getElementById('robomme_episode_loading_copy') === null") is True
             rejection_snapshot = _read_session_wait_overlay_snapshot(pages[-1])
             assert rejection_snapshot["content"] == config.UI_TEXT["progress"]["entry_rejected"]
+            assert rejection_snapshot["wrapperDisplay"] == "block"
+            assert rejection_snapshot["wrapperVisibility"] == "visible"
+            assert rejection_snapshot["markdownDisplay"] == "flex"
+            assert rejection_snapshot["markdownVisibility"] == "visible"
             assert _read_unified_overlay_text(pages[-1]) == config.UI_TEXT["progress"]["entry_rejected"]
             assert len(state_manager.GLOBAL_SESSIONS) == config.SESSION_CONCURRENCY_LIMIT
 
@@ -452,7 +467,7 @@ def test_execute_does_not_use_episode_loading_copy(monkeypatch):
 
             body_text = page.evaluate("() => document.body.innerText")
             assert "The episode is loading..." not in body_text
-            assert "too many people playing" not in body_text
+            assert "Too many users are trying the demo right now. Please try again later." not in body_text
             assert page.evaluate("() => document.getElementById('robomme_episode_loading_copy') === null") is True
 
             browser.close()
