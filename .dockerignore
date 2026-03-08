@@ -1,20 +1,37 @@
 .git
 .gitignore
+.claude
+.cursor
 .venv
 .pytest_cache
 .mypy_cache
 .ruff_cache
 __pycache__
+**/__pycache__
 *.pyc
 *.pyo
 *.pyd
 
+Untitled
+app.py
+human_readme.md
 tests
+tests/
+gradio-web/test
+gradio-web/test/
+gradio-web/scripts
+gradio-web/scripts/
 uv.lock
 temp_demos
+temp_demos/
 sample_run_videos
+sample_run_videos/
 gradio-web/logs
 gradio-web/server.pid
 
 assets
+assets/
 doc
+doc/
+scripts
+scripts/

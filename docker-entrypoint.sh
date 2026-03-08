@@ -22,8 +22,9 @@ run_diagnostic() {
     echo "[entrypoint] $label"
     if "$@"; then
         return 0
+    else
+        status=$?
     fi
-    status=$?
     echo "[entrypoint] $label failed with exit code $status"
     return 0
 }

@@ -28,6 +28,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -f /tmp/get-pip.py \
     && rm -rf /var/lib/apt/lists/*
 
+RUN useradd -m -u 1000 user
+
 ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics \
@@ -36,20 +38,23 @@ ENV PYTHONUNBUFFERED=1 \
     OMP_NUM_THREADS=1 \
     PORT=7860
 
-RUN useradd -m -u 1000 user
 WORKDIR /home/user/app
 RUN mkdir -p /home/user/app/temp_demos \
-    && chown user:user /home/user/app /home/user/app/temp_demos
+    && chown -R user:user /home/user
 
-COPY --chown=user:user requirements.txt pyproject.toml README.md ./
-RUN python3 -m pip install --upgrade pip setuptools wheel \
-    && python3 -m pip install -r requirements.txt
-
-COPY --chown=user:user . .
-RUN python3 -m pip install -e .
-RUN chmod +x /home/user/app/docker-entrypoint.sh
+COPY --chown=user:user requirements.txt ./
 
 USER user
+
+RUN python3 -m pip install --user --upgrade pip setuptools wheel \
+    && python3 -m pip install --user -r requirements.txt
+
+COPY --chown=user:user docker-entrypoint.sh ./
+COPY --chown=user:user gradio-web ./gradio-web
+COPY --chown=user:user src ./src
+
+RUN chmod +x /home/user/app/docker-entrypoint.sh
+
 EXPOSE 7860
 ENTRYPOINT ["./docker-entrypoint.sh"]
 
