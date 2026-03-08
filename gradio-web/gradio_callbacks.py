@@ -26,6 +26,7 @@ from state_manager import (
     set_play_button_clicked,
     set_task_start_time,
     set_ui_phase,
+    try_create_session,
 )
 from image_utils import draw_marker, save_video, concatenate_frames_horizontally
 from user_manager import user_manager
@@ -73,6 +74,13 @@ def _session_error_text():
 def touch_session(uid):
     """Re-emit the current session key to refresh gr.State TTL."""
     return uid if uid and get_session(uid) is not None else None
+
+
+def touch_session_or_preserve_pending(uid, init_pending=False):
+    """Keep pending init uid alive until a real session is created."""
+    if init_pending:
+        return uid
+    return touch_session(uid)
 
 
 def cleanup_user_session(uid):
@@ -687,6 +695,10 @@ def init_session_and_load_task(uid):
     if get_session(uid) is None:
         create_session(uid)
 
+    return _load_initialized_session_task(uid)
+
+
+def _load_initialized_session_task(uid):
     LOGGER.debug("init_session_and_load_task: init_session uid=%s", _uid_for_log(uid))
     success, msg, status = user_manager.init_session(uid)
     LOGGER.debug(
@@ -701,6 +713,42 @@ def init_session_and_load_task(uid):
         return _task_load_failed_response(uid, msg)
     LOGGER.debug("init_session_and_load_task success uid=%s -> load_status_task", _uid_for_log(uid))
     return _load_status_task(uid, status)
+
+
+def try_init_session_and_load_task(uid):
+    """Try to initialize the session without blocking on a full slot queue."""
+    if not uid:
+        return {
+            "status": "ready",
+            "load_result": _task_load_failed_response(uid, _session_error_text()),
+        }
+
+    if get_session(uid) is None:
+        ready, queue_position = try_create_session(uid)
+        if not ready:
+            LOGGER.info(
+                "try_init_session_and_load_task pending uid=%s queue_position=%s",
+                _uid_for_log(uid),
+                queue_position,
+            )
+            return {
+                "status": "pending",
+                "uid": uid,
+                "queue_position": queue_position,
+            }
+
+    return {
+        "status": "ready",
+        "load_result": _load_initialized_session_task(uid),
+    }
+
+
+def resume_pending_init(uid, init_pending=False, request: gr.Request | None = None):
+    """Retry a previously pending init attempt."""
+    if not init_pending:
+        return {"status": "skip"}
+    effective_uid = uid or getattr(request, "session_hash", None)
+    return try_init_session_and_load_task(effective_uid)
 
 
 def load_next_task_wrapper(uid):
@@ -977,13 +1025,20 @@ def init_app(request: gr.Request):
         uid = getattr(request, "session_hash", None)
         LOGGER.info("init_app: session_hash=%s", _uid_for_log(uid))
         LOGGER.info("init_app: created uid=%s", _uid_for_log(uid))
-        result = init_session_and_load_task(uid)
-        LOGGER.debug("init_app: init_session_and_load_task returned %s outputs", len(result))
+        result = try_init_session_and_load_task(uid)
+        if isinstance(result, dict) and result.get("status") == "ready":
+            LOGGER.debug(
+                "init_app: init_session_and_load_task returned %s outputs",
+                len(result.get("load_result", ()) or ()),
+            )
         return result
     except Exception as e:
         LOGGER.exception("init_app exception")
         # Return a safe fallback that hides the loading overlay and shows error
-        return _task_load_failed_response("", _ui_text("errors", "init_failed", error=e))
+        return {
+            "status": "ready",
+            "load_result": _task_load_failed_response("", _ui_text("errors", "init_failed", error=e)),
+        }
 
 
 def precheck_execute_inputs(uid, option_idx, coords_str):

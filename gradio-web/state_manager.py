@@ -16,6 +16,7 @@ LOGGER = logging.getLogger("robomme.state_manager")
 # --- 全局会话存储 ---
 GLOBAL_SESSIONS = {}
 ACTIVE_SESSION_SLOTS = set()
+WAITING_SESSION_QUEUE = []
 
 # --- 任务索引存储（用于进度显示） ---
 TASK_INDEX_MAP = {}  # {uid: {"task_index": int, "total_tasks": int}}
@@ -42,6 +43,88 @@ def get_session(uid):
         return GLOBAL_SESSIONS.get(uid)
 
 
+def _cleanup_waiting_session_queue_locked():
+    if not WAITING_SESSION_QUEUE:
+        return
+
+    cleaned_queue = []
+    seen = set()
+    for queued_uid in WAITING_SESSION_QUEUE:
+        if not queued_uid or queued_uid in seen:
+            continue
+        if queued_uid in ACTIVE_SESSION_SLOTS:
+            continue
+        if queued_uid in GLOBAL_SESSIONS:
+            continue
+        seen.add(queued_uid)
+        cleaned_queue.append(queued_uid)
+
+    WAITING_SESSION_QUEUE[:] = cleaned_queue
+
+
+def _ensure_waiting_session_locked(uid):
+    _cleanup_waiting_session_queue_locked()
+    if uid not in WAITING_SESSION_QUEUE:
+        WAITING_SESSION_QUEUE.append(uid)
+    return WAITING_SESSION_QUEUE.index(uid) + 1
+
+
+def _try_reserve_session_slot_locked(uid, session_concurrency_limit):
+    if uid in ACTIVE_SESSION_SLOTS:
+        return True, 0
+
+    _cleanup_waiting_session_queue_locked()
+
+    if len(ACTIVE_SESSION_SLOTS) < int(session_concurrency_limit):
+        if WAITING_SESSION_QUEUE and WAITING_SESSION_QUEUE[0] != uid:
+            queue_position = _ensure_waiting_session_locked(uid)
+            LOGGER.debug(
+                "try_reserve_session_slot delayed uid=%s queue_position=%s active_slots=%s limit=%s",
+                uid,
+                queue_position,
+                len(ACTIVE_SESSION_SLOTS),
+                session_concurrency_limit,
+            )
+            return False, queue_position
+
+        if WAITING_SESSION_QUEUE and WAITING_SESSION_QUEUE[0] == uid:
+            WAITING_SESSION_QUEUE.pop(0)
+
+        ACTIVE_SESSION_SLOTS.add(uid)
+        LOGGER.info(
+            "try_reserve_session_slot acquired uid=%s active_slots=%s",
+            uid,
+            len(ACTIVE_SESSION_SLOTS),
+        )
+        return True, 0
+
+    queue_position = _ensure_waiting_session_locked(uid)
+    LOGGER.info(
+        "try_reserve_session_slot queued uid=%s queue_position=%s active_slots=%s limit=%s",
+        uid,
+        queue_position,
+        len(ACTIVE_SESSION_SLOTS),
+        session_concurrency_limit,
+    )
+    return False, queue_position
+
+
+def try_reserve_session_slot(uid):
+    """
+    Try to reserve a session slot without blocking.
+
+    Returns:
+        tuple[bool, int]: (acquired, queue_position)
+    """
+    if not uid:
+        raise ValueError("Session uid cannot be empty")
+
+    from config import SESSION_CONCURRENCY_LIMIT
+
+    with _session_slot_condition:
+        return _try_reserve_session_slot_locked(uid, SESSION_CONCURRENCY_LIMIT)
+
+
 def reserve_session_slot(uid):
     """
     Block until a session slot is available for this uid.
@@ -55,22 +138,17 @@ def reserve_session_slot(uid):
     from config import SESSION_CONCURRENCY_LIMIT
 
     with _session_slot_condition:
-        if uid in ACTIVE_SESSION_SLOTS:
-            return
-        while len(ACTIVE_SESSION_SLOTS) >= int(SESSION_CONCURRENCY_LIMIT):
+        while True:
+            acquired, queue_position = _try_reserve_session_slot_locked(uid, SESSION_CONCURRENCY_LIMIT)
+            if acquired:
+                return
             LOGGER.info(
-                "reserve_session_slot waiting uid=%s active_slots=%s limit=%s",
+                "reserve_session_slot waiting uid=%s queue_position=%s active_slots=%s",
                 uid,
+                queue_position,
                 len(ACTIVE_SESSION_SLOTS),
-                SESSION_CONCURRENCY_LIMIT,
             )
             _session_slot_condition.wait(timeout=0.1)
-        ACTIVE_SESSION_SLOTS.add(uid)
-        LOGGER.info(
-            "reserve_session_slot acquired uid=%s active_slots=%s",
-            uid,
-            len(ACTIVE_SESSION_SLOTS),
-        )
 
 
 def release_session_slot(uid):
@@ -80,12 +158,45 @@ def release_session_slot(uid):
     with _session_slot_condition:
         if uid in ACTIVE_SESSION_SLOTS:
             ACTIVE_SESSION_SLOTS.remove(uid)
+            _cleanup_waiting_session_queue_locked()
             LOGGER.info(
                 "release_session_slot uid=%s active_slots=%s",
                 uid,
                 len(ACTIVE_SESSION_SLOTS),
             )
             _session_slot_condition.notify_all()
+
+
+def try_create_session(uid):
+    """
+    Try to create a ProcessSessionProxy without blocking on session slot wait.
+
+    Returns:
+        tuple[bool, int]: (ready, queue_position)
+    """
+    if not uid:
+        raise ValueError("Session uid cannot be empty")
+
+    with _state_lock:
+        if GLOBAL_SESSIONS.get(uid) is not None:
+            return True, 0
+
+    acquired, queue_position = try_reserve_session_slot(uid)
+    if not acquired:
+        return False, queue_position
+
+    try:
+        with _state_lock:
+            session = GLOBAL_SESSIONS.get(uid)
+            if session is None:
+                session = ProcessSessionProxy()
+                GLOBAL_SESSIONS[uid] = session
+    except Exception:
+        release_session_slot(uid)
+        raise
+
+    LOGGER.info("try_create_session uid=%s total_sessions=%s", uid, len(GLOBAL_SESSIONS))
+    return True, 0
 
 
 def create_session(uid):
@@ -220,6 +331,8 @@ def cleanup_session(uid):
 
     with _state_lock:
         session = GLOBAL_SESSIONS.pop(uid, None)
+        if uid in WAITING_SESSION_QUEUE:
+            WAITING_SESSION_QUEUE[:] = [queued_uid for queued_uid in WAITING_SESSION_QUEUE if queued_uid != uid]
         TASK_INDEX_MAP.pop(uid, None)
         UI_PHASE_MAP.pop(uid, None)
         PLAY_BUTTON_CLICKED.pop(uid, None)

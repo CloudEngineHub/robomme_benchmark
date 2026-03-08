@@ -19,9 +19,11 @@ RIGHT_TOP_LOG_SCALE = 1
 UI_GLOBAL_FONT_SIZE = "24px"
 
 # Session / queue 配置
-SESSION_TIMEOUT = 39999  # 30秒无用户主动操作后，交由 gr.State TTL 自动回收 session
-SESSION_CONCURRENCY_ID = "session_slots"
+SESSION_TIMEOUT = 20  # 30秒无用户主动操作后，交由 gr.State TTL 自动回收 session
+SESSION_CONCURRENCY_ID = "session_actions"
 SESSION_CONCURRENCY_LIMIT = 2
+SESSION_INIT_CONCURRENCY_ID = "session_init"
+SESSION_INIT_CONCURRENCY_LIMIT = 2
 
 # 兜底执行次数配置
 EXECUTE_LIMIT_OFFSET = 4  # 兜底执行次数 = non_demonstration_task_length + EXECUTE_LIMIT_OFFSET

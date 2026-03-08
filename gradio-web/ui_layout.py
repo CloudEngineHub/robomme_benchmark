@@ -15,6 +15,8 @@ from config import (
     LIVE_OBS_POINT_WAIT_CLASS,
     SESSION_CONCURRENCY_ID,
     SESSION_CONCURRENCY_LIMIT,
+    SESSION_INIT_CONCURRENCY_ID,
+    SESSION_INIT_CONCURRENCY_LIMIT,
     SESSION_TIMEOUT,
     LIVE_OBS_REFRESH_HZ,
     POINT_SELECTION_SCALE,
@@ -37,11 +39,13 @@ from gradio_callbacks import (
     on_video_end_transition,
     precheck_execute_inputs,
     refresh_live_obs,
+    resume_pending_init,
     restart_episode_wrapper,
     switch_env_wrapper,
     switch_to_action_phase,
     switch_to_execute_phase,
     touch_session,
+    touch_session_or_preserve_pending,
 )
 from user_manager import user_manager
 
@@ -403,6 +407,91 @@ PROGRESS_TEXT_REWRITE_JS = f"""
         }}
     }};
 
+    const resetManualOverlayStyles = (host, markdown, prose) => {{
+        host.style.setProperty("pointer-events", "none", "important");
+        if (markdown instanceof HTMLElement) {{
+            [
+                "position",
+                "inset",
+                "display",
+                "align-items",
+                "justify-content",
+                "padding",
+            ].forEach((prop) => markdown.style.removeProperty(prop));
+        }}
+        if (prose instanceof HTMLElement) {{
+            [
+                "min-width",
+                "max-width",
+                "margin",
+                "padding",
+                "border-radius",
+                "background",
+                "border",
+                "box-shadow",
+                "text-align",
+                "color",
+                "font-size",
+                "font-weight",
+                "line-height",
+                "white-space",
+            ].forEach((prop) => prose.style.removeProperty(prop));
+        }}
+    }};
+
+    const updateManualWaitOverlay = () => {{
+        const host = document.getElementById("native_progress_host");
+        if (!(host instanceof HTMLElement)) {{
+            return;
+        }}
+
+        const markdown = host.querySelector('[data-testid="markdown"]');
+        const prose =
+            markdown instanceof HTMLElement
+                ? markdown.querySelector(".prose, .md") || markdown
+                : null;
+        const progressNode = host.querySelector(".progress-text");
+        const text =
+            prose instanceof HTMLElement
+                ? (prose.innerText || prose.textContent || "").trim()
+                : "";
+        const manualVisible =
+            Boolean(text) &&
+            !progressNode &&
+            text.toLowerCase().includes(queueWaitText.toLowerCase());
+
+        if (!manualVisible) {{
+            resetManualOverlayStyles(host, markdown, prose);
+            return;
+        }}
+
+        host.style.setProperty("pointer-events", "auto", "important");
+        if (markdown instanceof HTMLElement) {{
+            markdown.style.setProperty("position", "fixed", "important");
+            markdown.style.setProperty("inset", "0", "important");
+            markdown.style.setProperty("display", "flex", "important");
+            markdown.style.setProperty("align-items", "center", "important");
+            markdown.style.setProperty("justify-content", "center", "important");
+            markdown.style.setProperty("padding", "24px", "important");
+        }}
+        if (prose instanceof HTMLElement) {{
+            prose.style.setProperty("min-width", "min(560px, calc(100vw - 48px))", "important");
+            prose.style.setProperty("max-width", "calc(100vw - 48px)", "important");
+            prose.style.setProperty("margin", "0", "important");
+            prose.style.setProperty("padding", "28px 32px", "important");
+            prose.style.setProperty("border-radius", "16px", "important");
+            prose.style.setProperty("background", "rgba(255, 255, 255, 0.96)", "important");
+            prose.style.setProperty("border", "1px solid rgba(15, 23, 42, 0.08)", "important");
+            prose.style.setProperty("box-shadow", "0 24px 60px rgba(15, 23, 42, 0.14)", "important");
+            prose.style.setProperty("text-align", "center", "important");
+            prose.style.setProperty("color", "#0f172a", "important");
+            prose.style.setProperty("font-size", "var(--text-lg)", "important");
+            prose.style.setProperty("font-weight", "600", "important");
+            prose.style.setProperty("line-height", "1.5", "important");
+            prose.style.setProperty("white-space", "pre-line", "important");
+        }}
+    }};
+
     const splitSegments = (text) =>
         text
             .split("|")
@@ -461,6 +550,7 @@ PROGRESS_TEXT_REWRITE_JS = f"""
     const rewriteAll = () => {{
         ensureOverlayStyles();
         document.querySelectorAll(".progress-text").forEach(rewriteNode);
+        updateManualWaitOverlay();
     }};
 
     const scheduleRewrite = () => {{
@@ -533,7 +623,6 @@ CSS = f"""
 #native_progress_host .pending {{
     min-height: 100vh !important;
 }}
-
 
 #reference_action_btn button:not(:disabled),
 button#reference_action_btn:not(:disabled) {{
@@ -677,11 +766,13 @@ def _phase_from_updates(main_interface_update, video_phase_update):
 
 def _with_phase_from_load(load_result):
     phase = _phase_from_updates(load_result[1], load_result[14])
-    return (*load_result, phase)
-
-
-def _skip_load_flow():
-    return tuple(gr.skip() for _ in range(20))
+    return (
+        *load_result,
+        phase,
+        False,
+        gr.update(value=""),
+        gr.update(active=False),
+    )
 
 
 def _phase_visibility_updates(phase):
@@ -750,9 +841,11 @@ def create_ui_blocks():
             delete_callback=cleanup_user_session,
         )
         ui_phase_state = gr.State(value=PHASE_INIT)
+        session_boot_pending_state = gr.State(value=False)
         current_task_env_state = gr.State(value=None)
         suppress_next_option_change_state = gr.State(value=False)
         live_obs_timer = gr.Timer(value=1.0 / LIVE_OBS_REFRESH_HZ, active=True)
+        session_init_retry_timer = gr.Timer(value=0.5, active=False)
 
         task_info_box = gr.Textbox(visible=False, elem_id="task_info_box")
         progress_info_box = gr.Textbox(visible=False)
@@ -900,12 +993,65 @@ def create_ui_blocks():
             task_hint_display,
             reference_action_btn,
             ui_phase_state,
+            session_boot_pending_state,
+            native_progress_host,
+            session_init_retry_timer,
         ]
         phase_visibility_outputs = [
             video_phase_group,
             action_phase_group,
             control_panel_group,
         ]
+        action_queue_kwargs = {
+            "concurrency_id": SESSION_CONCURRENCY_ID,
+            "concurrency_limit": SESSION_CONCURRENCY_LIMIT,
+        }
+        init_queue_kwargs = {
+            "concurrency_id": SESSION_INIT_CONCURRENCY_ID,
+            "concurrency_limit": SESSION_INIT_CONCURRENCY_LIMIT,
+        }
+
+        def _skip_load_flow():
+            return tuple(gr.skip() for _ in range(len(load_flow_outputs)))
+
+        def _pending_init_flow(uid, queue_position):
+            _ = queue_position
+            return (
+                uid,
+                gr.update(visible=True),
+                gr.update(interactive=False),
+                "",
+                gr.update(choices=[], value=None),
+                "",
+                "",
+                gr.update(value=None, visible=False),
+                gr.update(visible=False, interactive=False),
+                "",
+                "",
+                gr.update(interactive=False),
+                gr.update(interactive=False),
+                gr.update(interactive=False),
+                gr.update(visible=False),
+                gr.update(visible=False),
+                gr.update(visible=False),
+                gr.update(value=""),
+                gr.update(interactive=False),
+                PHASE_INIT,
+                True,
+                gr.update(value=f'{UI_TEXT["progress"]["queue_wait"]}\\n\\nqueue: {max(1, int(queue_position or 1))}'),
+                gr.update(active=True),
+            )
+
+        def _coerce_init_load_result(result):
+            if isinstance(result, dict):
+                status = result.get("status")
+                if status == "pending":
+                    return _pending_init_flow(result.get("uid"), result.get("queue_position"))
+                if status == "skip":
+                    return _skip_load_flow()
+                if status == "ready":
+                    return _with_phase_from_load(result.get("load_result"))
+            return _with_phase_from_load(result)
 
         def _normalize_env_choice(env_value, choices):
             if env_value is None:
@@ -949,7 +1095,10 @@ def create_ui_blocks():
             )
 
         def init_app_with_phase(request: gr.Request):
-            return _with_phase_from_load(init_app(request))
+            return _coerce_init_load_result(init_app(request))
+
+        def resume_pending_init_with_phase(uid, init_pending, request: gr.Request):
+            return _coerce_init_load_result(resume_pending_init(uid, init_pending, request))
 
         def load_next_task_with_phase(uid):
             return _with_phase_from_load(load_next_task_wrapper(uid))
@@ -994,11 +1143,10 @@ def create_ui_blocks():
             fn=maybe_switch_env_with_phase,
             inputs=[uid_state, header_task_box, current_task_env_state],
             outputs=load_flow_outputs,
-            concurrency_id=SESSION_CONCURRENCY_ID,
-            concurrency_limit=SESSION_CONCURRENCY_LIMIT,
             show_progress="full",
             js=SET_EPISODE_LOAD_MODE_IF_SWITCH_JS,
             show_progress_on=[native_progress_host],
+            **action_queue_kwargs,
         ).then(
             fn=_phase_visibility_updates,
             inputs=[ui_phase_state],
@@ -1035,11 +1183,10 @@ def create_ui_blocks():
             fn=load_next_task_with_phase,
             inputs=[uid_state],
             outputs=load_flow_outputs,
-            concurrency_id=SESSION_CONCURRENCY_ID,
-            concurrency_limit=SESSION_CONCURRENCY_LIMIT,
             show_progress="full",
             js=SET_EPISODE_LOAD_MODE_JS,
             show_progress_on=[native_progress_host],
+            **action_queue_kwargs,
         ).then(
             fn=_phase_visibility_updates,
             inputs=[ui_phase_state],
@@ -1076,11 +1223,10 @@ def create_ui_blocks():
             fn=restart_episode_with_phase,
             inputs=[uid_state],
             outputs=load_flow_outputs,
-            concurrency_id=SESSION_CONCURRENCY_ID,
-            concurrency_limit=SESSION_CONCURRENCY_LIMIT,
             show_progress="full",
             js=SET_EPISODE_LOAD_MODE_JS,
             show_progress_on=[native_progress_host],
+            **action_queue_kwargs,
         ).then(
             fn=_phase_visibility_updates,
             inputs=[ui_phase_state],
@@ -1208,8 +1354,7 @@ def create_ui_blocks():
             fn=on_reference_action,
             inputs=[uid_state, options_radio],
             outputs=[img_display, options_radio, coords_box, log_output, suppress_next_option_change_state],
-            concurrency_id=SESSION_CONCURRENCY_ID,
-            concurrency_limit=SESSION_CONCURRENCY_LIMIT,
+            **action_queue_kwargs,
         ).then(
             fn=touch_session,
             inputs=[uid_state],
@@ -1252,9 +1397,8 @@ def create_ui_blocks():
             fn=execute_step,
             inputs=[uid_state, options_radio, coords_box],
             outputs=[img_display, log_output, task_info_box, progress_info_box, restart_episode_btn, next_task_btn, exec_btn],
-            concurrency_id=SESSION_CONCURRENCY_ID,
-            concurrency_limit=SESSION_CONCURRENCY_LIMIT,
             show_progress="hidden",
+            **action_queue_kwargs,
         ).then(
             fn=switch_to_action_phase,
             inputs=[uid_state],
@@ -1317,11 +1461,10 @@ def create_ui_blocks():
             fn=init_app_with_phase,
             inputs=[],
             outputs=load_flow_outputs,
-            concurrency_id=SESSION_CONCURRENCY_ID,
-            concurrency_limit=SESSION_CONCURRENCY_LIMIT,
             show_progress="full",
             js=SET_EPISODE_LOAD_MODE_JS,
             show_progress_on=[native_progress_host],
+            **init_queue_kwargs,
         ).then(
             fn=_phase_visibility_updates,
             inputs=[ui_phase_state],
@@ -1335,8 +1478,8 @@ def create_ui_blocks():
             queue=False,
             show_progress="hidden",
         ).then(
-            fn=touch_session,
-            inputs=[uid_state],
+            fn=touch_session_or_preserve_pending,
+            inputs=[uid_state, session_boot_pending_state],
             outputs=[uid_state],
             queue=False,
             show_progress="hidden",
@@ -1350,6 +1493,32 @@ def create_ui_blocks():
         init_load.failure(
             fn=None,
             js=RESET_EPISODE_LOAD_MODE_JS,
+            queue=False,
+            show_progress="hidden",
+        )
+
+        session_init_retry_timer.tick(
+            fn=resume_pending_init_with_phase,
+            inputs=[uid_state, session_boot_pending_state],
+            outputs=load_flow_outputs,
+            show_progress="hidden",
+            **init_queue_kwargs,
+        ).then(
+            fn=_phase_visibility_updates,
+            inputs=[ui_phase_state],
+            outputs=phase_visibility_outputs,
+            queue=False,
+            show_progress="hidden",
+        ).then(
+            fn=sync_header_from_task,
+            inputs=[task_info_box, goal_box],
+            outputs=[header_task_box, header_goal_box, current_task_env_state],
+            queue=False,
+            show_progress="hidden",
+        ).then(
+            fn=touch_session_or_preserve_pending,
+            inputs=[uid_state, session_boot_pending_state],
+            outputs=[uid_state],
             queue=False,
             show_progress="hidden",
         )
