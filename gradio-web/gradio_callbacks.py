@@ -264,29 +264,6 @@ def show_task_hint(uid, current_hint=""):
     return get_task_hint(env_id)
 
 
-def show_loading_info():
-    """
-    显示加载环境的全屏遮罩层提示信息
-    
-    功能说明：
-    - 此函数在用户点击登录/加载任务等按钮时被调用
-    - 返回包含全屏遮罩层的 HTML 字符串，用于显示加载提示
-    - 遮罩层会覆盖整个页面，防止用户在加载过程中进行其他操作
-    - 加载完成后，回调函数会返回空字符串 "" 来清空 loading_overlay 组件，从而隐藏遮罩层
-    
-    工作流程：
-    1. 用户点击按钮（如 Login、Next Task 等）
-    2. 按钮的 click 事件首先调用此函数，显示遮罩层
-    3. 然后通过 .then() 链式调用实际的加载函数（如 login_and_load_task）
-    4. 加载函数执行完成后，返回 gr.update(visible=False) 隐藏遮罩层
-
-    Returns:
-        gr.update: 显示 loading overlay group
-    """
-    LOGGER.debug("show_loading_info: displaying loading overlay")
-    return gr.update(visible=True)
-
-
 def on_video_end(uid):
     """
     Called when the demonstration video finishes playing.
@@ -519,7 +496,6 @@ def _task_load_failed_response(uid, message):
         gr.update(visible=False),  # action_phase_group
         gr.update(visible=False),  # control_panel_group
         gr.update(value=""),  # task_hint_display
-        gr.update(visible=False),  # loading_overlay
         gr.update(interactive=False),  # reference_action_btn
     )
 
@@ -596,7 +572,6 @@ def _load_status_task(uid, status):
             gr.update(visible=True),  # action_phase_group
             gr.update(visible=True),  # control_panel_group
             gr.update(value=get_task_hint(env_id) if env_id else ""),  # task_hint_display
-            gr.update(visible=False),  # loading_overlay
             gr.update(interactive=False),  # reference_action_btn
         )
 
@@ -676,7 +651,6 @@ def _load_status_task(uid, status):
             gr.update(visible=False),  # action_phase_group
             gr.update(visible=False),  # control_panel_group
             gr.update(value=get_task_hint(actual_env_id)),  # task_hint_display
-            gr.update(visible=False),  # loading_overlay
             gr.update(interactive=True),  # reference_action_btn
         )
 
@@ -701,7 +675,6 @@ def _load_status_task(uid, status):
         gr.update(visible=True),  # action_phase_group
         gr.update(visible=True),  # control_panel_group
         gr.update(value=get_task_hint(actual_env_id)),  # task_hint_display
-        gr.update(visible=False),  # loading_overlay
         gr.update(interactive=True),  # reference_action_btn
     )
 

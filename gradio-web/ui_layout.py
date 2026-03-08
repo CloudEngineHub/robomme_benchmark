@@ -5,6 +5,7 @@ Two-column layout: Point Selection | Right Panel.
 """
 
 import ast
+import json
 
 import gradio as gr
 
@@ -19,6 +20,7 @@ from config import (
     POINT_SELECTION_SCALE,
     RIGHT_TOP_ACTION_SCALE,
     RIGHT_TOP_LOG_SCALE,
+    UI_TEXT,
     UI_GLOBAL_FONT_SIZE,
     get_live_obs_elem_classes,
 )
@@ -36,7 +38,6 @@ from gradio_callbacks import (
     precheck_execute_inputs,
     refresh_live_obs,
     restart_episode_wrapper,
-    show_loading_info,
     switch_env_wrapper,
     switch_to_action_phase,
     switch_to_execute_phase,
@@ -49,6 +50,8 @@ PHASE_INIT = "init"
 PHASE_DEMO_VIDEO = "demo_video"
 PHASE_ACTION_POINT = "action_point"
 PHASE_EXECUTION_PLAYBACK = "execution_playback"
+LOAD_STATUS_MODE_IDLE = "idle"
+LOAD_STATUS_MODE_EPISODE_LOAD = "episode_load"
 
 APP_THEME = gr.themes.Default()
 
@@ -333,6 +336,159 @@ THEME_LOCK_JS = r"""
 """
 
 
+SET_EPISODE_LOAD_MODE_JS = f"""
+() => {{
+    window.__robommeLoadStatusMode = {json.dumps(LOAD_STATUS_MODE_EPISODE_LOAD)};
+}}
+"""
+
+
+SET_EPISODE_LOAD_MODE_IF_SWITCH_JS = f"""
+(_uid, selectedEnv, currentTaskEnv) => {{
+    const normalize = (value) => (value == null ? "" : String(value).trim().toLowerCase());
+    const nextEnv = normalize(selectedEnv);
+    const currentEnv = normalize(currentTaskEnv);
+    window.__robommeLoadStatusMode =
+        nextEnv && nextEnv !== currentEnv
+            ? {json.dumps(LOAD_STATUS_MODE_EPISODE_LOAD)}
+            : {json.dumps(LOAD_STATUS_MODE_IDLE)};
+}}
+"""
+
+
+RESET_EPISODE_LOAD_MODE_JS = f"""
+() => {{
+    window.__robommeLoadStatusMode = {json.dumps(LOAD_STATUS_MODE_IDLE)};
+}}
+"""
+
+
+PROGRESS_TEXT_REWRITE_JS = f"""
+() => {{
+    const modeEpisodeLoad = {json.dumps(LOAD_STATUS_MODE_EPISODE_LOAD)};
+    const modeIdle = {json.dumps(LOAD_STATUS_MODE_IDLE)};
+    const episodeLoadingText = {json.dumps(UI_TEXT["progress"]["episode_loading"])};
+    const queueWaitText = {json.dumps(UI_TEXT["progress"]["queue_wait"])};
+
+    window.__robommeLoadStatusMode = window.__robommeLoadStatusMode || modeIdle;
+    const getMode = () => window.__robommeLoadStatusMode || modeIdle;
+
+    const ensureOverlayStyles = () => {{
+        const host = document.getElementById("native_progress_host");
+        if (!(host instanceof HTMLElement)) {{
+            return;
+        }}
+        host.style.setProperty("position", "fixed", "important");
+        host.style.setProperty("inset", "0", "important");
+        host.style.setProperty("z-index", "9999", "important");
+        host.style.setProperty("pointer-events", "none", "important");
+        host.style.setProperty("width", "100vw", "important");
+        host.style.setProperty("height", "100vh", "important");
+        host.style.setProperty("min-height", "100vh", "important");
+        host.style.setProperty("overflow", "visible", "important");
+
+        const wrap = host.querySelector(".wrap");
+        if (wrap instanceof HTMLElement) {{
+            wrap.style.setProperty("position", "fixed", "important");
+            wrap.style.setProperty("inset", "0", "important");
+            wrap.style.setProperty("width", "100vw", "important");
+            wrap.style.setProperty("height", "100vh", "important");
+            wrap.style.setProperty("min-height", "100vh", "important");
+            wrap.style.setProperty("padding", "0", "important");
+            wrap.style.setProperty("display", "flex", "important");
+            wrap.style.setProperty("align-items", "center", "important");
+            wrap.style.setProperty("justify-content", "center", "important");
+            wrap.style.setProperty("background", "rgba(255, 255, 255, 0.92)", "important");
+            wrap.style.setProperty("backdrop-filter", "blur(2px)", "important");
+        }}
+    }};
+
+    const splitSegments = (text) =>
+        text
+            .split("|")
+            .map((part) => part.trim())
+            .filter(Boolean);
+
+    const rewriteNode = (node) => {{
+        if (!(node instanceof HTMLElement)) {{
+            return;
+        }}
+
+        const displayed = (node.innerText || node.textContent || "").trim();
+        const previousCustom = node.dataset.robommeProgressCustom || "";
+        const raw =
+            node.dataset.robommeProgressCustomized === "1" && displayed === previousCustom
+                ? node.dataset.robommeProgressRaw || displayed
+                : displayed;
+
+        if (getMode() !== modeEpisodeLoad) {{
+            if (
+                node.dataset.robommeProgressCustomized === "1" &&
+                displayed === previousCustom &&
+                node.dataset.robommeProgressRaw
+            ) {{
+                node.textContent = node.dataset.robommeProgressRaw;
+            }}
+            delete node.dataset.robommeProgressCustomized;
+            delete node.dataset.robommeProgressRaw;
+            delete node.dataset.robommeProgressCustom;
+            return;
+        }}
+
+        const normalized = raw.toLowerCase();
+        let custom = null;
+
+        if (normalized.startsWith("processing")) {{
+            const segments = splitSegments(raw);
+            const suffix = segments.length > 1 ? ` | ${{segments.slice(1).join(" | ")}}` : "";
+            custom = `${{episodeLoadingText}}${{suffix}}`;
+        }} else if (normalized.startsWith("queue:")) {{
+            custom = `${{queueWaitText}} | ${{raw}}`;
+        }}
+
+        if (!custom) {{
+            return;
+        }}
+
+        node.dataset.robommeProgressCustomized = "1";
+        node.dataset.robommeProgressRaw = raw;
+        node.dataset.robommeProgressCustom = custom;
+        if (displayed !== custom) {{
+            node.textContent = custom;
+        }}
+    }};
+
+    const rewriteAll = () => {{
+        ensureOverlayStyles();
+        document.querySelectorAll(".progress-text").forEach(rewriteNode);
+    }};
+
+    const scheduleRewrite = () => {{
+        if (window.__robommeProgressRewriteRaf) {{
+            return;
+        }}
+        window.__robommeProgressRewriteRaf = window.requestAnimationFrame(() => {{
+            window.__robommeProgressRewriteRaf = null;
+            rewriteAll();
+        }});
+    }};
+
+    if (!window.__robommeProgressRewriteInstalled) {{
+        const observer = new MutationObserver(scheduleRewrite);
+        observer.observe(document.body, {{
+            childList: true,
+            subtree: true,
+            characterData: true,
+        }});
+        window.setInterval(scheduleRewrite, 200);
+        window.__robommeProgressRewriteInstalled = true;
+    }}
+
+    scheduleRewrite();
+}}
+"""
+
+
 CSS = f"""
 :root {{
     --body-text-size: {UI_GLOBAL_FONT_SIZE} !important;
@@ -357,26 +513,27 @@ CSS = f"""
     font-size: var(--text-xxl) !important;
 }}
 
-#loading_overlay_group {{
+#native_progress_host {{
     position: fixed !important;
     inset: 0 !important;
     z-index: 9999 !important;
+    pointer-events: none !important;
+}}
+
+#native_progress_host .wrap {{
+    width: 100vw !important;
+    min-height: 100vh !important;
+}}
+
+#native_progress_host .wrap.translucent {{
     background: rgba(255, 255, 255, 0.92) !important;
-    color: var(--body-text-color) !important;
-    text-align: center !important;
+    backdrop-filter: blur(2px);
 }}
 
-#loading_overlay_group > div {{
-    min-height: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+#native_progress_host .pending {{
+    min-height: 100vh !important;
 }}
 
-#loading_overlay_group h3 {{
-    margin: 0 !important;
-    font-size: {UI_GLOBAL_FONT_SIZE} !important;
-}}
 
 #reference_action_btn button:not(:disabled),
 button#reference_action_btn:not(:disabled) {{
@@ -524,7 +681,7 @@ def _with_phase_from_load(load_result):
 
 
 def _skip_load_flow():
-    return tuple(gr.skip() for _ in range(21))
+    return tuple(gr.skip() for _ in range(20))
 
 
 def _phase_visibility_updates(phase):
@@ -587,12 +744,6 @@ def create_ui_blocks():
                     elem_id="header_goal",
                 )
 
-        loading_overlay = gr.Markdown(
-            "### The episode is loading...",
-            visible=True,
-            elem_id="loading_overlay_group",
-        )
-
         uid_state = gr.State(
             value=None,
             time_to_live=SESSION_TIMEOUT,
@@ -607,7 +758,13 @@ def create_ui_blocks():
         progress_info_box = gr.Textbox(visible=False)
         goal_box = gr.Textbox(visible=False)
 
-        with gr.Column(visible=False, elem_id="main_interface_root") as main_interface:
+        with gr.Column(visible=True, elem_id="main_interface_root") as main_interface:
+            native_progress_host = gr.Markdown(
+                value="",
+                visible=True,
+                container=False,
+                elem_id="native_progress_host",
+            )
             with gr.Row(elem_id="main_layout_row"):
                 with gr.Column(scale=POINT_SELECTION_SCALE):
                     with gr.Column(elem_classes=["native-card"], elem_id="media_card"):
@@ -741,7 +898,6 @@ def create_ui_blocks():
             action_phase_group,
             control_panel_group,
             task_hint_display,
-            loading_overlay,
             reference_action_btn,
             ui_phase_state,
         ]
@@ -810,17 +966,6 @@ def create_ui_blocks():
             normalized_current_env = _normalize_env_choice(current_task_env, base_choices)
             return normalized_selected_env, normalized_current_env
 
-        def prepare_header_task_switch(selected_env, current_task_env):
-            normalized_selected_env, normalized_current_env = _normalize_selected_env(
-                selected_env,
-                current_task_env,
-            )
-            if not normalized_selected_env:
-                return gr.update(visible=False)
-            if normalized_selected_env == normalized_current_env:
-                return gr.update(visible=False)
-            return gr.update(visible=False)
-
         def maybe_switch_env_with_phase(uid, selected_env, current_task_env):
             normalized_selected_env, normalized_current_env = _normalize_selected_env(
                 selected_env,
@@ -845,18 +990,15 @@ def create_ui_blocks():
             show_progress="hidden",
         )
 
-        header_task_box.select(
-            fn=prepare_header_task_switch,
-            inputs=[header_task_box, current_task_env_state],
-            outputs=[loading_overlay],
-            queue=False,
-            show_progress="hidden",
-        ).then(
+        header_task_switch = header_task_box.select(
             fn=maybe_switch_env_with_phase,
             inputs=[uid_state, header_task_box, current_task_env_state],
             outputs=load_flow_outputs,
             concurrency_id=SESSION_CONCURRENCY_ID,
             concurrency_limit=SESSION_CONCURRENCY_LIMIT,
+            show_progress="full",
+            js=SET_EPISODE_LOAD_MODE_IF_SWITCH_JS,
+            show_progress_on=[native_progress_host],
         ).then(
             fn=_phase_visibility_updates,
             inputs=[ui_phase_state],
@@ -876,13 +1018,28 @@ def create_ui_blocks():
             queue=False,
             show_progress="hidden",
         )
+        header_task_switch.success(
+            fn=None,
+            js=RESET_EPISODE_LOAD_MODE_JS,
+            queue=False,
+            show_progress="hidden",
+        )
+        header_task_switch.failure(
+            fn=None,
+            js=RESET_EPISODE_LOAD_MODE_JS,
+            queue=False,
+            show_progress="hidden",
+        )
 
-        next_task_btn.click(
+        next_task_click = next_task_btn.click(
             fn=load_next_task_with_phase,
             inputs=[uid_state],
             outputs=load_flow_outputs,
             concurrency_id=SESSION_CONCURRENCY_ID,
             concurrency_limit=SESSION_CONCURRENCY_LIMIT,
+            show_progress="full",
+            js=SET_EPISODE_LOAD_MODE_JS,
+            show_progress_on=[native_progress_host],
         ).then(
             fn=_phase_visibility_updates,
             inputs=[ui_phase_state],
@@ -902,13 +1059,28 @@ def create_ui_blocks():
             queue=False,
             show_progress="hidden",
         )
+        next_task_click.success(
+            fn=None,
+            js=RESET_EPISODE_LOAD_MODE_JS,
+            queue=False,
+            show_progress="hidden",
+        )
+        next_task_click.failure(
+            fn=None,
+            js=RESET_EPISODE_LOAD_MODE_JS,
+            queue=False,
+            show_progress="hidden",
+        )
 
-        restart_episode_btn.click(
+        restart_episode_click = restart_episode_btn.click(
             fn=restart_episode_with_phase,
             inputs=[uid_state],
             outputs=load_flow_outputs,
             concurrency_id=SESSION_CONCURRENCY_ID,
             concurrency_limit=SESSION_CONCURRENCY_LIMIT,
+            show_progress="full",
+            js=SET_EPISODE_LOAD_MODE_JS,
+            show_progress_on=[native_progress_host],
         ).then(
             fn=_phase_visibility_updates,
             inputs=[ui_phase_state],
@@ -925,6 +1097,18 @@ def create_ui_blocks():
             fn=touch_session,
             inputs=[uid_state],
             outputs=[uid_state],
+            queue=False,
+            show_progress="hidden",
+        )
+        restart_episode_click.success(
+            fn=None,
+            js=RESET_EPISODE_LOAD_MODE_JS,
+            queue=False,
+            show_progress="hidden",
+        )
+        restart_episode_click.failure(
+            fn=None,
+            js=RESET_EPISODE_LOAD_MODE_JS,
             queue=False,
             show_progress="hidden",
         )
@@ -1124,11 +1308,20 @@ def create_ui_blocks():
         )
 
         demo.load(
+            fn=None,
+            js=PROGRESS_TEXT_REWRITE_JS,
+            queue=False,
+        )
+
+        init_load = demo.load(
             fn=init_app_with_phase,
             inputs=[],
             outputs=load_flow_outputs,
             concurrency_id=SESSION_CONCURRENCY_ID,
             concurrency_limit=SESSION_CONCURRENCY_LIMIT,
+            show_progress="full",
+            js=SET_EPISODE_LOAD_MODE_JS,
+            show_progress_on=[native_progress_host],
         ).then(
             fn=_phase_visibility_updates,
             inputs=[ui_phase_state],
@@ -1145,6 +1338,18 @@ def create_ui_blocks():
             fn=touch_session,
             inputs=[uid_state],
             outputs=[uid_state],
+            queue=False,
+            show_progress="hidden",
+        )
+        init_load.success(
+            fn=None,
+            js=RESET_EPISODE_LOAD_MODE_JS,
+            queue=False,
+            show_progress="hidden",
+        )
+        init_load.failure(
+            fn=None,
+            js=RESET_EPISODE_LOAD_MODE_JS,
             queue=False,
             show_progress="hidden",
         )

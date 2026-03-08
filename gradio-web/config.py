@@ -19,7 +19,7 @@ RIGHT_TOP_LOG_SCALE = 1
 UI_GLOBAL_FONT_SIZE = "24px"
 
 # Session / queue 配置
-SESSION_TIMEOUT = 5  # 30秒无用户主动操作后，交由 gr.State TTL 自动回收 session
+SESSION_TIMEOUT = 39999  # 30秒无用户主动操作后，交由 gr.State TTL 自动回收 session
 SESSION_CONCURRENCY_ID = "session_slots"
 SESSION_CONCURRENCY_LIMIT = 2
 
@@ -84,6 +84,10 @@ UI_TEXT = {
     "actions": {
         "point_required_suffix": " 🎯",
     },
+    "progress": {
+        "episode_loading": "The episode is loading...",
+        "queue_wait": "Lots of people are playing! Please wait...",
+    },
     "errors": {
         "load_missing_task": "Error loading task: missing current_task",
         "load_invalid_task": "Error loading task: invalid task payload",
@@ -108,12 +112,12 @@ UI_ACTION_TEXT_OVERRIDES = {
         "move backward-left": "move backward-left↗︎",
         "move backward-right": "move backward-right↖︎",
     },
-    # "RouteStick": {
-    #     "move to the nearest left target by circling around the stick clockwise": "move left clockwise↘︎→↗︎ ◟→◞",
-    #     "move to the nearest right target by circling around the stick clockwise": "move right clockwise↖︎←↙︎ ◟←◞",
-    #     "move to the nearest left target by circling around the stick counterclockwise": "move left counterclockwise↗︎→↘︎ ◜→◝",
-    #     "move to the nearest right target by circling around the stick counterclockwise": "move right counterclockwise↙︎←↖︎ ◜←◝",
-    # },
+    "RouteStick": {
+        "move to the nearest left target by circling around the stick clockwise": "move left clockwise↘︎→↗︎ ◟→◞",
+        "move to the nearest right target by circling around the stick clockwise": "move right clockwise↖︎←↙︎ ◟←◞",
+        "move to the nearest left target by circling around the stick counterclockwise": "move left counterclockwise↗︎→↘︎ ◜→◝",
+        "move to the nearest right target by circling around the stick counterclockwise": "move right counterclockwise↙︎←↖︎ ◜←◝",
+    },
 }
 
 ROUTESTICK_OVERLAY_ACTION_TEXTS = [

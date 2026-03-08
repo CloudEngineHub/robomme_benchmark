@@ -15,6 +15,7 @@ LOGGER = logging.getLogger("robomme.state_manager")
 
 # --- 全局会话存储 ---
 GLOBAL_SESSIONS = {}
+ACTIVE_SESSION_SLOTS = set()
 
 # --- 任务索引存储（用于进度显示） ---
 TASK_INDEX_MAP = {}  # {uid: {"task_index": int, "total_tasks": int}}
@@ -32,12 +33,59 @@ TASK_START_TIMES = {}  # {"{uid}:{env_id}:{episode_idx}": iso_timestamp}
 PLAY_BUTTON_CLICKED = {}  # {uid: bool}
 
 _state_lock = threading.Lock()
+_session_slot_condition = threading.Condition(_state_lock)
 
 
 def get_session(uid):
     """获取指定 uid 的 ProcessSessionProxy。"""
     with _state_lock:
         return GLOBAL_SESSIONS.get(uid)
+
+
+def reserve_session_slot(uid):
+    """
+    Block until a session slot is available for this uid.
+
+    Slots are held for the full lifetime of a ProcessSessionProxy and released
+    only after cleanup closes the worker process.
+    """
+    if not uid:
+        raise ValueError("Session uid cannot be empty")
+
+    from config import SESSION_CONCURRENCY_LIMIT
+
+    with _session_slot_condition:
+        if uid in ACTIVE_SESSION_SLOTS:
+            return
+        while len(ACTIVE_SESSION_SLOTS) >= int(SESSION_CONCURRENCY_LIMIT):
+            LOGGER.info(
+                "reserve_session_slot waiting uid=%s active_slots=%s limit=%s",
+                uid,
+                len(ACTIVE_SESSION_SLOTS),
+                SESSION_CONCURRENCY_LIMIT,
+            )
+            _session_slot_condition.wait(timeout=0.1)
+        ACTIVE_SESSION_SLOTS.add(uid)
+        LOGGER.info(
+            "reserve_session_slot acquired uid=%s active_slots=%s",
+            uid,
+            len(ACTIVE_SESSION_SLOTS),
+        )
+
+
+def release_session_slot(uid):
+    if not uid:
+        return
+
+    with _session_slot_condition:
+        if uid in ACTIVE_SESSION_SLOTS:
+            ACTIVE_SESSION_SLOTS.remove(uid)
+            LOGGER.info(
+                "release_session_slot uid=%s active_slots=%s",
+                uid,
+                len(ACTIVE_SESSION_SLOTS),
+            )
+            _session_slot_condition.notify_all()
 
 
 def create_session(uid):
@@ -49,11 +97,16 @@ def create_session(uid):
     if not uid:
         raise ValueError("Session uid cannot be empty")
 
-    with _state_lock:
-        session = GLOBAL_SESSIONS.get(uid)
-        if session is None:
-            session = ProcessSessionProxy()
-            GLOBAL_SESSIONS[uid] = session
+    reserve_session_slot(uid)
+    try:
+        with _state_lock:
+            session = GLOBAL_SESSIONS.get(uid)
+            if session is None:
+                session = ProcessSessionProxy()
+                GLOBAL_SESSIONS[uid] = session
+    except Exception:
+        release_session_slot(uid)
+        raise
     LOGGER.info("create_session uid=%s total_sessions=%s", uid, len(GLOBAL_SESSIONS))
     return uid
 
@@ -186,6 +239,7 @@ def cleanup_session(uid):
             LOGGER.info("cleanup_session uid=%s proxy closed", uid)
         except Exception as exc:
             LOGGER.exception("cleanup_session uid=%s proxy close failed: %s", uid, exc)
+    release_session_slot(uid)
 
     from user_manager import user_manager
 

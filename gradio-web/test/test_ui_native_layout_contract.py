@@ -36,8 +36,7 @@ def test_native_ui_css_uses_configured_global_font_size_variables(reload_module)
     assert f"--button-large-text-size: {config.UI_GLOBAL_FONT_SIZE} !important;" in css
     assert f"--section-header-text-size: {config.UI_GLOBAL_FONT_SIZE} !important;" in css
     assert f"--text-md: {config.UI_GLOBAL_FONT_SIZE} !important;" in css
-    assert "#loading_overlay_group h3" in css
-    assert f"font-size: {config.UI_GLOBAL_FONT_SIZE} !important;" in css
+    assert "#load_status_mode" not in css
 
 
 def test_native_ui_css_excludes_header_title_from_global_font_size(reload_module):
@@ -53,8 +52,7 @@ def test_native_ui_forces_light_theme_and_uses_light_overlay_baseline(reload_mod
     css = ui_layout.CSS
 
     assert "color-scheme: light !important;" in css
-    assert "background: rgba(255, 255, 255, 0.92) !important;" in css
-    assert "color: var(--body-text-color) !important;" in css
+    assert "#loading_overlay_group" not in css
     assert "body.dark," not in css
     assert ".dark," not in css
     assert ":root.dark" not in css
@@ -137,7 +135,6 @@ def test_native_ui_config_contains_phase_machine_and_precheck_chain(reload_modul
 
         required_ids = {
             "header_task",
-            "loading_overlay_group",
             "main_layout_row",
             "media_card",
             "log_card",
@@ -166,15 +163,13 @@ def test_native_ui_config_contains_phase_machine_and_precheck_chain(reload_modul
             if "value" in comp.get("props", {})
         ]
         assert all("_anchor" not in str(v) for v in values)
-        assert any(
-            "The episode is loading..." in str(v)
-            for v in values
-        )
         assert all(
             "Logging in and setting up environment... Please wait." not in str(v)
             for v in values
         )
         assert all("Loading environment, please wait..." not in str(v) for v in values)
+        assert "The episode is loading..." in ui_layout.PROGRESS_TEXT_REWRITE_JS
+        assert "Lots of people are playing! Please wait..." in ui_layout.PROGRESS_TEXT_REWRITE_JS
 
         log_output_comp = next(
             comp

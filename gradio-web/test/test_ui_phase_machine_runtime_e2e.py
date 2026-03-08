@@ -1043,9 +1043,6 @@ def test_unified_loading_overlay_init_flow(monkeypatch):
     fake_obs_img = Image.fromarray(fake_obs)
     calls = {"init": 0}
 
-    def fake_show_loading_info():
-        return gr.update(visible=True)
-
     def fake_init_app(_request=None):
         calls["init"] += 1
         time.sleep(0.8)
@@ -1068,11 +1065,9 @@ def test_unified_loading_overlay_init_flow(monkeypatch):
             gr.update(visible=True),   # action_phase_group
             gr.update(visible=True),   # control_panel_group
             gr.update(value="hint"),  # task_hint_display
-            gr.update(visible=False),  # loading_overlay
             gr.update(interactive=True),  # reference_action_btn
         )
 
-    monkeypatch.setattr(ui_layout, "show_loading_info", fake_show_loading_info)
     monkeypatch.setattr(ui_layout, "init_app", fake_init_app)
 
     demo = ui_layout.create_ui_blocks()
@@ -1098,26 +1093,29 @@ def test_unified_loading_overlay_init_flow(monkeypatch):
             page = browser.new_page(viewport={"width": 1280, "height": 900})
             page.goto(root_url, wait_until="domcontentloaded")
 
-            page.wait_for_selector("#loading_overlay_group", state="visible", timeout=2500)
-
-            overlay_text = page.evaluate(
-                """() => {
-                    const el = document.getElementById('loading_overlay_group');
-                    return el ? (el.textContent || '') : '';
-                }"""
-            )
             page.wait_for_function(
                 """() => {
-                    const heading = document.querySelector('#loading_overlay_group h3');
-                    return !!heading && getComputedStyle(heading).fontSize === '32px';
-                }""",
+                    const node = document.querySelector('.progress-text');
+                    return !!node && (node.textContent || '').includes('The episode is loading...');
+                }"""
+                ,
                 timeout=5000,
             )
-            assert canonical_copy in overlay_text
-            assert superseded_copy not in overlay_text
+            progress_text = page.evaluate(
+                """() => {
+                    const node = document.querySelector('.progress-text');
+                    return node ? (node.textContent || '') : '';
+                }"""
+            )
+            assert canonical_copy in progress_text
+            assert superseded_copy not in progress_text
             assert legacy_copy not in page.content()
+            assert page.locator("#loading_overlay_group").count() == 0
 
-            page.wait_for_selector("#loading_overlay_group", state="hidden", timeout=15000)
+            page.wait_for_function(
+                """() => !document.querySelector('.progress-text')""",
+                timeout=15000,
+            )
             page.wait_for_selector("#main_interface_root", state="visible", timeout=15000)
             page.wait_for_function(
                 """() => {
@@ -1167,7 +1165,6 @@ def test_no_video_task_hides_manual_demo_button(monkeypatch):
             gr.update(visible=True),  # action_phase_group
             gr.update(visible=True),  # control_panel_group
             gr.update(value="hint"),  # task_hint_display
-            gr.update(visible=False),  # loading_overlay
             gr.update(interactive=True),  # reference_action_btn
         )
 
@@ -1274,7 +1271,6 @@ def test_point_wait_state_pulses_live_obs_and_updates_system_log(monkeypatch):
             gr.update(visible=True),  # action_phase_group
             gr.update(visible=True),  # control_panel_group
             gr.update(value="hint"),  # task_hint_display
-            gr.update(visible=False),  # loading_overlay
             gr.update(interactive=True),  # reference_action_btn
         )
 
@@ -1499,7 +1495,6 @@ def test_reference_action_single_click_applies_coords_without_wait_state(monkeyp
             gr.update(visible=True),  # action_phase_group
             gr.update(visible=True),  # control_panel_group
             gr.update(value="hint"),  # task_hint_display
-            gr.update(visible=False),  # loading_overlay
             gr.update(interactive=True),  # reference_action_btn
         )
 
@@ -1651,7 +1646,6 @@ def test_live_obs_client_resize_fills_width_and_keeps_click_mapping(monkeypatch)
             gr.update(visible=True),  # action_phase_group
             gr.update(visible=True),  # control_panel_group
             gr.update(value="hint"),  # task_hint_display
-            gr.update(visible=False),  # loading_overlay
             gr.update(interactive=True),  # reference_action_btn
         )
 
@@ -1879,7 +1873,6 @@ def test_header_task_shows_env_after_init(monkeypatch):
             gr.update(visible=True),  # action_phase_group
             gr.update(visible=True),  # control_panel_group
             gr.update(value="hint"),  # task_hint_display
-            gr.update(visible=False),  # loading_overlay
             gr.update(interactive=True),  # reference_action_btn
         )
 
@@ -1950,7 +1943,6 @@ def test_header_goal_capitalizes_displayed_value_after_init(monkeypatch):
             gr.update(visible=True),  # action_phase_group
             gr.update(visible=True),  # control_panel_group
             gr.update(value="hint"),  # task_hint_display
-            gr.update(visible=False),  # loading_overlay
             gr.update(interactive=True),  # reference_action_btn
         )
 
@@ -2026,7 +2018,6 @@ def test_header_task_env_normalization_and_fallback(monkeypatch, task_info_text,
             gr.update(visible=True),  # action_phase_group
             gr.update(visible=True),  # control_panel_group
             gr.update(value="hint"),  # task_hint_display
-            gr.update(visible=False),  # loading_overlay
             gr.update(interactive=True),  # reference_action_btn
         )
 
@@ -2098,7 +2089,6 @@ def test_header_task_switch_to_video_task_shows_demo_phase(monkeypatch):
             gr.update(visible=not show_video),  # action_phase_group
             gr.update(visible=not show_video),  # control_panel_group
             gr.update(value="video hint" if show_video else "hint"),  # task_hint_display
-            gr.update(visible=False),  # loading_overlay
             gr.update(interactive=True),  # reference_action_btn
         )
 
