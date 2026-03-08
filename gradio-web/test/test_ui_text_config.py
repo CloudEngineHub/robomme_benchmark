@@ -83,6 +83,23 @@ def test_on_video_end_transition_uses_configured_action_prompt(monkeypatch, relo
     assert result[5] == "action_point"
 
 
+def test_on_execute_video_end_transition_preserves_log_and_restores_controls(reload_module):
+    callbacks = reload_module("gradio_callbacks")
+
+    result = callbacks.on_execute_video_end_transition("uid-1", False)
+
+    assert result[0]["visible"] is False
+    assert result[1]["visible"] is True
+    assert result[2]["visible"] is True
+    assert result[3]["interactive"] is True
+    assert result[4]["interactive"] is False
+    assert result[5]["interactive"] is True
+    assert result[6]["interactive"] is True
+    assert result[8]["interactive"] is True
+    assert result[9]["interactive"] is True
+    assert result[10] == "action_point"
+
+
 def test_on_demo_video_play_disables_button_and_sets_single_use_state(monkeypatch, reload_module):
     reload_module("config")
     callbacks = reload_module("gradio_callbacks")
@@ -234,11 +251,12 @@ def test_load_status_task_shows_demo_video_button_for_valid_video(monkeypatch, r
 
     assert result[7]["visible"] is True
     assert result[7]["value"] == str(video_path)
-    assert result[8]["visible"] is True
-    assert result[8]["interactive"] is True
-    assert result[14]["visible"] is True
-    assert result[15]["visible"] is False
+    assert result[8]["visible"] is False
+    assert result[9]["visible"] is True
+    assert result[9]["interactive"] is True
+    assert result[15]["visible"] is True
     assert result[16]["visible"] is False
+    assert result[17]["visible"] is False
     assert callbacks.UI_TEXT["log"]["demo_video_prompt"] in result[3]
 
 
@@ -268,10 +286,12 @@ def test_load_status_task_hides_demo_video_button_when_video_is_missing(monkeypa
 
     assert result[7]["visible"] is False
     assert result[8]["visible"] is False
-    assert result[8]["interactive"] is False
-    assert result[14]["visible"] is False
-    assert result[15]["visible"] is True
-    assert result[16]["visible"] is True
+    assert result[9]["visible"] is False
+    assert result[9]["interactive"] is False
+    assert result[15]["visible"] is False
+    assert result[16]["visible"] is False
+    assert result[17]["visible"] is True
+    assert result[18]["visible"] is True
     assert callbacks.UI_TEXT["log"]["action_selection_prompt"] in result[3]
 
 

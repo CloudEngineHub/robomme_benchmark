@@ -31,13 +31,13 @@ from gradio_callbacks import (
     load_next_task_wrapper,
     on_map_click,
     on_demo_video_play,
+    on_demo_video_end_transition,
+    on_execute_video_end_transition,
     on_option_select,
     on_reference_action,
-    on_video_end_transition,
     precheck_execute_inputs,
     restart_episode_wrapper,
     switch_env_wrapper,
-    switch_to_action_phase,
     switch_to_execute_phase,
     touch_session,
 )
@@ -740,12 +740,15 @@ button#watch_demo_video_btn {{
 #media_card > div,
 #media_card #action_phase_group,
 #media_card #video_phase_group,
+#media_card #execution_video_group,
 #media_card #live_obs,
 #media_card #live_obs button,
 #media_card #live_obs .image-frame,
 #media_card #live_obs img,
 #media_card #demo_video,
-#media_card #demo_video video {{
+#media_card #demo_video video,
+#media_card #execute_video,
+#media_card #execute_video video {{
     border-radius: var(--media-card-radius);
 }}
 
@@ -835,16 +838,17 @@ def render_header_goal(goal_text):
     return capitalize_first_letter(last_goal)
 
 
-def _phase_from_updates(main_interface_update, video_phase_update):
+def _phase_from_updates(main_interface_update, demo_video_phase_update):
     if isinstance(main_interface_update, dict) and main_interface_update.get("visible") is False:
         return PHASE_INIT
-    if isinstance(video_phase_update, dict) and video_phase_update.get("visible") is True:
+    if isinstance(demo_video_phase_update, dict) and demo_video_phase_update.get("visible") is True:
         return PHASE_DEMO_VIDEO
     return PHASE_ACTION_POINT
 
 
 def _with_phase_from_load(load_result):
-    phase = _phase_from_updates(load_result[1], load_result[14])
+    load_result = _normalize_load_result(load_result)
+    phase = _phase_from_updates(load_result[1], load_result[15])
     return (
         *load_result,
         phase,
@@ -853,6 +857,7 @@ def _with_phase_from_load(load_result):
 
 
 def _with_rejected_init(load_result, message):
+    load_result = _normalize_load_result(load_result)
     return (
         *load_result,
         PHASE_INIT,
@@ -860,20 +865,40 @@ def _with_rejected_init(load_result, message):
     )
 
 
+def _normalize_load_result(load_result):
+    if not isinstance(load_result, (tuple, list)):
+        return load_result
+    normalized = list(load_result)
+    if len(normalized) in {19, 20}:
+        normalized.insert(8, gr.update(value=None, visible=False, playback_position=0))
+        normalized.insert(16, gr.update(visible=False))
+    return tuple(normalized)
+
+
 def _phase_visibility_updates(phase):
-    if phase in {PHASE_DEMO_VIDEO, PHASE_EXECUTION_VIDEO}:
+    if phase == PHASE_DEMO_VIDEO:
         return (
             gr.update(visible=True),
             gr.update(visible=False),
             gr.update(visible=False),
+            gr.update(visible=False),
+        )
+    if phase == PHASE_EXECUTION_VIDEO:
+        return (
+            gr.update(visible=False),
+            gr.update(visible=True),
+            gr.update(visible=False),
+            gr.update(visible=True),
         )
     if phase == PHASE_ACTION_POINT:
         return (
+            gr.update(visible=False),
             gr.update(visible=False),
             gr.update(visible=True),
             gr.update(visible=True),
         )
     return (
+        gr.update(visible=False),
         gr.update(visible=False),
         gr.update(visible=False),
         gr.update(visible=False),
@@ -927,6 +952,7 @@ def create_ui_blocks():
             delete_callback=cleanup_user_session,
         )
         ui_phase_state = gr.State(value=PHASE_INIT)
+        post_execute_exec_interactive_state = gr.State(value=True)
         current_task_env_state = gr.State(value=None)
         suppress_next_option_change_state = gr.State(value=False)
 
@@ -960,6 +986,16 @@ def create_ui_blocks():
                                 interactive=False,
                                 visible=False,
                                 elem_id="watch_demo_video_btn",
+                            )
+
+                        with gr.Column(visible=False, elem_id="execution_video_group") as execution_video_group:
+                            execute_video_display = gr.Video(
+                                label="Execution Playback 🎬",
+                                interactive=False,
+                                elem_id="execute_video",
+                                autoplay=True,
+                                show_label=True,
+                                visible=True,
                             )
 
                         with gr.Column(visible=False, elem_id="action_phase_group") as action_phase_group:
@@ -1069,6 +1105,7 @@ def create_ui_blocks():
             goal_box,
             coords_box,
             video_display,
+            execute_video_display,
             watch_demo_video_btn,
             task_info_box,
             progress_info_box,
@@ -1076,6 +1113,7 @@ def create_ui_blocks():
             next_task_btn,
             exec_btn,
             video_phase_group,
+            execution_video_group,
             action_phase_group,
             control_panel_group,
             task_hint_display,
@@ -1085,6 +1123,7 @@ def create_ui_blocks():
         ]
         phase_visibility_outputs = [
             video_phase_group,
+            execution_video_group,
             action_phase_group,
             control_panel_group,
         ]
@@ -1312,7 +1351,7 @@ def create_ui_blocks():
         )
 
         video_display.end(
-            fn=on_video_end_transition,
+            fn=on_demo_video_end_transition,
             inputs=[uid_state, ui_phase_state],
             outputs=[
                 video_phase_group,
@@ -1332,7 +1371,7 @@ def create_ui_blocks():
             show_progress="hidden",
         )
         video_display.stop(
-            fn=on_video_end_transition,
+            fn=on_demo_video_end_transition,
             inputs=[uid_state, ui_phase_state],
             outputs=[
                 video_phase_group,
@@ -1340,6 +1379,57 @@ def create_ui_blocks():
                 control_panel_group,
                 log_output,
                 watch_demo_video_btn,
+                ui_phase_state,
+            ],
+            queue=False,
+            show_progress="hidden",
+        ).then(
+            fn=touch_session,
+            inputs=[uid_state],
+            outputs=[uid_state],
+            queue=False,
+            show_progress="hidden",
+        )
+
+        execute_video_display.end(
+            fn=on_execute_video_end_transition,
+            inputs=[uid_state, post_execute_exec_interactive_state],
+            outputs=[
+                execution_video_group,
+                action_phase_group,
+                control_panel_group,
+                options_radio,
+                exec_btn,
+                restart_episode_btn,
+                next_task_btn,
+                img_display,
+                reference_action_btn,
+                task_hint_display,
+                ui_phase_state,
+            ],
+            queue=False,
+            show_progress="hidden",
+        ).then(
+            fn=touch_session,
+            inputs=[uid_state],
+            outputs=[uid_state],
+            queue=False,
+            show_progress="hidden",
+        )
+        execute_video_display.stop(
+            fn=on_execute_video_end_transition,
+            inputs=[uid_state, post_execute_exec_interactive_state],
+            outputs=[
+                execution_video_group,
+                action_phase_group,
+                control_panel_group,
+                options_radio,
+                exec_btn,
+                restart_episode_btn,
+                next_task_btn,
+                img_display,
+                reference_action_btn,
+                task_hint_display,
                 ui_phase_state,
             ],
             queue=False,
@@ -1423,6 +1513,7 @@ def create_ui_blocks():
                 next_task_btn,
                 img_display,
                 reference_action_btn,
+                task_hint_display,
             ],
             queue=False,
             show_progress="hidden",
@@ -1443,14 +1534,15 @@ def create_ui_blocks():
                 restart_episode_btn,
                 next_task_btn,
                 exec_btn,
-                video_display,
-                watch_demo_video_btn,
-                video_phase_group,
+                execute_video_display,
                 action_phase_group,
                 control_panel_group,
+                execution_video_group,
                 options_radio,
                 coords_box,
                 reference_action_btn,
+                task_hint_display,
+                post_execute_exec_interactive_state,
                 ui_phase_state,
             ],
             show_progress="hidden",

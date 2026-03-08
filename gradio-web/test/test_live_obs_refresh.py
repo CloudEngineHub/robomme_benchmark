@@ -57,12 +57,14 @@ def test_execute_step_builds_video_from_last_execution_frames(monkeypatch, reloa
     assert [int(frame[0, 0, 0]) for frame in saved_frames] == [11, 22]
     assert suffix.startswith("execute_")
     assert result[7]["visible"] is True
-    assert result[7]["autoplay"] is True
+    assert result[8]["visible"] is False
     assert result[9]["visible"] is True
-    assert result[10]["visible"] is False
-    assert result[11]["visible"] is False
-    assert result[12]["value"] is None
-    assert result[15] == "execution_video"
+    assert result[10]["visible"] is True
+    assert result[11]["value"] is None
+    assert result[11]["interactive"] is False
+    assert result[14]["interactive"] is False
+    assert result[15] is True
+    assert result[16] == "execution_video"
 
 
 def test_execute_step_falls_back_to_single_frame_clip_when_no_new_frames(monkeypatch, reload_module):
@@ -95,7 +97,8 @@ def test_execute_step_falls_back_to_single_frame_clip_when_no_new_frames(monkeyp
     assert len(captured["frames"]) == 1
     assert int(captured["frames"][0][0, 0, 0]) == 33
     assert result[7]["visible"] is True
-    assert result[15] == "execution_video"
+    assert result[10]["visible"] is True
+    assert result[16] == "execution_video"
 
 
 def test_switch_phase_toggles_live_obs_interactive_without_refresh_queue(reload_module):
@@ -103,11 +106,12 @@ def test_switch_phase_toggles_live_obs_interactive_without_refresh_queue(reload_
     callbacks = reload_module("gradio_callbacks")
 
     to_exec = callbacks.switch_to_execute_phase("uid-3")
-    assert len(to_exec) == 6
+    assert len(to_exec) == 7
     assert to_exec[0].get("interactive") is False
     assert to_exec[4].get("interactive") is False
     assert to_exec[4].get("elem_classes") == config.get_live_obs_elem_classes()
     assert to_exec[5].get("interactive") is False
+    assert to_exec[6].get("interactive") is False
 
     to_action = callbacks.switch_to_action_phase()
     assert len(to_action) == 6

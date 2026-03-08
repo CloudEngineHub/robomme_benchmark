@@ -423,6 +423,7 @@ def test_execute_does_not_use_episode_loading_copy(monkeypatch):
             gr.update(interactive=False),
             gr.update(interactive=False),
             gr.update(interactive=False),
+            gr.update(interactive=False),
         )
 
     def fake_execute_step(uid, option_idx, coords_str):
@@ -435,14 +436,15 @@ def test_execute_does_not_use_episode_loading_copy(monkeypatch):
             gr.update(interactive=True),
             gr.update(interactive=True),
             gr.update(interactive=True),
-            gr.update(value=None, visible=False, autoplay=False, playback_position=0),
-            gr.update(visible=False, interactive=False),
+            gr.update(value=None, visible=False, playback_position=0),
+            gr.update(visible=True),
+            gr.update(visible=True),
             gr.update(visible=False),
-            gr.update(visible=True),
-            gr.update(visible=True),
             gr.update(choices=[("pick", 0)], value=None, interactive=True),
             "No need for coordinates",
             gr.update(interactive=True),
+            gr.update(interactive=True),
+            True,
             "action_point",
         )
 

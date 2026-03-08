@@ -251,41 +251,47 @@ def _read_phase_visibility(page) -> dict[str, bool | str | None]:
                 return st.display !== 'none' && st.visibility !== 'hidden' && el.getClientRects().length > 0;
             };
             const videoEl = document.querySelector('#demo_video video');
+            const executeVideoEl = document.querySelector('#execute_video video');
             return {
                 videoPhase: visible('video_phase_group'),
                 video: visible('demo_video'),
+                executionVideoPhase: visible('execution_video_group'),
+                executionVideo: visible('execute_video'),
                 watchButton: visible('watch_demo_video_btn'),
                 actionPhase: visible('action_phase_group'),
                 action: visible('live_obs'),
                 controlPhase: visible('control_panel_group'),
                 control: visible('action_radio'),
                 currentSrc: videoEl ? videoEl.currentSrc : null,
+                executeCurrentSrc: executeVideoEl ? executeVideoEl.currentSrc : null,
             };
         }"""
     )
 
 
-def _read_demo_video_controls(page) -> dict[str, bool | None]:
+def _read_demo_video_controls(page, elem_id: str = "demo_video", button_elem_id: str | None = "watch_demo_video_btn") -> dict[str, bool | None]:
     return page.evaluate(
-        """() => {
+        """({ elemId, buttonElemId }) => {
             const visible = (id) => {
+                if (!id) return false;
                 const el = document.getElementById(id);
                 if (!el) return false;
                 const st = getComputedStyle(el);
                 return st.display !== 'none' && st.visibility !== 'hidden' && el.getClientRects().length > 0;
             };
-            const videoEl = document.querySelector('#demo_video video');
-            const button =
-                document.querySelector('#watch_demo_video_btn button') ||
-                document.querySelector('button#watch_demo_video_btn');
+            const videoEl = document.querySelector(`#${elemId} video`);
+            const button = buttonElemId
+                ? (document.querySelector(`#${buttonElemId} button`) || document.querySelector(`button#${buttonElemId}`))
+                : null;
             return {
-                videoVisible: visible('demo_video'),
-                buttonVisible: visible('watch_demo_video_btn'),
+                videoVisible: visible(elemId),
+                buttonVisible: visible(buttonElemId),
                 buttonDisabled: button ? button.disabled : null,
                 autoplay: videoEl ? videoEl.autoplay : null,
                 paused: videoEl ? videoEl.paused : null,
             };
-        }"""
+        }""",
+        {"elemId": elem_id, "buttonElemId": button_elem_id},
     )
 
 
@@ -293,12 +299,12 @@ def _click_demo_video_button(page) -> None:
     page.locator("#watch_demo_video_btn button, button#watch_demo_video_btn").first.click()
 
 
-def _dispatch_video_event(page, event_name: str) -> bool:
+def _dispatch_video_event(page, event_name: str, elem_id: str = "demo_video") -> bool:
     return page.evaluate(
-        """(eventName) => {
+        """({ eventName, elemId }) => {
             const targets = [
-                document.querySelector('#demo_video video'),
-                document.getElementById('demo_video'),
+                document.querySelector(`#${elemId} video`),
+                document.getElementById(elemId),
             ].filter(Boolean);
             if (!targets.length) return false;
             for (const target of targets) {
@@ -306,7 +312,7 @@ def _dispatch_video_event(page, event_name: str) -> bool:
             }
             return true;
         }""",
-        event_name,
+        {"eventName": event_name, "elemId": elem_id},
     )
 
 
@@ -422,6 +428,7 @@ def phase_machine_ui_url():
     with gr.Blocks(title="Native phase machine test") as demo:
         gr.HTML(f"<style>{ui_layout.CSS}</style>")
         phase_state = gr.State("init")
+        post_execute_exec_state = gr.State(True)
 
         with gr.Column(visible=True, elem_id="login_group") as login_group:
             login_btn = gr.Button("Login", elem_id="login_btn")
@@ -435,6 +442,9 @@ def phase_machine_ui_url():
                     interactive=False,
                     visible=False,
                 )
+
+            with gr.Column(visible=False, elem_id="execution_video_group") as execution_video_group:
+                execute_video_display = gr.Video(value=None, elem_id="execute_video", autoplay=True)
 
             with gr.Column(visible=False, elem_id="action_phase_group") as action_phase_group:
                 img_display = gr.Image(value=np.zeros((24, 24, 3), dtype=np.uint8), elem_id="live_obs")
@@ -450,6 +460,7 @@ def phase_machine_ui_url():
                         interactive=False,
                     )
                     next_task_btn = gr.Button("Next Task", elem_id="next_task_btn")
+                task_hint_display = gr.Textbox(value="hint", interactive=True, elem_id="task_hint_display")
 
         log_output = gr.Markdown("", elem_id="log_output")
         simulate_stop_btn = gr.Button("Simulate Stop", elem_id="simulate_stop_btn")
@@ -472,6 +483,7 @@ def phase_machine_ui_url():
                 gr.update(visible=False),
                 gr.update(interactive=False),
                 gr.update(value="please click the point selection image"),
+                gr.update(visible=False),
                 "demo_video",
             )
 
@@ -493,6 +505,20 @@ def phase_machine_ui_url():
                 "action_point",
             )
 
+        def on_execute_video_end_fn(exec_enabled):
+            return (
+                gr.update(visible=False),
+                gr.update(visible=True),
+                gr.update(visible=True),
+                gr.update(interactive=True),
+                gr.update(interactive=bool(exec_enabled)),
+                gr.update(interactive=True),
+                gr.update(interactive=False),
+                gr.update(interactive=True),
+                gr.update(interactive=True),
+                "action_point",
+            )
+
         def precheck_fn(_option_idx, _coords):
             state["precheck_calls"] += 1
             if state["precheck_calls"] == 1:
@@ -505,22 +531,23 @@ def phase_machine_ui_url():
                 gr.update(interactive=False),
                 gr.update(interactive=False),
                 gr.update(interactive=False),
+                gr.update(interactive=False),
             )
 
         def execute_fn():
             time.sleep(0.8)
             return (
                 "executed",
-                gr.update(interactive=True),
-                gr.update(interactive=True),
-                gr.update(value=execution_video_path, visible=True, autoplay=True, playback_position=0),
-                gr.update(visible=False, interactive=False),
+                gr.update(visible=False),
+                gr.update(interactive=False),
+                gr.update(interactive=False),
+                gr.update(value=execution_video_path, visible=True, playback_position=0),
                 gr.update(visible=True),
-                gr.update(visible=False),
-                gr.update(visible=False),
-                gr.update(interactive=True),
+                gr.update(interactive=False),
                 "No need for coordinates",
-                gr.update(interactive=True),
+                gr.update(interactive=False),
+                gr.update(interactive=False),
+                True,
                 "execution_video",
             )
 
@@ -537,6 +564,7 @@ def phase_machine_ui_url():
                 action_buttons_row,
                 reference_action_btn,
                 coords_box,
+                execution_video_group,
                 phase_state,
             ],
             queue=False,
@@ -574,6 +602,40 @@ def phase_machine_ui_url():
             ],
             queue=False,
         )
+        execute_video_display.end(
+            fn=on_execute_video_end_fn,
+            inputs=[post_execute_exec_state],
+            outputs=[
+                execution_video_group,
+                action_phase_group,
+                control_panel_group,
+                options_radio,
+                exec_btn,
+                next_task_btn,
+                img_display,
+                reference_action_btn,
+                task_hint_display,
+                phase_state,
+            ],
+            queue=False,
+        )
+        execute_video_display.stop(
+            fn=on_execute_video_end_fn,
+            inputs=[post_execute_exec_state],
+            outputs=[
+                execution_video_group,
+                action_phase_group,
+                control_panel_group,
+                options_radio,
+                exec_btn,
+                next_task_btn,
+                img_display,
+                reference_action_btn,
+                task_hint_display,
+                phase_state,
+            ],
+            queue=False,
+        )
         simulate_stop_btn.click(
             fn=on_simulate_stop_fn,
             outputs=[log_output],
@@ -585,6 +647,8 @@ def phase_machine_ui_url():
                 };
                 show('video_phase_group', false);
                 show('demo_video', false);
+                show('execution_video_group', false);
+                show('execute_video', false);
                 show('action_phase_group', true);
                 show('live_obs', true);
                 show('control_panel_group', true);
@@ -615,22 +679,23 @@ def phase_machine_ui_url():
                 next_task_btn,
                 img_display,
                 reference_action_btn,
+                task_hint_display,
             ],
             queue=False,
         ).then(
             fn=execute_fn,
             outputs=[
                 log_output,
-                next_task_btn,
-                exec_btn,
-                video_display,
-                watch_demo_video_btn,
-                video_phase_group,
                 action_phase_group,
-                control_panel_group,
+                exec_btn,
+                next_task_btn,
+                execute_video_display,
+                execution_video_group,
                 options_radio,
                 coords_box,
                 reference_action_btn,
+                task_hint_display,
+                post_execute_exec_state,
                 phase_state,
             ],
             queue=False,
@@ -972,17 +1037,37 @@ def test_phase_machine_runtime_flow_and_execute_precheck(phase_machine_ui_url):
 
         page.wait_for_function(
             """() => {
-                const videoEl = document.querySelector('#demo_video video');
+                const videoEl = document.querySelector('#execute_video video');
                 return !!videoEl && videoEl.autoplay === true && (videoEl.paused === false || videoEl.currentTime > 0);
             }""",
             timeout=6000,
         )
-        execute_video_controls = _read_demo_video_controls(page)
-        assert execute_video_controls["videoVisible"] is True
+        execute_video_controls = _read_demo_video_controls(page, elem_id="execute_video", button_elem_id=None)
         assert execute_video_controls["autoplay"] is True
         assert execute_video_controls["paused"] is False
+        execute_phase_snapshot = _read_phase_visibility(page)
+        assert execute_phase_snapshot["actionPhase"] is False
+        assert execute_phase_snapshot["controlPhase"] is True
+        panel_snapshot = page.evaluate(
+            """() => {
+                const resolveButton = (id) => {
+                    return document.querySelector(`#${id} button`) || document.querySelector(`button#${id}`);
+                };
+                const radio = document.querySelector('#action_radio input[type="radio"]');
+                const refBtn = resolveButton('reference_action_btn');
+                const hint = document.querySelector('#task_hint_display textarea, #task_hint_display input');
+                return {
+                    radioDisabled: radio ? radio.disabled : null,
+                    refDisabled: refBtn ? refBtn.disabled : null,
+                    hintDisabled: hint ? hint.disabled : null,
+                };
+            }"""
+        )
+        assert panel_snapshot["radioDisabled"] is True
+        assert panel_snapshot["refDisabled"] is True
+        assert panel_snapshot["hintDisabled"] is True
 
-        did_dispatch_end = _dispatch_video_event(page, "ended")
+        did_dispatch_end = _dispatch_video_event(page, "ended", elem_id="execute_video")
         assert did_dispatch_end
 
         page.wait_for_function(
@@ -2523,6 +2608,7 @@ def test_phase_machine_runtime_local_video_path_end_transition():
         with gr.Blocks(title="Native phase machine local video test") as demo:
             uid_state = gr.State(value="uid-local-video")
             phase_state = gr.State(value="action_point")
+            post_execute_exec_state = gr.State(value=True)
             suppress_state = gr.State(value=False)
             with gr.Column(visible=True, elem_id="main_interface") as main_interface:
                 with gr.Column(visible=False, elem_id="video_phase_group") as video_phase_group:
@@ -2534,6 +2620,9 @@ def test_phase_machine_runtime_local_video_path_end_transition():
                         visible=False,
                     )
 
+                with gr.Column(visible=False, elem_id="execution_video_group") as execution_video_group:
+                    execute_video_display = gr.Video(value=None, elem_id="execute_video", autoplay=True)
+
                 with gr.Column(visible=True, elem_id="action_phase_group") as action_phase_group:
                     img_display = gr.Image(value=fake_obs.copy(), elem_id="live_obs")
 
@@ -2544,6 +2633,7 @@ def test_phase_machine_runtime_local_video_path_end_transition():
                     reference_action_btn = gr.Button("reference", interactive=True, elem_id="reference_action_btn")
                     restart_episode_btn = gr.Button("restart", interactive=True, elem_id="restart_episode_btn")
                     next_task_btn = gr.Button("next", interactive=True, elem_id="next_task_btn")
+                    task_hint_display = gr.Textbox("hint", interactive=True, elem_id="task_hint_display")
 
             log_output = gr.Markdown("", elem_id="log_output")
             task_info_box = gr.Textbox("")
@@ -2564,6 +2654,7 @@ def test_phase_machine_runtime_local_video_path_end_transition():
                     next_task_btn,
                     img_display,
                     reference_action_btn,
+                    task_hint_display,
                 ],
                 queue=False,
             ).then(
@@ -2577,14 +2668,15 @@ def test_phase_machine_runtime_local_video_path_end_transition():
                     restart_episode_btn,
                     next_task_btn,
                     exec_btn,
-                    video_display,
-                    watch_demo_video_btn,
-                    video_phase_group,
+                    execute_video_display,
                     action_phase_group,
                     control_panel_group,
+                    execution_video_group,
                     options_radio,
                     coords_box,
                     reference_action_btn,
+                    task_hint_display,
+                    post_execute_exec_state,
                     phase_state,
                 ],
                 queue=False,
@@ -2596,28 +2688,38 @@ def test_phase_machine_runtime_local_video_path_end_transition():
                 queue=False,
             )
 
-            video_display.end(
-                fn=cb.on_video_end_transition,
-                inputs=[uid_state, phase_state],
+            execute_video_display.end(
+                fn=cb.on_execute_video_end_transition,
+                inputs=[uid_state, post_execute_exec_state],
                 outputs=[
-                    video_phase_group,
+                    execution_video_group,
                     action_phase_group,
                     control_panel_group,
-                    log_output,
-                    watch_demo_video_btn,
+                    options_radio,
+                    exec_btn,
+                    restart_episode_btn,
+                    next_task_btn,
+                    img_display,
+                    reference_action_btn,
+                    task_hint_display,
                     phase_state,
                 ],
                 queue=False,
             )
-            video_display.stop(
-                fn=cb.on_video_end_transition,
-                inputs=[uid_state, phase_state],
+            execute_video_display.stop(
+                fn=cb.on_execute_video_end_transition,
+                inputs=[uid_state, post_execute_exec_state],
                 outputs=[
-                    video_phase_group,
+                    execution_video_group,
                     action_phase_group,
                     control_panel_group,
-                    log_output,
-                    watch_demo_video_btn,
+                    options_radio,
+                    exec_btn,
+                    restart_episode_btn,
+                    next_task_btn,
+                    img_display,
+                    reference_action_btn,
+                    task_hint_display,
                     phase_state,
                 ],
                 queue=False,
@@ -2644,7 +2746,7 @@ def test_phase_machine_runtime_local_video_path_end_transition():
                 page.wait_for_selector("#main_interface", state="visible", timeout=20000)
                 page.locator("#action_radio input[type='radio']").first.check(force=True)
                 page.locator("#exec_btn button, button#exec_btn").first.click()
-                page.wait_for_selector("#demo_video video", timeout=5000)
+                page.wait_for_selector("#execute_video video", timeout=5000)
                 page.wait_for_function(
                     """() => {
                         const visible = (id) => {
@@ -2653,13 +2755,12 @@ def test_phase_machine_runtime_local_video_path_end_transition():
                             const st = getComputedStyle(el);
                             return st.display !== 'none' && st.visibility !== 'hidden' && el.getClientRects().length > 0;
                         };
-                        const videoEl = document.querySelector('#demo_video video');
+                        const videoEl = document.querySelector('#execute_video video');
                         return (
-                            visible('video_phase_group') &&
-                            visible('demo_video') &&
-                            !visible('watch_demo_video_btn') &&
+                            visible('execution_video_group') &&
+                            visible('execute_video') &&
                             !visible('action_phase_group') &&
-                            !visible('control_panel_group') &&
+                            visible('control_panel_group') &&
                             !!videoEl &&
                             videoEl.autoplay === true &&
                             (videoEl.paused === false || videoEl.currentTime > 0)
@@ -2667,13 +2768,37 @@ def test_phase_machine_runtime_local_video_path_end_transition():
                     }""",
                     timeout=10000,
                 )
-                controls_after_execute = _read_demo_video_controls(page)
-                assert controls_after_execute["videoVisible"] is True
-                assert controls_after_execute["buttonVisible"] is False
+                controls_after_execute = _read_demo_video_controls(page, elem_id="execute_video", button_elem_id=None)
                 assert controls_after_execute["autoplay"] is True
                 assert controls_after_execute["paused"] is False
+                panel_snapshot = page.evaluate(
+                    """() => {
+                        const resolveButton = (id) => {
+                            return document.querySelector(`#${id} button`) || document.querySelector(`button#${id}`);
+                        };
+                        const radio = document.querySelector('#action_radio input[type="radio"]');
+                        const refBtn = resolveButton('reference_action_btn');
+                        const restartBtn = resolveButton('restart_episode_btn');
+                        const nextBtn = resolveButton('next_task_btn');
+                        const hint = document.querySelector('#task_hint_display textarea, #task_hint_display input');
+                        return {
+                            radioDisabled: radio ? radio.disabled : null,
+                            refDisabled: refBtn ? refBtn.disabled : null,
+                            restartDisabled: restartBtn ? restartBtn.disabled : null,
+                            nextDisabled: nextBtn ? nextBtn.disabled : null,
+                            hintDisabled: hint ? hint.disabled : null,
+                        };
+                    }"""
+                )
+                assert panel_snapshot == {
+                    "radioDisabled": True,
+                    "refDisabled": True,
+                    "restartDisabled": True,
+                    "nextDisabled": True,
+                    "hintDisabled": True,
+                }
 
-                did_dispatch_end = _dispatch_video_event(page, "ended")
+                did_dispatch_end = _dispatch_video_event(page, "ended", elem_id="execute_video")
                 assert did_dispatch_end
 
                 page.wait_for_function(
@@ -2687,8 +2812,8 @@ def test_phase_machine_runtime_local_video_path_end_transition():
                         return (
                             visible('live_obs') &&
                             visible('action_radio') &&
-                            !visible('demo_video') &&
-                            !visible('watch_demo_video_btn')
+                            !visible('execute_video') &&
+                            visible('control_panel_group')
                         );
                     }""",
                     timeout=2000,
