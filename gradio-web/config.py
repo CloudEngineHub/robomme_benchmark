@@ -63,7 +63,7 @@ DEMO_VIDEO_ENV_IDS = [
 
 UI_TEXT = {
     "log": {
-        "action_selection_prompt": "Please select the action.\nActions with 🎯 need to select a point on the image as input",
+        "action_selection_prompt": "Please select the action.\n \nActions with 🎯 need to select a point on the image as input",
         "point_selection_prompt": "Current action needs location input, please click on the image to select key pixel",
         "point_selected_message": "Select: {label} | point <{x}, {y}>",
         "execute_action_prompt": "Executing: {label}",
