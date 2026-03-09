@@ -2556,7 +2556,7 @@ def test_header_task_switch_to_video_task_shows_demo_phase(monkeypatch):
         demo.close()
 
 
-def test_phase_machine_runtime_local_video_path_end_transition():
+def _run_local_execute_video_transition_test(*, status_text, done, expect_terminal_buttons_disabled):
     import gradio_callbacks as cb
     import config as config_module
 
@@ -2590,7 +2590,7 @@ def test_phase_machine_runtime_local_video_path_end_transition():
             _ = option_idx, click_coords
             self.last_execution_frames = [fake_obs.copy() for _ in range(3)]
             self.base_frames.extend(self.last_execution_frames)
-            return fake_obs.copy(), "Executing: pick", False
+            return fake_obs.copy(), status_text, done
 
     originals = {
         "get_session": cb.get_session,
@@ -2608,7 +2608,12 @@ def test_phase_machine_runtime_local_video_path_end_transition():
         with gr.Blocks(title="Native phase machine local video test") as demo:
             uid_state = gr.State(value="uid-local-video")
             phase_state = gr.State(value="action_point")
-            post_execute_exec_state = gr.State(value=True)
+            post_execute_controls_state = gr.State(
+                value={
+                    "exec_btn_interactive": True,
+                    "reference_action_interactive": True,
+                }
+            )
             suppress_state = gr.State(value=False)
             with gr.Column(visible=True, elem_id="main_interface") as main_interface:
                 with gr.Column(visible=False, elem_id="video_phase_group") as video_phase_group:
@@ -2676,7 +2681,7 @@ def test_phase_machine_runtime_local_video_path_end_transition():
                     coords_box,
                     reference_action_btn,
                     task_hint_display,
-                    post_execute_exec_state,
+                    post_execute_controls_state,
                     phase_state,
                 ],
                 queue=False,
@@ -2690,7 +2695,7 @@ def test_phase_machine_runtime_local_video_path_end_transition():
 
             execute_video_display.end(
                 fn=cb.on_execute_video_end_transition,
-                inputs=[uid_state, post_execute_exec_state],
+                inputs=[uid_state, post_execute_controls_state],
                 outputs=[
                     execution_video_group,
                     action_phase_group,
@@ -2708,7 +2713,7 @@ def test_phase_machine_runtime_local_video_path_end_transition():
             )
             execute_video_display.stop(
                 fn=cb.on_execute_video_end_transition,
-                inputs=[uid_state, post_execute_exec_state],
+                inputs=[uid_state, post_execute_controls_state],
                 outputs=[
                     execution_video_group,
                     action_phase_group,
@@ -2818,30 +2823,66 @@ def test_phase_machine_runtime_local_video_path_end_transition():
                     }""",
                     timeout=2000,
                 )
-                page.locator("#action_radio input[type='radio']").nth(1).check(force=True)
-                page.wait_for_function(
-                    """(state) => {
-                        const liveObs = document.getElementById('live_obs');
-                        const coordsRoot = document.getElementById('coords_box');
-                        const coordsField = coordsRoot?.querySelector('textarea, input');
-                        const logRoot = document.getElementById('log_output');
-                        const logField = logRoot?.querySelector('textarea, input');
-                        const coordsValue = coordsField ? coordsField.value.trim() : '';
-                        const logValue = logField ? logField.value.trim() : (logRoot?.textContent || '').trim();
-                        return (
-                            !!liveObs &&
-                            liveObs.classList.contains(state.waitClass) &&
-                            coordsValue === state.coordsPrompt &&
-                            logValue === state.waitLog
-                        );
-                    }""",
-                    arg={
-                        "waitClass": config_module.LIVE_OBS_POINT_WAIT_CLASS,
-                        "coordsPrompt": config_module.UI_TEXT["coords"]["select_point"],
-                        "waitLog": config_module.UI_TEXT["log"]["point_selection_prompt"],
-                    },
-                    timeout=5000,
-                )
+                if expect_terminal_buttons_disabled:
+                    button_snapshot = page.evaluate(
+                        """() => {
+                            const resolveButton = (id) => {
+                                return document.querySelector(`#${id} button`) || document.querySelector(`button#${id}`);
+                            };
+                            const execBtn = resolveButton('exec_btn');
+                            const refBtn = resolveButton('reference_action_btn');
+                            return {
+                                execDisabled: execBtn ? execBtn.disabled : null,
+                                refDisabled: refBtn ? refBtn.disabled : null,
+                            };
+                        }"""
+                    )
+                    assert button_snapshot == {
+                        "execDisabled": True,
+                        "refDisabled": True,
+                    }
+                else:
+                    button_snapshot = page.evaluate(
+                        """() => {
+                            const resolveButton = (id) => {
+                                return document.querySelector(`#${id} button`) || document.querySelector(`button#${id}`);
+                            };
+                            const execBtn = resolveButton('exec_btn');
+                            const refBtn = resolveButton('reference_action_btn');
+                            return {
+                                execDisabled: execBtn ? execBtn.disabled : null,
+                                refDisabled: refBtn ? refBtn.disabled : null,
+                            };
+                        }"""
+                    )
+                    assert button_snapshot == {
+                        "execDisabled": False,
+                        "refDisabled": False,
+                    }
+                    page.locator("#action_radio input[type='radio']").nth(1).check(force=True)
+                    page.wait_for_function(
+                        """(state) => {
+                            const liveObs = document.getElementById('live_obs');
+                            const coordsRoot = document.getElementById('coords_box');
+                            const coordsField = coordsRoot?.querySelector('textarea, input');
+                            const logRoot = document.getElementById('log_output');
+                            const logField = logRoot?.querySelector('textarea, input');
+                            const coordsValue = coordsField ? coordsField.value.trim() : '';
+                            const logValue = logField ? logField.value.trim() : (logRoot?.textContent || '').trim();
+                            return (
+                                !!liveObs &&
+                                liveObs.classList.contains(state.waitClass) &&
+                                coordsValue === state.coordsPrompt &&
+                                logValue === state.waitLog
+                            );
+                        }""",
+                        arg={
+                            "waitClass": config_module.LIVE_OBS_POINT_WAIT_CLASS,
+                            "coordsPrompt": config_module.UI_TEXT["coords"]["select_point"],
+                            "waitLog": config_module.UI_TEXT["log"]["point_selection_prompt"],
+                        },
+                        timeout=5000,
+                    )
 
                 browser.close()
         finally:
@@ -2851,3 +2892,27 @@ def test_phase_machine_runtime_local_video_path_end_transition():
     finally:
         for name, value in originals.items():
             setattr(cb, name, value)
+
+
+def test_phase_machine_runtime_local_video_path_end_transition():
+    _run_local_execute_video_transition_test(
+        status_text="Executing: pick",
+        done=False,
+        expect_terminal_buttons_disabled=False,
+    )
+
+
+def test_phase_machine_runtime_local_video_path_end_transition_terminal_success():
+    _run_local_execute_video_transition_test(
+        status_text="SUCCESS",
+        done=True,
+        expect_terminal_buttons_disabled=True,
+    )
+
+
+def test_phase_machine_runtime_local_video_path_end_transition_terminal_failed():
+    _run_local_execute_video_transition_test(
+        status_text="Executing: pick | FAILED",
+        done=True,
+        expect_terminal_buttons_disabled=True,
+    )

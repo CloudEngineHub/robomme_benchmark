@@ -952,7 +952,12 @@ def create_ui_blocks():
             delete_callback=cleanup_user_session,
         )
         ui_phase_state = gr.State(value=PHASE_INIT)
-        post_execute_exec_interactive_state = gr.State(value=True)
+        post_execute_controls_state = gr.State(
+            value={
+                "exec_btn_interactive": True,
+                "reference_action_interactive": True,
+            }
+        )
         current_task_env_state = gr.State(value=None)
         suppress_next_option_change_state = gr.State(value=False)
 
@@ -1393,7 +1398,7 @@ def create_ui_blocks():
 
         execute_video_display.end(
             fn=on_execute_video_end_transition,
-            inputs=[uid_state, post_execute_exec_interactive_state],
+            inputs=[uid_state, post_execute_controls_state],
             outputs=[
                 execution_video_group,
                 action_phase_group,
@@ -1418,7 +1423,7 @@ def create_ui_blocks():
         )
         execute_video_display.stop(
             fn=on_execute_video_end_transition,
-            inputs=[uid_state, post_execute_exec_interactive_state],
+            inputs=[uid_state, post_execute_controls_state],
             outputs=[
                 execution_video_group,
                 action_phase_group,
@@ -1542,7 +1547,7 @@ def create_ui_blocks():
                 coords_box,
                 reference_action_btn,
                 task_hint_display,
-                post_execute_exec_interactive_state,
+                post_execute_controls_state,
                 ui_phase_state,
             ],
             show_progress="hidden",

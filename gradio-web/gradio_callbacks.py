@@ -423,23 +423,40 @@ def on_video_end_transition(uid, ui_phase=None):
     return on_demo_video_end_transition(uid, ui_phase)
 
 
-def on_execute_video_end_transition(uid, exec_btn_interactive=True):
+def _normalize_post_execute_controls_state(state):
+    """Normalize legacy bool and dict payloads for execute-video exit transitions."""
+    if isinstance(state, dict):
+        exec_interactive = bool(state.get("exec_btn_interactive", True))
+        reference_interactive = bool(state.get("reference_action_interactive", True))
+        return {
+            "exec_btn_interactive": exec_interactive,
+            "reference_action_interactive": reference_interactive,
+        }
+    legacy_exec_interactive = bool(state)
+    return {
+        "exec_btn_interactive": legacy_exec_interactive,
+        "reference_action_interactive": legacy_exec_interactive,
+    }
+
+
+def on_execute_video_end_transition(uid, post_execute_controls_state=True):
     """Transition from execute video phase back to the action phase."""
+    controls_state = _normalize_post_execute_controls_state(post_execute_controls_state)
     LOGGER.debug(
-        "on_execute_video_end_transition uid=%s exec_btn_interactive=%s",
+        "on_execute_video_end_transition uid=%s controls_state=%s",
         _uid_for_log(uid),
-        exec_btn_interactive,
+        controls_state,
     )
     return (
         gr.update(visible=False),  # execution_video_group
         gr.update(visible=True),   # action_phase_group
         gr.update(visible=True),   # control_panel_group
         gr.update(interactive=True),  # options_radio
-        gr.update(interactive=bool(exec_btn_interactive)),  # exec_btn
+        gr.update(interactive=controls_state["exec_btn_interactive"]),  # exec_btn
         gr.update(interactive=True),  # restart_episode_btn
         gr.update(interactive=True),  # next_task_btn
         _live_obs_update(interactive=False),  # img_display
-        gr.update(interactive=True),  # reference_action_btn
+        gr.update(interactive=controls_state["reference_action_interactive"]),  # reference_action_btn
         gr.update(interactive=True),  # task_hint_display
         "action_point",  # ui_phase_state
     )
@@ -1045,7 +1062,7 @@ def execute_step(uid, option_idx, coords_str):
         coords_update=None,
         reference_update=gr.update(interactive=True),
         task_hint_update=gr.update(interactive=True),
-        post_execute_exec_interactive=True,
+        post_execute_controls_state=None,
         show_execution_video=False,
         ui_phase="action_point",
     ):
@@ -1053,6 +1070,14 @@ def execute_step(uid, option_idx, coords_str):
             execute_video_update = gr.update(value=None, visible=False, playback_position=0)
         if coords_update is None:
             coords_update = _ui_text("coords", "not_needed")
+        if post_execute_controls_state is None:
+            post_execute_controls_state = {
+                "exec_btn_interactive": True,
+                "reference_action_interactive": True,
+            }
+        normalized_post_execute_controls_state = _normalize_post_execute_controls_state(
+            post_execute_controls_state
+        )
         return (
             img_update,
             log_update,
@@ -1069,7 +1094,7 @@ def execute_step(uid, option_idx, coords_str):
             coords_update,
             reference_update,
             task_hint_update,
-            bool(post_execute_exec_interactive),
+            normalized_post_execute_controls_state,
             ui_phase,
         )
 
@@ -1085,7 +1110,10 @@ def execute_step(uid, option_idx, coords_str):
             options_update=gr.update(interactive=False),
             reference_update=gr.update(interactive=False),
             task_hint_update=gr.update(interactive=False),
-            post_execute_exec_interactive=False,
+            post_execute_controls_state={
+                "exec_btn_interactive": False,
+                "reference_action_interactive": False,
+            },
             show_execution_video=False,
         )
 
@@ -1128,7 +1156,10 @@ def execute_step(uid, option_idx, coords_str):
             options_update=gr.update(choices=_build_radio_choices(session), value=None, interactive=True),
             reference_update=gr.update(interactive=True),
             task_hint_update=gr.update(interactive=True),
-            post_execute_exec_interactive=True,
+            post_execute_controls_state={
+                "exec_btn_interactive": True,
+                "reference_action_interactive": True,
+            },
             show_execution_video=False,
         )
 
@@ -1153,7 +1184,10 @@ def execute_step(uid, option_idx, coords_str):
                 coords_update=coords_str,
                 reference_update=gr.update(interactive=True),
                 task_hint_update=gr.update(interactive=True),
-                post_execute_exec_interactive=True,
+                post_execute_controls_state={
+                    "exec_btn_interactive": True,
+                    "reference_action_interactive": True,
+                },
                 show_execution_video=False,
             )
 
@@ -1288,13 +1322,16 @@ def execute_step(uid, option_idx, coords_str):
     execute_video_update = _build_execution_video_update(uid, session)
     show_execution_video = execute_video_update.get("visible") is True
     radio_choices = _build_radio_choices(session)
-    post_execute_exec_interactive = not done
+    post_execute_controls_state = {
+        "exec_btn_interactive": not done,
+        "reference_action_interactive": not done,
+    }
     restart_episode_update = gr.update(interactive=False) if show_execution_video else gr.update(interactive=True)
     next_task_update = gr.update(interactive=False) if show_execution_video else gr.update(interactive=True)
     exec_btn_update = (
         gr.update(interactive=False)
         if show_execution_video
-        else gr.update(interactive=post_execute_exec_interactive)
+        else gr.update(interactive=post_execute_controls_state["exec_btn_interactive"])
     )
     options_update = gr.update(
         choices=radio_choices,
@@ -1308,12 +1345,12 @@ def execute_step(uid, option_idx, coords_str):
     # 格式化日志消息为 HTML 格式（支持颜色显示）
     formatted_status = format_log_markdown(status)
     LOGGER.debug(
-        "execute_step done uid=%s env=%s ep=%s done=%s exec_btn_interactive=%s show_execution_video=%s",
+        "execute_step done uid=%s env=%s ep=%s done=%s post_execute_controls=%s show_execution_video=%s",
         _uid_for_log(uid),
         getattr(session, "env_id", None),
         getattr(session, "episode_idx", None),
         done,
-        not done,
+        post_execute_controls_state,
         show_execution_video,
     )
 
@@ -1330,7 +1367,7 @@ def execute_step(uid, option_idx, coords_str):
         coords_update=coords_update,
         reference_update=reference_update,
         task_hint_update=task_hint_update,
-        post_execute_exec_interactive=post_execute_exec_interactive,
+        post_execute_controls_state=post_execute_controls_state,
         show_execution_video=show_execution_video,
         ui_phase="execution_video" if show_execution_video else "action_point",
     )

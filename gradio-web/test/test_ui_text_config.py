@@ -83,10 +83,39 @@ def test_on_video_end_transition_uses_configured_action_prompt(monkeypatch, relo
     assert result[5] == "action_point"
 
 
-def test_on_execute_video_end_transition_preserves_log_and_restores_controls(reload_module):
+def test_on_execute_video_end_transition_restores_controls_for_non_terminal_state(reload_module):
     callbacks = reload_module("gradio_callbacks")
 
-    result = callbacks.on_execute_video_end_transition("uid-1", False)
+    result = callbacks.on_execute_video_end_transition(
+        "uid-1",
+        {
+            "exec_btn_interactive": True,
+            "reference_action_interactive": True,
+        },
+    )
+
+    assert result[0]["visible"] is False
+    assert result[1]["visible"] is True
+    assert result[2]["visible"] is True
+    assert result[3]["interactive"] is True
+    assert result[4]["interactive"] is True
+    assert result[5]["interactive"] is True
+    assert result[6]["interactive"] is True
+    assert result[8]["interactive"] is True
+    assert result[9]["interactive"] is True
+    assert result[10] == "action_point"
+
+
+def test_on_execute_video_end_transition_keeps_terminal_buttons_disabled(reload_module):
+    callbacks = reload_module("gradio_callbacks")
+
+    result = callbacks.on_execute_video_end_transition(
+        "uid-1",
+        {
+            "exec_btn_interactive": False,
+            "reference_action_interactive": False,
+        },
+    )
 
     assert result[0]["visible"] is False
     assert result[1]["visible"] is True
@@ -95,7 +124,7 @@ def test_on_execute_video_end_transition_preserves_log_and_restores_controls(rel
     assert result[4]["interactive"] is False
     assert result[5]["interactive"] is True
     assert result[6]["interactive"] is True
-    assert result[8]["interactive"] is True
+    assert result[8]["interactive"] is False
     assert result[9]["interactive"] is True
     assert result[10] == "action_point"
 
