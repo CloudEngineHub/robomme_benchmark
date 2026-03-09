@@ -7,7 +7,7 @@ from PIL import Image
 class _FakeOptionSession:
     def __init__(self, env_id="BinFill", raw_solve_options=None):
         self.env_id = env_id
-        self.raw_solve_options = raw_solve_options or [{"available": True}]
+        self.raw_solve_options = raw_solve_options or [{"label": "a", "available": True}]
 
     def get_pil_image(self, use_segmented=False):
         _ = use_segmented
@@ -50,6 +50,24 @@ def test_on_option_select_uses_configured_select_point_and_log_messages(monkeypa
     assert log_text == "custom log prompt from config"
     assert suppress_flag is False
     assert log_state == callbacks._default_post_execute_log_state()
+
+
+def test_on_map_click_uses_configured_selected_point_log(monkeypatch, reload_module):
+    reload_module("config")
+    callbacks = reload_module("gradio_callbacks")
+
+    monkeypatch.setitem(
+        callbacks.UI_TEXT["log"],
+        "point_selected_message",
+        "picked {label} @ <{x}, {y}>",
+    )
+    monkeypatch.setattr(callbacks, "get_session", lambda uid: _FakeOptionSession())
+
+    event = type("Evt", (), {"index": (7, 9)})()
+    _img, coords_text, log_text = callbacks.on_map_click("uid-1", 0, event)
+
+    assert coords_text == "7, 9"
+    assert log_text == "picked A @ <7, 9>"
 
 
 def test_precheck_execute_inputs_uses_configured_before_execute_message(monkeypatch, reload_module):

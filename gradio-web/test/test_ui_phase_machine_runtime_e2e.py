@@ -1559,7 +1559,10 @@ def test_point_wait_state_pulses_live_obs_and_updates_system_log(monkeypatch):
     fake_obs_img = Image.fromarray(fake_obs)
 
     class FakeSession:
-        raw_solve_options = [{"available": [object()]}, {"available": False}]
+        raw_solve_options = [
+            {"label": "a", "available": [object()]},
+            {"label": "b", "available": False},
+        ]
 
         def get_pil_image(self, use_segmented=False):
             _ = use_segmented
@@ -1714,12 +1717,12 @@ def test_point_wait_state_pulses_live_obs_and_updates_system_log(monkeypatch):
                         !!liveObs &&
                         !liveObs.classList.contains(state.waitClass) &&
                         /^\\d+\\s*,\\s*\\d+$/.test(coordsValue) &&
-                        logValue === state.actionLog
+                        logValue === `Select: ${state.label} | point <${coordsValue}>`
                     );
                 }""",
                 arg={
                     "waitClass": config_module.LIVE_OBS_POINT_WAIT_CLASS,
-                    "actionLog": config_module.UI_TEXT["log"]["action_selection_prompt"],
+                    "label": "A",
                 },
                 timeout=5000,
             )
@@ -1733,7 +1736,11 @@ def test_point_wait_state_pulses_live_obs_and_updates_system_log(monkeypatch):
             assert final_classes is not None
             assert config_module.LIVE_OBS_POINT_WAIT_CLASS not in final_classes
             assert config_module.LIVE_OBS_BASE_CLASS in final_classes
-            assert _read_log_output_value(page) == config_module.UI_TEXT["log"]["action_selection_prompt"]
+            assert _read_log_output_value(page) == config_module.UI_TEXT["log"]["point_selected_message"].format(
+                label="A",
+                x=coord_x,
+                y=coord_y,
+            )
             final_card_wait = _read_media_card_wait_snapshot(page)
             final_transforms = _read_live_obs_transform_snapshot(page)
             assert final_card_wait["opacity"] == 0
@@ -2805,9 +2812,9 @@ def _run_local_execute_video_transition_test(
                         const logField = logRoot?.querySelector('textarea, input');
                         const coordsValue = coordsField ? coordsField.value.trim() : '';
                         const logValue = logField ? logField.value.trim() : (logRoot?.textContent || '').trim();
-                        return /^\\d+\\s*,\\s*\\d+$/.test(coordsValue) && logValue === state.actionLog;
+                        return /^\\d+\\s*,\\s*\\d+$/.test(coordsValue) && logValue === `Select: ${state.label} | point <${coordsValue}>`;
                     }""",
-                    arg={"actionLog": config_module.UI_TEXT["log"]["action_selection_prompt"]},
+                    arg={"label": "B"},
                     timeout=5000,
                 )
                 page.locator("#exec_btn button, button#exec_btn").first.click()

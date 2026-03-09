@@ -100,6 +100,17 @@ def _default_post_execute_log_state():
     }
 
 
+def _point_selected_log(session, option_value, x, y):
+    label = _get_raw_option_label(session, option_value)
+    if label:
+        display_label = _format_choice_prefix(label)
+    else:
+        display_label = str(option_value).strip() if option_value is not None else "?"
+    return format_log_markdown(
+        _ui_text("log", "point_selected_message", label=display_label, x=int(x), y=int(y))
+    )
+
+
 def _normalize_post_execute_log_state(state):
     """Normalize terminal-log preservation payloads across callback boundaries."""
     if isinstance(state, dict):
@@ -912,7 +923,11 @@ def on_map_click(uid, option_value, evt: gr.SelectData):
     
     coords_str = f"{x}, {y}"
     
-    return _live_obs_update(value=marked_img, interactive=True), coords_str, _action_selection_log()
+    return (
+        _live_obs_update(value=marked_img, interactive=True),
+        coords_str,
+        _point_selected_log(session, option_value, x, y),
+    )
 
 
 def _is_valid_coords_text(coords_text: str) -> bool:

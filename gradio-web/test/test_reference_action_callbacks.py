@@ -17,7 +17,7 @@ class _FakeSession:
 
 class _FakeOptionSession:
     def __init__(self):
-        self.raw_solve_options = [{"available": [object()]}]
+        self.raw_solve_options = [{"label": "a", "available": [object()]}]
         self.available_options = [("pick", 0)]
 
     def get_pil_image(self, use_segmented=True):
@@ -144,7 +144,7 @@ def test_on_option_select_suppresses_programmatic_reference_change(reload_module
     assert log_state == callbacks._default_post_execute_log_state()
 
 
-def test_on_map_click_clears_wait_state_and_restores_action_prompt(monkeypatch, reload_module):
+def test_on_map_click_updates_log_with_selected_option_and_coords(monkeypatch, reload_module):
     config = reload_module("config")
     callbacks = reload_module("gradio_callbacks")
 
@@ -159,7 +159,11 @@ def test_on_map_click_clears_wait_state_and_restores_action_prompt(monkeypatch, 
     assert _is_fluorescent_yellow(img_update["value"].getpixel((5, 6)))
     assert img_update.get("elem_classes") == config.get_live_obs_elem_classes()
     assert coords_text == "5, 6"
-    assert log_text == config.UI_TEXT["log"]["action_selection_prompt"]
+    assert log_text == config.UI_TEXT["log"]["point_selected_message"].format(
+        label="A",
+        x=5,
+        y=6,
+    )
 
 
 def test_on_reference_action_uses_configured_action_text_override(monkeypatch, reload_module):
