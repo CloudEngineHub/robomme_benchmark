@@ -1548,9 +1548,9 @@ def create_ui_blocks():
             show_progress="hidden",
             **action_queue_kwargs,
         ).then(
-            fn=touch_session,
-            inputs=[uid_state],
-            outputs=[uid_state],
+            fn=_phase_visibility_updates,
+            inputs=[ui_phase_state],
+            outputs=phase_visibility_outputs,
             queue=False,
             show_progress="hidden",
         )
