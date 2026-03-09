@@ -7,7 +7,7 @@ My cool model leverages a novel representation for history keyframes and maintai
 
 ## Results 
 
-> We ask for **at least three runs** with different model seeds to decrease the performance fluctuations.
+> We evaluate in a multi-task setting, using a single model checkpoint for all tasks, and require at least three runs with different random seeds to reduce performance variance. 
 > The benchmark seed is fixed internally.
 
 ### Table
