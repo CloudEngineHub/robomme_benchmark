@@ -271,6 +271,23 @@ def capitalize_first_letter(text: str) -> str:
     return text[0].upper() + text[1:]
 
 
+def _format_choice_prefix(text: str) -> str:
+    """Display multi-choice labels like a/b/c/d as uppercase without changing action text."""
+    if not isinstance(text, str):
+        return text
+
+    stripped = text.strip()
+    if not stripped:
+        return stripped
+
+    prefix, dot, rest = stripped.partition(".")
+    if dot and prefix.isalpha() and len(prefix) <= 4:
+        return f"{prefix.upper()}.{rest}"
+    if stripped.isalpha() and len(stripped) <= 4:
+        return stripped.upper()
+    return stripped
+
+
 
 
 def _ui_option_label(session, opt_label: str, opt_idx: int) -> str:
@@ -282,19 +299,19 @@ def _ui_option_label(session, opt_label: str, opt_idx: int) -> str:
     try:
         option_index = int(opt_idx)
     except (TypeError, ValueError):
-        return opt_label
+        return _format_choice_prefix(opt_label)
 
     raw_solve_options = getattr(session, "raw_solve_options", None)
     if not isinstance(raw_solve_options, list):
-        return opt_label
+        return _format_choice_prefix(opt_label)
     if not (0 <= option_index < len(raw_solve_options)):
-        return opt_label
+        return _format_choice_prefix(opt_label)
 
     raw_option = raw_solve_options[option_index]
     if not isinstance(raw_option, dict):
-        return opt_label
+        return _format_choice_prefix(opt_label)
 
-    raw_label = str(raw_option.get("label", "")).strip()
+    raw_label = _format_choice_prefix(str(raw_option.get("label", "")).strip())
     raw_action = str(raw_option.get("action", "")).strip()
     mapped_action = get_ui_action_text(getattr(session, "env_id", None), raw_action)
 

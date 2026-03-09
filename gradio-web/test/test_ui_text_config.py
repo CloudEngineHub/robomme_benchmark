@@ -226,7 +226,7 @@ def test_ui_option_label_uses_patternlock_configured_action_text(reload_module):
         raw_solve_options=[{"label": "a", "action": "move forward", "available": False}],
     )
 
-    assert callbacks._ui_option_label(session, "fallback", 0) == "a. move forward↓"
+    assert callbacks._ui_option_label(session, "fallback", 0) == "A. move forward↓"
 
 
 def test_load_status_task_appends_configured_point_suffix_after_mapped_label(monkeypatch, reload_module):
@@ -253,7 +253,7 @@ def test_load_status_task_appends_configured_point_suffix_after_mapped_label(mon
 
     assert result[4]["choices"] == [
         (
-            f"a. move forward↓{config.UI_TEXT['actions']['point_required_suffix']}",
+            f"A. move forward↓{config.UI_TEXT['actions']['point_required_suffix']}",
             0,
         )
     ]
