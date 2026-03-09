@@ -569,10 +569,7 @@ def _load_status_task(uid, status):
             gr.update(interactive=False),  # reference_action_btn
         )
 
-    if session.env_id == "VideoPlaceButton" and session.language_goal:
-        goal_text = get_videoplacebutton_goal(session.language_goal)
-    else:
-        goal_text = capitalize_first_letter(session.language_goal) if session.language_goal else ""
+    goal_text = capitalize_first_letter(session.language_goal) if session.language_goal else ""
 
     options = session.available_options
     radio_choices = []
