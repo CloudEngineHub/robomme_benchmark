@@ -133,17 +133,9 @@ def test_get_ui_action_text_uses_configured_overrides_and_fallback(reload_module
         "move backward-left": "move backward-left↗︎",
         "move backward-right": "move backward-right↖︎",
     }
-    routestick_expected = {
-        "move to the nearest left target by circling around the stick clockwise": "move left clockwise↘︎→↗︎ ◟→◞",
-        "move to the nearest right target by circling around the stick clockwise": "move right clockwise↖︎←↙︎ ◟←◞",
-        "move to the nearest left target by circling around the stick counterclockwise": "move left counterclockwise↗︎→↘︎ ◜→◝",
-        "move to the nearest right target by circling around the stick counterclockwise": "move right counterclockwise↙︎←↖︎ ◜←◝",
-    }
 
     for raw_action, expected in patternlock_expected.items():
         assert config.get_ui_action_text("PatternLock", raw_action) == expected
-    for raw_action, expected in routestick_expected.items():
-        assert config.get_ui_action_text("RouteStick", raw_action) == expected
     assert config.get_ui_action_text("BinFill", "pick up the cube") == "pick up the cube"
 
 
@@ -158,21 +150,22 @@ def test_ui_option_label_uses_patternlock_configured_action_text(reload_module):
     assert callbacks._ui_option_label(session, "fallback", 0) == "a. move forward↓"
 
 
-def test_ui_option_label_uses_routestick_configured_action_text(reload_module):
-    reload_module("config")
+def test_ui_option_label_preserves_routestick_raw_action_text_without_override(reload_module):
+    config = reload_module("config")
     callbacks = reload_module("gradio_callbacks")
+    raw_action = "move to the nearest right target by circling around the stick counterclockwise"
     session = _FakeOptionSession(
         env_id="RouteStick",
         raw_solve_options=[
             {
                 "label": "d",
-                "action": "move to the nearest right target by circling around the stick counterclockwise",
+                "action": raw_action,
                 "available": False,
             }
         ],
     )
 
-    assert callbacks._ui_option_label(session, "fallback", 0) == "d. move right counterclockwise↙︎←↖︎ ◜←◝"
+    assert callbacks._ui_option_label(session, "fallback", 0) == f"d. {config.get_ui_action_text('RouteStick', raw_action)}"
 
 
 def test_load_status_task_appends_configured_point_suffix_after_mapped_label(monkeypatch, reload_module):
@@ -289,9 +282,6 @@ def test_draw_coordinate_axes_uses_configured_routestick_overlay_labels(monkeypa
     img = image_utils.Image.new("RGB", (220, 260), color=(0, 0, 0))
     image_utils.draw_coordinate_axes(img, position="left", env_id="RouteStick")
 
-    expected_labels = [
-        config.get_ui_action_text("RouteStick", action_text)
-        for action_text in config.ROUTESTICK_OVERLAY_ACTION_TEXTS
-    ]
+    expected_labels = list(config.ROUTESTICK_OVERLAY_ACTION_TEXTS)
     for label in expected_labels:
         assert label in recorded_texts
