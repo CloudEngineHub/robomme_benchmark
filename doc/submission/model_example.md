@@ -9,6 +9,7 @@ My cool model leverages a novel representation for history keyframes and maintai
 
 > We evaluate in a multi-task setting, using a single model checkpoint for all tasks, and require at least three runs with different random seeds to reduce performance variance. 
 > The benchmark seed is fixed internally.
+> Only `joint_angle`, `ee_pose` and `waypoint` are allowed. `multi_choice` is disallowed since it leverages ground-truth information and is mainly designed for Video-QA.
 
 ### Table
 
