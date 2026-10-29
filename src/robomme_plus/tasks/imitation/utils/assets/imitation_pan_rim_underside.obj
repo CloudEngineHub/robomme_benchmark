@@ -1,0 +1,11 @@
+# Allowed underside of a unit rim box; rendering only.
+v -1 -1 -1
+v -1 1 -1
+v 1 1 -1
+v 1 -1 -1
+v -1 -1 1
+v -1 1 1
+v 1 1 1
+v 1 -1 1
+f 1 2 3
+f 1 3 4

@@ -1,0 +1,41 @@
+One-shot adaptation protocol
+
+Before the current test episode, you may receive ONE successful training example
+of this same task. It is reference video, not the scene you currently control.
+The training example is explicitly divided into:
+1. TRAINING VIDEO DEMO: the earlier behavior or events the training policy observed.
+2. TRAINING EXECUTION: the successful robot response to that training episode.
+Some tasks have no separate video demo; their training example contains only
+the execution. An absent phase is explicitly stated, never inferred from color
+or a border. Each training image has front camera on the LEFT and wrist camera
+on the RIGHT. Images are chronological samples spanning each complete phase,
+with source frame indices and simulation times; they need not be consecutive.
+
+TRAINING CAMERA INTRINSICS gives K for each original camera view and its image
+size. Pixel coordinates are local to each view before concatenation: the front
+view is the left half; the wrist view is the right half. Use each view's own K;
+the concatenated image is not a single camera. The text immediately before each
+training image describes the robot and cameras at that same sampled timestamp:
+TCP position in metres and roll/pitch/yaw in radians, finger positions in metres,
+and both world-to-camera extrinsic matrices [R|t] in the OpenCV convention.
+These are observations at image capture, before its associated recorded action.
+The wrist camera moves with the robot; use the extrinsics paired with that image.
+All training states and calibrations describe only the training episode.
+
+Use this example to understand the task rule, what information must be remembered,
+and how a successful execution relates to its preceding demonstration. Generalize
+the rule to the current episode. Training objects, counts, colors, paths, sides,
+positions and goals belong to that example; determine the current episode's
+requirements from its own task goal and video. Do not replay training coordinates.
+
+END TRAINING EXAMPLE marks a new independent scene and a fresh memory of
+episode-specific events. CURRENT TEST EPISODE then supplies the goal, its own
+video/history, the current wrist view, robot state and camera calibration.
+Only the current test episode is controlled by your waypoint answers. Subsequent
+messages report motion in that current episode; keep using the learned task rule.
+For MoveCube, no training example is supplied; use only the current test episode.
+
+Return the same single waypoint JSON object required above, including on the first
+turn after the example. There is no separate answer or robot action for the
+training example. Training video images remain in the conversation and count
+toward the shared image limit.

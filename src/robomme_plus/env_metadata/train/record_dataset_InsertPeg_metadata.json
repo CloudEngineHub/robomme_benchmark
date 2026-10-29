@@ -1,0 +1,45 @@
+{
+  "schema": "robomme-ood-episodes/1",
+  "env_id": "InsertPeg",
+  "record_count": 3,
+  "verified_by": "privileged oracle rollout",
+  "records": [
+    {
+      "task": "InsertPeg",
+      "seed": 1365734056,
+      "difficulty": "easy",
+      "oracle_policy_step": 410,
+      "hole_width_m": 0.0230796437258463,
+      "control_freq": 20,
+      "oracle_grasp_offset_m": 0.005,
+      "oracle_wrist_visible_grasp": true,
+      "suite": "imitation",
+      "episode": 0,
+      "oracle_wall_seconds": 78.942
+    },
+    {
+      "task": "InsertPeg",
+      "seed": 2135389715,
+      "difficulty": "medium",
+      "oracle_policy_step": 375,
+      "hole_width_m": 0.022648217392519446,
+      "control_freq": 20,
+      "oracle_grasp_offset_m": 0.005,
+      "oracle_wrist_visible_grasp": true,
+      "suite": "imitation",
+      "episode": 1,
+      "oracle_wall_seconds": 73.35
+    },
+    {
+      "task": "InsertPeg",
+      "seed": 2082027877,
+      "difficulty": "hard",
+      "oracle_policy_step": 443,
+      "suite": "imitation",
+      "episode": 2,
+      "oracle_wall_seconds": 87.973,
+      "control_freq": 20,
+      "hole_width_m": 0.0204
+    }
+  ]
+}

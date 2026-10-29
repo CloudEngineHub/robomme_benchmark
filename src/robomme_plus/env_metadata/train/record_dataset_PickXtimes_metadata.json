@@ -1,0 +1,38 @@
+{
+  "schema": "robomme-ood-episodes/1",
+  "env_id": "PickXtimes",
+  "record_count": 3,
+  "verified_by": "privileged oracle rollout",
+  "records": [
+    {
+      "task": "PickXtimes",
+      "seed": 2083218884,
+      "difficulty": "easy",
+      "oracle_policy_step": 1659,
+      "suite": "counting",
+      "episode": 0,
+      "oracle_wall_seconds": 392.219,
+      "control_freq": 20
+    },
+    {
+      "task": "PickXtimes",
+      "seed": 1702144992,
+      "difficulty": "medium",
+      "oracle_policy_step": 1177,
+      "suite": "counting",
+      "episode": 1,
+      "oracle_wall_seconds": 249.054,
+      "control_freq": 20
+    },
+    {
+      "task": "PickXtimes",
+      "seed": 1646712862,
+      "difficulty": "hard",
+      "oracle_policy_step": 1838,
+      "suite": "counting",
+      "episode": 2,
+      "oracle_wall_seconds": 350.125,
+      "control_freq": 20
+    }
+  ]
+}

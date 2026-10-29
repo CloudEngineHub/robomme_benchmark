@@ -1,0 +1,47 @@
+{
+  "schema": "robomme-ood-episodes/1",
+  "env_id": "PatternLock",
+  "record_count": 3,
+  "verified_by": "privileged oracle rollout",
+  "records": [
+    {
+      "task": "PatternLock",
+      "seed": 1223285224,
+      "difficulty": "easy",
+      "oracle_policy_step": 155,
+      "stick_change_version": 6,
+      "execution_stick_angle_deg": 0.0,
+      "suite": "imitation",
+      "episode": 0,
+      "control_freq": 20,
+      "oracle_wall_seconds": 31.69,
+      "execution_grid_scale": 1.0
+    },
+    {
+      "task": "PatternLock",
+      "seed": 1583389125,
+      "difficulty": "medium",
+      "oracle_policy_step": 338,
+      "stick_change_version": 6,
+      "execution_grid_scale": 0.9,
+      "execution_stick_angle_deg": 13.70498725053962,
+      "suite": "imitation",
+      "episode": 1,
+      "control_freq": 20,
+      "oracle_wall_seconds": 82.31
+    },
+    {
+      "task": "PatternLock",
+      "seed": 760060850,
+      "difficulty": "hard",
+      "oracle_policy_step": 620,
+      "stick_change_version": 6,
+      "execution_grid_scale": 1.2,
+      "execution_stick_angle_deg": 29.351319870857594,
+      "suite": "imitation",
+      "episode": 2,
+      "control_freq": 20,
+      "oracle_wall_seconds": 127.585
+    }
+  ]
+}

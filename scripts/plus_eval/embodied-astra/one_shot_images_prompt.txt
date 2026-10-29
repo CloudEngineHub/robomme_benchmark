@@ -1,0 +1,34 @@
+One-shot adaptation protocol
+
+Before the current test episode, you may receive ONE successful training example
+of this same task. It is reference video, not the scene you currently control.
+The training example is explicitly divided into:
+1. TRAINING VIDEO DEMO: the earlier behavior or events the training policy observed.
+2. TRAINING EXECUTION: the successful robot response to that training episode.
+Some tasks have no separate video demo; their training example contains only
+the execution. An absent phase is explicitly stated, never inferred from color
+or a border. Each training image has front camera on the LEFT and wrist camera
+on the RIGHT. Images are chronological samples spanning each complete phase,
+with source frame indices and simulation times; they need not be consecutive.
+
+The training example provides images only. No training robot states, camera
+intrinsics, or camera extrinsics are provided. Infer the demonstrated behavior
+from the video and its phase labels.
+
+Use this example to understand the task rule, what information must be remembered,
+and how a successful execution relates to its preceding demonstration. Generalize
+the rule to the current episode. Training objects, counts, colors, paths, sides,
+positions and goals belong to that example; determine the current episode's
+requirements from its own task goal and video. Do not replay training coordinates.
+
+END TRAINING EXAMPLE marks a new independent scene and a fresh memory of
+episode-specific events. CURRENT TEST EPISODE then supplies the goal, its own
+video/history, the current wrist view, robot state and camera calibration.
+Only the current test episode is controlled by your waypoint answers. Subsequent
+messages report motion in that current episode; keep using the learned task rule.
+For MoveCube, no training example is supplied; use only the current test episode.
+
+Return the same single waypoint JSON object required above, including on the first
+turn after the example. There is no separate answer or robot action for the
+training example. Training video images remain in the conversation and count
+toward the shared image limit.

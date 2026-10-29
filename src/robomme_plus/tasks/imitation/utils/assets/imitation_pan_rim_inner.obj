@@ -1,0 +1,11 @@
+# Unit rim box; +x is the permitted inner face. Rendering only.
+v -1 -1 -1
+v -1 1 -1
+v 1 1 -1
+v 1 -1 -1
+v -1 -1 1
+v -1 1 1
+v 1 1 1
+v 1 -1 1
+f 3 8 4
+f 3 7 8
