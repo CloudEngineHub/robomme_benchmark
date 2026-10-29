@@ -1,0 +1,91 @@
+{
+  "schema": "robomme-ood-episodes/1",
+  "env_id": "RouteStick",
+  "record_count": 3,
+  "verified_by": "privileged oracle rollout",
+  "records": [
+    {
+      "task": "RouteStick",
+      "seed": 1882199712,
+      "difficulty": "easy",
+      "oracle_policy_step": 563,
+      "suite": "imitation",
+      "episode": 0,
+      "oracle_wall_seconds": 115.68,
+      "control_freq": 20,
+      "execution_route_layout": {
+        "version": 3,
+        "spacing_scale": 1.0,
+        "board_height_scale": 1.3,
+        "translation_xy_m": [
+          0.0,
+          0.0
+        ],
+        "yaw_deg": 0.0,
+        "board_collision": true,
+        "board_contact_fails": false
+      }
+    },
+    {
+      "task": "RouteStick",
+      "seed": 1178335854,
+      "difficulty": "medium",
+      "oracle_policy_step": 784,
+      "execution_route_layout": {
+        "version": 3,
+        "spacing_scale": 0.939855033098489,
+        "board_height_scale": 1.3,
+        "translation_xy_m": [
+          0.0,
+          0.05
+        ],
+        "yaw_deg": -6.493806575043639,
+        "board_collision": true,
+        "board_contact_fails": false
+      },
+      "suite": "imitation",
+      "episode": 1,
+      "control_freq": 20,
+      "oracle_wall_seconds": 116.434
+    },
+    {
+      "task": "RouteStick",
+      "seed": 1822726029,
+      "difficulty": "hard",
+      "oracle_policy_step": 1066,
+      "execution_route_layout": {
+        "version": 3,
+        "spacing_scale": 0.9026421388372879,
+        "board_height_scale": 1.3,
+        "translation_xy_m": [
+          0.05,
+          0.0
+        ],
+        "yaw_deg": 9.867118329588866,
+        "board_collision": true,
+        "board_contact_fails": false,
+        "board_motion": {
+          "mode": "arrival_boards",
+          "move_s": 2.0,
+          "hold_s": 1.5,
+          "return_s": 2.0,
+          "stroke_m": 0.07,
+          "arrival_radius_m": 0.03,
+          "phases": [
+            "execution"
+          ],
+          "enabled_boards": [
+            false,
+            false,
+            false,
+            true
+          ]
+        }
+      },
+      "suite": "imitation",
+      "episode": 2,
+      "control_freq": 20,
+      "oracle_wall_seconds": 145.486
+    }
+  ]
+}

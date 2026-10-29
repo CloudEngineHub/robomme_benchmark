@@ -1,0 +1,38 @@
+{
+  "schema": "robomme-ood-episodes/1",
+  "env_id": "VideoPlaceButton",
+  "record_count": 3,
+  "verified_by": "privileged oracle rollout",
+  "records": [
+    {
+      "task": "VideoPlaceButton",
+      "seed": 1155046303,
+      "difficulty": "easy",
+      "oracle_policy_step": 192,
+      "suite": "reference",
+      "episode": 0,
+      "oracle_wall_seconds": 296.557,
+      "control_freq": 20
+    },
+    {
+      "task": "VideoPlaceButton",
+      "seed": 1911834806,
+      "difficulty": "medium",
+      "oracle_policy_step": 216,
+      "suite": "reference",
+      "episode": 1,
+      "oracle_wall_seconds": 287.394,
+      "control_freq": 20
+    },
+    {
+      "task": "VideoPlaceButton",
+      "seed": 1073749011,
+      "difficulty": "hard",
+      "oracle_policy_step": 198,
+      "suite": "reference",
+      "episode": 2,
+      "oracle_wall_seconds": 474.024,
+      "control_freq": 20
+    }
+  ]
+}

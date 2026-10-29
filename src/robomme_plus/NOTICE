@@ -1,0 +1,19 @@
+RoboMME-Plus (robomme_plus), formerly RoboMME-OOD
+
+This distribution contains software derived from RoboMME and
+RoboMME-benchmark-OOD, licensed under the Apache License, Version 2.0.
+
+RoboMME: https://github.com/RoboMME/robomme_benchmark
+RoboMME-benchmark-OOD: https://github.com/hongzefu/RoboMME-benchmark-OOD
+
+The runtime adapts all 16 tasks, simulator utilities and observation/action
+wrappers. Modifications include namespaced environment IDs, scene construction,
+motion, demonstrations, scoring and execution budgets. Suite extensions are
+adapted from the astra-robomme experiments.
+
+UPSTREAM.json preserves source revisions and file hashes from the historical
+import snapshot. Its paths and package hashes do not describe the current
+release; use the repository's Git revision for current file identities.
+
+Private authoring tools, execution oracles, evaluation rollouts and credentials
+are excluded from the public release.

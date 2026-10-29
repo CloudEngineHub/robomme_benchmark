@@ -1,7 +1,7 @@
 [project]
 name = "robomme"
 version = "0.1.0"
-description = "Add your description here"
+description = "RoboMME and RoboMME-Plus benchmarks for robot memory"
 readme = "readme.md"
 requires-python = ">=3.11"
 dependencies = [
@@ -30,8 +30,15 @@ server = [
     "websockets==15.0.1",
 ]
 
+[tool.hatch.build]
+exclude = [
+    "/src/robomme_plus_private",
+    "/runs",
+    "**/__pycache__",
+]
+
 [tool.hatch.build.targets.wheel]
-packages = ["src/robomme"]
+packages = ["src/robomme", "src/robomme_plus"]
 
 [tool.pytest.ini_options]
 markers = [

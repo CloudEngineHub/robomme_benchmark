@@ -1,0 +1,7 @@
+# Overrides used with the root uv.lock for the verified Astra simulator runtime.
+openai==2.42.0
+sapien==3.0.2
+numpy==1.26.4
+opencv-python==4.11.0.86
+imageio==2.37.2
+imageio-ffmpeg==0.6.0

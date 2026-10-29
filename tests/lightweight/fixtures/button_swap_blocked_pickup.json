@@ -1,0 +1,159 @@
+{
+  "description": "Reachability mask and geometry of the first bypass preview, seed 599879872; paused red cube at the reported 24-second congestion case.",
+  "seed": 600622803,
+  "radius_m": 0.038890872965260115,
+  "actor_count": 11,
+  "speed": 0.00675,
+  "workspace": {
+    "bounds_xy_m": [
+      [
+        -0.4,
+        0.16
+      ],
+      [
+        -0.29,
+        0.29
+      ]
+    ],
+    "central_bounds_xy_m": [
+      [
+        -0.32,
+        0.16
+      ],
+      [
+        -0.28,
+        0.28
+      ]
+    ],
+    "board_x_m": 0.2
+  },
+  "obstacles": [
+    {
+      "xy": [
+        -0.15173465013504028,
+        0.11555299907922745
+      ],
+      "radius_m": 0.055
+    },
+    {
+      "xy": [
+        -0.17155514657497406,
+        -0.06163228303194046
+      ],
+      "radius_m": 0.055
+    }
+  ],
+  "extra_obstacles": [
+    {
+      "xy": [
+        0.2,
+        0.0
+      ],
+      "radius_m": 0.04981214711292819
+    }
+  ],
+  "x_range_count": [
+    -0.49,
+    0.14,
+    33
+  ],
+  "y_range_count": [
+    -0.34,
+    0.34,
+    35
+  ],
+  "vertex_bits_hex": "fc000003ff800000fff000001fff000007fff00001ffff00007ffff8003fffffc01ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffbfffffffe0ffffffe00",
+  "cell_bits_hex": "f8000003fe000001ff8000007ff000003ffe00001fffc0000ffffc000fffffc00ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7fffffff83ffffff0",
+  "pickup_positions_xy_m": [
+    [
+      0.038123850158007094,
+      0.010957880465204642
+    ],
+    [
+      -0.19216335645820767,
+      0.24678984382755367
+    ],
+    [
+      0.03795041504080735,
+      -0.10055096731725159
+    ],
+    [
+      0.12081741465022423,
+      0.13229540051797414
+    ],
+    [
+      -0.2896975911748469,
+      0.1738114691117879
+    ],
+    [
+      -0.2892787920827971,
+      -0.043979091217240834
+    ],
+    [
+      -0.12056070533931054,
+      -0.20252893336422648
+    ],
+    [
+      -0.022847946257805833,
+      0.21754038998998507
+    ],
+    [
+      0.00027376178527712194,
+      -0.24075079899194055
+    ],
+    [
+      -0.04170977738533219,
+      0.054219718965340676
+    ],
+    [
+      0.08470583550257302,
+      -0.17852843271691898
+    ]
+  ],
+  "original_24s_positions_xy_m": [
+    [
+      0.03812390938401222,
+      0.010957406833767891
+    ],
+    [
+      0.04892288539747912,
+      0.24109176979006466
+    ],
+    [
+      -0.09683068793563097,
+      -0.1632226720332125
+    ],
+    [
+      0.1077597923310524,
+      0.06961825668051685
+    ],
+    [
+      -0.06234434236124665,
+      0.19864572821996498
+    ],
+    [
+      -0.17153125523274404,
+      0.22700228327899044
+    ],
+    [
+      -0.2597361883372185,
+      0.24939101428979898
+    ],
+    [
+      0.1070550653909284,
+      0.17047534656592853
+    ],
+    [
+      -0.29318870640887557,
+      0.16412263674681202
+    ],
+    [
+      -0.040879770490592646,
+      0.06947547502590083
+    ],
+    [
+      0.06900611494265602,
+      -0.23985010443277469
+    ]
+  ]
+}

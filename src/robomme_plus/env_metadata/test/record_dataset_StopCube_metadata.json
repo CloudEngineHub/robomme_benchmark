@@ -1,0 +1,458 @@
+{
+  "schema": "robomme-ood-episodes/1",
+  "env_id": "StopCube",
+  "record_count": 50,
+  "verified_by": "privileged oracle rollout",
+  "records": [
+    {
+      "task": "StopCube",
+      "seed": 838100446,
+      "difficulty": "easy",
+      "oracle_policy_step": 316,
+      "suite": "counting",
+      "episode": 0,
+      "oracle_wall_seconds": 3.556
+    },
+    {
+      "task": "StopCube",
+      "seed": 402734080,
+      "difficulty": "easy",
+      "oracle_policy_step": 530,
+      "suite": "counting",
+      "episode": 1,
+      "oracle_wall_seconds": 14.739
+    },
+    {
+      "task": "StopCube",
+      "seed": 896312097,
+      "difficulty": "easy",
+      "oracle_policy_step": 168,
+      "suite": "counting",
+      "episode": 2,
+      "oracle_wall_seconds": 6.491
+    },
+    {
+      "task": "StopCube",
+      "seed": 352529969,
+      "difficulty": "easy",
+      "oracle_policy_step": 161,
+      "suite": "counting",
+      "episode": 3,
+      "oracle_wall_seconds": 5.381
+    },
+    {
+      "task": "StopCube",
+      "seed": 464138285,
+      "difficulty": "easy",
+      "oracle_policy_step": 220,
+      "suite": "counting",
+      "episode": 4,
+      "oracle_wall_seconds": 6.925
+    },
+    {
+      "task": "StopCube",
+      "seed": 331263894,
+      "difficulty": "easy",
+      "oracle_policy_step": 416,
+      "suite": "counting",
+      "episode": 5,
+      "oracle_wall_seconds": 14.314
+    },
+    {
+      "task": "StopCube",
+      "seed": 14069232,
+      "difficulty": "easy",
+      "oracle_policy_step": 404,
+      "suite": "counting",
+      "episode": 6,
+      "oracle_wall_seconds": 13.359
+    },
+    {
+      "task": "StopCube",
+      "seed": 492400210,
+      "difficulty": "easy",
+      "oracle_policy_step": 404,
+      "suite": "counting",
+      "episode": 7,
+      "oracle_wall_seconds": 11.486
+    },
+    {
+      "task": "StopCube",
+      "seed": 16664528,
+      "difficulty": "easy",
+      "oracle_policy_step": 313,
+      "suite": "counting",
+      "episode": 8,
+      "oracle_wall_seconds": 9.656
+    },
+    {
+      "task": "StopCube",
+      "seed": 306184989,
+      "difficulty": "easy",
+      "oracle_policy_step": 280,
+      "suite": "counting",
+      "episode": 9,
+      "oracle_wall_seconds": 11.175
+    },
+    {
+      "task": "StopCube",
+      "seed": 124828991,
+      "difficulty": "medium",
+      "oracle_policy_step": 258,
+      "suite": "counting",
+      "episode": 10,
+      "oracle_wall_seconds": 6.323
+    },
+    {
+      "task": "StopCube",
+      "seed": 352979092,
+      "difficulty": "medium",
+      "oracle_policy_step": 113,
+      "suite": "counting",
+      "episode": 11,
+      "oracle_wall_seconds": 2.298
+    },
+    {
+      "task": "StopCube",
+      "seed": 449449594,
+      "difficulty": "medium",
+      "oracle_policy_step": 299,
+      "suite": "counting",
+      "episode": 12,
+      "oracle_wall_seconds": 7.831
+    },
+    {
+      "task": "StopCube",
+      "seed": 829363076,
+      "difficulty": "medium",
+      "oracle_policy_step": 183,
+      "suite": "counting",
+      "episode": 13,
+      "oracle_wall_seconds": 4.434
+    },
+    {
+      "task": "StopCube",
+      "seed": 924830553,
+      "difficulty": "medium",
+      "oracle_policy_step": 272,
+      "suite": "counting",
+      "episode": 14,
+      "oracle_wall_seconds": 7.551
+    },
+    {
+      "task": "StopCube",
+      "seed": 838792545,
+      "difficulty": "medium",
+      "oracle_policy_step": 322,
+      "suite": "counting",
+      "episode": 15,
+      "oracle_wall_seconds": 12.493
+    },
+    {
+      "task": "StopCube",
+      "seed": 965271430,
+      "difficulty": "medium",
+      "oracle_policy_step": 246,
+      "suite": "counting",
+      "episode": 16,
+      "oracle_wall_seconds": 6.821
+    },
+    {
+      "task": "StopCube",
+      "seed": 304326732,
+      "difficulty": "medium",
+      "oracle_policy_step": 200,
+      "suite": "counting",
+      "episode": 17,
+      "oracle_wall_seconds": 4.91
+    },
+    {
+      "task": "StopCube",
+      "seed": 1044329631,
+      "difficulty": "medium",
+      "oracle_policy_step": 191,
+      "suite": "counting",
+      "episode": 18,
+      "oracle_wall_seconds": 3.028
+    },
+    {
+      "task": "StopCube",
+      "seed": 993601284,
+      "difficulty": "medium",
+      "oracle_policy_step": 210,
+      "suite": "counting",
+      "episode": 19,
+      "oracle_wall_seconds": 6.35
+    },
+    {
+      "task": "StopCube",
+      "seed": 627604763,
+      "difficulty": "medium",
+      "oracle_policy_step": 441,
+      "suite": "counting",
+      "episode": 20,
+      "oracle_wall_seconds": 13.353
+    },
+    {
+      "task": "StopCube",
+      "seed": 46775775,
+      "difficulty": "medium",
+      "oracle_policy_step": 346,
+      "suite": "counting",
+      "episode": 21,
+      "oracle_wall_seconds": 10.571
+    },
+    {
+      "task": "StopCube",
+      "seed": 838674513,
+      "difficulty": "medium",
+      "oracle_policy_step": 451,
+      "suite": "counting",
+      "episode": 22,
+      "oracle_wall_seconds": 13.465
+    },
+    {
+      "task": "StopCube",
+      "seed": 842947868,
+      "difficulty": "medium",
+      "oracle_policy_step": 240,
+      "suite": "counting",
+      "episode": 23,
+      "oracle_wall_seconds": 5.734
+    },
+    {
+      "task": "StopCube",
+      "seed": 505234047,
+      "difficulty": "medium",
+      "oracle_policy_step": 182,
+      "suite": "counting",
+      "episode": 24,
+      "oracle_wall_seconds": 5.538
+    },
+    {
+      "task": "StopCube",
+      "seed": 969810230,
+      "difficulty": "hard",
+      "oracle_policy_step": 407,
+      "suite": "counting",
+      "episode": 25,
+      "oracle_wall_seconds": 11.464
+    },
+    {
+      "task": "StopCube",
+      "seed": 495038725,
+      "difficulty": "hard",
+      "oracle_policy_step": 212,
+      "suite": "counting",
+      "episode": 26,
+      "oracle_wall_seconds": 6.818
+    },
+    {
+      "task": "StopCube",
+      "seed": 667254956,
+      "difficulty": "hard",
+      "oracle_policy_step": 130,
+      "suite": "counting",
+      "episode": 27,
+      "oracle_wall_seconds": 2.78
+    },
+    {
+      "task": "StopCube",
+      "seed": 608333836,
+      "difficulty": "hard",
+      "oracle_policy_step": 235,
+      "suite": "counting",
+      "episode": 28,
+      "oracle_wall_seconds": 7.652
+    },
+    {
+      "task": "StopCube",
+      "seed": 1049135089,
+      "difficulty": "hard",
+      "oracle_policy_step": 466,
+      "suite": "counting",
+      "episode": 29,
+      "oracle_wall_seconds": 12.938
+    },
+    {
+      "task": "StopCube",
+      "seed": 943507860,
+      "difficulty": "hard",
+      "oracle_policy_step": 140,
+      "suite": "counting",
+      "episode": 30,
+      "oracle_wall_seconds": 3.848
+    },
+    {
+      "task": "StopCube",
+      "seed": 70667122,
+      "difficulty": "hard",
+      "oracle_policy_step": 157,
+      "suite": "counting",
+      "episode": 31,
+      "oracle_wall_seconds": 4.745
+    },
+    {
+      "task": "StopCube",
+      "seed": 695740787,
+      "difficulty": "hard",
+      "oracle_policy_step": 143,
+      "suite": "counting",
+      "episode": 32,
+      "oracle_wall_seconds": 3.495
+    },
+    {
+      "task": "StopCube",
+      "seed": 40156625,
+      "difficulty": "hard",
+      "oracle_policy_step": 551,
+      "suite": "counting",
+      "episode": 33,
+      "oracle_wall_seconds": 12.797
+    },
+    {
+      "task": "StopCube",
+      "seed": 98333140,
+      "difficulty": "hard",
+      "oracle_policy_step": 213,
+      "suite": "counting",
+      "episode": 34,
+      "oracle_wall_seconds": 3.706
+    },
+    {
+      "task": "StopCube",
+      "seed": 826248992,
+      "difficulty": "hard",
+      "oracle_policy_step": 473,
+      "suite": "counting",
+      "episode": 35,
+      "oracle_wall_seconds": 13.73
+    },
+    {
+      "task": "StopCube",
+      "seed": 774886395,
+      "difficulty": "hard",
+      "oracle_policy_step": 331,
+      "suite": "counting",
+      "episode": 36,
+      "oracle_wall_seconds": 7.376
+    },
+    {
+      "task": "StopCube",
+      "seed": 672216618,
+      "difficulty": "hard",
+      "oracle_policy_step": 447,
+      "suite": "counting",
+      "episode": 37,
+      "oracle_wall_seconds": 12.53
+    },
+    {
+      "task": "StopCube",
+      "seed": 623735939,
+      "difficulty": "hard",
+      "oracle_policy_step": 393,
+      "suite": "counting",
+      "episode": 38,
+      "oracle_wall_seconds": 9.748
+    },
+    {
+      "task": "StopCube",
+      "seed": 9779126,
+      "difficulty": "hard",
+      "oracle_policy_step": 170,
+      "suite": "counting",
+      "episode": 39,
+      "oracle_wall_seconds": 3.386
+    },
+    {
+      "task": "StopCube",
+      "seed": 713312637,
+      "difficulty": "hard",
+      "oracle_policy_step": 289,
+      "suite": "counting",
+      "episode": 40,
+      "oracle_wall_seconds": 6.928
+    },
+    {
+      "task": "StopCube",
+      "seed": 394939113,
+      "difficulty": "hard",
+      "oracle_policy_step": 310,
+      "suite": "counting",
+      "episode": 41,
+      "oracle_wall_seconds": 8.919
+    },
+    {
+      "task": "StopCube",
+      "seed": 20440061,
+      "difficulty": "hard",
+      "oracle_policy_step": 215,
+      "suite": "counting",
+      "episode": 42,
+      "oracle_wall_seconds": 4.503
+    },
+    {
+      "task": "StopCube",
+      "seed": 701781513,
+      "difficulty": "hard",
+      "oracle_policy_step": 408,
+      "suite": "counting",
+      "episode": 43,
+      "oracle_wall_seconds": 8.378
+    },
+    {
+      "task": "StopCube",
+      "seed": 498590288,
+      "difficulty": "hard",
+      "oracle_policy_step": 203,
+      "suite": "counting",
+      "episode": 44,
+      "oracle_wall_seconds": 4.834
+    },
+    {
+      "task": "StopCube",
+      "seed": 20607126,
+      "difficulty": "hard",
+      "oracle_policy_step": 244,
+      "suite": "counting",
+      "episode": 45,
+      "oracle_wall_seconds": 4.804
+    },
+    {
+      "task": "StopCube",
+      "seed": 349284994,
+      "difficulty": "hard",
+      "oracle_policy_step": 298,
+      "suite": "counting",
+      "episode": 46,
+      "oracle_wall_seconds": 10.1
+    },
+    {
+      "task": "StopCube",
+      "seed": 446145358,
+      "difficulty": "hard",
+      "oracle_policy_step": 330,
+      "suite": "counting",
+      "episode": 47,
+      "oracle_wall_seconds": 7.222
+    },
+    {
+      "task": "StopCube",
+      "seed": 958783028,
+      "difficulty": "hard",
+      "oracle_policy_step": 246,
+      "suite": "counting",
+      "episode": 48,
+      "oracle_wall_seconds": 7.439
+    },
+    {
+      "task": "StopCube",
+      "seed": 486579103,
+      "difficulty": "hard",
+      "oracle_policy_step": 303,
+      "suite": "counting",
+      "episode": 49,
+      "oracle_wall_seconds": 6.969
+    }
+  ]
+}

@@ -1,0 +1,1533 @@
+{
+  "schema": "robomme-ood-episodes/1",
+  "env_id": "RouteStick",
+  "record_count": 50,
+  "verified_by": "privileged oracle rollout",
+  "records": [
+    {
+      "task": "RouteStick",
+      "seed": 384458969,
+      "difficulty": "easy",
+      "oracle_policy_step": 556,
+      "execution_route_layout": {
+        "version": 3,
+        "spacing_scale": 1.0,
+        "board_height_scale": 1.3,
+        "translation_xy_m": [
+          0.0,
+          0.0
+        ],
+        "yaw_deg": 0.0,
+        "board_collision": true,
+        "board_contact_fails": false
+      },
+      "suite": "imitation",
+      "episode": 0,
+      "control_freq": 20,
+      "oracle_wall_seconds": 24.736
+    },
+    {
+      "task": "RouteStick",
+      "seed": 692302298,
+      "difficulty": "easy",
+      "oracle_policy_step": 608,
+      "execution_route_layout": {
+        "version": 3,
+        "spacing_scale": 1.0,
+        "board_height_scale": 1.3,
+        "translation_xy_m": [
+          0.0,
+          0.0
+        ],
+        "yaw_deg": 0.0,
+        "board_collision": true,
+        "board_contact_fails": false
+      },
+      "suite": "imitation",
+      "episode": 1,
+      "control_freq": 20,
+      "oracle_wall_seconds": 25.055
+    },
+    {
+      "task": "RouteStick",
+      "seed": 966614341,
+      "difficulty": "easy",
+      "oracle_policy_step": 456,
+      "execution_route_layout": {
+        "version": 3,
+        "spacing_scale": 1.0,
+        "board_height_scale": 1.3,
+        "translation_xy_m": [
+          0.0,
+          0.0
+        ],
+        "yaw_deg": 0.0,
+        "board_collision": true,
+        "board_contact_fails": false
+      },
+      "suite": "imitation",
+      "episode": 2,
+      "control_freq": 20,
+      "oracle_wall_seconds": 18.321
+    },
+    {
+      "task": "RouteStick",
+      "seed": 776895518,
+      "difficulty": "easy",
+      "oracle_policy_step": 608,
+      "execution_route_layout": {
+        "version": 3,
+        "spacing_scale": 1.0,
+        "board_height_scale": 1.3,
+        "translation_xy_m": [
+          0.0,
+          0.0
+        ],
+        "yaw_deg": 0.0,
+        "board_collision": true,
+        "board_contact_fails": false
+      },
+      "suite": "imitation",
+      "episode": 3,
+      "control_freq": 20,
+      "oracle_wall_seconds": 25.397
+    },
+    {
+      "task": "RouteStick",
+      "seed": 501863995,
+      "difficulty": "easy",
+      "oracle_policy_step": 559,
+      "execution_route_layout": {
+        "version": 3,
+        "spacing_scale": 1.0,
+        "board_height_scale": 1.3,
+        "translation_xy_m": [
+          0.0,
+          0.0
+        ],
+        "yaw_deg": 0.0,
+        "board_collision": true,
+        "board_contact_fails": false
+      },
+      "suite": "imitation",
+      "episode": 4,
+      "control_freq": 20,
+      "oracle_wall_seconds": 37.12
+    },
+    {
+      "task": "RouteStick",
+      "seed": 143369292,
+      "difficulty": "easy",
+      "oracle_policy_step": 557,
+      "execution_route_layout": {
+        "version": 3,
+        "spacing_scale": 1.0,
+        "board_height_scale": 1.3,
+        "translation_xy_m": [
+          0.0,
+          0.0
+        ],
+        "yaw_deg": 0.0,
+        "board_collision": true,
+        "board_contact_fails": false
+      },
+      "suite": "imitation",
+      "episode": 5,
+      "control_freq": 20,
+      "oracle_wall_seconds": 33.769
+    },
+    {
+      "task": "RouteStick",
+      "seed": 129903979,
+      "difficulty": "easy",
+      "oracle_policy_step": 507,
+      "execution_route_layout": {
+        "version": 3,
+        "spacing_scale": 1.0,
+        "board_height_scale": 1.3,
+        "translation_xy_m": [
+          0.0,
+          0.0
+        ],
+        "yaw_deg": 0.0,
+        "board_collision": true,
+        "board_contact_fails": false
+      },
+      "suite": "imitation",
+      "episode": 6,
+      "control_freq": 20,
+      "oracle_wall_seconds": 22.496
+    },
+    {
+      "task": "RouteStick",
+      "seed": 457595862,
+      "difficulty": "easy",
+      "oracle_policy_step": 557,
+      "execution_route_layout": {
+        "version": 3,
+        "spacing_scale": 1.0,
+        "board_height_scale": 1.3,
+        "translation_xy_m": [
+          0.0,
+          0.0
+        ],
+        "yaw_deg": 0.0,
+        "board_collision": true,
+        "board_contact_fails": false
+      },
+      "suite": "imitation",
+      "episode": 7,
+      "control_freq": 20,
+      "oracle_wall_seconds": 23.32
+    },
+    {
+      "task": "RouteStick",
+      "seed": 367836978,
+      "difficulty": "easy",
+      "oracle_policy_step": 455,
+      "execution_route_layout": {
+        "version": 3,
+        "spacing_scale": 1.0,
+        "board_height_scale": 1.3,
+        "translation_xy_m": [
+          0.0,
+          0.0
+        ],
+        "yaw_deg": 0.0,
+        "board_collision": true,
+        "board_contact_fails": false
+      },
+      "suite": "imitation",
+      "episode": 8,
+      "control_freq": 20,
+      "oracle_wall_seconds": 21.584
+    },
+    {
+      "task": "RouteStick",
+      "seed": 621906677,
+      "difficulty": "easy",
+      "oracle_policy_step": 506,
+      "execution_route_layout": {
+        "version": 3,
+        "spacing_scale": 1.0,
+        "board_height_scale": 1.3,
+        "translation_xy_m": [
+          0.0,
+          0.0
+        ],
+        "yaw_deg": 0.0,
+        "board_collision": true,
+        "board_contact_fails": false
+      },
+      "suite": "imitation",
+      "episode": 9,
+      "control_freq": 20,
+      "oracle_wall_seconds": 22.187
+    },
+    {
+      "task": "RouteStick",
+      "seed": 616539629,
+      "difficulty": "medium",
+      "oracle_policy_step": 507,
+      "execution_route_layout": {
+        "version": 3,
+        "spacing_scale": 0.9889176667955324,
+        "board_height_scale": 1.3,
+        "translation_xy_m": [
+          0.05,
+          0.0
+        ],
+        "yaw_deg": 7.170376059152131,
+        "board_collision": true,
+        "board_contact_fails": false
+      },
+      "suite": "imitation",
+      "episode": 10,
+      "control_freq": 20,
+      "oracle_wall_seconds": 12.698
+    },
+    {
+      "task": "RouteStick",
+      "seed": 1995077361,
+      "difficulty": "medium",
+      "oracle_policy_step": 963,
+      "execution_route_layout": {
+        "version": 3,
+        "spacing_scale": 0.9336886661651491,
+        "board_height_scale": 1.3,
+        "translation_xy_m": [
+          0.0,
+          0.05
+        ],
+        "yaw_deg": 9.816395247071988,
+        "board_collision": true,
+        "board_contact_fails": false
+      },
+      "suite": "imitation",
+      "episode": 11,
+      "control_freq": 20,
+      "oracle_wall_seconds": 32.839
+    },
+    {
+      "task": "RouteStick",
+      "seed": 181840476,
+      "difficulty": "medium",
+      "oracle_policy_step": 738,
+      "execution_route_layout": {
+        "version": 3,
+        "spacing_scale": 0.9972819968371269,
+        "board_height_scale": 1.3,
+        "translation_xy_m": [
+          0.05,
+          0.0
+        ],
+        "yaw_deg": 7.543219647782335,
+        "board_collision": true,
+        "board_contact_fails": false
+      },
+      "suite": "imitation",
+      "episode": 12,
+      "control_freq": 20,
+      "oracle_wall_seconds": 19.185
+    },
+    {
+      "task": "RouteStick",
+      "seed": 468125691,
+      "difficulty": "medium",
+      "oracle_policy_step": 880,
+      "execution_route_layout": {
+        "version": 3,
+        "spacing_scale": 0.9077933517346907,
+        "board_height_scale": 1.3,
+        "translation_xy_m": [
+          0.0,
+          0.05
+        ],
+        "yaw_deg": -6.871210817011727,
+        "board_collision": true,
+        "board_contact_fails": false
+      },
+      "suite": "imitation",
+      "episode": 13,
+      "control_freq": 20,
+      "oracle_wall_seconds": 18.059
+    },
+    {
+      "task": "RouteStick",
+      "seed": 473338180,
+      "difficulty": "medium",
+      "oracle_policy_step": 585,
+      "execution_route_layout": {
+        "version": 3,
+        "spacing_scale": 0.9148159243817187,
+        "board_height_scale": 1.3,
+        "translation_xy_m": [
+          0.0,
+          -0.05
+        ],
+        "yaw_deg": -7.266793082048897,
+        "board_collision": true,
+        "board_contact_fails": false
+      },
+      "suite": "imitation",
+      "episode": 14,
+      "control_freq": 20,
+      "oracle_wall_seconds": 11.637
+    },
+    {
+      "task": "RouteStick",
+      "seed": 458319784,
+      "difficulty": "medium",
+      "oracle_policy_step": 629,
+      "execution_route_layout": {
+        "version": 3,
+        "spacing_scale": 0.9794727467028983,
+        "board_height_scale": 1.3,
+        "translation_xy_m": [
+          0.0,
+          -0.05
+        ],
+        "yaw_deg": 7.083711082369994,
+        "board_collision": true,
+        "board_contact_fails": false
+      },
+      "suite": "imitation",
+      "episode": 15,
+      "control_freq": 20,
+      "oracle_wall_seconds": 21.497
+    },
+    {
+      "task": "RouteStick",
+      "seed": 1962713582,
+      "difficulty": "medium",
+      "oracle_policy_step": 805,
+      "execution_route_layout": {
+        "version": 3,
+        "spacing_scale": 0.9276251085681371,
+        "board_height_scale": 1.3,
+        "translation_xy_m": [
+          0.0,
+          0.05
+        ],
+        "yaw_deg": -9.875931719043262,
+        "board_collision": true,
+        "board_contact_fails": false
+      },
+      "suite": "imitation",
+      "episode": 16,
+      "control_freq": 20,
+      "oracle_wall_seconds": 21.606
+    },
+    {
+      "task": "RouteStick",
+      "seed": 18957240,
+      "difficulty": "medium",
+      "oracle_policy_step": 890,
+      "execution_route_layout": {
+        "version": 3,
+        "spacing_scale": 0.9406054589141981,
+        "board_height_scale": 1.3,
+        "translation_xy_m": [
+          0.05,
+          0.0
+        ],
+        "yaw_deg": 6.1548721655921454,
+        "board_collision": true,
+        "board_contact_fails": false
+      },
+      "suite": "imitation",
+      "episode": 17,
+      "control_freq": 20,
+      "oracle_wall_seconds": 25.273
+    },
+    {
+      "task": "RouteStick",
+      "seed": 714921918,
+      "difficulty": "medium",
+      "oracle_policy_step": 656,
+      "execution_route_layout": {
+        "version": 3,
+        "spacing_scale": 0.9463068783196229,
+        "board_height_scale": 1.3,
+        "translation_xy_m": [
+          0.05,
+          0.0
+        ],
+        "yaw_deg": 5.532248978507893,
+        "board_collision": true,
+        "board_contact_fails": false
+      },
+      "suite": "imitation",
+      "episode": 18,
+      "control_freq": 20,
+      "oracle_wall_seconds": 21.757
+    },
+    {
+      "task": "RouteStick",
+      "seed": 356370682,
+      "difficulty": "medium",
+      "oracle_policy_step": 635,
+      "execution_route_layout": {
+        "version": 3,
+        "spacing_scale": 0.9326634669324909,
+        "board_height_scale": 1.3,
+        "translation_xy_m": [
+          0.0,
+          -0.05
+        ],
+        "yaw_deg": 9.722499796326215,
+        "board_collision": true,
+        "board_contact_fails": false
+      },
+      "suite": "imitation",
+      "episode": 19,
+      "control_freq": 20,
+      "oracle_wall_seconds": 16.263
+    },
+    {
+      "task": "RouteStick",
+      "seed": 1045763862,
+      "difficulty": "medium",
+      "oracle_policy_step": 955,
+      "execution_route_layout": {
+        "version": 3,
+        "spacing_scale": 0.9004221347383967,
+        "board_height_scale": 1.3,
+        "translation_xy_m": [
+          0.0,
+          -0.05
+        ],
+        "yaw_deg": -8.3352247666633,
+        "board_collision": true,
+        "board_contact_fails": false
+      },
+      "suite": "imitation",
+      "episode": 20,
+      "control_freq": 20,
+      "oracle_wall_seconds": 28.451
+    },
+    {
+      "task": "RouteStick",
+      "seed": 1802912521,
+      "difficulty": "medium",
+      "oracle_policy_step": 505,
+      "execution_route_layout": {
+        "version": 3,
+        "spacing_scale": 0.9311717261401715,
+        "board_height_scale": 1.3,
+        "translation_xy_m": [
+          -0.05,
+          0.0
+        ],
+        "yaw_deg": 8.987819262369428,
+        "board_collision": true,
+        "board_contact_fails": false
+      },
+      "suite": "imitation",
+      "episode": 21,
+      "control_freq": 20,
+      "oracle_wall_seconds": 9.046
+    },
+    {
+      "task": "RouteStick",
+      "seed": 556356417,
+      "difficulty": "medium",
+      "oracle_policy_step": 658,
+      "execution_route_layout": {
+        "version": 3,
+        "spacing_scale": 0.927266204994705,
+        "board_height_scale": 1.3,
+        "translation_xy_m": [
+          0.05,
+          0.0
+        ],
+        "yaw_deg": -6.180107116414725,
+        "board_collision": true,
+        "board_contact_fails": false
+      },
+      "suite": "imitation",
+      "episode": 22,
+      "control_freq": 20,
+      "oracle_wall_seconds": 18.622
+    },
+    {
+      "task": "RouteStick",
+      "seed": 607178499,
+      "difficulty": "medium",
+      "oracle_policy_step": 502,
+      "execution_route_layout": {
+        "version": 3,
+        "spacing_scale": 0.945416728802143,
+        "board_height_scale": 1.3,
+        "translation_xy_m": [
+          0.05,
+          0.0
+        ],
+        "yaw_deg": -5.509235234544651,
+        "board_collision": true,
+        "board_contact_fails": false
+      },
+      "suite": "imitation",
+      "episode": 23,
+      "control_freq": 20,
+      "oracle_wall_seconds": 10.707
+    },
+    {
+      "task": "RouteStick",
+      "seed": 434717265,
+      "difficulty": "medium",
+      "oracle_policy_step": 954,
+      "execution_route_layout": {
+        "version": 3,
+        "spacing_scale": 0.920103600109788,
+        "board_height_scale": 1.3,
+        "translation_xy_m": [
+          0.0,
+          -0.05
+        ],
+        "yaw_deg": -5.902504463460932,
+        "board_collision": true,
+        "board_contact_fails": false
+      },
+      "suite": "imitation",
+      "episode": 24,
+      "control_freq": 20,
+      "oracle_wall_seconds": 27.086
+    },
+    {
+      "task": "RouteStick",
+      "seed": 1478024189,
+      "difficulty": "hard",
+      "oracle_policy_step": 808,
+      "execution_route_layout": {
+        "version": 3,
+        "spacing_scale": 0.9448397015900101,
+        "board_height_scale": 1.3,
+        "translation_xy_m": [
+          0.05,
+          0.0
+        ],
+        "yaw_deg": -5.266282217692962,
+        "board_collision": true,
+        "board_contact_fails": false,
+        "board_motion": {
+          "mode": "arrival_boards",
+          "move_s": 2.0,
+          "hold_s": 1.5,
+          "return_s": 2.0,
+          "stroke_m": 0.07,
+          "arrival_radius_m": 0.03,
+          "phases": [
+            "execution"
+          ],
+          "enabled_boards": [
+            false,
+            true,
+            true,
+            false
+          ]
+        }
+      },
+      "suite": "imitation",
+      "episode": 25,
+      "control_freq": 20,
+      "oracle_wall_seconds": 21.493
+    },
+    {
+      "task": "RouteStick",
+      "seed": 308034002,
+      "difficulty": "hard",
+      "oracle_policy_step": 1225,
+      "execution_route_layout": {
+        "version": 3,
+        "spacing_scale": 0.9801860245259925,
+        "board_height_scale": 1.3,
+        "translation_xy_m": [
+          0.0,
+          -0.05
+        ],
+        "yaw_deg": 7.874661482592238,
+        "board_collision": true,
+        "board_contact_fails": false,
+        "board_motion": {
+          "mode": "arrival_boards",
+          "move_s": 2.0,
+          "hold_s": 1.5,
+          "return_s": 2.0,
+          "stroke_m": 0.07,
+          "arrival_radius_m": 0.03,
+          "phases": [
+            "execution"
+          ],
+          "enabled_boards": [
+            true,
+            false,
+            true,
+            true
+          ]
+        }
+      },
+      "suite": "imitation",
+      "episode": 26,
+      "control_freq": 20,
+      "oracle_wall_seconds": 40.319
+    },
+    {
+      "task": "RouteStick",
+      "seed": 506809277,
+      "difficulty": "hard",
+      "oracle_policy_step": 1277,
+      "execution_route_layout": {
+        "version": 3,
+        "spacing_scale": 0.9522136406477064,
+        "board_height_scale": 1.3,
+        "translation_xy_m": [
+          0.0,
+          -0.05
+        ],
+        "yaw_deg": 7.36669645274184,
+        "board_collision": true,
+        "board_contact_fails": false,
+        "board_motion": {
+          "mode": "arrival_boards",
+          "move_s": 2.0,
+          "hold_s": 1.5,
+          "return_s": 2.0,
+          "stroke_m": 0.07,
+          "arrival_radius_m": 0.03,
+          "phases": [
+            "execution"
+          ],
+          "enabled_boards": [
+            true,
+            false,
+            true,
+            true
+          ]
+        }
+      },
+      "suite": "imitation",
+      "episode": 27,
+      "control_freq": 20,
+      "oracle_wall_seconds": 40.815
+    },
+    {
+      "task": "RouteStick",
+      "seed": 1622647786,
+      "difficulty": "hard",
+      "oracle_policy_step": 973,
+      "execution_route_layout": {
+        "version": 3,
+        "spacing_scale": 0.9391394475708946,
+        "board_height_scale": 1.3,
+        "translation_xy_m": [
+          0.0,
+          0.05
+        ],
+        "yaw_deg": -6.471931111415443,
+        "board_collision": true,
+        "board_contact_fails": false,
+        "board_motion": {
+          "mode": "arrival_boards",
+          "move_s": 2.0,
+          "hold_s": 1.5,
+          "return_s": 2.0,
+          "stroke_m": 0.07,
+          "arrival_radius_m": 0.03,
+          "phases": [
+            "execution"
+          ],
+          "enabled_boards": [
+            true,
+            true,
+            true,
+            true
+          ]
+        }
+      },
+      "suite": "imitation",
+      "episode": 28,
+      "control_freq": 20,
+      "oracle_wall_seconds": 26.032
+    },
+    {
+      "task": "RouteStick",
+      "seed": 728284231,
+      "difficulty": "hard",
+      "oracle_policy_step": 1280,
+      "execution_route_layout": {
+        "version": 3,
+        "spacing_scale": 0.9715174630319728,
+        "board_height_scale": 1.3,
+        "translation_xy_m": [
+          0.0,
+          0.05
+        ],
+        "yaw_deg": 8.085377913387815,
+        "board_collision": true,
+        "board_contact_fails": false,
+        "board_motion": {
+          "mode": "arrival_boards",
+          "move_s": 2.0,
+          "hold_s": 1.5,
+          "return_s": 2.0,
+          "stroke_m": 0.07,
+          "arrival_radius_m": 0.03,
+          "phases": [
+            "execution"
+          ],
+          "enabled_boards": [
+            false,
+            false,
+            true,
+            true
+          ]
+        }
+      },
+      "suite": "imitation",
+      "episode": 29,
+      "control_freq": 20,
+      "oracle_wall_seconds": 37.192
+    },
+    {
+      "task": "RouteStick",
+      "seed": 1316280783,
+      "difficulty": "hard",
+      "oracle_policy_step": 971,
+      "execution_route_layout": {
+        "version": 3,
+        "spacing_scale": 0.9628518830464357,
+        "board_height_scale": 1.3,
+        "translation_xy_m": [
+          0.0,
+          0.05
+        ],
+        "yaw_deg": -7.291001340028786,
+        "board_collision": true,
+        "board_contact_fails": false,
+        "board_motion": {
+          "mode": "arrival_boards",
+          "move_s": 2.0,
+          "hold_s": 1.5,
+          "return_s": 2.0,
+          "stroke_m": 0.07,
+          "arrival_radius_m": 0.03,
+          "phases": [
+            "execution"
+          ],
+          "enabled_boards": [
+            true,
+            false,
+            true,
+            true
+          ]
+        }
+      },
+      "suite": "imitation",
+      "episode": 30,
+      "control_freq": 20,
+      "oracle_wall_seconds": 14.763
+    },
+    {
+      "task": "RouteStick",
+      "seed": 1102381566,
+      "difficulty": "hard",
+      "oracle_policy_step": 1201,
+      "execution_route_layout": {
+        "version": 3,
+        "spacing_scale": 0.9201536264182542,
+        "board_height_scale": 1.3,
+        "translation_xy_m": [
+          -0.05,
+          0.0
+        ],
+        "yaw_deg": 9.215037721666484,
+        "board_collision": true,
+        "board_contact_fails": false,
+        "board_motion": {
+          "mode": "arrival_boards",
+          "move_s": 2.0,
+          "hold_s": 1.5,
+          "return_s": 2.0,
+          "stroke_m": 0.07,
+          "arrival_radius_m": 0.03,
+          "phases": [
+            "execution"
+          ],
+          "enabled_boards": [
+            true,
+            false,
+            true,
+            false
+          ]
+        }
+      },
+      "suite": "imitation",
+      "episode": 31,
+      "control_freq": 20,
+      "oracle_wall_seconds": 26.696
+    },
+    {
+      "task": "RouteStick",
+      "seed": 1932051035,
+      "difficulty": "hard",
+      "oracle_policy_step": 979,
+      "execution_route_layout": {
+        "version": 3,
+        "spacing_scale": 0.9711107858675085,
+        "board_height_scale": 1.3,
+        "translation_xy_m": [
+          0.0,
+          0.05
+        ],
+        "yaw_deg": 7.575378408687534,
+        "board_collision": true,
+        "board_contact_fails": false,
+        "board_motion": {
+          "mode": "arrival_boards",
+          "move_s": 2.0,
+          "hold_s": 1.5,
+          "return_s": 2.0,
+          "stroke_m": 0.07,
+          "arrival_radius_m": 0.03,
+          "phases": [
+            "execution"
+          ],
+          "enabled_boards": [
+            true,
+            true,
+            true,
+            false
+          ]
+        }
+      },
+      "suite": "imitation",
+      "episode": 32,
+      "control_freq": 20,
+      "oracle_wall_seconds": 30.833
+    },
+    {
+      "task": "RouteStick",
+      "seed": 589420671,
+      "difficulty": "hard",
+      "oracle_policy_step": 1104,
+      "execution_route_layout": {
+        "version": 3,
+        "spacing_scale": 0.9222654722178706,
+        "board_height_scale": 1.3,
+        "translation_xy_m": [
+          0.0,
+          -0.05
+        ],
+        "yaw_deg": 9.50804034025543,
+        "board_collision": true,
+        "board_contact_fails": false,
+        "board_motion": {
+          "mode": "arrival_boards",
+          "move_s": 2.0,
+          "hold_s": 1.5,
+          "return_s": 2.0,
+          "stroke_m": 0.07,
+          "arrival_radius_m": 0.03,
+          "phases": [
+            "execution"
+          ],
+          "enabled_boards": [
+            false,
+            false,
+            false,
+            false
+          ]
+        }
+      },
+      "suite": "imitation",
+      "episode": 33,
+      "control_freq": 20,
+      "oracle_wall_seconds": 42.466
+    },
+    {
+      "task": "RouteStick",
+      "seed": 860657359,
+      "difficulty": "hard",
+      "oracle_policy_step": 718,
+      "execution_route_layout": {
+        "version": 3,
+        "spacing_scale": 0.9106549204829624,
+        "board_height_scale": 1.3,
+        "translation_xy_m": [
+          -0.05,
+          0.0
+        ],
+        "yaw_deg": 5.851769481218495,
+        "board_collision": true,
+        "board_contact_fails": false,
+        "board_motion": {
+          "mode": "arrival_boards",
+          "move_s": 2.0,
+          "hold_s": 1.5,
+          "return_s": 2.0,
+          "stroke_m": 0.07,
+          "arrival_radius_m": 0.03,
+          "phases": [
+            "execution"
+          ],
+          "enabled_boards": [
+            true,
+            false,
+            true,
+            false
+          ]
+        }
+      },
+      "suite": "imitation",
+      "episode": 34,
+      "control_freq": 20,
+      "oracle_wall_seconds": 15.443
+    },
+    {
+      "task": "RouteStick",
+      "seed": 119361874,
+      "difficulty": "hard",
+      "oracle_policy_step": 980,
+      "execution_route_layout": {
+        "version": 3,
+        "spacing_scale": 0.9791538007135439,
+        "board_height_scale": 1.3,
+        "translation_xy_m": [
+          0.05,
+          0.0
+        ],
+        "yaw_deg": 5.057319524245272,
+        "board_collision": true,
+        "board_contact_fails": false,
+        "board_motion": {
+          "mode": "arrival_boards",
+          "move_s": 2.0,
+          "hold_s": 1.5,
+          "return_s": 2.0,
+          "stroke_m": 0.07,
+          "arrival_radius_m": 0.03,
+          "phases": [
+            "execution"
+          ],
+          "enabled_boards": [
+            true,
+            true,
+            false,
+            true
+          ]
+        }
+      },
+      "suite": "imitation",
+      "episode": 35,
+      "control_freq": 20,
+      "oracle_wall_seconds": 16.303
+    },
+    {
+      "task": "RouteStick",
+      "seed": 817782375,
+      "difficulty": "hard",
+      "oracle_policy_step": 1022,
+      "execution_route_layout": {
+        "version": 3,
+        "spacing_scale": 0.9833230303023814,
+        "board_height_scale": 1.3,
+        "translation_xy_m": [
+          -0.05,
+          0.0
+        ],
+        "yaw_deg": 5.469362520119136,
+        "board_collision": true,
+        "board_contact_fails": false,
+        "board_motion": {
+          "mode": "arrival_boards",
+          "move_s": 2.0,
+          "hold_s": 1.5,
+          "return_s": 2.0,
+          "stroke_m": 0.07,
+          "arrival_radius_m": 0.03,
+          "phases": [
+            "execution"
+          ],
+          "enabled_boards": [
+            false,
+            true,
+            true,
+            true
+          ]
+        }
+      },
+      "suite": "imitation",
+      "episode": 36,
+      "control_freq": 20,
+      "oracle_wall_seconds": 39.559
+    },
+    {
+      "task": "RouteStick",
+      "seed": 715375680,
+      "difficulty": "hard",
+      "oracle_policy_step": 1116,
+      "execution_route_layout": {
+        "version": 3,
+        "spacing_scale": 0.9301921095398122,
+        "board_height_scale": 1.3,
+        "translation_xy_m": [
+          0.0,
+          0.05
+        ],
+        "yaw_deg": 6.739428842486144,
+        "board_collision": true,
+        "board_contact_fails": false,
+        "board_motion": {
+          "mode": "arrival_boards",
+          "move_s": 2.0,
+          "hold_s": 1.5,
+          "return_s": 2.0,
+          "stroke_m": 0.07,
+          "arrival_radius_m": 0.03,
+          "phases": [
+            "execution"
+          ],
+          "enabled_boards": [
+            true,
+            false,
+            false,
+            false
+          ]
+        }
+      },
+      "suite": "imitation",
+      "episode": 37,
+      "control_freq": 20,
+      "oracle_wall_seconds": 31.923
+    },
+    {
+      "task": "RouteStick",
+      "seed": 1040956220,
+      "difficulty": "hard",
+      "oracle_policy_step": 1144,
+      "execution_route_layout": {
+        "version": 3,
+        "spacing_scale": 0.9094102699950564,
+        "board_height_scale": 1.3,
+        "translation_xy_m": [
+          -0.05,
+          0.0
+        ],
+        "yaw_deg": 5.229921835497273,
+        "board_collision": true,
+        "board_contact_fails": false,
+        "board_motion": {
+          "mode": "arrival_boards",
+          "move_s": 2.0,
+          "hold_s": 1.5,
+          "return_s": 2.0,
+          "stroke_m": 0.07,
+          "arrival_radius_m": 0.03,
+          "phases": [
+            "execution"
+          ],
+          "enabled_boards": [
+            true,
+            true,
+            true,
+            false
+          ]
+        }
+      },
+      "suite": "imitation",
+      "episode": 38,
+      "control_freq": 20,
+      "oracle_wall_seconds": 36.56
+    },
+    {
+      "task": "RouteStick",
+      "seed": 256078046,
+      "difficulty": "hard",
+      "oracle_policy_step": 1273,
+      "execution_route_layout": {
+        "version": 3,
+        "spacing_scale": 0.9353112177480438,
+        "board_height_scale": 1.3,
+        "translation_xy_m": [
+          0.0,
+          -0.05
+        ],
+        "yaw_deg": 7.922714495695139,
+        "board_collision": true,
+        "board_contact_fails": false,
+        "board_motion": {
+          "mode": "arrival_boards",
+          "move_s": 2.0,
+          "hold_s": 1.5,
+          "return_s": 2.0,
+          "stroke_m": 0.07,
+          "arrival_radius_m": 0.03,
+          "phases": [
+            "execution"
+          ],
+          "enabled_boards": [
+            true,
+            true,
+            true,
+            false
+          ]
+        }
+      },
+      "suite": "imitation",
+      "episode": 39,
+      "control_freq": 20,
+      "oracle_wall_seconds": 33.063
+    },
+    {
+      "task": "RouteStick",
+      "seed": 1963186081,
+      "difficulty": "hard",
+      "oracle_policy_step": 1082,
+      "execution_route_layout": {
+        "version": 3,
+        "spacing_scale": 0.9341306559788649,
+        "board_height_scale": 1.3,
+        "translation_xy_m": [
+          0.0,
+          -0.05
+        ],
+        "yaw_deg": 8.839578186811053,
+        "board_collision": true,
+        "board_contact_fails": false,
+        "board_motion": {
+          "mode": "arrival_boards",
+          "move_s": 2.0,
+          "hold_s": 1.5,
+          "return_s": 2.0,
+          "stroke_m": 0.07,
+          "arrival_radius_m": 0.03,
+          "phases": [
+            "execution"
+          ],
+          "enabled_boards": [
+            false,
+            false,
+            true,
+            true
+          ]
+        }
+      },
+      "suite": "imitation",
+      "episode": 40,
+      "control_freq": 20,
+      "oracle_wall_seconds": 29.469
+    },
+    {
+      "task": "RouteStick",
+      "seed": 1051846916,
+      "difficulty": "hard",
+      "oracle_policy_step": 1066,
+      "execution_route_layout": {
+        "version": 3,
+        "spacing_scale": 0.9976422640777302,
+        "board_height_scale": 1.3,
+        "translation_xy_m": [
+          0.0,
+          0.05
+        ],
+        "yaw_deg": 8.447448403450474,
+        "board_collision": true,
+        "board_contact_fails": false,
+        "board_motion": {
+          "mode": "arrival_boards",
+          "move_s": 2.0,
+          "hold_s": 1.5,
+          "return_s": 2.0,
+          "stroke_m": 0.07,
+          "arrival_radius_m": 0.03,
+          "phases": [
+            "execution"
+          ],
+          "enabled_boards": [
+            true,
+            false,
+            true,
+            false
+          ]
+        }
+      },
+      "suite": "imitation",
+      "episode": 41,
+      "control_freq": 20,
+      "oracle_wall_seconds": 34.113
+    },
+    {
+      "task": "RouteStick",
+      "seed": 1119406125,
+      "difficulty": "hard",
+      "oracle_policy_step": 1199,
+      "execution_route_layout": {
+        "version": 3,
+        "spacing_scale": 0.9943201445913477,
+        "board_height_scale": 1.3,
+        "translation_xy_m": [
+          0.0,
+          0.05
+        ],
+        "yaw_deg": 6.476614699799043,
+        "board_collision": true,
+        "board_contact_fails": false,
+        "board_motion": {
+          "mode": "arrival_boards",
+          "move_s": 2.0,
+          "hold_s": 1.5,
+          "return_s": 2.0,
+          "stroke_m": 0.07,
+          "arrival_radius_m": 0.03,
+          "phases": [
+            "execution"
+          ],
+          "enabled_boards": [
+            true,
+            false,
+            false,
+            false
+          ]
+        }
+      },
+      "suite": "imitation",
+      "episode": 42,
+      "control_freq": 20,
+      "oracle_wall_seconds": 40.245
+    },
+    {
+      "task": "RouteStick",
+      "seed": 330033232,
+      "difficulty": "hard",
+      "oracle_policy_step": 1247,
+      "execution_route_layout": {
+        "version": 3,
+        "spacing_scale": 0.9979983536851084,
+        "board_height_scale": 1.3,
+        "translation_xy_m": [
+          -0.05,
+          0.0
+        ],
+        "yaw_deg": -6.386510560535495,
+        "board_collision": true,
+        "board_contact_fails": false,
+        "board_motion": {
+          "mode": "arrival_boards",
+          "move_s": 2.0,
+          "hold_s": 1.5,
+          "return_s": 2.0,
+          "stroke_m": 0.07,
+          "arrival_radius_m": 0.03,
+          "phases": [
+            "execution"
+          ],
+          "enabled_boards": [
+            true,
+            false,
+            true,
+            false
+          ]
+        }
+      },
+      "suite": "imitation",
+      "episode": 43,
+      "control_freq": 20,
+      "oracle_wall_seconds": 34.375
+    },
+    {
+      "task": "RouteStick",
+      "seed": 964572262,
+      "difficulty": "hard",
+      "oracle_policy_step": 798,
+      "execution_route_layout": {
+        "version": 3,
+        "spacing_scale": 0.9158455241702725,
+        "board_height_scale": 1.3,
+        "translation_xy_m": [
+          0.05,
+          0.0
+        ],
+        "yaw_deg": 6.77971897884807,
+        "board_collision": true,
+        "board_contact_fails": false,
+        "board_motion": {
+          "mode": "arrival_boards",
+          "move_s": 2.0,
+          "hold_s": 1.5,
+          "return_s": 2.0,
+          "stroke_m": 0.07,
+          "arrival_radius_m": 0.03,
+          "phases": [
+            "execution"
+          ],
+          "enabled_boards": [
+            false,
+            false,
+            false,
+            true
+          ]
+        }
+      },
+      "suite": "imitation",
+      "episode": 44,
+      "control_freq": 20,
+      "oracle_wall_seconds": 15.414
+    },
+    {
+      "task": "RouteStick",
+      "seed": 2000823278,
+      "difficulty": "hard",
+      "oracle_policy_step": 986,
+      "execution_route_layout": {
+        "version": 3,
+        "spacing_scale": 0.9105296694446905,
+        "board_height_scale": 1.3,
+        "translation_xy_m": [
+          0.0,
+          -0.05
+        ],
+        "yaw_deg": 6.34093462492692,
+        "board_collision": true,
+        "board_contact_fails": false,
+        "board_motion": {
+          "mode": "arrival_boards",
+          "move_s": 2.0,
+          "hold_s": 1.5,
+          "return_s": 2.0,
+          "stroke_m": 0.07,
+          "arrival_radius_m": 0.03,
+          "phases": [
+            "execution"
+          ],
+          "enabled_boards": [
+            false,
+            false,
+            true,
+            false
+          ]
+        }
+      },
+      "suite": "imitation",
+      "episode": 45,
+      "control_freq": 20,
+      "oracle_wall_seconds": 23.383
+    },
+    {
+      "task": "RouteStick",
+      "seed": 881413592,
+      "difficulty": "hard",
+      "oracle_policy_step": 838,
+      "execution_route_layout": {
+        "version": 3,
+        "spacing_scale": 0.9249805828447011,
+        "board_height_scale": 1.3,
+        "translation_xy_m": [
+          0.0,
+          -0.05
+        ],
+        "yaw_deg": 5.424174177575155,
+        "board_collision": true,
+        "board_contact_fails": false,
+        "board_motion": {
+          "mode": "arrival_boards",
+          "move_s": 2.0,
+          "hold_s": 1.5,
+          "return_s": 2.0,
+          "stroke_m": 0.07,
+          "arrival_radius_m": 0.03,
+          "phases": [
+            "execution"
+          ],
+          "enabled_boards": [
+            true,
+            false,
+            true,
+            true
+          ]
+        }
+      },
+      "suite": "imitation",
+      "episode": 46,
+      "control_freq": 20,
+      "oracle_wall_seconds": 16.772
+    },
+    {
+      "task": "RouteStick",
+      "seed": 782211374,
+      "difficulty": "hard",
+      "oracle_policy_step": 1023,
+      "execution_route_layout": {
+        "version": 3,
+        "spacing_scale": 0.9321916665737751,
+        "board_height_scale": 1.3,
+        "translation_xy_m": [
+          -0.05,
+          0.0
+        ],
+        "yaw_deg": -7.232969244812682,
+        "board_collision": true,
+        "board_contact_fails": false,
+        "board_motion": {
+          "mode": "arrival_boards",
+          "move_s": 2.0,
+          "hold_s": 1.5,
+          "return_s": 2.0,
+          "stroke_m": 0.07,
+          "arrival_radius_m": 0.03,
+          "phases": [
+            "execution"
+          ],
+          "enabled_boards": [
+            true,
+            false,
+            false,
+            true
+          ]
+        }
+      },
+      "suite": "imitation",
+      "episode": 47,
+      "control_freq": 20,
+      "oracle_wall_seconds": 22.412
+    },
+    {
+      "task": "RouteStick",
+      "seed": 195986637,
+      "difficulty": "hard",
+      "oracle_policy_step": 1024,
+      "execution_route_layout": {
+        "version": 3,
+        "spacing_scale": 0.9154150168683085,
+        "board_height_scale": 1.3,
+        "translation_xy_m": [
+          0.0,
+          -0.05
+        ],
+        "yaw_deg": -8.591692999708393,
+        "board_collision": true,
+        "board_contact_fails": false,
+        "board_motion": {
+          "mode": "arrival_boards",
+          "move_s": 2.0,
+          "hold_s": 1.5,
+          "return_s": 2.0,
+          "stroke_m": 0.07,
+          "arrival_radius_m": 0.03,
+          "phases": [
+            "execution"
+          ],
+          "enabled_boards": [
+            true,
+            false,
+            true,
+            false
+          ]
+        }
+      },
+      "suite": "imitation",
+      "episode": 48,
+      "control_freq": 20,
+      "oracle_wall_seconds": 19.585
+    },
+    {
+      "task": "RouteStick",
+      "seed": 1801214773,
+      "difficulty": "hard",
+      "oracle_policy_step": 1129,
+      "execution_route_layout": {
+        "version": 3,
+        "spacing_scale": 0.9939839643808872,
+        "board_height_scale": 1.3,
+        "translation_xy_m": [
+          0.05,
+          0.0
+        ],
+        "yaw_deg": -6.649411759062588,
+        "board_collision": true,
+        "board_contact_fails": false,
+        "board_motion": {
+          "mode": "arrival_boards",
+          "move_s": 2.0,
+          "hold_s": 1.5,
+          "return_s": 2.0,
+          "stroke_m": 0.07,
+          "arrival_radius_m": 0.03,
+          "phases": [
+            "execution"
+          ],
+          "enabled_boards": [
+            true,
+            false,
+            false,
+            true
+          ]
+        }
+      },
+      "suite": "imitation",
+      "episode": 49,
+      "control_freq": 20,
+      "oracle_wall_seconds": 19.221
+    }
+  ]
+}

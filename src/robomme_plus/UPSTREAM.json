@@ -1,0 +1,981 @@
+{
+  "schema": "robomme-ood-upstream/3",
+  "source_repository": "https://github.com/hongzefu/RoboMME-benchmark-OOD",
+  "source_commit": "a5efb992e769b7011281a1d31739b76d8868602a",
+  "source_kind": "working tree; per-file hashes include local wrapper/evaluator changes",
+  "official_repository": "https://github.com/RoboMME/robomme_benchmark",
+  "official_commit": "1fadc0ec50316b60ddcfd8e82ac62ef2b70c18f9",
+  "file_paths": "relative to the package directory in the historical import snapshot",
+  "snapshot_note": "Historical provenance only: file paths and package sha256 values below do not describe the current release. Use the repository's Git revision for current file identities.",
+  "packaging_note": "Runtime consolidated into common/ and tasks/<suite>/utils. Task scenes and their OOD adapters share one task module. Duplicate wrapper trees and unused training helpers removed; execution budgets come from oracle metadata.",
+  "files": [
+    {
+      "file": "__init__.py",
+      "sha256": "5f4bac139ff7403289f1b945900d3fbeab6e944d0380e4f77bd0f5bfe7cde703",
+      "sources": []
+    },
+    {
+      "file": "builder.py",
+      "sha256": "7011479a600d566cf2c92a037ea79bf8efacf64c7fda53134f0781cf23c10918",
+      "sources": []
+    },
+    {
+      "file": "common/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sources": []
+    },
+    {
+      "file": "common/base.py",
+      "sha256": "6dc6bf0c2d00d38a018db335efaa5a2321dddfeb33696f1873bda3f7ff9e0641",
+      "sources": []
+    },
+    {
+      "file": "common/batches.py",
+      "sha256": "a3265f4a088fe190a3de57da0e920402334a5729915711d889008cae2b0aff48",
+      "sources": [
+        {
+          "source": "src/robomme/robomme_env/utils/planner_denseStep.py",
+          "source_sha256": "beb54b06a8edb3dc8ae742a78c5b3c8193255a6a88a358b659daff55490854f1"
+        },
+        {
+          "source": "src/robomme_hard/robomme_env/utils/planner_denseStep.py",
+          "source_sha256": "3676a3aba8546e0121e8e15b0f4dcc928e8ef4de820f20540ed2c975df139273"
+        }
+      ]
+    },
+    {
+      "file": "common/bin_collision.py",
+      "sha256": "cae84096e0838efc9680436da3d4d8d3859de8d39224caf1cdc3fcc3d4e9e94d",
+      "sources": [
+        {
+          "source": "src/robomme_hard/robomme_env/utils/bin_collision.py",
+          "source_sha256": "d3fab1a2e04139cf36ee01c60ece9b03451d548aa5e9c444ef3755c558b986e9"
+        }
+      ]
+    },
+    {
+      "file": "common/camera_perturbation.py",
+      "sha256": "b8297f741ab564115f339456faf60336eb259e749f1b8f77c32e1f2048f9aa5d",
+      "sources": [
+        {
+          "source": "src/robomme_hard/env_record_wrapper/camera_perturbation.py",
+          "source_sha256": "86e55fb95303747ee8bd3ae85bd5060ddf2f30a7e83ea190811542ce07171f23"
+        }
+      ]
+    },
+    {
+      "file": "common/demonstration.py",
+      "sha256": "4cbd89ca289585edf964b1621faa444a43a96fd21ede569c6dc8e72c52fb3c87",
+      "sources": [
+        {
+          "source": "src/robomme/env_record_wrapper/DemonstrationWrapper.py",
+          "source_sha256": "1355727502a56a79d19e5dfd40519bcbbc7ddce48f9a823408db4c6a4760c9d1"
+        },
+        {
+          "source": "src/robomme_hard/env_record_wrapper/DemonstrationWrapper.py",
+          "source_sha256": "13b6374fdbc5a749205b98c606bec1db5de540c01577e8320d13966d1ac06d09"
+        }
+      ]
+    },
+    {
+      "file": "common/difficulty.py",
+      "sha256": "1db56202cb9ff7da69309d38a0459fca426f567f82fcc8d400fe4d25c6e5e7bc",
+      "sources": [
+        {
+          "source": "src/robomme/robomme_env/utils/difficulty.py",
+          "source_sha256": "9390a72c4e8e072c0078c942f442a97c1bb77e8f08e7f3d3a3fafd6e74abff72"
+        },
+        {
+          "source": "src/robomme_hard/robomme_env/utils/difficulty.py",
+          "source_sha256": "043a25e8091d3fd4eb476d5c75d0bdcb737cb17311cf1697c21f2eaafb01bf3e"
+        }
+      ]
+    },
+    {
+      "file": "common/ee_pose.py",
+      "sha256": "678fca029fdf13fcadf0b4c0b9612da05e8ca3afc8f9b507ca93211269ed6097",
+      "sources": [
+        {
+          "source": "src/robomme/env_record_wrapper/EndeffectorDemonstrationWrapper.py",
+          "source_sha256": "7b56560e6b04c8527125f9efc9b29e50ab959cc5639ef24a2cc8eda1ae4389ff"
+        },
+        {
+          "source": "src/robomme_hard/env_record_wrapper/EndeffectorDemonstrationWrapper.py",
+          "source_sha256": "d22be61634865f4a4a36378ba7346dddf5e62e5dad786d8b7d7bdbb8440f986e"
+        }
+      ]
+    },
+    {
+      "file": "common/episode.py",
+      "sha256": "b89f3a88ddbe4a7fb8e9ae88a3282590377041e1fb138665c7d578f6671410ac",
+      "sources": []
+    },
+    {
+      "file": "common/episode_spec.py",
+      "sha256": "a038e0d70a0088a3744741b3abfceb888046c18d5d1136ddea6f030e8d099bd6",
+      "sources": [
+        {
+          "source": "src/robomme_hard/robomme_env/utils/episode_spec.py",
+          "source_sha256": "62db7ff04eabbafbd16bed9a5919f603bd623a9580f5c73984b12f12849eab9d"
+        }
+      ]
+    },
+    {
+      "file": "common/errors.py",
+      "sha256": "3694a0fb61dfd7c3f0b8dfdfda9aa035bab4ca28becf1fb5aa9f6c0d052c835b",
+      "sources": [
+        {
+          "source": "src/robomme/robomme_env/utils/SceneGenerationError.py",
+          "source_sha256": "3694a0fb61dfd7c3f0b8dfdfda9aa035bab4ca28becf1fb5aa9f6c0d052c835b"
+        },
+        {
+          "source": "src/robomme_hard/robomme_env/utils/SceneGenerationError.py",
+          "source_sha256": "38e5f87e413377de49836ab7425b58126cfc3b638a7490ab58fe3d28e32623a0"
+        }
+      ]
+    },
+    {
+      "file": "common/failure.py",
+      "sha256": "5172451e8695ecf36f96623f04d0c53ccbe78b4eb94677c13ac1215b3cd2e510",
+      "sources": [
+        {
+          "source": "src/robomme/env_record_wrapper/FailAwareWrapper.py",
+          "source_sha256": "3fb395119818eb433704bd7b8132abba03e53468d0eca8ee494adf79163e1efd"
+        },
+        {
+          "source": "src/robomme_hard/env_record_wrapper/FailAwareWrapper.py",
+          "source_sha256": "b515e45ba30bce87e0d843d6584b82565a004bcc8cf030724680ed82a40cf5b9"
+        }
+      ]
+    },
+    {
+      "file": "common/grounding.py",
+      "sha256": "a0d09fe8f5a225fc31983cc809e29ed02bfd719f68a213f05f815238e4d830ba",
+      "sources": []
+    },
+    {
+      "file": "common/logging_utils.py",
+      "sha256": "0f6d0c8944bc5f8cca0e708ab361f06a7ca0535a61efa3f9751252825ec77144",
+      "sources": [
+        {
+          "source": "src/robomme/logging_utils.py",
+          "source_sha256": "8992d80942a79af9c17ebd0a1784dd3c7c09142567de1dc697e099d05b605cb2"
+        },
+        {
+          "source": "src/robomme_hard/logging_utils.py",
+          "source_sha256": "868069094d2076624c72a9849845daedee7dbdc82f059dda07e1294a05cf54b9"
+        }
+      ]
+    },
+    {
+      "file": "common/metadata.py",
+      "sha256": "3b6624cab11d9f2d4861193ae54bc52f59435ca0b244fc0813c3683d9e14c2d0",
+      "sources": []
+    },
+    {
+      "file": "common/motion.py",
+      "sha256": "798eba1fda767fbdef2c30982449863b0d1b03b25339ae68112037b5b600066e"
+    },
+    {
+      "file": "common/object_generation.py",
+      "sha256": "6e9f991574b3c078582f40381efbe057ee467595586d444eb36040cab1d83d3e",
+      "sources": [
+        {
+          "source": "src/robomme/robomme_env/utils/object_generation.py",
+          "source_sha256": "c782464428bd552063f139f9c2684b114f4cd724d2e7967d56ee40d57e830163"
+        },
+        {
+          "source": "src/robomme_hard/robomme_env/utils/object_generation.py",
+          "source_sha256": "2d579cda50b2a0cc5811986b768f69ca8f04901ca9fa46a662d163dadaa98e67"
+        }
+      ]
+    },
+    {
+      "file": "common/oracle.py",
+      "sha256": "74be7d573071a6489d98f7054f55eb8b25674f88a119be81f5d22e20c06b363c",
+      "sources": []
+    },
+    {
+      "file": "common/planner_fail_safe.py",
+      "sha256": "faa69a42997e1d8f2a863f2e99389da2ee5daa19c6b4077e7106a48ff9de209e",
+      "sources": [
+        {
+          "source": "src/robomme/robomme_env/utils/planner_fail_safe.py",
+          "source_sha256": "444c52bc2ec3b7f119804b810eaafcc6251142dcc37116f0bedfddc744246451"
+        },
+        {
+          "source": "src/robomme_hard/robomme_env/utils/planner_fail_safe.py",
+          "source_sha256": "8b6e2724db199bcc0322651df219800b6c3a342f1c32354b249328a86f31aa03"
+        }
+      ]
+    },
+    {
+      "file": "common/planning.py",
+      "sha256": "d60cf9a5ac28e37c088dbae32712a5dd968f6552639446e6cb57eda2a4ee7ea1",
+      "sources": [
+        {
+          "source": "src/robomme/robomme_env/utils/subgoal_planner_func.py",
+          "source_sha256": "9001aeb9c679d5e71f334fbc87d73b40a1ed03d1a3297f4811213b4c874a0c0f"
+        },
+        {
+          "source": "src/robomme_hard/robomme_env/utils/subgoal_planner_func.py",
+          "source_sha256": "5953bcb9cd2e9d84378824f327e96e687a70e51329bf3e38a05753fb210ca95a"
+        }
+      ]
+    },
+    {
+      "file": "common/predicates.py",
+      "sha256": "9bdb7bc032870a4894b551a30e879df7a541f70eb28e9f9cf956bca803154c36",
+      "sources": [
+        {
+          "source": "src/robomme/robomme_env/utils/subgoal_evaluate_func.py",
+          "source_sha256": "ff2e77e913f038752e26b23900a09ad7ec85a0513b1969eddb0e3efa7fa76989"
+        },
+        {
+          "source": "src/robomme_hard/robomme_env/utils/subgoal_evaluate_func.py",
+          "source_sha256": "6de8bfa2992caa554a570f9a8e12576f39ec48a6f2b30e344ab8ee95c4bb1d10"
+        }
+      ]
+    },
+    {
+      "file": "common/reset_panda.py",
+      "sha256": "36f0476cc8f368537bc2fb6d70b0302345eb665c9e4652cb98b34e2f34b1cb51",
+      "sources": [
+        {
+          "source": "src/robomme/robomme_env/utils/reset_panda.py",
+          "source_sha256": "206bf936dcbca47fbdc28f43c6caa2f5fec48e6ecceeef644935644b16f2bd4c"
+        },
+        {
+          "source": "src/robomme_hard/robomme_env/utils/reset_panda.py",
+          "source_sha256": "c77d8136c4437b049c93c4fb333e831e12b5066e1d237b1ef5de866575d0bb63"
+        }
+      ]
+    },
+    {
+      "file": "common/rpy_util.py",
+      "sha256": "de11a9f19217013bddf24fa8be22a97f22742aa4ad84edd2b058e60bf5c1d803",
+      "sources": [
+        {
+          "source": "src/robomme/robomme_env/utils/rpy_util.py",
+          "source_sha256": "5e28ceedea8b4c4a850d659e0f213d8989c4b205d47c75d07c9135cf45458d59"
+        },
+        {
+          "source": "src/robomme_hard/robomme_env/utils/rpy_util.py",
+          "source_sha256": "98c21803edb0815ea3b5138e43ecd3c9cbffacf0f85e5f1858ee303f5c20064b"
+        }
+      ]
+    },
+    {
+      "file": "common/runtime.py",
+      "sha256": "c37f7e88c441b9d5c071d5acb669793b12b40177139534ff5a6d2169b29809dc",
+      "sources": []
+    },
+    {
+      "file": "common/sampling_config.py",
+      "sha256": "7554c487c2ad7e49e023d626a30584516ef5c9e02e974b68c39186a23021a662",
+      "sources": [
+        {
+          "source": "src/robomme_hard/robomme_env/utils/sampling_config.py",
+          "source_sha256": "d5406d3189ee7a8c5c556e64c63b680d6842a811c486ad8d7afadf4c6e5f537b"
+        }
+      ]
+    },
+    {
+      "file": "common/sim.py",
+      "sha256": "74a9c43370a0c86c4e9e46d3fefa2c702d0849daefc56b6c6668a27b6ff278cc",
+      "sources": []
+    },
+    {
+      "file": "common/statechange.py",
+      "sha256": "79982cc5a1900d5f62f7bda086c5c48c4266cd563f1c84104909cc55387c24ec",
+      "sources": [
+        {
+          "source": "src/robomme/robomme_env/utils/statechange.py",
+          "source_sha256": "c159096bd3e0b6ac3ce530f413615eeb1fadd54cce202f71728f5a4028e8bd05"
+        },
+        {
+          "source": "src/robomme_hard/robomme_env/utils/statechange.py",
+          "source_sha256": "0985dc599f24b880bb6c8f34ba6f373cb7e8eb0686c4a278210792cf3ca24e77"
+        }
+      ]
+    },
+    {
+      "file": "common/subgoal_language.py",
+      "sha256": "0907629b3b7d57836383460653ddd8b9ef7b54fd83f6fec0a9946033a6178824",
+      "sources": [
+        {
+          "source": "src/robomme/robomme_env/utils/subgoal_language.py",
+          "source_sha256": "ac76073cc1805794c4a60777492db361e8fc80f428a63e6433760b13cfb59ea9"
+        },
+        {
+          "source": "src/robomme_hard/robomme_env/utils/subgoal_language.py",
+          "source_sha256": "f8eb43ce9f2b0030f85bfcad088a2a3f1c6986525702320f7b0b055bf540d124"
+        }
+      ]
+    },
+    {
+      "file": "common/subgoals.py",
+      "sha256": "9a1231669499922f197c9144a414d215f640cd82c5c43f7aaa05d07689addd8f"
+    },
+    {
+      "file": "common/swap_uniform.py",
+      "sha256": "fc38a378585435f2264aee7103b17d1205a5d3c59386bb8303bad0244ca4d886",
+      "sources": [
+        {
+          "source": "src/robomme_hard/robomme_env/utils/swap_uniform.py",
+          "source_sha256": "f4a1a8c08c629e8924ff1a0d37e9acdd4c7bcfee32ba7be80cf18e6328d85821"
+        }
+      ]
+    },
+    {
+      "file": "common/task4recovery.py",
+      "sha256": "099679ef528987538645eb60d1fc85d2db7a5e2ae449e699260ac585e4eca6f2",
+      "sources": [
+        {
+          "source": "src/robomme/robomme_env/utils/task4recovery.py",
+          "source_sha256": "2248a03b91b04feca0378c8e6a4bfb46292fc30e96d7217e7e2201c99eb71e7b"
+        },
+        {
+          "source": "src/robomme_hard/robomme_env/utils/task4recovery.py",
+          "source_sha256": "2248a03b91b04feca0378c8e6a4bfb46292fc30e96d7217e7e2201c99eb71e7b"
+        }
+      ]
+    },
+    {
+      "file": "common/task_goal.py",
+      "sha256": "bc7d74a059d1473fcc96f02896c1008d3de2a62798aced4519d8f434cd741063",
+      "sources": [
+        {
+          "source": "src/robomme/robomme_env/utils/task_goal.py",
+          "source_sha256": "60a020f657cc89f67d8a3df2d95b19f8f0bfbf868b10b4db81b4d0ba12232223"
+        },
+        {
+          "source": "src/robomme_hard/robomme_env/utils/task_goal.py",
+          "source_sha256": "2e9b1f07abac40ed4bb562e194de63664db3abd09f1941af2f7132f590d6494f"
+        }
+      ]
+    },
+    {
+      "file": "common/waypoint.py",
+      "sha256": "54753642e3c95fa55008f7dd85fd8616b59c031d95d2e95811288bf9a90227e4",
+      "sources": [
+        {
+          "source": "src/robomme/env_record_wrapper/MultiStepDemonstrationWrapper.py",
+          "source_sha256": "3edbada86ca73c22cd2278553d86b3d4aa2f75b9b093eee12584ceb398c36f7c"
+        },
+        {
+          "source": "src/robomme_hard/env_record_wrapper/MultiStepDemonstrationWrapper.py",
+          "source_sha256": "c98b9c8cb4ab93fd44b690b882a4bdee2bea8096869216666f6e81bfa8cbef3f"
+        }
+      ]
+    },
+    {
+      "file": "common/xhard.py",
+      "sha256": "a0e63d247195c1c36de8072abac6a02c2fd7ceb8962a929c650e477361120e37",
+      "sources": [
+        {
+          "source": "src/robomme_hard/robomme_env/utils/xhard.py",
+          "source_sha256": "c717510c2752c348c8c3591521c359d4a481a03e052315a172917af850a20426"
+        }
+      ]
+    },
+    {
+      "file": "env_record_wrapper.py",
+      "sha256": "a6cd622d3e7770feff5f4aca0bc007f8971a640fd391e8ca18498ea4ffc0b50c",
+      "sources": []
+    },
+    {
+      "file": "oracle.py",
+      "sha256": "35a43db4a30a9582d3474eef84865a16495f4cd3103629badb0cb861c56a7618",
+      "sources": []
+    },
+    {
+      "file": "registry.py",
+      "sha256": "499e66ec70824daa94641dbf1749406dd62981948e6933baf0453ededb02255d",
+      "sources": []
+    },
+    {
+      "file": "tasks/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sources": []
+    },
+    {
+      "file": "tasks/counting/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sources": []
+    },
+    {
+      "file": "tasks/counting/bin_fill.py",
+      "sha256": "0e4ee9c2850a477b207d01a06d412f5439310f9b6ab8f277030b65fb5ab7e7d7",
+      "sources": [
+        {
+          "source": "src/robomme_hard/robomme_env/BinFill.py",
+          "source_sha256": "5c09ff4414f1dfaa25cd1e1b249c25eb1e79420d11e1a3ee6552e29d8fc20756"
+        }
+      ]
+    },
+    {
+      "file": "tasks/counting/pick_xtimes.py",
+      "sha256": "20feab62355f85f7277ffc438500338bb238584246e66147ae53a4c12756588c",
+      "sources": [
+        {
+          "source": "src/robomme_hard/robomme_env/PickXtimes.py",
+          "source_sha256": "a7783ed8000eceb1eafb669c350b5dba046934834ad52d9fc51bd7d7d91f05e1"
+        }
+      ]
+    },
+    {
+      "file": "tasks/counting/stop_cube.py",
+      "sha256": "9f7826a8f445cd89368244b3782cc18c2b744781a3a8c909d38682ae57d49a09",
+      "sources": [
+        {
+          "source": "src/robomme_hard/robomme_env/StopCube.py",
+          "source_sha256": "9ea04cce2be874bf780147781570875c10a449319d34aa6e551d346b69b810f5"
+        }
+      ]
+    },
+    {
+      "file": "tasks/counting/swing_xtimes.py",
+      "sha256": "6261ce9d7837186b1797620b20296c743e501b04a7f0fbdb65f5b43aae97ae8b",
+      "sources": [
+        {
+          "source": "src/robomme_hard/robomme_env/SwingXtimes.py",
+          "source_sha256": "dd10a2275cdc2bcfae8c77993462f12979a0a96e47545e49eeef4f4fd933882d"
+        }
+      ]
+    },
+    {
+      "file": "tasks/counting/utils/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sources": []
+    },
+    {
+      "file": "tasks/counting/utils/controllers.py",
+      "sha256": "99969a37bc089af1962371180cf19639d627d8ecd95d8ac1ec516a1c5957005c",
+      "sources": [
+        {
+          "source": "third_party/robomme/counting_challenges.py",
+          "source_sha256": "a26d62d8a4e47a3d0f577807cc23e744c3b1795ec075f73bb3a0918c773fda5e"
+        }
+      ]
+    },
+    {
+      "file": "tasks/counting/utils/conveyor.py",
+      "sources": [],
+      "sha256": "c3cb52c2bc0ce25a3683af8985d1e6b535dd703b98a6e03e55fa74276fdd0462"
+    },
+    {
+      "file": "tasks/counting/utils/environment.py",
+      "sha256": "34ae60afb155a5981e85e849178218f225c5751fe4b187677eaae84e2c820d26",
+      "sources": []
+    },
+    {
+      "file": "tasks/counting/utils/goals.py",
+      "sha256": "8a9521afc14e7c6074b7e6b25f6b84c5229cb98fe953dad97acbb43d307d2d68",
+      "sources": [
+        {
+          "source": "third_party/robomme/counting_goals.py",
+          "source_sha256": "91d46bd8a8627331da8c1fa022bf70204bc7ec34343ed6ddca0882f9bceeac1d"
+        }
+      ]
+    },
+    {
+      "file": "tasks/counting/utils/motion.py",
+      "sha256": "b9c68a5b7460990fa1f224fe33707743156a6087b1e83bb0e2dd214582427b8c",
+      "sources": [
+        {
+          "source": "third_party/robomme/counting_motion.py",
+          "source_sha256": "c49a18c2b27047d874ce7f0d2609b0a57acd5542a5b4966ef0a60dbb56d6c71e"
+        }
+      ]
+    },
+    {
+      "file": "tasks/counting/utils/oracle.py",
+      "sha256": "959d2366fb114be33215a377766efc8663e664cd48cccb2fc7f285d6855de111",
+      "sources": [
+        {
+          "source": "third_party/robomme/counting_oracle.py",
+          "source_sha256": "75ed5a018255166c5963dd25125ce91aa93bba89ac3db3004d0fc4b38fca0a37"
+        }
+      ]
+    },
+    {
+      "file": "tasks/counting/utils/subgoals.py",
+      "sha256": "b9b7ccee32f3cc4a4d224f7096332e628bbb7b4c9b8f08e0df954e30906d988c",
+      "sources": []
+    },
+    {
+      "file": "tasks/counting/utils/variations.py",
+      "sha256": "7645210c17473dfc54d20a0b5599181d5f370d2fe346922783752eb2859dd4d2",
+      "sources": [
+        {
+          "source": "third_party/robomme/counting_variations.py",
+          "source_sha256": "218ecb1cd9d58bf0c7c8b8d97d197d3bf8a2fa0b93f037328d10a76bc5201aa7"
+        }
+      ]
+    },
+    {
+      "file": "tasks/imitation/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sources": []
+    },
+    {
+      "file": "tasks/imitation/insert_peg.py",
+      "sha256": "6d01ed5b7ebd090f0bf5ab4d02119c97c77b0e7e2ed4f66f4d0f682507ce2c52",
+      "sources": [
+        {
+          "source": "src/robomme_hard/robomme_env/InsertPeg.py",
+          "source_sha256": "89e7d8fca43d42ad6e884e9816819f02397601df2abfbdc146969cefa004bbd8"
+        }
+      ]
+    },
+    {
+      "file": "tasks/imitation/move_cube.py",
+      "sha256": "a07290cd533fa7e7f406c03950bb1ffc3a4e12d14259fd1ddbb73ded638b6b14",
+      "sources": [
+        {
+          "source": "src/robomme_hard/robomme_env/MoveCube.py",
+          "source_sha256": "f856d835fd8598b9a4f6008c89266cc6d48280a6395132d77d16d06522ca0fad"
+        }
+      ]
+    },
+    {
+      "file": "tasks/imitation/pattern_lock.py",
+      "sha256": "c47e180b83c93746682ab57ef6c8270a47ef7b0387127dc2c5e02f2e643023af",
+      "sources": [
+        {
+          "source": "src/robomme_hard/robomme_env/PatternLock.py",
+          "source_sha256": "7314df57b53803d397603834ac4b7e660afef8ea1b0440aa8648fb005a939f98"
+        }
+      ]
+    },
+    {
+      "file": "tasks/imitation/route_stick.py",
+      "sha256": "b51cfc088eedbdf7a11032fb58e821522a57872ec7bf3ac0c81e5f33da7d5947",
+      "sources": [
+        {
+          "source": "src/robomme_hard/robomme_env/RouteStick.py",
+          "source_sha256": "643a0e7d013719a560cce005c3d2c18cc2f0f92bb04b6da8a94cd968e6c93d34"
+        }
+      ]
+    },
+    {
+      "file": "tasks/imitation/utils/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sources": []
+    },
+    {
+      "file": "tasks/imitation/utils/adjacent.py",
+      "sha256": "4a27ecb551e55de5bc88746c2d46a62f4dd0955b4963fb0abcb36778f42cb0e0",
+      "sources": [
+        {
+          "source": "src/robomme/robomme_env/utils/adjacent.py",
+          "source_sha256": "7e20cd26c3203c66a5a1163f4436003c2502e3ba592b2e107f85979cdae33f5e"
+        },
+        {
+          "source": "src/robomme_hard/robomme_env/utils/adjacent.py",
+          "source_sha256": "8bb4f2cd8ea69e46780f50f933cfd39dedb73eed8bf4c5d62e0b0bb637b8ff91"
+        }
+      ]
+    },
+    {
+      "file": "tasks/imitation/utils/assets/imitation_pan_floor_inner.obj",
+      "sources": [],
+      "sha256": "c3df9c666a8f73f996ce8f9bb272a3e3be508ba2035e9a78af58b57f9356071c"
+    },
+    {
+      "file": "tasks/imitation/utils/assets/imitation_pan_floor_outer.obj",
+      "sources": [],
+      "sha256": "a0293a9b0f873ba4b99f7724849a3b5dcbe71247d386c31fec62efed3a4541e7"
+    },
+    {
+      "file": "tasks/imitation/utils/assets/imitation_pan_rim_inner.obj",
+      "sources": [],
+      "sha256": "8636b2f37c1e7fd54c9c972b4731146d1e89d800742a76f7e363cc3e49cec174"
+    },
+    {
+      "file": "tasks/imitation/utils/assets/imitation_pan_rim_outer.obj",
+      "sources": [],
+      "sha256": "2b0872ce909c06ae31cd8b38ee5240e7a0521fa8216c36f3972318eb3ae7ce01"
+    },
+    {
+      "file": "tasks/imitation/utils/controllers.py",
+      "sha256": "93f3f91c99e63219da627692f0ffe0b97264e4e005b896a14bfbdd3c8b55bbe2",
+      "sources": [
+        {
+          "source": "third_party/robomme/imitation_challenges.py",
+          "source_sha256": "2cac68a05271cdefd1f9f272d4f2fff775914321f9d0ffd631b90c6391d0e84f"
+        }
+      ]
+    },
+    {
+      "file": "tasks/imitation/utils/drawing.py",
+      "sha256": "62e8fb928701394883c6c5436cc1f4e5edad20a7b93c79c474a8005fc1f49575",
+      "sources": []
+    },
+    {
+      "file": "tasks/imitation/utils/environment.py",
+      "sha256": "abe295d7ac4e89de480cebea40ce0a9dc2abb657348adb8ae0445c0a0a023b23",
+      "sources": []
+    },
+    {
+      "file": "tasks/imitation/utils/geometry.py",
+      "sha256": "61406af56718180b448ab3172a0f236f8591c06a4495a4bb2c74bdaca57ddbda",
+      "sources": [
+        {
+          "source": "third_party/robomme/imitation_geometry.py",
+          "source_sha256": "477c6bdfa9e8d07d53199923fe9f09ee28eebf06e57ce7a23ed09877fa4fde30"
+        }
+      ]
+    },
+    {
+      "file": "tasks/imitation/utils/route.py",
+      "sha256": "2d2fd175dec2fe84a19ec27354493f6bf0e485fa4349d5ca54cde157d2fff23a",
+      "sources": [
+        {
+          "source": "src/robomme/robomme_env/utils/route.py",
+          "source_sha256": "9a6a07703056b3b3bfa2f6814659748749b9cdaf3dcc45038e3e547f10047878"
+        },
+        {
+          "source": "src/robomme_hard/robomme_env/utils/route.py",
+          "source_sha256": "d96c0fefb4c809e22560e6ee8c5a23eb338d72cb1daf159c691a8a1b0aefba31"
+        }
+      ]
+    },
+    {
+      "file": "tasks/imitation/utils/split_stick.py",
+      "sha256": "b4d1978330b0cebdd27dd0471bad829c98e515a9f4492b9261aa869cc5aca9bf",
+      "sources": []
+    },
+    {
+      "file": "tasks/imitation/utils/tools.py",
+      "sha256": "aeb23cf8806bca7ca39fe01fa85e6d0b9aad3028f0bb9f23f9fc203089716ddb",
+      "sources": [
+        {
+          "source": "third_party/robomme/imitation_tools.py",
+          "source_sha256": "d916d8c2ba4d368aa40ef2d3007ce9a06523c81d98da74bbfca68d85dd0bf784"
+        }
+      ]
+    },
+    {
+      "file": "tasks/imitation/utils/tracing.py",
+      "sources": [],
+      "sha256": "109bbf1a2c96997f0156503d531d583b569158c91af6151df3dc63206152b96f"
+    },
+    {
+      "file": "tasks/imitation/utils/variants.py",
+      "sha256": "114b6348fd9e3658b6b5d985826f59081eca36543acd5da28d0c8c78ca8196da",
+      "sources": []
+    },
+    {
+      "file": "tasks/permanence/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sources": []
+    },
+    {
+      "file": "tasks/permanence/button_unmask.py",
+      "sha256": "dcaf241ab54d687a79584e6f1f1b880f1bf817bdfa976a35591281ffa6e7eb22",
+      "sources": [
+        {
+          "source": "src/robomme_hard/robomme_env/ButtonUnmask.py",
+          "source_sha256": "6b193c06975e6f348361a11006e14fa507f03ef73dc32ba24f23b29d09b166c9",
+          "source_code_sha256": "a94fe8bd9014aa961204cbb1b8003906209307b843a56b9f611837f5296467ad"
+        }
+      ]
+    },
+    {
+      "file": "tasks/permanence/button_unmask_swap.py",
+      "sha256": "31f6aa23d37bd268aa72ab2c5c277d798d14fe7db679f47ce44416a5c39a8f6a",
+      "sources": [
+        {
+          "source": "src/robomme_hard/robomme_env/ButtonUnmaskSwap.py",
+          "source_sha256": "1f271f41b34d7331fe86a496f82547abe3bbd1da74ecce7b071bee5deeb91d8f",
+          "source_code_sha256": "212d3e50285d6b64bf06e512f25e28ab8f78ca15347c52603540c50666a4be05"
+        }
+      ]
+    },
+    {
+      "file": "tasks/permanence/utils/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sources": []
+    },
+    {
+      "file": "tasks/permanence/utils/board.py",
+      "sha256": "e7cb4ad142dabd899d535b2a2a4e18d234b2098d198b0d8be3bcb683371ceb57",
+      "sources": [
+        {
+          "source": "third_party/robomme/button_swap_board.py",
+          "source_sha256": "5a772fbbf1963b72001882d45c3dca2337099444d9ffe6d1f73151d2dab817d2"
+        }
+      ]
+    },
+    {
+      "file": "tasks/permanence/utils/environment.py",
+      "sha256": "de17d12e3bf17d896b4921056055629623155b697dddbac3d730906f2c4750a7",
+      "sources": []
+    },
+    {
+      "file": "tasks/permanence/utils/moving.py",
+      "sha256": "6cc21b67cffde1830231bf2bbe82a002a1dc6862be422e96909e4c5fb358a6b6",
+      "sources": [
+        {
+          "source": "third_party/robomme/unmask_reachable_motion.py",
+          "source_sha256": "49aec36c3daf10ea8a10db8c365c42898584941a756514836232dde584a6f0c8"
+        }
+      ]
+    },
+    {
+      "file": "tasks/permanence/utils/progress.py",
+      "sha256": "a69e190904b6f90a11e2cd2e45add3b55f74c6ac6deed7c8f031ab568283b464",
+      "sources": [
+        {
+          "source": "third_party/robomme/unmask_repeated_colors.py",
+          "source_sha256": "0e4b123ac007c99ee86b4a59d4de95b3c5ea92eafab1f17a2223797cdb4cd54f"
+        }
+      ]
+    },
+    {
+      "file": "tasks/permanence/utils/reachability.py",
+      "sha256": "ccec4014dd7bb7f1ed7ca60c15f431b9d9487813838825b2b59d41645bf1b2cf",
+      "sources": [
+        {
+          "source": "third_party/robomme/unmask_reachability.py",
+          "source_sha256": "f8882fbbb470799ff887cf0bc4708688de875031404b5b859c93b631603aae12"
+        }
+      ]
+    },
+    {
+      "file": "tasks/permanence/utils/routes.py",
+      "sha256": "5efd5129f016af5f7ea9e05176e7ae4741fdfe42111db8569d55be0b083b733c",
+      "sources": [
+        {
+          "source": "third_party/robomme/permanence_routes.py",
+          "source_sha256": "b450f587ad6d982f27404abd2d2c433b58b8119ca6b2512adf0aa87d052e0c2d"
+        }
+      ]
+    },
+    {
+      "file": "tasks/permanence/utils/sampling.py",
+      "sha256": "ba44409948128e56a3e2213ac8730c6fdb1394cdd9915aa498371815dc05df9f",
+      "sources": [
+        {
+          "source": "third_party/robomme/unmask_free_targets.py",
+          "source_sha256": "7432691255197b990b3427951d43025c863a81fdaef1067dd4a867449200239d"
+        }
+      ]
+    },
+    {
+      "file": "tasks/permanence/utils/support.py",
+      "sha256": "490b4ebb1848f717f1e0c48f219431ecae455fa94bf296c0b62c7a57d851678b",
+      "sources": [
+        {
+          "source": "third_party/robomme/limit_challenges.py",
+          "source_sha256": "0e193a08c2eb8a869ca5ab3c486aa3cea22a317f3e64de24532938c74b325f74"
+        }
+      ]
+    },
+    {
+      "file": "tasks/permanence/utils/tasks.py",
+      "sha256": "8d4441fc40c74fe81fff3c0b4e3dab9ada0a22e8f7de2160eb480f11b05c2d87",
+      "sources": [
+        {
+          "source": "third_party/robomme/permanence_tasks.py",
+          "source_sha256": "cbc57f3e5c7f9f6dbd3b36590a80350eff0d9d7ca70d857a365dbc3c99951dfc"
+        }
+      ]
+    },
+    {
+      "file": "tasks/permanence/utils/unmask_distractor_sampler.py",
+      "sha256": "12dc68448f1f0d457b2ccdd08c5a1b1a6e0cd2f02b5edcc1f7560a362bca73aa",
+      "sources": [
+        {
+          "source": "src/robomme_hard/robomme_env/utils/unmask_distractor_sampler.py",
+          "source_sha256": "58c3e89a689ee30ac2e4d1239ec823544c171c77440e649a2c223e0e9adbebaf"
+        }
+      ]
+    },
+    {
+      "file": "tasks/permanence/utils/unmask_distractors.py",
+      "sha256": "16bbeb0f363e721e15944f22ae1438b866e2885f43f108571db64c18eede030f",
+      "sources": [
+        {
+          "source": "src/robomme_hard/robomme_env/utils/unmask_distractors.py",
+          "source_sha256": "e21ef504ee14e807c2786edad59f4055cc4c2d51d52c9eacf6b223c6e07a86ce"
+        }
+      ]
+    },
+    {
+      "file": "tasks/permanence/utils/unmask_swap_xhard.py",
+      "sha256": "0edb78a5faaa8107197c090c8b8b0df0e1e88ca134362f4375bc12f6c266b523",
+      "sources": [
+        {
+          "source": "src/robomme_hard/robomme_env/utils/unmask_swap_xhard.py",
+          "source_sha256": "96254f3b6c70ff1ee29d384acbf96a460c6c49ea7b704daab6ad547adbf07280"
+        }
+      ]
+    },
+    {
+      "file": "tasks/permanence/utils/view.py",
+      "sha256": "94be5cf7ac1e5aabfd957bba4074cc6e72af84e72d9df91c87edcbac988e7e47",
+      "sources": [
+        {
+          "source": "third_party/robomme/unmask_forward_view.py",
+          "source_sha256": "c28fa37313c24abbd7b0c96975bea1f5e63a72c1905cfbe4ff5131785dca4a30"
+        }
+      ]
+    },
+    {
+      "file": "tasks/permanence/video_unmask.py",
+      "sha256": "e7d40432b62c49f3c94e227105b60412dec3e0779cdccac1d2eaf67ce381473e",
+      "sources": [
+        {
+          "source": "src/robomme_hard/robomme_env/VideoUnmask.py",
+          "source_sha256": "7e7280f13473b08850f2e908a9f17960da9ff932500535219260dece69bd1fd0",
+          "source_code_sha256": "61831616b6bf22d56248880e7ae3186c9ae8a8497f6010791891aeeb27a9c3cb"
+        }
+      ]
+    },
+    {
+      "file": "tasks/permanence/video_unmask_swap.py",
+      "sha256": "4aeb94d42bc687fcbe2d32cf7fbf7e12c5b478650d0ce2f5747ba9a38d160817",
+      "sources": [
+        {
+          "source": "src/robomme_hard/robomme_env/VideoUnmaskSwap.py",
+          "source_sha256": "71b1c8a0b1085fce248aa48e18e8213289806c2511ebde64a5673308e9d88031",
+          "source_code_sha256": "e5c4deda517c8d6e4ce302f9a8c5def3a8d7017e1b3925a6545242866e8077b1"
+        }
+      ]
+    },
+    {
+      "file": "tasks/reference/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sources": []
+    },
+    {
+      "file": "tasks/reference/pick_highlight.py",
+      "sha256": "928d3caa638c6be0d9186d8a49b1c3bf6055cb48da3271e170025ae20111415c",
+      "sources": [
+        {
+          "source": "src/robomme_hard/robomme_env/PickHighlight.py",
+          "source_sha256": "10362678aebac170cdd2504d12ac20f8e717382810c350609bb665f5dd4162b2",
+          "source_code_sha256": "8436f2018b975798ace17f7224572e05c17280ad9850547fd0269ecc5a7f3919"
+        }
+      ]
+    },
+    {
+      "file": "tasks/reference/utils/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sources": []
+    },
+    {
+      "file": "tasks/reference/utils/highlight_levels.py",
+      "sha256": "b0a252a9e29e99bad2f3ac856435573956695580d0d25bf21f4ad456a21793fb",
+      "sources": []
+    },
+    {
+      "file": "tasks/reference/utils/home_sites.py",
+      "sha256": "9812ab89f9fefd11b8a4574d73ee802f4b5fd8fd599e36ea669e147a410f01a0",
+      "sources": [
+        {
+          "source": "src/robomme_hard/robomme_env/utils/xhard_home_site.py",
+          "source_sha256": "382f412b78b93d3160c12ce17f85070480ae5547ff23a82cb215d8ec5cf1a89f"
+        }
+      ]
+    },
+    {
+      "file": "tasks/reference/utils/place_demonstration.py",
+      "sha256": "7f1ecfa535f4d79bc5a419e34d985103cc776a7a05687777fac3175637c4f8ae",
+      "sources": []
+    },
+    {
+      "file": "tasks/reference/utils/place_environment.py",
+      "sha256": "db4b15896277b2e71a2941657b8e57852aa46e6984940bac5fb7fd23c111ea01",
+      "sources": []
+    },
+    {
+      "file": "tasks/reference/utils/place_layout.py",
+      "sha256": "f4cbc9db77f7a2b810859281e37e15b92b58d825b6cad0087e665fc8a9114202",
+      "sources": []
+    },
+    {
+      "file": "tasks/reference/utils/place_levels.py",
+      "sha256": "a5ead861c815f261217af7805f08d2dec52e79990bc7a74edf3c0d7b765078cb",
+      "sources": []
+    },
+    {
+      "file": "tasks/reference/utils/place_projection.py",
+      "sha256": "a2e6b2d61b3991e1222a5e6c44c12e42643ade899be1def03494218b920c1d15",
+      "sources": []
+    },
+    {
+      "file": "tasks/reference/utils/place_scoring.py",
+      "sha256": "8880500deea68ffbf0e0fedddcdf4f264ef66eb41970aa3a12e75147cd69fcd1",
+      "sources": []
+    },
+    {
+      "file": "tasks/reference/utils/place_swaps.py",
+      "sha256": "8619bd752eb39727ce3c791fe9eb9556576d9d1433123a7f5f5c4bc405d5abb9",
+      "sources": []
+    },
+    {
+      "file": "tasks/reference/utils/repick_controller.py",
+      "sha256": "64d03f60b814ee58e1af46609e1ad7fc82ebf837f2fff2fff571891f570a7212",
+      "sources": [
+        {
+          "source": "third_party/robomme/limit_challenges.py",
+          "source_sha256": "d62c28fad7c5b623552f7d7734e657ebc3e49d4a6b3b0af6cfadabf9ef8bda91"
+        }
+      ]
+    },
+    {
+      "file": "tasks/reference/utils/repick_motion.py",
+      "sha256": "b6c383eaaf584e931d0563b7574906c212d12329ce6ab612e83cd835b24f3152",
+      "sources": [
+        {
+          "source": "third_party/robomme/repick_level_motion.py",
+          "source_sha256": "4e21e53382aebf0fe6c6b45c48f8002adc8909d0e78144a1e6fc75d00eaa902d"
+        }
+      ]
+    },
+    {
+      "file": "tasks/reference/utils/repick_tasks.py",
+      "sha256": "b0fda77f253f59e1923849c9b2c36f390271accc26f9fb87b148ffe57e9054b4",
+      "sources": [
+        {
+          "source": "third_party/robomme/repick_difficulty_levels.py",
+          "source_sha256": "b84b1d47fb2a0f74304d0c996212317c9b098d6994ad237b943e79f481124f51"
+        }
+      ]
+    },
+    {
+      "file": "tasks/reference/video_place_button.py",
+      "sha256": "30099dd5c792233fb1d563186fdaee25046657a8e8993f97256881d950df837c",
+      "sources": [
+        {
+          "source": "src/robomme_hard/robomme_env/VideoPlaceButton.py",
+          "source_sha256": "80577729069539da700708bc4417c8ce50a91b2b67bb5e0d2240becdea2b8f90"
+        }
+      ]
+    },
+    {
+      "file": "tasks/reference/video_place_order.py",
+      "sha256": "f93dee219e7f58095302ee65b62615846e35759ed8523fe038e300040c712f9a",
+      "sources": [
+        {
+          "source": "src/robomme_hard/robomme_env/VideoPlaceOrder.py",
+          "source_sha256": "684ea41adb8a369b98a780cdc4cde2bf2737c7abddc692978188332019e789d7"
+        }
+      ]
+    },
+    {
+      "file": "tasks/reference/video_repick.py",
+      "sha256": "8053dca31f0568028c9f9af0a914b78ba95713410ee0ab79b9bd4e793c069fb1",
+      "sources": [
+        {
+          "source": "runs/repick_levels_v3_20261014/hard/benchmark_snapshot/src/robomme_hard/robomme_env/VideoRepick.py",
+          "source_sha256": "bab01e036c583de43fd9283909cab377c72dcef4a7ff7858ad8ce1621d0b4805"
+        }
+      ]
+    }
+  ]
+}

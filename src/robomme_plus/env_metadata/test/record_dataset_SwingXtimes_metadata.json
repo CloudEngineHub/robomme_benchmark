@@ -1,0 +1,458 @@
+{
+  "schema": "robomme-ood-episodes/1",
+  "env_id": "SwingXtimes",
+  "record_count": 50,
+  "verified_by": "privileged oracle rollout",
+  "records": [
+    {
+      "task": "SwingXtimes",
+      "seed": 401767636,
+      "difficulty": "easy",
+      "oracle_policy_step": 690,
+      "suite": "counting",
+      "episode": 0,
+      "oracle_wall_seconds": 9.212
+    },
+    {
+      "task": "SwingXtimes",
+      "seed": 66298810,
+      "difficulty": "easy",
+      "oracle_policy_step": 713,
+      "suite": "counting",
+      "episode": 1,
+      "oracle_wall_seconds": 23.632
+    },
+    {
+      "task": "SwingXtimes",
+      "seed": 85282953,
+      "difficulty": "easy",
+      "oracle_policy_step": 584,
+      "suite": "counting",
+      "episode": 2,
+      "oracle_wall_seconds": 22.117
+    },
+    {
+      "task": "SwingXtimes",
+      "seed": 258907430,
+      "difficulty": "easy",
+      "oracle_policy_step": 574,
+      "suite": "counting",
+      "episode": 3,
+      "oracle_wall_seconds": 19.935
+    },
+    {
+      "task": "SwingXtimes",
+      "seed": 779058694,
+      "difficulty": "easy",
+      "oracle_policy_step": 752,
+      "suite": "counting",
+      "episode": 4,
+      "oracle_wall_seconds": 24.228
+    },
+    {
+      "task": "SwingXtimes",
+      "seed": 1005078117,
+      "difficulty": "easy",
+      "oracle_policy_step": 637,
+      "suite": "counting",
+      "episode": 5,
+      "oracle_wall_seconds": 24.164
+    },
+    {
+      "task": "SwingXtimes",
+      "seed": 179172107,
+      "difficulty": "easy",
+      "oracle_policy_step": 713,
+      "suite": "counting",
+      "episode": 6,
+      "oracle_wall_seconds": 26.613
+    },
+    {
+      "task": "SwingXtimes",
+      "seed": 61015722,
+      "difficulty": "easy",
+      "oracle_policy_step": 621,
+      "suite": "counting",
+      "episode": 7,
+      "oracle_wall_seconds": 22.549
+    },
+    {
+      "task": "SwingXtimes",
+      "seed": 581916487,
+      "difficulty": "easy",
+      "oracle_policy_step": 530,
+      "suite": "counting",
+      "episode": 8,
+      "oracle_wall_seconds": 19.087
+    },
+    {
+      "task": "SwingXtimes",
+      "seed": 533294049,
+      "difficulty": "easy",
+      "oracle_policy_step": 552,
+      "suite": "counting",
+      "episode": 9,
+      "oracle_wall_seconds": 20.358
+    },
+    {
+      "task": "SwingXtimes",
+      "seed": 232622382,
+      "difficulty": "medium",
+      "oracle_policy_step": 724,
+      "suite": "counting",
+      "episode": 10,
+      "oracle_wall_seconds": 26.629
+    },
+    {
+      "task": "SwingXtimes",
+      "seed": 22711883,
+      "difficulty": "medium",
+      "oracle_policy_step": 536,
+      "suite": "counting",
+      "episode": 11,
+      "oracle_wall_seconds": 17.057
+    },
+    {
+      "task": "SwingXtimes",
+      "seed": 565711099,
+      "difficulty": "medium",
+      "oracle_policy_step": 551,
+      "suite": "counting",
+      "episode": 12,
+      "oracle_wall_seconds": 15.849
+    },
+    {
+      "task": "SwingXtimes",
+      "seed": 59144891,
+      "difficulty": "medium",
+      "oracle_policy_step": 620,
+      "suite": "counting",
+      "episode": 13,
+      "oracle_wall_seconds": 23.091
+    },
+    {
+      "task": "SwingXtimes",
+      "seed": 69256104,
+      "difficulty": "medium",
+      "oracle_policy_step": 632,
+      "suite": "counting",
+      "episode": 14,
+      "oracle_wall_seconds": 22.159
+    },
+    {
+      "task": "SwingXtimes",
+      "seed": 146294917,
+      "difficulty": "medium",
+      "oracle_policy_step": 628,
+      "suite": "counting",
+      "episode": 15,
+      "oracle_wall_seconds": 26.346
+    },
+    {
+      "task": "SwingXtimes",
+      "seed": 173195190,
+      "difficulty": "medium",
+      "oracle_policy_step": 626,
+      "suite": "counting",
+      "episode": 16,
+      "oracle_wall_seconds": 21.988
+    },
+    {
+      "task": "SwingXtimes",
+      "seed": 9325806,
+      "difficulty": "medium",
+      "oracle_policy_step": 823,
+      "suite": "counting",
+      "episode": 17,
+      "oracle_wall_seconds": 26.443
+    },
+    {
+      "task": "SwingXtimes",
+      "seed": 558673055,
+      "difficulty": "medium",
+      "oracle_policy_step": 714,
+      "suite": "counting",
+      "episode": 18,
+      "oracle_wall_seconds": 23.356
+    },
+    {
+      "task": "SwingXtimes",
+      "seed": 27089387,
+      "difficulty": "medium",
+      "oracle_policy_step": 614,
+      "suite": "counting",
+      "episode": 19,
+      "oracle_wall_seconds": 21.354
+    },
+    {
+      "task": "SwingXtimes",
+      "seed": 560351906,
+      "difficulty": "medium",
+      "oracle_policy_step": 724,
+      "suite": "counting",
+      "episode": 20,
+      "oracle_wall_seconds": 26.087
+    },
+    {
+      "task": "SwingXtimes",
+      "seed": 1016416834,
+      "difficulty": "medium",
+      "oracle_policy_step": 728,
+      "suite": "counting",
+      "episode": 21,
+      "oracle_wall_seconds": 24.526
+    },
+    {
+      "task": "SwingXtimes",
+      "seed": 585646466,
+      "difficulty": "medium",
+      "oracle_policy_step": 604,
+      "suite": "counting",
+      "episode": 22,
+      "oracle_wall_seconds": 20.008
+    },
+    {
+      "task": "SwingXtimes",
+      "seed": 426215464,
+      "difficulty": "medium",
+      "oracle_policy_step": 737,
+      "suite": "counting",
+      "episode": 23,
+      "oracle_wall_seconds": 27.403
+    },
+    {
+      "task": "SwingXtimes",
+      "seed": 200239973,
+      "difficulty": "medium",
+      "oracle_policy_step": 637,
+      "suite": "counting",
+      "episode": 24,
+      "oracle_wall_seconds": 22.539
+    },
+    {
+      "task": "SwingXtimes",
+      "seed": 945386648,
+      "difficulty": "hard",
+      "oracle_policy_step": 1223,
+      "suite": "counting",
+      "episode": 25,
+      "oracle_wall_seconds": 43.165
+    },
+    {
+      "task": "SwingXtimes",
+      "seed": 808984548,
+      "difficulty": "hard",
+      "oracle_policy_step": 713,
+      "suite": "counting",
+      "episode": 26,
+      "oracle_wall_seconds": 22.488
+    },
+    {
+      "task": "SwingXtimes",
+      "seed": 163648012,
+      "difficulty": "hard",
+      "oracle_policy_step": 1287,
+      "suite": "counting",
+      "episode": 27,
+      "oracle_wall_seconds": 41.952
+    },
+    {
+      "task": "SwingXtimes",
+      "seed": 891215992,
+      "difficulty": "hard",
+      "oracle_policy_step": 1176,
+      "suite": "counting",
+      "episode": 28,
+      "oracle_wall_seconds": 40.469
+    },
+    {
+      "task": "SwingXtimes",
+      "seed": 410231661,
+      "difficulty": "hard",
+      "oracle_policy_step": 1066,
+      "suite": "counting",
+      "episode": 29,
+      "oracle_wall_seconds": 36.013
+    },
+    {
+      "task": "SwingXtimes",
+      "seed": 1018643208,
+      "difficulty": "hard",
+      "oracle_policy_step": 922,
+      "suite": "counting",
+      "episode": 30,
+      "oracle_wall_seconds": 30.673
+    },
+    {
+      "task": "SwingXtimes",
+      "seed": 631018680,
+      "difficulty": "hard",
+      "oracle_policy_step": 1243,
+      "suite": "counting",
+      "episode": 31,
+      "oracle_wall_seconds": 38.548
+    },
+    {
+      "task": "SwingXtimes",
+      "seed": 624812369,
+      "difficulty": "hard",
+      "oracle_policy_step": 1055,
+      "suite": "counting",
+      "episode": 32,
+      "oracle_wall_seconds": 32.693
+    },
+    {
+      "task": "SwingXtimes",
+      "seed": 725487899,
+      "difficulty": "hard",
+      "oracle_policy_step": 852,
+      "suite": "counting",
+      "episode": 33,
+      "oracle_wall_seconds": 26.638
+    },
+    {
+      "task": "SwingXtimes",
+      "seed": 659089800,
+      "difficulty": "hard",
+      "oracle_policy_step": 1076,
+      "suite": "counting",
+      "episode": 34,
+      "oracle_wall_seconds": 34.377
+    },
+    {
+      "task": "SwingXtimes",
+      "seed": 95039228,
+      "difficulty": "hard",
+      "oracle_policy_step": 1227,
+      "suite": "counting",
+      "episode": 35,
+      "oracle_wall_seconds": 38.617
+    },
+    {
+      "task": "SwingXtimes",
+      "seed": 736507232,
+      "difficulty": "hard",
+      "oracle_policy_step": 989,
+      "suite": "counting",
+      "episode": 36,
+      "oracle_wall_seconds": 33.579
+    },
+    {
+      "task": "SwingXtimes",
+      "seed": 736873478,
+      "difficulty": "hard",
+      "oracle_policy_step": 1176,
+      "suite": "counting",
+      "episode": 37,
+      "oracle_wall_seconds": 37.221
+    },
+    {
+      "task": "SwingXtimes",
+      "seed": 638293691,
+      "difficulty": "hard",
+      "oracle_policy_step": 1269,
+      "suite": "counting",
+      "episode": 38,
+      "oracle_wall_seconds": 38.108
+    },
+    {
+      "task": "SwingXtimes",
+      "seed": 1007957781,
+      "difficulty": "hard",
+      "oracle_policy_step": 886,
+      "suite": "counting",
+      "episode": 39,
+      "oracle_wall_seconds": 27.16
+    },
+    {
+      "task": "SwingXtimes",
+      "seed": 696311443,
+      "difficulty": "hard",
+      "oracle_policy_step": 1103,
+      "suite": "counting",
+      "episode": 40,
+      "oracle_wall_seconds": 33.949
+    },
+    {
+      "task": "SwingXtimes",
+      "seed": 669721148,
+      "difficulty": "hard",
+      "oracle_policy_step": 816,
+      "suite": "counting",
+      "episode": 41,
+      "oracle_wall_seconds": 22.243
+    },
+    {
+      "task": "SwingXtimes",
+      "seed": 68700977,
+      "difficulty": "hard",
+      "oracle_policy_step": 1008,
+      "suite": "counting",
+      "episode": 42,
+      "oracle_wall_seconds": 26.187
+    },
+    {
+      "task": "SwingXtimes",
+      "seed": 981415642,
+      "difficulty": "hard",
+      "oracle_policy_step": 953,
+      "suite": "counting",
+      "episode": 43,
+      "oracle_wall_seconds": 25.482
+    },
+    {
+      "task": "SwingXtimes",
+      "seed": 674514616,
+      "difficulty": "hard",
+      "oracle_policy_step": 1084,
+      "suite": "counting",
+      "episode": 44,
+      "oracle_wall_seconds": 35.206
+    },
+    {
+      "task": "SwingXtimes",
+      "seed": 554860879,
+      "difficulty": "hard",
+      "oracle_policy_step": 937,
+      "suite": "counting",
+      "episode": 45,
+      "oracle_wall_seconds": 31.334
+    },
+    {
+      "task": "SwingXtimes",
+      "seed": 147790813,
+      "difficulty": "hard",
+      "oracle_policy_step": 882,
+      "suite": "counting",
+      "episode": 46,
+      "oracle_wall_seconds": 24.312
+    },
+    {
+      "task": "SwingXtimes",
+      "seed": 357942065,
+      "difficulty": "hard",
+      "oracle_policy_step": 1022,
+      "suite": "counting",
+      "episode": 47,
+      "oracle_wall_seconds": 26.796
+    },
+    {
+      "task": "SwingXtimes",
+      "seed": 430799318,
+      "difficulty": "hard",
+      "oracle_policy_step": 1010,
+      "suite": "counting",
+      "episode": 48,
+      "oracle_wall_seconds": 32.272
+    },
+    {
+      "task": "SwingXtimes",
+      "seed": 732413775,
+      "difficulty": "hard",
+      "oracle_policy_step": 725,
+      "suite": "counting",
+      "episode": 49,
+      "oracle_wall_seconds": 14.175
+    }
+  ]
+}

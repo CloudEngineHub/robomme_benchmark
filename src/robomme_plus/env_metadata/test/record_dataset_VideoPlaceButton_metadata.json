@@ -1,0 +1,458 @@
+{
+  "schema": "robomme-ood-episodes/1",
+  "env_id": "VideoPlaceButton",
+  "record_count": 50,
+  "verified_by": "privileged oracle rollout",
+  "records": [
+    {
+      "task": "VideoPlaceButton",
+      "seed": 610143360,
+      "difficulty": "easy",
+      "oracle_policy_step": 167,
+      "suite": "reference",
+      "episode": 0,
+      "oracle_wall_seconds": 41.999
+    },
+    {
+      "task": "VideoPlaceButton",
+      "seed": 276128242,
+      "difficulty": "easy",
+      "oracle_policy_step": 219,
+      "suite": "reference",
+      "episode": 1,
+      "oracle_wall_seconds": 50.403
+    },
+    {
+      "task": "VideoPlaceButton",
+      "seed": 999064043,
+      "difficulty": "easy",
+      "oracle_policy_step": 186,
+      "suite": "reference",
+      "episode": 2,
+      "oracle_wall_seconds": 51.174
+    },
+    {
+      "task": "VideoPlaceButton",
+      "seed": 641719621,
+      "difficulty": "easy",
+      "oracle_policy_step": 178,
+      "suite": "reference",
+      "episode": 3,
+      "oracle_wall_seconds": 43.479
+    },
+    {
+      "task": "VideoPlaceButton",
+      "seed": 847676544,
+      "difficulty": "easy",
+      "oracle_policy_step": 203,
+      "suite": "reference",
+      "episode": 4,
+      "oracle_wall_seconds": 47.037
+    },
+    {
+      "task": "VideoPlaceButton",
+      "seed": 89213082,
+      "difficulty": "easy",
+      "oracle_policy_step": 239,
+      "suite": "reference",
+      "episode": 5,
+      "oracle_wall_seconds": 47.413
+    },
+    {
+      "task": "VideoPlaceButton",
+      "seed": 238499407,
+      "difficulty": "easy",
+      "oracle_policy_step": 183,
+      "suite": "reference",
+      "episode": 6,
+      "oracle_wall_seconds": 50.591
+    },
+    {
+      "task": "VideoPlaceButton",
+      "seed": 203339824,
+      "difficulty": "easy",
+      "oracle_policy_step": 158,
+      "suite": "reference",
+      "episode": 7,
+      "oracle_wall_seconds": 36.238
+    },
+    {
+      "task": "VideoPlaceButton",
+      "seed": 199297098,
+      "difficulty": "easy",
+      "oracle_policy_step": 177,
+      "suite": "reference",
+      "episode": 8,
+      "oracle_wall_seconds": 49.725
+    },
+    {
+      "task": "VideoPlaceButton",
+      "seed": 45642563,
+      "difficulty": "easy",
+      "oracle_policy_step": 170,
+      "suite": "reference",
+      "episode": 9,
+      "oracle_wall_seconds": 54.755
+    },
+    {
+      "task": "VideoPlaceButton",
+      "seed": 1026346409,
+      "difficulty": "medium",
+      "oracle_policy_step": 191,
+      "suite": "reference",
+      "episode": 10,
+      "oracle_wall_seconds": 48.195
+    },
+    {
+      "task": "VideoPlaceButton",
+      "seed": 1020066983,
+      "difficulty": "medium",
+      "oracle_policy_step": 171,
+      "suite": "reference",
+      "episode": 11,
+      "oracle_wall_seconds": 38.274
+    },
+    {
+      "task": "VideoPlaceButton",
+      "seed": 520306619,
+      "difficulty": "medium",
+      "oracle_policy_step": 187,
+      "suite": "reference",
+      "episode": 12,
+      "oracle_wall_seconds": 40.758
+    },
+    {
+      "task": "VideoPlaceButton",
+      "seed": 862623141,
+      "difficulty": "medium",
+      "oracle_policy_step": 221,
+      "suite": "reference",
+      "episode": 13,
+      "oracle_wall_seconds": 32.528
+    },
+    {
+      "task": "VideoPlaceButton",
+      "seed": 660008596,
+      "difficulty": "medium",
+      "oracle_policy_step": 178,
+      "suite": "reference",
+      "episode": 14,
+      "oracle_wall_seconds": 31.565
+    },
+    {
+      "task": "VideoPlaceButton",
+      "seed": 821198432,
+      "difficulty": "medium",
+      "oracle_policy_step": 227,
+      "suite": "reference",
+      "episode": 15,
+      "oracle_wall_seconds": 41.655
+    },
+    {
+      "task": "VideoPlaceButton",
+      "seed": 443784790,
+      "difficulty": "medium",
+      "oracle_policy_step": 172,
+      "suite": "reference",
+      "episode": 16,
+      "oracle_wall_seconds": 36.012
+    },
+    {
+      "task": "VideoPlaceButton",
+      "seed": 1032914459,
+      "difficulty": "medium",
+      "oracle_policy_step": 188,
+      "suite": "reference",
+      "episode": 17,
+      "oracle_wall_seconds": 55.025
+    },
+    {
+      "task": "VideoPlaceButton",
+      "seed": 805436555,
+      "difficulty": "medium",
+      "oracle_policy_step": 187,
+      "suite": "reference",
+      "episode": 18,
+      "oracle_wall_seconds": 42.041
+    },
+    {
+      "task": "VideoPlaceButton",
+      "seed": 532111792,
+      "difficulty": "medium",
+      "oracle_policy_step": 212,
+      "suite": "reference",
+      "episode": 19,
+      "oracle_wall_seconds": 49.384
+    },
+    {
+      "task": "VideoPlaceButton",
+      "seed": 742277104,
+      "difficulty": "medium",
+      "oracle_policy_step": 197,
+      "suite": "reference",
+      "episode": 20,
+      "oracle_wall_seconds": 43.001
+    },
+    {
+      "task": "VideoPlaceButton",
+      "seed": 237365215,
+      "difficulty": "medium",
+      "oracle_policy_step": 167,
+      "suite": "reference",
+      "episode": 21,
+      "oracle_wall_seconds": 41.39
+    },
+    {
+      "task": "VideoPlaceButton",
+      "seed": 772525794,
+      "difficulty": "medium",
+      "oracle_policy_step": 180,
+      "suite": "reference",
+      "episode": 22,
+      "oracle_wall_seconds": 56.192
+    },
+    {
+      "task": "VideoPlaceButton",
+      "seed": 16859110,
+      "difficulty": "medium",
+      "oracle_policy_step": 199,
+      "suite": "reference",
+      "episode": 23,
+      "oracle_wall_seconds": 43.74
+    },
+    {
+      "task": "VideoPlaceButton",
+      "seed": 588722235,
+      "difficulty": "medium",
+      "oracle_policy_step": 165,
+      "suite": "reference",
+      "episode": 24,
+      "oracle_wall_seconds": 42.771
+    },
+    {
+      "task": "VideoPlaceButton",
+      "seed": 1046090021,
+      "difficulty": "hard",
+      "oracle_policy_step": 208,
+      "suite": "reference",
+      "episode": 25,
+      "oracle_wall_seconds": 80.153
+    },
+    {
+      "task": "VideoPlaceButton",
+      "seed": 789700124,
+      "difficulty": "hard",
+      "oracle_policy_step": 223,
+      "suite": "reference",
+      "episode": 26,
+      "oracle_wall_seconds": 77.972
+    },
+    {
+      "task": "VideoPlaceButton",
+      "seed": 490737474,
+      "difficulty": "hard",
+      "oracle_policy_step": 160,
+      "suite": "reference",
+      "episode": 27,
+      "oracle_wall_seconds": 94.091
+    },
+    {
+      "task": "VideoPlaceButton",
+      "seed": 292757942,
+      "difficulty": "hard",
+      "oracle_policy_step": 180,
+      "suite": "reference",
+      "episode": 28,
+      "oracle_wall_seconds": 82.122
+    },
+    {
+      "task": "VideoPlaceButton",
+      "seed": 350606222,
+      "difficulty": "hard",
+      "oracle_policy_step": 172,
+      "suite": "reference",
+      "episode": 29,
+      "oracle_wall_seconds": 98.051
+    },
+    {
+      "task": "VideoPlaceButton",
+      "seed": 605836951,
+      "difficulty": "hard",
+      "oracle_policy_step": 149,
+      "suite": "reference",
+      "episode": 30,
+      "oracle_wall_seconds": 75.751
+    },
+    {
+      "task": "VideoPlaceButton",
+      "seed": 1068601111,
+      "difficulty": "hard",
+      "oracle_policy_step": 175,
+      "suite": "reference",
+      "episode": 31,
+      "oracle_wall_seconds": 78.486
+    },
+    {
+      "task": "VideoPlaceButton",
+      "seed": 204257081,
+      "difficulty": "hard",
+      "oracle_policy_step": 202,
+      "suite": "reference",
+      "episode": 32,
+      "oracle_wall_seconds": 96.438
+    },
+    {
+      "task": "VideoPlaceButton",
+      "seed": 465425837,
+      "difficulty": "hard",
+      "oracle_policy_step": 164,
+      "suite": "reference",
+      "episode": 33,
+      "oracle_wall_seconds": 81.22
+    },
+    {
+      "task": "VideoPlaceButton",
+      "seed": 328529746,
+      "difficulty": "hard",
+      "oracle_policy_step": 208,
+      "suite": "reference",
+      "episode": 34,
+      "oracle_wall_seconds": 129.292
+    },
+    {
+      "task": "VideoPlaceButton",
+      "seed": 814698520,
+      "difficulty": "hard",
+      "oracle_policy_step": 212,
+      "suite": "reference",
+      "episode": 35,
+      "oracle_wall_seconds": 77.524
+    },
+    {
+      "task": "VideoPlaceButton",
+      "seed": 96029303,
+      "difficulty": "hard",
+      "oracle_policy_step": 188,
+      "suite": "reference",
+      "episode": 36,
+      "oracle_wall_seconds": 80.598
+    },
+    {
+      "task": "VideoPlaceButton",
+      "seed": 338861003,
+      "difficulty": "hard",
+      "oracle_policy_step": 215,
+      "suite": "reference",
+      "episode": 37,
+      "oracle_wall_seconds": 80.064
+    },
+    {
+      "task": "VideoPlaceButton",
+      "seed": 87362300,
+      "difficulty": "hard",
+      "oracle_policy_step": 187,
+      "suite": "reference",
+      "episode": 38,
+      "oracle_wall_seconds": 90.842
+    },
+    {
+      "task": "VideoPlaceButton",
+      "seed": 29584799,
+      "difficulty": "hard",
+      "oracle_policy_step": 194,
+      "suite": "reference",
+      "episode": 39,
+      "oracle_wall_seconds": 92.85
+    },
+    {
+      "task": "VideoPlaceButton",
+      "seed": 379534825,
+      "difficulty": "hard",
+      "oracle_policy_step": 221,
+      "suite": "reference",
+      "episode": 40,
+      "oracle_wall_seconds": 72.855
+    },
+    {
+      "task": "VideoPlaceButton",
+      "seed": 12589798,
+      "difficulty": "hard",
+      "oracle_policy_step": 193,
+      "suite": "reference",
+      "episode": 41,
+      "oracle_wall_seconds": 64.336
+    },
+    {
+      "task": "VideoPlaceButton",
+      "seed": 100276674,
+      "difficulty": "hard",
+      "oracle_policy_step": 188,
+      "suite": "reference",
+      "episode": 42,
+      "oracle_wall_seconds": 70.114
+    },
+    {
+      "task": "VideoPlaceButton",
+      "seed": 998609493,
+      "difficulty": "hard",
+      "oracle_policy_step": 200,
+      "suite": "reference",
+      "episode": 43,
+      "oracle_wall_seconds": 92.211
+    },
+    {
+      "task": "VideoPlaceButton",
+      "seed": 966574328,
+      "difficulty": "hard",
+      "oracle_policy_step": 169,
+      "suite": "reference",
+      "episode": 44,
+      "oracle_wall_seconds": 79.387
+    },
+    {
+      "task": "VideoPlaceButton",
+      "seed": 239200568,
+      "difficulty": "hard",
+      "oracle_policy_step": 182,
+      "suite": "reference",
+      "episode": 45,
+      "oracle_wall_seconds": 92.74
+    },
+    {
+      "task": "VideoPlaceButton",
+      "seed": 522129066,
+      "difficulty": "hard",
+      "oracle_policy_step": 197,
+      "suite": "reference",
+      "episode": 46,
+      "oracle_wall_seconds": 79.435
+    },
+    {
+      "task": "VideoPlaceButton",
+      "seed": 60538861,
+      "difficulty": "hard",
+      "oracle_policy_step": 179,
+      "suite": "reference",
+      "episode": 47,
+      "oracle_wall_seconds": 66.021
+    },
+    {
+      "task": "VideoPlaceButton",
+      "seed": 633477400,
+      "difficulty": "hard",
+      "oracle_policy_step": 172,
+      "suite": "reference",
+      "episode": 48,
+      "oracle_wall_seconds": 58.69
+    },
+    {
+      "task": "VideoPlaceButton",
+      "seed": 116308099,
+      "difficulty": "hard",
+      "oracle_policy_step": 168,
+      "suite": "reference",
+      "episode": 49,
+      "oracle_wall_seconds": 37.522
+    }
+  ]
+}

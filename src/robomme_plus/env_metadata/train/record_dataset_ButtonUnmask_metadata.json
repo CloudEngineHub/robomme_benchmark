@@ -1,0 +1,38 @@
+{
+  "schema": "robomme-ood-episodes/1",
+  "env_id": "ButtonUnmask",
+  "record_count": 3,
+  "verified_by": "privileged oracle rollout",
+  "records": [
+    {
+      "task": "ButtonUnmask",
+      "seed": 1567058032,
+      "difficulty": "easy",
+      "oracle_policy_step": 598,
+      "suite": "permanence",
+      "episode": 0,
+      "control_freq": 20,
+      "oracle_wall_seconds": 104.517
+    },
+    {
+      "task": "ButtonUnmask",
+      "seed": 2043653783,
+      "difficulty": "medium",
+      "oracle_policy_step": 981,
+      "suite": "permanence",
+      "episode": 1,
+      "control_freq": 20,
+      "oracle_wall_seconds": 106.965
+    },
+    {
+      "task": "ButtonUnmask",
+      "seed": 1878721550,
+      "difficulty": "hard",
+      "oracle_policy_step": 575,
+      "suite": "permanence",
+      "episode": 2,
+      "control_freq": 20,
+      "oracle_wall_seconds": 65.781
+    }
+  ]
+}
